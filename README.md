@@ -207,36 +207,39 @@ Done! Your tablet is now in kiosk mode.
 
 ## 🗺️ Roadmap
 
-### ✅ v1.0.1 (Current - Oct 2025)
-- ✅ Optional screen pinning toggle
-- ✅ HTTPS self-signed certificate support
-- ✅ Default OFF mode (user choice)
-- ✅ In-app reset settings
-- ✅ English language UI
-- ✅ Improved Device Owner integration
+### ✅ v1.0.2 (Current - Nov 2025)
+- ✅ Configuration access button on main screen
+- ✅ HTTPS self-signed certificate security prompt
+- ✅ Clear trusted certificates in reset settings
+- ✅ Improved Play Store compliance for SSL
 
-### v1.1.0 (Q4 2025)
-- [ ] Multi-language support (FR, DE, ES)
-- [ ] Dark mode
-- [ ] Multiple URL rotation
-- [ ] Scheduled URL changes
-- [ ] Motion detection (camera wake-up)
-- [ ] Auto-brightness scheduling
-- [ ] Offline mode
+### ✅ v1.0.1 (Oct 2025)
+- ✅ Initial public release
+- ✅ Full kiosk mode with Device Owner support
+- ✅ Optional screen pinning toggle (ON/OFF in settings)
+- ✅ WebView display for any URL
+- ✅ HTTPS self-signed certificate support
+- ✅ PIN code protection (4-6 digits configurable)
+- ✅ Reset settings button
+- ✅ Auto-start on device boot
+- ✅ Samsung popup blocking (Device Owner mode)
+- ✅ Immersive fullscreen mode
+- ✅ Lock task mode support
+- ✅ System apps suspension (Device Owner mode)
+- ✅ English language UI
 
 ### v1.2.0 (Q1 2026)
-- [ ] Remote configuration (Firebase)
-- [ ] Basic analytics (device status)
-- [ ] URL favorites list
-- [ ] Custom timeout settings
-- [ ] Battery monitoring alerts
+- [ ] Multi-language support (French, Spanish, German)
+- [ ] Multiple URL rotation
+- [ ] Scheduled URL changes
+- [ ] Motion detection via camera
+- [ ] Auto-brightness scheduling
 
 ### v2.0.0 (Q2 2026)
 - [ ] **FreeKiosk Cloud** (MDM Dashboard)
 - [ ] Multi-device management
-- [ ] Remote commands
-- [ ] Fleet monitoring
-- [ ] Advanced analytics
+- [ ] Remote device configuration
+- [ ] Analytics and monitoring
 
 ---
 

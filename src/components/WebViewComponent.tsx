@@ -5,22 +5,29 @@ import {
   ActivityIndicator, 
   Text, 
   TouchableOpacity,
-  Animated
+  Animated,
+  Image,
+  ScrollView
 } from 'react-native';
+
 import { WebView } from 'react-native-webview';
 import type { WebViewErrorEvent, ShouldStartLoadRequest } from 'react-native-webview/lib/WebViewTypes';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/AppNavigator';
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 interface WebViewComponentProps {
   url: string;
   autoReload: boolean;
-  onNavigateToSettings?: () => void;
 }
 
 const WebViewComponent: React.FC<WebViewComponentProps> = ({ 
   url, 
-  autoReload,
-  onNavigateToSettings 
+  autoReload
 }) => {
+  const navigation = useNavigation<NavigationProp>();
   const webViewRef = useRef<WebView>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<boolean>(false);
@@ -82,70 +89,81 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
     webViewRef.current?.reload();
   };
 
+  const handleNavigateToSettings = (): void => {
+    navigation.navigate('Pin');
+  };
+
   if (!url) {
     return (
       <View style={styles.welcomeContainer}>
-        <Animated.View style={[styles.welcomeContent, { opacity: fadeAnim }]}>
-          
-          {/* Logo / Icon */}
-          <View style={styles.logoContainer}>
-            <View style={styles.logoCircle}>
-              <Text style={styles.logoIcon}>📱</Text>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View style={[styles.welcomeContent, { opacity: fadeAnim }]}>
+            
+            {/* Logo / Icon */}
+            <View style={styles.logoContainer}>
+              <View style={styles.logoCircle}>
+                <Image 
+                  source={require('../assets/images/logo_circle.png')} 
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
+              </View>
             </View>
-          </View>
 
-          {/* Title */}
-          <Text style={styles.welcomeTitle}>FreeKiosk</Text>
-          <Text style={styles.welcomeSubtitle}>
-            Professional Kiosk Application
-          </Text>
+            {/* Title */}
+            <Text style={styles.welcomeTitle}>FreeKiosk</Text>
+            <Text style={styles.welcomeSubtitle}>
+              Professional Kiosk Application
+            </Text>
 
-          {/* Features List */}
-          <View style={styles.featuresList}>
-            <FeatureItem 
-              icon="🔒" 
-              text="Secure kiosk mode" 
-            />
-            <FeatureItem 
-              icon="🌐" 
-              text="Full HTTPS support" 
-            />
-            <FeatureItem 
-              icon="⚡" 
-              text="Optimal performance" 
-            />
-            <FeatureItem 
-              icon="🎯" 
-              text="100% free & open source" 
-            />
-          </View>
+            {/* Features List */}
+            <View style={styles.featuresList}>
+              <FeatureItem 
+                icon="🔒" 
+                text="Secure kiosk mode" 
+              />
+              <FeatureItem 
+                icon="🌐" 
+                text="Full HTTPS support" 
+              />
+              <FeatureItem 
+                icon="⚡" 
+                text="Optimal performance" 
+              />
+              <FeatureItem 
+                icon="🎯" 
+                text="100% free & open source" 
+              />
+            </View>
 
-          {/* Action Button */}
-          {onNavigateToSettings && (
+            {/* Action Button */}
             <TouchableOpacity 
               style={styles.setupButton}
-              onPress={onNavigateToSettings}
+              onPress={handleNavigateToSettings}
               activeOpacity={0.8}
             >
               <Text style={styles.setupButtonText}>
                 🚀 Start Configuration
               </Text>
             </TouchableOpacity>
-          )}
 
-          {/* Hint */}
-          <View style={styles.hintContainer}>
-            <Text style={styles.hintText}>
-              💡 Tip: Tap 5× in the bottom right corner to access settings
+            {/* Hint */}
+            <View style={styles.hintContainer}>
+              <Text style={styles.hintText}>
+                💡 Tip: Tap 5× in the bottom right corner to access settings
+              </Text>
+            </View>
+
+            {/* Footer */}
+            <Text style={styles.footerText}>
+              Version 1.0.2 • by Rushb
             </Text>
-          </View>
 
-          {/* Footer */}
-          <Text style={styles.footerText}>
-            Version 1.0.1 • by Rushb
-          </Text>
-
-        </Animated.View>
+          </Animated.View>
+        </ScrollView>
       </View>
     );
   }
@@ -246,13 +264,17 @@ const styles = StyleSheet.create({
   welcomeContainer: {
     flex: 1,
     backgroundColor: '#0066cc',
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
+    paddingVertical: 24,
+    paddingHorizontal: 24,
   },
   welcomeContent: {
     width: '100%',
     maxWidth: 500,
+    alignSelf: 'center',
     alignItems: 'center',
   },
   logoContainer: {
@@ -268,8 +290,10 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: 'rgba(255, 255, 255, 0.4)',
   },
-  logoIcon: {
-    fontSize: 60,
+  logoImage: {
+    width: 80,
+    height: 80,
+    tintColor: undefined,
   },
   welcomeTitle: {
     fontSize: 42,

@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Switch,
   ScrollView,
+  NativeModules,
   Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -15,6 +16,7 @@ import KioskModule from '../utils/KioskModule';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
+const { CertificateModule } = NativeModules;
 type SettingsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Settings'>;
 
 interface SettingsScreenProps {
@@ -36,7 +38,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedPin = await StorageService.getPin();
     const savedAutoReload = await StorageService.getAutoReload();
     const savedKioskEnabled = await StorageService.getKioskEnabled();
-    
+
     if (savedUrl) setUrl(savedUrl);
     if (savedPin) setPin(savedPin);
     setAutoReload(savedAutoReload);
@@ -86,7 +88,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const handleResetSettings = async (): Promise<void> => {
     Alert.alert(
       'Reset Settings',
-      'This will erase all settings (URL, PIN, preferences) and restart the app with default values.\n\nContinue?',
+      'This will erase all settings (URL, PIN, preferences, SSL certificates) and restart the app with default values.\n\nContinue?',
       [
         {
           text: 'Cancel',
@@ -99,20 +101,22 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
             try {
               // Clear AsyncStorage
               await AsyncStorage.clear();
-              
+              console.log('AsyncStorage cleared');
+              await CertificateModule.clearAcceptedCertificates();
+             
               // Réinitialiser les states
               setUrl('');
               setPin('');
               setAutoReload(false);
               setKioskEnabled(false);
-              
+
               // Arrêter Lock Task si actif
               try {
                 await KioskModule.stopLockTask();
               } catch (e) {
                 console.log('Not in lock task');
               }
-              
+
               Alert.alert('Success', 'Settings reset successfully!\nPlease configure the app again.', [
                 { text: 'OK', onPress: () => navigation.navigate('Kiosk') },
               ]);
@@ -191,7 +195,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
         {/* Screen Pinning Toggle */}
         <View style={styles.section}>
           <View style={styles.switchRow}>
-            <View style={{flex: 1}}>
+            <View style={{ flex: 1 }}>
               <Text style={styles.label}>📌 Pin App to Screen</Text>
               <Text style={styles.hint}>
                 Lock app in kiosk mode (requires Device Owner){'\n'}
@@ -206,7 +210,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
               thumbColor={kioskEnabled ? '#0066cc' : '#f4f3f4'}
             />
           </View>
-          
+
           {!kioskEnabled && (
             <View style={styles.warningBox}>
               <Text style={styles.warningText}>
@@ -226,7 +230,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
 
         <View style={styles.section}>
           <View style={styles.switchRow}>
-            <View style={{flex: 1}}>
+            <View style={{ flex: 1 }}>
               <Text style={styles.label}>🔄 Automatic Reload</Text>
               <Text style={styles.hint}>
                 Automatically reload the page on error
@@ -252,7 +256,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
           <Text style={styles.cancelButtonText}>↩️ Back to Kiosk</Text>
         </TouchableOpacity>
 
-        
+
         <TouchableOpacity
           style={styles.resetButton}
           onPress={handleResetSettings}
