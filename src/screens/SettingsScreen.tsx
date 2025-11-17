@@ -4,19 +4,19 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
   Switch,
   ScrollView,
   NativeModules,
+  StyleSheet,
   Alert,
+  Linking,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StorageService } from '../utils/storage';
-import KioskModule from '../utils/KioskModule';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
-const { CertificateModule } = NativeModules;
+const { KioskModule, CertificateModule } = NativeModules;
+
 type SettingsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Settings'>;
 
 interface SettingsScreenProps {
@@ -28,6 +28,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [pin, setPin] = useState<string>('');
   const [autoReload, setAutoReload] = useState<boolean>(false);
   const [kioskEnabled, setKioskEnabled] = useState<boolean>(false);
+  const [autoLaunchEnabled, setAutoLaunchEnabled] = useState<boolean>(false);
 
   useEffect(() => {
     loadSettings();
@@ -38,11 +39,27 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedPin = await StorageService.getPin();
     const savedAutoReload = await StorageService.getAutoReload();
     const savedKioskEnabled = await StorageService.getKioskEnabled();
+    const savedAutoLaunch = await StorageService.getAutoLaunch();
 
     if (savedUrl) setUrl(savedUrl);
     if (savedPin) setPin(savedPin);
     setAutoReload(savedAutoReload);
     setKioskEnabled(savedKioskEnabled);
+    setAutoLaunchEnabled(savedAutoLaunch ?? false);
+  };
+
+  const toggleAutoLaunch = async (value: boolean) => {
+    setAutoLaunchEnabled(value);
+    await StorageService.saveAutoLaunch(value);
+    try {
+      if (value) {
+        await KioskModule.enableAutoLaunch();
+      } else {
+        await KioskModule.disableAutoLaunch();
+      }
+    } catch (error) {
+      Alert.alert('Error', `Failed to update auto launch: ${error}`);
+    }
   };
 
   const handleSave = async (): Promise<void> => {
@@ -50,7 +67,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
       Alert.alert('Error', 'Please enter a URL');
       return;
     }
-
     if (!pin || pin.length < 4) {
       Alert.alert('Error', 'PIN code must contain at least 4 digits');
       return;
@@ -60,8 +76,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.savePin(pin);
     await StorageService.saveAutoReload(autoReload);
     await StorageService.saveKioskEnabled(kioskEnabled);
+    await StorageService.saveAutoLaunch(autoLaunchEnabled);
 
-    // Activer/désactiver Lock Task selon toggle
     if (kioskEnabled) {
       try {
         await KioskModule.startLockTask();
@@ -99,18 +115,15 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Clear AsyncStorage
-              await AsyncStorage.clear();
-              console.log('AsyncStorage cleared');
+              await StorageService.clearAll(); // Implémentez cette méthode si besoin
               await CertificateModule.clearAcceptedCertificates();
-             
-              // Réinitialiser les states
+
               setUrl('');
               setPin('');
               setAutoReload(false);
               setKioskEnabled(false);
+              setAutoLaunchEnabled(false);
 
-              // Arrêter Lock Task si actif
               try {
                 await KioskModule.stopLockTask();
               } catch (e) {
@@ -171,9 +184,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
             keyboardType="url"
             autoCapitalize="none"
           />
-          <Text style={styles.hint}>
-            Example: https://www.freekiosk.app
-          </Text>
+          <Text style={styles.hint}>Example: https://www.freekiosk.app</Text>
         </View>
 
         <View style={styles.section}>
@@ -187,12 +198,35 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
             secureTextEntry
             maxLength={6}
           />
-          <Text style={styles.hint}>
-            Minimum 4 digits (default: 1234)
-          </Text>
+          <Text style={styles.hint}>Minimum 4 digits (default: 1234)</Text>
         </View>
 
-        {/* Screen Pinning Toggle */}
+        <View style={styles.section}>
+          <View style={styles.switchRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>🚀 Auto Launch</Text>
+              <Text style={styles.hint}>Enable or disable automatic launch on device startup</Text>
+            </View>
+            <Switch
+              value={autoLaunchEnabled}
+              onValueChange={toggleAutoLaunch}
+              trackColor={{ false: '#767577', true: '#81b0ff' }}
+              thumbColor={autoLaunchEnabled ? '#0066cc' : '#f4f3f4'}
+            />
+          </View>
+          <View style={styles.warningBox}>
+            <Text style={styles.warningText}>
+              ⚠️ For non-Device Owner devices, please enable the "Appear on top" permission in the system settings.
+            </Text>
+            <Text style={styles.hint}>
+              This permission is only necessary for the auto launch feature to work.
+            </Text>
+            <TouchableOpacity style={styles.saveButton} onPress={() => Linking.openSettings()}>
+              <Text style={styles.saveButtonText}>📲 Open Settings</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <View style={styles.section}>
           <View style={styles.switchRow}>
             <View style={{ flex: 1 }}>
@@ -213,17 +247,13 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
 
           {!kioskEnabled && (
             <View style={styles.warningBox}>
-              <Text style={styles.warningText}>
-                ⚠️ Warning: With screen pinning disabled, users can swipe up to exit the app
-              </Text>
+              <Text style={styles.warningText}>⚠️ Warning: With screen pinning disabled, users can swipe up to exit the app</Text>
             </View>
           )}
 
           {kioskEnabled && (
             <View style={styles.infoSubBox}>
-              <Text style={styles.infoSubText}>
-                ℹ️ Screen pinning enabled: Only 5-tap gesture + PIN code allows exit
-              </Text>
+              <Text style={styles.infoSubText}>ℹ️ Screen pinning enabled: Only 5-tap gesture + PIN code allows exit</Text>
             </View>
           )}
         </View>
@@ -232,9 +262,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
           <View style={styles.switchRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.label}>🔄 Automatic Reload</Text>
-              <Text style={styles.hint}>
-                Automatically reload the page on error
-              </Text>
+              <Text style={styles.hint}>Automatically reload the page on error</Text>
             </View>
             <Switch
               value={autoReload}
@@ -249,26 +277,16 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
           <Text style={styles.saveButtonText}>💾 Save</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={() => navigation.navigate('Kiosk')}
-        >
+        <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.navigate('Kiosk')}>
           <Text style={styles.cancelButtonText}>↩️ Back to Kiosk</Text>
         </TouchableOpacity>
 
-
-        <TouchableOpacity
-          style={styles.resetButton}
-          onPress={handleResetSettings}
-        >
+        <TouchableOpacity style={styles.resetButton} onPress={handleResetSettings}>
           <Text style={styles.resetButtonText}>🔄 Reset All Settings</Text>
         </TouchableOpacity>
 
         {kioskEnabled && (
-          <TouchableOpacity
-            style={styles.exitButton}
-            onPress={handleExitKioskMode}
-          >
+          <TouchableOpacity style={styles.exitButton} onPress={handleExitKioskMode}>
             <Text style={styles.exitButtonText}>🚪 Exit Kiosk Mode</Text>
           </TouchableOpacity>
         )}

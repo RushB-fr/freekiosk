@@ -5,6 +5,7 @@ const KEYS = {
   PIN: '@kiosk_pin',
   AUTO_RELOAD: '@kiosk_auto_reload',
   KIOSK_ENABLED: '@kiosk_enabled',
+  AUTO_LAUNCH: '@kiosk_auto_launch',
 };
 
 export const StorageService = {
@@ -78,4 +79,37 @@ export const StorageService = {
       return false; // Default OFF
     }
   },
+
+  // Ajout des méthodes Auto Launch avec bonne clé KEYS.AUTO_LAUNCH
+  saveAutoLaunch: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.AUTO_LAUNCH, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving auto launch:', error);
+    }
+  },
+
+  getAutoLaunch: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.AUTO_LAUNCH);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting auto launch:', error);
+      return false;
+    }
+  },
+
+  async clearAll(): Promise<void> {
+  try {
+    await AsyncStorage.multiRemove([
+      KEYS.URL,
+      KEYS.PIN,
+      KEYS.AUTO_RELOAD,
+      KEYS.KIOSK_ENABLED,
+      KEYS.AUTO_LAUNCH,
+    ]);
+  } catch (error) {
+    console.error('Error clearing all storage keys:', error);
+  }
+}
 };

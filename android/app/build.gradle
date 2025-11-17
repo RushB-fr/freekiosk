@@ -89,8 +89,8 @@ android {
         applicationId "com.freekiosk"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 3
-        versionName "1.0.2"
+        versionCode 4
+        versionName "1.0.3"
 
         manifestPlaceholders = [usesCleartextTraffic: "true"]
     }
@@ -117,7 +117,6 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            // ✅ MODIFIÉ : Utilise signing config release
             signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
             shrinkResources true

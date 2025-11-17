@@ -6,6 +6,7 @@ import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnable
 import com.facebook.react.defaults.DefaultReactActivityDelegate
 import android.os.Bundle
 import android.view.View
+import android.view.WindowManager  // ⬅️ NOUVEAU
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
@@ -22,6 +23,9 @@ class MainActivity : ReactActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    
+    // ⬇️ NOUVEAU - Keep screen always on
+    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     
     devicePolicyManager = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
     adminComponent = ComponentName(this, DeviceAdminReceiver::class.java)
@@ -63,14 +67,12 @@ class MainActivity : ReactActivity() {
   }
 
   private fun startLockTaskIfPossible() {
-    // SEULEMENT si Device Owner
     if (devicePolicyManager.isDeviceOwnerApp(packageName)) {
       enableKioskRestrictions()
       devicePolicyManager.setLockTaskPackages(adminComponent, arrayOf(packageName))
       startLockTask()
       android.util.Log.d("MainActivity", "Lock task started (Device Owner)")
     } else {
-      // PAS de try/catch ! Ne rien faire si pas Device Owner
       android.util.Log.d("MainActivity", "Not Device Owner, kiosk mode not available")
     }
   }

@@ -187,7 +187,6 @@ Done! Your tablet is now in kiosk mode.
 | **Price** | 🟢 Free | 🔴 €7.90/device |
 | **Open-source** | 🟢 MIT | 🔴 Closed |
 | **Device Owner** | ✅ | ✅ |
-| **Optional Pinning** | ✅ | ❌ |
 | **HTTPS Self-signed** | ✅ | ⚠️ |
 | **In-app Reset** | ✅ | ⚠️ |
 | **Auto-start** | ✅ | ✅ |
@@ -207,7 +206,13 @@ Done! Your tablet is now in kiosk mode.
 
 ## 🗺️ Roadmap
 
-### ✅ v1.0.2 (Current - Nov 2025)
+### ✅ v1.0.3 (Current - Nov 2025)
+- ✅ Auto-launch toggle: Enable/disable automatic app launch at device boot
+- ✅ Screen always-on feature: Keep screen awake while app is running
+- ✅ Open Settings button: Quick access to Android system settings
+- ✅ Improved Device Owner auto-launch handling
+
+### ✅ v1.0.2 (Nov 2025)
 - ✅ Configuration access button on main screen
 - ✅ HTTPS self-signed certificate security prompt
 - ✅ Clear trusted certificates in reset settings

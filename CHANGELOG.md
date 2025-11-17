@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ***
 
+## [1.0.3] - 2025-11-17
+
+### Added
+- 🚀 Auto-launch toggle: Enable/disable automatic app launch at device boot
+- 💡 Screen always-on feature: Keep screen awake while app is running
+- 📲 Open Settings button: Quick access to Android system settings from app
+
+### Changed
+- 🔧 Improved Device Owner auto-launch handling with preference-based control
+- 📱 Enhanced boot receiver logic to respect user auto-launch preference
+
+***
+
 ## [1.0.2] - 2025-11-13
 
 ### Added
@@ -69,6 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ***
 
+[1.0.3]: https://github.com/rushb-fr/freekiosk/releases/tag/v1.0.3
 [1.0.2]: https://github.com/rushb-fr/freekiosk/releases/tag/v1.0.2
 [1.0.1]: https://github.com/rushb-fr/freekiosk/releases/tag/v1.0.1
-[Unreleased]: https://github.com/rushb-fr/freekiosk/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/rushb-fr/freekiosk/compare/v1.0.3...HEAD
