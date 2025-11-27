@@ -11,7 +11,7 @@
   </p>
   
   <p>
-    <img src="https://img.shields.io/badge/Version-1.0.1-blue.svg" alt="Version 1.0.1">
+    <img src="https://img.shields.io/badge/Version-1.0.5-blue.svg" alt="Version 1.0.5">
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT">
     <img src="https://img.shields.io/badge/Android-8.0%2B-green.svg" alt="Android 8.0+">
     <img src="https://img.shields.io/badge/Device%20Owner-Supported-brightgreen" alt="Device Owner">
@@ -206,7 +206,14 @@ Done! Your tablet is now in kiosk mode.
 
 ## 🗺️ Roadmap
 
-### ✅ v1.0.4 (Current - Nov 2025)
+### ✅ v1.0.5 (Current - Nov 2025)
+- 🎥 Motion detection (Beta): Camera-based motion detection to exit screensaver mode
+- 🍪 Cookie management: Basic cookie handling via react-native-cookies for web session persistence
+- 🚀 WebView optimization: Performance improvements specifically for Fire OS tablets
+- 🔒 Enhanced WebView security: Additional security measures for safe web content display
+- 🐛 WebView stability improvements on Fire OS devices
+
+### ✅ v1.0.4 (Nov 2025)
 - 🔆 Brightness control: Adjustable screen brightness slider in settings
 - 🌙 Screensaver mode: Configurable inactivity timer that dims screen to save power
 - 🎥 Added CAMERA permission for web apps needing camera access
