@@ -41,7 +41,7 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
       duration: 800,
       useNativeDriver: true,
     }).start();
-  }, []);
+  }, [fadeAnim]);
 
   // Injection JS pour détecter les clics dans la webview
   // Optimisé pour Fire OS : throttling des événements, protection double-init
@@ -52,6 +52,20 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
       return;
     }
     window.__FREEKIOSK_INITIALIZED__ = true;
+
+    // Debug storage availability for Pinia/Nuxt
+    console.log('[FreeKiosk Debug] localStorage available:', typeof localStorage !== 'undefined');
+    console.log('[FreeKiosk Debug] sessionStorage available:', typeof sessionStorage !== 'undefined');
+    console.log('[FreeKiosk Debug] Cookie:', document.cookie ? 'enabled' : 'disabled');
+    
+    // Ensure storage is working properly
+    try {
+      localStorage.setItem('__test__', '1');
+      localStorage.removeItem('__test__');
+      console.log('[FreeKiosk Debug] localStorage: WORKING');
+    } catch(e) {
+      console.error('[FreeKiosk Debug] localStorage: FAILED', e);
+    }
 
     // Throttling pour éviter le flood de messages (critique sur Fire OS)
     let lastInteraction = 0;
@@ -213,6 +227,9 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
         source={{ uri: url }}
         style={styles.webview}
         
+        // User Agent - Mimic Chrome to ensure proper storage APIs
+        userAgent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        
         originWhitelist={['http://*', 'https://*']}
         mixedContentMode="always"
         onHttpError={handleHttpError}
@@ -225,6 +242,12 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
         onLoadEnd={() => {
           console.log('[FreeKiosk] Load ended');
           setLoading(false);
+        }}
+        onLoadProgress={({ nativeEvent }) => {
+          // For SPAs like Nuxt, hide spinner when fully loaded
+          if (nativeEvent.progress === 1) {
+            setLoading(false);
+          }
         }}
         onError={handleError}
 
@@ -260,6 +283,10 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
         incognito={false}
         sharedCookiesEnabled={true}
         thirdPartyCookiesEnabled={true}
+        
+        // Storage settings for Pinia/Nuxt compatibility
+        cacheMode="LOAD_DEFAULT"
+        setSupportMultipleWindows={false}
 
         // Security: Disable file access to prevent reading local files
         allowFileAccess={false}
