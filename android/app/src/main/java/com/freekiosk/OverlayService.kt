@@ -25,8 +25,24 @@ import com.facebook.react.modules.core.DeviceEventManagerModule
 
 class OverlayService : Service() {
 
+    companion object {
+        // Opacité du bouton overlay (0.0 = invisible, 1.0 = opaque)
+        @Volatile
+        var buttonOpacity = 0.0f
+        
+        // Instance du service pour pouvoir mettre à jour le bouton
+        @Volatile
+        private var instance: OverlayService? = null
+        
+        fun updateButtonOpacity(opacity: Float) {
+            buttonOpacity = opacity
+            instance?.updateButtonAlpha()
+        }
+    }
+
     private var windowManager: WindowManager? = null
     private var overlayView: View? = null
+    private var returnButton: Button? = null
     private var tapCount = 0
     private val tapHandler = Handler(Looper.getMainLooper())
     private val TAP_TIMEOUT = 2000L // 2 secondes pour faire 5 taps
@@ -54,7 +70,11 @@ class OverlayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        
+        // Charger l'opacité depuis SharedPreferences
+        loadButtonOpacity()
         
         // Démarrer comme Foreground Service pour survivre à la mise en veille
         startForegroundService()
@@ -67,6 +87,17 @@ class OverlayService : Service() {
         registerReceiver(screenReceiver, filter)
         
         createOverlay()
+    }
+
+    private fun loadButtonOpacity() {
+        try {
+            val prefs = getSharedPreferences("FreeKioskSettings", Context.MODE_PRIVATE)
+            buttonOpacity = prefs.getFloat("overlay_button_opacity", 0.0f)
+            DebugLog.d("OverlayService", "Loaded button opacity: $buttonOpacity")
+        } catch (e: Exception) {
+            DebugLog.errorProduction("OverlayService", "Failed to load button opacity: ${e.message}")
+            buttonOpacity = 0.0f
+        }
     }
 
     private fun startForegroundService() {
@@ -110,17 +141,19 @@ class OverlayService : Service() {
         // Créer le layout de l'overlay
         overlayView = FrameLayout(this).apply {
             // Petit bouton discret dans le coin inférieur droit
-            val returnButton = Button(context).apply {
+            returnButton = Button(context).apply {
                 text = "↩"
                 setTextColor(android.graphics.Color.WHITE)
-                setBackgroundColor(android.graphics.Color.parseColor("#CC2196F3")) // Bleu semi-opaque
-                setPadding(0, 0, 0, 0)  // Padding minimal
-                textSize = 10f  // Taille de texte très réduite
-                alpha = 0.0f  // ⬅️ OPACITÉ DU BOUTON (0.0 = invisible, 1.0 = opaque)
-                minWidth = 0  // Supprime la largeur minimale par défaut
-                minHeight = 0  // Supprime la hauteur minimale par défaut
+                setBackgroundColor(android.graphics.Color.parseColor("#2196F3")) // Bleu Material Design
+                setPadding(0, 0, 0, 0)  // Pas de padding
+                textSize = 12f  // Taille de texte très réduite
+                alpha = buttonOpacity  // Utilise l'opacité configurée
+                
+                // Taille minimale pour que le bouton soit cliquable
+                minimumWidth = 0
+                minimumHeight = 0
 
-                // Arrondir les coins
+                // Arrondir les coins et ombre
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     elevation = 8f
                 }
@@ -131,11 +164,11 @@ class OverlayService : Service() {
             }
 
             addView(returnButton, FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,  // Taille minimale
                 FrameLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 gravity = Gravity.BOTTOM or Gravity.END
-                setMargins(0, 0, 2, 2) // Marges réduites, plus dans le coin
+                setMargins(0, 0, 0, 0) // Pas de marges, collé au coin
             })
         }
 
@@ -158,14 +191,24 @@ class OverlayService : Service() {
         )
 
         params.gravity = Gravity.BOTTOM or Gravity.END  // Position coin inférieur droit
-        params.x = 2  // Marge depuis le bord droit (réduite)
-        params.y = 2  // Marge depuis le bord bas (réduite)
+        params.x = 0  // Pas de marge, collé au bord droit
+        params.y = 0  // Pas de marge, collé au bord bas
 
         try {
             windowManager?.addView(overlayView, params)
             DebugLog.d("OverlayService", "Overlay created successfully")
         } catch (e: Exception) {
             DebugLog.errorProduction("OverlayService", "Failed to create overlay: ${e.message}")
+        }
+    }
+
+    // Méthode pour mettre à jour l'alpha du bouton en temps réel
+    private fun updateButtonAlpha() {
+        try {
+            returnButton?.alpha = buttonOpacity
+            DebugLog.d("OverlayService", "Updated button alpha to: $buttonOpacity")
+        } catch (e: Exception) {
+            DebugLog.errorProduction("OverlayService", "Failed to update button alpha: ${e.message}")
         }
     }
 
@@ -247,6 +290,7 @@ class OverlayService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        instance = null
         try {
             // Désenregistrer le receiver
             try {

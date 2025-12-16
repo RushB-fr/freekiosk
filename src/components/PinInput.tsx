@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { verifySecurePin, getLockoutStatus } from '../utils/secureStorage';
+import { verifySecurePin, getLockoutStatus, hasSecurePin } from '../utils/secureStorage';
 
 interface PinInputProps {
   onSuccess: () => void;
@@ -13,12 +13,19 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
   const [isLockedOut, setIsLockedOut] = useState<boolean>(false);
   const [lockoutTimeRemaining, setLockoutTimeRemaining] = useState<number>(0);
   const [attemptsRemaining, setAttemptsRemaining] = useState<number>(5);
+  const [hasPinConfigured, setHasPinConfigured] = useState<boolean>(false);
 
   useEffect(() => {
     checkLockoutStatus();
+    checkPinConfiguration();
     const interval = setInterval(checkLockoutStatus, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  const checkPinConfiguration = async (): Promise<void> => {
+    const isPinConfigured = await hasSecurePin();
+    setHasPinConfigured(isPinConfigured);
+  };
 
   const checkLockoutStatus = async (): Promise<void> => {
     const status = await getLockoutStatus();
@@ -101,7 +108,9 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
         </>
       ) : (
         <>
-          <Text style={styles.subtitle}>Default code: 1234</Text>
+          {!hasPinConfigured && (
+            <Text style={styles.subtitle}>Default code: 1234</Text>
+          )}
 
           {attemptsRemaining < 5 && (
             <View style={styles.warningContainer}>

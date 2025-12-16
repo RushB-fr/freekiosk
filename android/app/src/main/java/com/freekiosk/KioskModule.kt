@@ -202,4 +202,27 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
         DebugLog.d("KioskModule", "setBlockAutoRelaunch = $block")
         promise.resolve(true)
     }
+
+    @ReactMethod
+    fun removeDeviceOwner(promise: Promise) {
+        try {
+            val dpm = reactApplicationContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+            val adminComponent = ComponentName(reactApplicationContext, DeviceAdminReceiver::class.java)
+            
+            if (dpm.isDeviceOwnerApp(reactApplicationContext.packageName)) {
+                try {
+                    dpm.clearDeviceOwnerApp(reactApplicationContext.packageName)
+                    android.util.Log.d("KioskModule", "Device Owner removed successfully")
+                    promise.resolve(true)
+                } catch (e: Exception) {
+                    android.util.Log.e("KioskModule", "Failed to remove Device Owner: ${e.message}")
+                    promise.reject("ERROR", "Failed to remove Device Owner: ${e.message}")
+                }
+            } else {
+                promise.reject("NOT_DEVICE_OWNER", "App is not a Device Owner")
+            }
+        } catch (e: Exception) {
+            promise.reject("ERROR", "Failed to check Device Owner status: ${e.message}")
+        }
+    }
 }

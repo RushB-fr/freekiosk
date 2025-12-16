@@ -11,7 +11,7 @@
   </p>
   
   <p>
-    <img src="https://img.shields.io/badge/Version-1.1.0-blue.svg" alt="Version 1.1.0">
+    <img src="https://img.shields.io/badge/Version-1.1.1-blue.svg" alt="Version 1.1.1">
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT">
     <img src="https://img.shields.io/badge/Android-8.0%2B-green.svg" alt="Android 8.0+">
     <img src="https://img.shields.io/badge/Device%20Owner-Supported-brightgreen" alt="Device Owner">
@@ -214,7 +214,14 @@ Done! Your tablet is now in kiosk mode.
 
 ## 🗺️ Roadmap
 
-### ✅ v1.1.0 (Current - Dec 2025)
+### ✅ v1.1.1 (Current - Dec 2025)
+- 👁️ **Overlay Button Visibility Toggle**: Show/hide return button in External App Mode
+- 🗑️ **Device Owner Removal**: Easy removal of Device Owner privileges for uninstallation
+- 🔢 **Configurable PIN Attempts**: Set maximum attempts (1-100) with 15min lockout
+- 🐛 **Critical Fix**: PIN attempts now auto-reset after 1 hour of inactivity
+- 🐛 **Critical Fix**: Expired PIN attempts properly persisted to storage
+
+### ✅ v1.1.0 (Dec 2025)
 - 📱 **External App Mode (Beta)**: Launch and lock any Android app instead of a WebView
 - 🔒 Enhanced Lock Task: Whitelisted external apps in lock task mode
 - 🎯 Auto-relaunch: Configurable automatic app restart on exit attempts

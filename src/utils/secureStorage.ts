@@ -1,12 +1,14 @@
 import * as Keychain from 'react-native-keychain';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { StorageService } from './storage';
 
 // Constants
 const PIN_SERVICE = 'freekiosk_pin';
 const ATTEMPTS_KEY = '@kiosk_pin_attempts';
 const LOCKOUT_KEY = '@kiosk_pin_lockout';
-const MAX_ATTEMPTS = 5;
+const DEFAULT_MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes in milliseconds
+const ATTEMPTS_RESET_DURATION = 60 * 60 * 1000; // 1 hour - Reset attempts after 1 hour of no activity
 
 // Crypto constants
 const PBKDF2_ITERATIONS = 100000; // 100k iterations (secure)
@@ -215,9 +217,10 @@ export async function verifySecurePin(inputPin: string): Promise<{
         } else {
           // Failed plaintext verification
           await recordFailedAttempt();
+          const maxAttempts = await getMaxAttempts();
           const attempts = await getPinAttempts();
 
-          if (attempts.count >= MAX_ATTEMPTS) {
+          if (attempts.count >= maxAttempts) {
             return {
               success: false,
               lockoutTimeRemaining: LOCKOUT_DURATION,
@@ -227,7 +230,7 @@ export async function verifySecurePin(inputPin: string): Promise<{
 
           return {
             success: false,
-            attemptsRemaining: MAX_ATTEMPTS - attempts.count,
+            attemptsRemaining: maxAttempts - attempts.count,
             message: 'Incorrect PIN',
           };
         }
@@ -239,10 +242,11 @@ export async function verifySecurePin(inputPin: string): Promise<{
         return { success: true };
       } else {
         await recordFailedAttempt();
+        const maxAttempts = await getMaxAttempts();
         const attempts = await getPinAttempts();
         return {
           success: false,
-          attemptsRemaining: MAX_ATTEMPTS - attempts.count,
+          attemptsRemaining: maxAttempts - attempts.count,
           message: 'Incorrect PIN',
         };
       }
@@ -261,9 +265,10 @@ export async function verifySecurePin(inputPin: string): Promise<{
     } else {
       // Failed - record attempt
       await recordFailedAttempt();
+      const maxAttempts = await getMaxAttempts();
       const attempts = await getPinAttempts();
 
-      if (attempts.count >= MAX_ATTEMPTS) {
+      if (attempts.count >= maxAttempts) {
         return {
           success: false,
           lockoutTimeRemaining: LOCKOUT_DURATION,
@@ -273,7 +278,7 @@ export async function verifySecurePin(inputPin: string): Promise<{
 
       return {
         success: false,
-        attemptsRemaining: MAX_ATTEMPTS - attempts.count,
+        attemptsRemaining: maxAttempts - attempts.count,
         message: 'Incorrect PIN',
       };
     }
@@ -293,7 +298,23 @@ async function getPinAttempts(): Promise<PinAttempts> {
   try {
     const data = await AsyncStorage.getItem(ATTEMPTS_KEY);
     if (data) {
-      return JSON.parse(data);
+      const attempts: PinAttempts = JSON.parse(data);
+      const now = Date.now();
+      
+      // Reset attempts if more than 1 hour has passed since last attempt
+      if (attempts.lastAttempt > 0 && (now - attempts.lastAttempt) > ATTEMPTS_RESET_DURATION) {
+        console.log('[SecureStorage] Attempts expired after 1 hour of inactivity - resetting counter');
+        // Reset and persist to storage
+        const resetAttempts: PinAttempts = {
+          count: 0,
+          lastAttempt: 0,
+          lockoutUntil: null,
+        };
+        await AsyncStorage.setItem(ATTEMPTS_KEY, JSON.stringify(resetAttempts));
+        return resetAttempts;
+      }
+      
+      return attempts;
     }
   } catch (error) {
     console.error('[SecureStorage] Error reading attempts:', error);
@@ -307,10 +328,24 @@ async function getPinAttempts(): Promise<PinAttempts> {
 }
 
 /**
+ * Get max attempts from settings
+ */
+async function getMaxAttempts(): Promise<number> {
+  try {
+    const maxAttempts = await StorageService.getPinMaxAttempts();
+    return Math.max(1, Math.min(100, maxAttempts)); // Clamp between 1 and 100
+  } catch (error) {
+    console.error('[SecureStorage] Error getting max attempts:', error);
+    return DEFAULT_MAX_ATTEMPTS;
+  }
+}
+
+/**
  * Record a failed PIN attempt
  */
 async function recordFailedAttempt(): Promise<void> {
   try {
+    const maxAttempts = await getMaxAttempts();
     const attempts = await getPinAttempts();
     const now = Date.now();
 
@@ -318,13 +353,13 @@ async function recordFailedAttempt(): Promise<void> {
     attempts.lastAttempt = now;
 
     // If max attempts reached, set lockout
-    if (attempts.count >= MAX_ATTEMPTS) {
+    if (attempts.count >= maxAttempts) {
       attempts.lockoutUntil = now + LOCKOUT_DURATION;
-      console.warn('[SecureStorage] Max attempts reached - locking for 15 minutes');
+      console.warn(`[SecureStorage] Max attempts (${maxAttempts}) reached - locking for 15 minutes`);
     }
 
     await AsyncStorage.setItem(ATTEMPTS_KEY, JSON.stringify(attempts));
-    console.log(`[SecureStorage] Failed attempt recorded: ${attempts.count}/${MAX_ATTEMPTS}`);
+    console.log(`[SecureStorage] Failed attempt recorded: ${attempts.count}/${maxAttempts}`);
   } catch (error) {
     console.error('[SecureStorage] Error recording attempt:', error);
   }
@@ -380,13 +415,14 @@ export async function getLockoutStatus(): Promise<{
   timeRemaining: number | null;
   attemptsRemaining: number;
 }> {
+  const maxAttempts = await getMaxAttempts();
   const lockout = await checkLockout();
   const attempts = await getPinAttempts();
 
   return {
     isLockedOut: lockout.isLockedOut,
     timeRemaining: lockout.timeRemaining,
-    attemptsRemaining: Math.max(0, MAX_ATTEMPTS - attempts.count),
+    attemptsRemaining: Math.max(0, maxAttempts - attempts.count),
   };
 }
 

@@ -11,6 +11,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ***
 
 
+## [1.1.1] - 2025-12-16
+
+
+### Added
+- 👁️ **Overlay Button Visibility Toggle**: New option to show/hide the return button in External App Mode
+  - Button is invisible by default for maximum discretion
+  - Real-time opacity update when toggling visibility
+  - Visible button appears as a small blue button in bottom-right corner
+- 🗑️ **Device Owner Removal**: New button in Settings to remove Device Owner privileges
+  - Helps with uninstallation on Android 15+
+  - Automatically resets all settings after removal
+- 🔢 **Configurable PIN Attempts**: Set maximum PIN attempts between 1-100 (default: 5)
+- 🔐 **Hidden Default PIN Text**: "Default code: 1234" text now hidden when PIN is configured
+
+### Fixed
+- 🐛 **Critical: PIN Lockout Expiration**: PIN attempts now automatically reset after 1 hour of inactivity
+- 🐛 **Critical: PIN Attempts Persistence**: Expired PIN attempts are now properly saved to storage
+
+
+
 ## [1.1.0] - 2025-12-11
 
 

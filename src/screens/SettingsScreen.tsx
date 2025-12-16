@@ -37,6 +37,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [url, setUrl] = useState<string>('');
   const [pin, setPin] = useState<string>('');
   const [isPinConfigured, setIsPinConfigured] = useState<boolean>(false);
+  const [pinMaxAttempts, setPinMaxAttempts] = useState<number>(5);
   const [autoReload, setAutoReload] = useState<boolean>(false);
   const [kioskEnabled, setKioskEnabled] = useState<boolean>(false);
   const [autoLaunchEnabled, setAutoLaunchEnabled] = useState<boolean>(false);
@@ -51,6 +52,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [displayMode, setDisplayMode] = useState<'webview' | 'external_app'>('webview');
   const [externalAppPackage, setExternalAppPackage] = useState<string>('');
   const [autoRelaunchApp, setAutoRelaunchApp] = useState<boolean>(true);
+  const [overlayButtonVisible, setOverlayButtonVisible] = useState<boolean>(false);
   const [installedApps, setInstalledApps] = useState<AppInfo[]>([]);
   const [showAppPicker, setShowAppPicker] = useState<boolean>(false);
   const [loadingApps, setLoadingApps] = useState<boolean>(false);
@@ -151,10 +153,14 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedDisplayMode = await StorageService.getDisplayMode();
     const savedExternalAppPackage = await StorageService.getExternalAppPackage();
     const savedAutoRelaunchApp = await StorageService.getAutoRelaunchApp();
+    const savedOverlayButtonVisible = await StorageService.getOverlayButtonVisible();
+    const savedPinMaxAttempts = await StorageService.getPinMaxAttempts();
 
     setDisplayMode(savedDisplayMode);
     setExternalAppPackage(savedExternalAppPackage ?? '');
     setAutoRelaunchApp(savedAutoRelaunchApp);
+    setOverlayButtonVisible(savedOverlayButtonVisible);
+    setPinMaxAttempts(savedPinMaxAttempts);
   };
 
   const loadCertificates = async (): Promise<void> => {
@@ -223,6 +229,22 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
       }
     } else {
       setMotionEnabled(false);
+    }
+  };
+
+  const handleOverlayButtonVisibleChange = async (value: boolean) => {
+    setOverlayButtonVisible(value);
+    
+    // Update button opacity immediately if in external app mode
+    if (displayMode === 'external_app') {
+      const opacity = value ? 1.0 : 0.0;
+      try {
+        const { OverlayServiceModule } = NativeModules;
+        await OverlayServiceModule.setButtonOpacity(opacity);
+        console.log(`Overlay button opacity set to: ${opacity}`);
+      } catch (error) {
+        console.log('Error setting button opacity:', error);
+      }
     }
   };
 
@@ -321,6 +343,12 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
       return;
     }
 
+    // Validate PIN max attempts
+    if (pinMaxAttempts < 1 || pinMaxAttempts > 100) {
+      Alert.alert('Error', 'PIN max attempts must be between 1 and 100');
+      return;
+    }
+
     // Save URL only in webview mode
     if (displayMode === 'webview') {
       await StorageService.saveUrl(finalUrl);
@@ -332,6 +360,9 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
       await StorageService.savePin('');
       setIsPinConfigured(true);
     }
+
+    // Save PIN max attempts
+    await StorageService.savePinMaxAttempts(pinMaxAttempts);
 
     // Save settings based on mode
     if (displayMode === 'webview') {
@@ -358,6 +389,17 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.saveDisplayMode(displayMode);
     await StorageService.saveExternalAppPackage(externalAppPackage);
     await StorageService.saveAutoRelaunchApp(autoRelaunchApp);
+    await StorageService.saveOverlayButtonVisible(overlayButtonVisible);
+
+    // Update overlay button opacity
+    if (displayMode === 'external_app') {
+      const opacity = overlayButtonVisible ? 1.0 : 0.0;
+      try {
+        await OverlayServiceModule.setButtonOpacity(opacity);
+      } catch (error) {
+        console.log('Error setting button opacity:', error);
+      }
+    }
 
     // Start/stop lock task based on kioskEnabled (works for BOTH webview and external_app)
     if (kioskEnabled) {
@@ -415,6 +457,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
               setUrl('');
               setPin('');
               setIsPinConfigured(false);
+              setPinMaxAttempts(5);
               setAutoReload(false);
               setKioskEnabled(false);
               setAutoLaunchEnabled(false);
@@ -427,6 +470,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
               setDisplayMode('webview');
               setExternalAppPackage('');
               setAutoRelaunchApp(true);
+              setOverlayButtonVisible(false);
 
               try {
                 await KioskModule.stopLockTask();
@@ -486,6 +530,79 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
               Alert.alert('Success', 'Certificate removed successfully');
             } catch (error) {
               Alert.alert('Error', `Failed to remove certificate: ${error}`);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleRemoveDeviceOwner = async (): Promise<void> => {
+    Alert.alert(
+      '⚠️ Remove Device Owner',
+      'WARNING: This will remove Device Owner privileges from FreeKiosk.\n\n' +
+      'You will lose:\n' +
+      '• Full kiosk mode (Lock Task)\n' +
+      '• Navigation blocking\n' +
+      '• Complete lockdown protection\n\n' +
+      'All app settings will be reset to default.\n\n' +
+      'Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove Device Owner',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Stop lock task first
+              try {
+                await KioskModule.stopLockTask();
+              } catch {
+                // ignore if not in lock task
+              }
+
+              // Remove Device Owner
+              await KioskModule.removeDeviceOwner();
+
+              // Reset all settings to default
+              await StorageService.clearAll();
+              await CertificateModuleTyped.clearAcceptedCertificates();
+              await clearSecurePin();
+              await CookieManager.clearAll();
+
+              // Reset state
+              setUrl('');
+              setPin('');
+              setIsPinConfigured(false);
+              setPinMaxAttempts(5);
+              setAutoReload(false);
+              setKioskEnabled(false);
+              setAutoLaunchEnabled(false);
+              setScreensaverEnabled(false);
+              setInactivityDelay('10');
+              setMotionEnabled(false);
+              setScreensaverBrightness(0);
+              setDefaultBrightness(0.5);
+              setCertificates([]);
+              setDisplayMode('webview');
+              setExternalAppPackage('');
+              setAutoRelaunchApp(true);
+              setOverlayButtonVisible(false);
+              setIsDeviceOwner(false);
+
+              Alert.alert(
+                'Success',
+                'Device Owner removed successfully!\n\n' +
+                'All settings have been reset.\n' +
+                'You can now uninstall FreeKiosk normally from Android Settings.',
+                [{ text: 'OK', onPress: () => navigation.navigate('Kiosk') }]
+              );
+            } catch (error: any) {
+              if (error.code === 'NOT_DEVICE_OWNER') {
+                Alert.alert('Error', 'FreeKiosk is not configured as Device Owner.');
+              } else {
+                Alert.alert('Error', `Failed to remove Device Owner: ${error.message || error}`);
+              }
             }
           },
         },
@@ -645,13 +762,31 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
               </View>
             </View>
 
+            {/* Overlay Button Visibility */}
+            <View style={styles.section}>
+              <View style={styles.switchRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>👁️ Show Return Button</Text>
+                  <Text style={styles.hint}>
+                    Make the return button visible on screen (otherwise tap the invisible area in bottom-right corner)
+                  </Text>
+                </View>
+                <Switch
+                  value={overlayButtonVisible}
+                  onValueChange={handleOverlayButtonVisibleChange}
+                  trackColor={{ false: '#767577', true: '#81b0ff' }}
+                  thumbColor={overlayButtonVisible ? '#0066cc' : '#f4f3f4'}
+                />
+              </View>
+            </View>
+
             {/* Return Mechanism Info */}
             <View style={styles.infoBox}>
               <Text style={styles.infoTitle}>ℹ️ Return to Settings</Text>
               <Text style={styles.infoText}>
-                • Return to FreeKiosk using your device's app switcher (recent apps button){'\n'}
-                • Device Owner mode: Press Volume Up button 5 times rapidly{'\n'}
-                • Auto-relaunch: Max 3 attempts to prevent crash loops
+                • Tap 5 times on the {overlayButtonVisible ? 'blue button' : 'invisible area'} in the bottom-right corner{'\n'}
+                • Or use your device's app switcher (recent apps button){'\n'}
+                • Device Owner mode: Press Volume Up button 5 times rapidly
               </Text>
             </View>
           </>
@@ -674,6 +809,29 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
               ? "✓ PIN configured - Leave empty to keep current PIN, or enter a new one to change it"
               : "Minimum 4 digits (default: 1234)"}
           </Text>
+
+          {/* PIN Max Attempts */}
+          <View style={{ marginTop: 20 }}>
+            <Text style={styles.label}>🔒 Max Failed Attempts (Before 15min Lockout)</Text>
+            <Text style={styles.hint}>Number of incorrect PIN attempts allowed before temporary lockout (1-100)</Text>
+            <View style={{ marginTop: 10 }}>
+              <TextInput
+                style={styles.input}
+                value={String(pinMaxAttempts)}
+                onChangeText={(text) => {
+                  const num = parseInt(text, 10);
+                  if (!isNaN(num) && num >= 1 && num <= 100) {
+                    setPinMaxAttempts(num);
+                  } else if (text === '') {
+                    setPinMaxAttempts(5);
+                  }
+                }}
+                keyboardType="numeric"
+                maxLength={3}
+                placeholder="5"
+              />
+            </View>
+          </View>
         </View>
 
         {/* Default Brightness - Only in WebView mode */}
@@ -964,6 +1122,12 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
           <Text style={styles.resetButtonText}>🔄 Reset All Settings</Text>
         </TouchableOpacity>
 
+        {isDeviceOwner && (
+          <TouchableOpacity style={styles.removeDeviceOwnerButton} onPress={handleRemoveDeviceOwner}>
+            <Text style={styles.removeDeviceOwnerButtonText}>⚠️ Remove Device Owner</Text>
+          </TouchableOpacity>
+        )}
+
         {kioskEnabled && (
           <TouchableOpacity style={styles.exitButton} onPress={handleExitKioskMode}>
             <Text style={styles.exitButtonText}>🚪 Exit Kiosk Mode</Text>
@@ -1171,6 +1335,20 @@ const styles = StyleSheet.create({
     borderColor: '#f57c00',
   },
   resetButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  removeDeviceOwnerButton: {
+    backgroundColor: '#e65100',
+    paddingVertical: 15,
+    borderRadius: 10,
+    marginTop: 10,
+    borderWidth: 2,
+    borderColor: '#bf360c',
+  },
+  removeDeviceOwnerButtonText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',

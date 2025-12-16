@@ -17,6 +17,8 @@ const KEYS = {
   DISPLAY_MODE: '@kiosk_display_mode',
   EXTERNAL_APP_PACKAGE: '@kiosk_external_app_package',
   AUTO_RELAUNCH_APP: '@kiosk_auto_relaunch_app',
+  OVERLAY_BUTTON_VISIBLE: '@kiosk_overlay_button_visible',
+  PIN_MAX_ATTEMPTS: '@kiosk_pin_max_attempts',
   // Legacy keys for backward compatibility
   SCREENSAVER_DELAY: '@screensaver_delay',
   MOTION_DETECTION_ENABLED: '@motion_detection_enabled',
@@ -139,6 +141,8 @@ export const StorageService = {
         KEYS.DISPLAY_MODE,
         KEYS.EXTERNAL_APP_PACKAGE,
         KEYS.AUTO_RELAUNCH_APP,
+        KEYS.OVERLAY_BUTTON_VISIBLE,
+        KEYS.PIN_MAX_ATTEMPTS,
         // Legacy keys
         KEYS.SCREENSAVER_DELAY,
         KEYS.MOTION_DETECTION_ENABLED,
@@ -428,6 +432,43 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting auto relaunch app:', error);
       return true;
+    }
+  },
+  //OVERLAY BUTTON VISIBLE
+  saveOverlayButtonVisible: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.OVERLAY_BUTTON_VISIBLE, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving overlay button visible:', error);
+    }
+  },
+
+  getOverlayButtonVisible: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.OVERLAY_BUTTON_VISIBLE);
+      return value === null ? false : JSON.parse(value); // Par défaut false (invisible)
+    } catch (error) {
+      console.error('Error getting overlay button visible:', error);
+      return false;
+    }
+  },
+
+  //PIN MAX ATTEMPTS
+  savePinMaxAttempts: async (value: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.PIN_MAX_ATTEMPTS, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving PIN max attempts:', error);
+    }
+  },
+
+  getPinMaxAttempts: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.PIN_MAX_ATTEMPTS);
+      return value === null ? 5 : JSON.parse(value); // Par défaut 5
+    } catch (error) {
+      console.error('Error getting PIN max attempts:', error);
+      return 5;
     }
   },
 

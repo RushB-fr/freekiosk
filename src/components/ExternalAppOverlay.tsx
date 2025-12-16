@@ -44,8 +44,8 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
               </Text>
               <Text style={styles.statusText}>
                 {isAppLaunched
-                  ? 'Application externe en cours d\'exécution'
-                  : 'En attente de l\'application...'}
+                  ? 'External application is running'
+                  : 'Waiting for application...'}
               </Text>
               {externalAppPackage && (
                 <Text style={styles.packageName}>{externalAppPackage}</Text>
@@ -61,7 +61,7 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
               activeOpacity={0.8}
             >
               <Text style={styles.primaryButtonText}>
-                ↩ Retourner vers l'application
+                ↩ Return to Application
               </Text>
             </TouchableOpacity>
 
@@ -70,7 +70,7 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
               onPress={onGoToSettings}
               activeOpacity={0.8}
             >
-              <Text style={styles.secondaryButtonText}>⚙ Paramètres</Text>
+              <Text style={styles.secondaryButtonText}>⚙ Settings</Text>
             </TouchableOpacity>
           </View>
 

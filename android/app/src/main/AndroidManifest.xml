@@ -89,12 +89,6 @@
         </intent-filter>
       </receiver>
 
-      <!-- Service for detecting volume keys in external app mode -->
-      <service
-        android:name=".VolumeKeyService"
-        android:enabled="true"
-        android:exported="false" />
-
       <!-- Service d'overlay pour bouton retour en mode External App -->
       <service
         android:name=".OverlayService"
