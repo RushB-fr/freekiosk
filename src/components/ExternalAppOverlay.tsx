@@ -1,10 +1,12 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView } from 'react-native';
+import StatusBar from './StatusBar';
 
 interface ExternalAppOverlayProps {
   externalAppPackage: string | null;
   isAppLaunched: boolean;
   testModeEnabled: boolean;
+  showStatusBar?: boolean;
   onReturnToApp: () => void;
   onGoToSettings: () => void;
 }
@@ -13,11 +15,13 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
   externalAppPackage,
   isAppLaunched,
   testModeEnabled,
+  showStatusBar = false,
   onReturnToApp,
   onGoToSettings,
 }) => {
   return (
     <View style={styles.container}>
+      {showStatusBar && <StatusBar />}
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}

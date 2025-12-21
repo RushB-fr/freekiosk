@@ -18,9 +18,6 @@ interface KioskScreenProps {
   navigation: KioskScreenNavigationProp;
 }
 
-let tapCount = 0;
-let tapTimer: any = null;
-
 const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [url, setUrl] = useState<string>('');
   const [autoReload, setAutoReload] = useState<boolean>(false);
@@ -32,6 +29,8 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [inactivityDelay, setInactivityDelay] = useState(600000);
   const [motionEnabled, setMotionEnabled] = useState(false);
   const [statusBarEnabled, setStatusBarEnabled] = useState(false);
+  const [statusBarOnOverlay, setStatusBarOnOverlay] = useState(true);
+  const [statusBarOnReturn, setStatusBarOnReturn] = useState(true);
   const timerRef = useRef<any>(null);
 
   // External app states
@@ -42,39 +41,42 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const relaunchTimerRef = useRef<any>(null);
   const [isAppLaunched, setIsAppLaunched] = useState<boolean>(false);
   const [externalAppTestMode, setExternalAppTestMode] = useState<boolean>(true);
+  const [keyboardMode, setKeyboardMode] = useState<string>('default');
   const appStateRef = useRef(AppState.currentState);
+  const appLaunchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const tapCountRef = useRef<number>(0);
+  const tapTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // AppState listener - détecte quand l'app revient au premier plan
   useEffect(() => {
     const subscription = AppState.addEventListener('change', async nextAppState => {
-      console.log(`[KioskScreen] AppState changed: ${appStateRef.current} -> ${nextAppState}`);
-      
       // L'app revient au premier plan (depuis background ou inactive)
       if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
-        console.log('[KioskScreen] App came to foreground, checking native block flag...');
-        
         try {
-          // En mode test, ne JAMAIS relancer automatiquement l'app externe
-          if (externalAppTestMode) {
-            console.log('[KioskScreen] Test mode enabled - NOT auto-relaunching');
+          // 1. D'abord vérifier le flag natif (5-tap, retour volontaire)
+          const shouldBlock = await KioskModule.shouldBlockAutoRelaunch();
+          
+          if (shouldBlock) {
+            // Reset le flag après l'avoir lu
+            await KioskModule.clearBlockAutoRelaunch();
             setIsAppLaunched(false);
             appStateRef.current = nextAppState;
             return;
           }
           
-          // Vérifier le flag natif (plus fiable que le ref React)
-          const shouldBlock = await KioskModule.shouldBlockAutoRelaunch();
-          console.log(`[KioskScreen] Native shouldBlockAutoRelaunch = ${shouldBlock}`);
+          // 2. Ensuite vérifier le mode test (back button depuis app externe)
+          // IMPORTANT: Lire directement depuis storage pour avoir la valeur actuelle
+          const currentTestMode = await StorageService.getExternalAppTestMode();
+          if (currentTestMode) {
+            setIsAppLaunched(false);
+            appStateRef.current = nextAppState;
+            return;
+          }
           
-          if (shouldBlock) {
-            console.log('[KioskScreen] Blocked by native flag - NOT relaunching, clearing flag');
-            // Reset le flag après l'avoir lu
-            await KioskModule.clearBlockAutoRelaunch();
-          } else if (displayMode === 'external_app' && externalAppPackage && autoRelaunchApp) {
-            console.log('[KioskScreen] Auto-relaunching external app from AppState...');
-            
+          // 3. Sinon, relancer automatiquement l'app externe
+          if (displayMode === 'external_app' && externalAppPackage && autoRelaunchApp) {
             // Petit délai pour laisser l'UI se stabiliser
-            setTimeout(() => {
+            appLaunchTimeoutRef.current = setTimeout(() => {
               launchExternalApp(externalAppPackage);
             }, 300);
           }
@@ -88,8 +90,11 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
 
     return () => {
       subscription.remove();
+      if (appLaunchTimeoutRef.current) {
+        clearTimeout(appLaunchTimeoutRef.current);
+      }
     };
-  }, [displayMode, externalAppPackage, autoRelaunchApp, externalAppTestMode]);
+  }, [displayMode, externalAppPackage, autoRelaunchApp]);
 
   useEffect(() => {
     const unsubscribeFocus = navigation.addListener('focus', () => {
@@ -113,13 +118,10 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       (async () => {
         try {
           await RNBrightness.setBrightnessLevel(defaultBrightness);
-          console.log(`[DEBUG Brightness] Luminosité normale appliquée: ${Math.round(defaultBrightness * 100)}%`);
         } catch (error) {
-          console.error('[DEBUG Brightness] Erreur application luminosité:', error);
+          console.error('[KioskScreen] Error setting brightness:', error);
         }
       })();
-    } else {
-      console.log('[DEBUG Brightness] Screensaver active, skipping brightness restore');
     }
   }, [defaultBrightness, isScreensaverActive]);
 
@@ -152,7 +154,6 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     const navigateToPinListener = eventEmitter.addListener(
       'navigateToPin',
       () => {
-        console.log('[KioskScreen] Received navigateToPin event - navigating to PIN');
         // Le flag natif est déjà mis par OverlayService.returnToFreeKiosk()
         navigation.navigate('Pin');
       }
@@ -179,15 +180,8 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       const savedInactivityDelay = await StorageService.getScreensaverInactivityDelay();
       const savedMotionEnabled = await StorageService.getScreensaverMotionEnabled();
       const savedStatusBarEnabled = await StorageService.getStatusBarEnabled();
-
-      console.log('[DEBUG loadSettings] URL:', savedUrl);
-      console.log('[DEBUG loadSettings] Screensaver enabled:', savedScreensaverEnabled);
-      console.log('[DEBUG loadSettings] Default brightness:', savedDefaultBrightness);
-      console.log('[DEBUG loadSettings] Screensaver brightness:', savedScreensaverBrightness);
-      console.log('[DEBUG loadSettings] Inactivity enabled:', savedInactivityEnabled);
-      console.log('[DEBUG loadSettings] Inactivity delay (ms):', savedInactivityDelay);
-      console.log('[DEBUG loadSettings] Motion enabled:', savedMotionEnabled);
-      console.log('[DEBUG loadSettings] Status bar enabled:', savedStatusBarEnabled);
+      const savedStatusBarOnOverlay = await StorageService.getStatusBarOnOverlay();
+      const savedStatusBarOnReturn = await StorageService.getStatusBarOnReturn();
 
       if (savedUrl) setUrl(savedUrl);
       setAutoReload(savedAutoReload);
@@ -198,38 +192,36 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       setInactivityDelay(savedInactivityDelay ?? 600000);
       setMotionEnabled(savedMotionEnabled ?? false);
       setStatusBarEnabled(savedStatusBarEnabled ?? false);
+      setStatusBarOnOverlay(savedStatusBarOnOverlay ?? true);
+      setStatusBarOnReturn(savedStatusBarOnReturn ?? true);
 
       // Load external app settings
       const savedDisplayMode = await StorageService.getDisplayMode();
       const savedExternalAppPackage = await StorageService.getExternalAppPackage();
       const savedAutoRelaunchApp = await StorageService.getAutoRelaunchApp();
 
-      console.log('[DEBUG loadSettings] Display mode:', savedDisplayMode);
-      console.log('[DEBUG loadSettings] External app package:', savedExternalAppPackage);
-      console.log('[DEBUG loadSettings] Auto relaunch app:', savedAutoRelaunchApp);
-
       const savedExternalAppTestMode = await StorageService.getExternalAppTestMode();
+      const savedKeyboardMode = await StorageService.getKeyboardMode();
 
       setDisplayMode(savedDisplayMode);
       setExternalAppPackage(savedExternalAppPackage);
       setAutoRelaunchApp(savedAutoRelaunchApp);
       setExternalAppTestMode(savedExternalAppTestMode);
+      setKeyboardMode(savedKeyboardMode);
 
       if (savedKioskEnabled) {
         try {
           // Pass external app package so it gets added to whitelist
           const packageToWhitelist = savedDisplayMode === 'external_app' ? savedExternalAppPackage : null;
           await KioskModule.startLockTask(packageToWhitelist);
-          console.log('[KioskScreen] Lock task enabled');
         } catch {
-          console.log('[KioskScreen] Failed to start lock task');
+          // Silent fail
         }
       } else {
         try {
           await KioskModule.stopLockTask();
-          console.log('[KioskScreen] Lock task disabled');
         } catch {
-          console.log('[KioskScreen] Not in lock task mode');
+          // Silent fail
         }
       }
 
@@ -248,7 +240,6 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       timerRef.current = setTimeout(() => {
         setIsScreensaverActive(true);
       }, inactivityDelay);
-      console.log('[DEBUG] Inactivity timer reset');
     }
   };
 
@@ -256,40 +247,31 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
-      console.log('[DEBUG] Inactivity timer cleared');
     }
   };
 
   const onUserInteraction = () => {
-    console.log('[DEBUG] User interaction detected, resetting timer');
     resetTimer();
     if (isScreensaverActive) {
       setIsScreensaverActive(false);
-      console.log('[DEBUG] Screensaver deactivated by user interaction');
     }
   };
 
   const onScreensaverTap = () => {
     setIsScreensaverActive(false);
     resetTimer();
-    console.log('[DEBUG] Screensaver deactivated by tap on overlay');
   };
 
   const onMotionDetected = () => {
-    console.log('[DEBUG MOTION] Motion detected!');
     if (isScreensaverActive) {
-      console.log('[DEBUG MOTION] Waking up screensaver and resetting timer');
       setIsScreensaverActive(false);
       resetTimer(); // IMPORTANT: Reset timer after waking up
-    } else {
-      console.log('[DEBUG MOTION] Screensaver not active, ignoring');
     }
   };
 
   const enableScreensaverEffects = async () => {
     try {
       await RNBrightness.setBrightnessLevel(screensaverBrightness);
-      console.log(`Screensaver activé : luminosité à ${Math.round(screensaverBrightness * 100)}%`);
     } catch (error) {
       console.error('Erreur activation luminosité screensaver:', error);
     }
@@ -306,7 +288,6 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       // Démarrer l'OverlayService AVANT de lancer l'app externe
       try {
         await OverlayServiceModule.startOverlayService();
-        console.log('[KioskScreen] OverlayService started');
       } catch (overlayError) {
         console.warn('[KioskScreen] Failed to start overlay service:', overlayError);
         // Continue anyway - l'app externe peut toujours être lancée
@@ -314,7 +295,6 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
 
       await AppLauncherModule.launchExternalApp(packageName);
       setIsAppLaunched(true);
-      console.log(`[KioskScreen] Launched external app: ${packageName}`);
     } catch (error) {
       console.error('[KioskScreen] Failed to launch app:', error);
     }
@@ -322,36 +302,32 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
 
   const handleAppReturned = (event?: { voluntary?: boolean }): void => {
     const isVoluntary = event?.voluntary ?? false;
-    console.log(`[KioskScreen] handleAppReturned called (voluntary=${isVoluntary})`);
     setIsAppLaunched(false);
 
     // Arrêter l'OverlayService quand on revient sur FreeKiosk
     OverlayServiceModule.stopOverlayService()
-      .then(() => console.log('[KioskScreen] OverlayService stopped'))
       .catch(error => console.warn('[KioskScreen] Failed to stop overlay:', error));
 
     // Si retour volontaire (5 taps), le flag natif est déjà mis par OverlayService
     if (isVoluntary) {
-      console.log('[KioskScreen] Voluntary return detected - native flag already set');
       setAppCrashCount(0);
     }
     // Note: Le relaunch automatique est maintenant géré par AppState listener
   };
 
   const handleSecretTap = (): void => {
-    tapCount++;
-    if (tapTimer) clearTimeout(tapTimer);
+    tapCountRef.current++;
+    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
 
-    if (tapCount === 5) {
-      tapCount = 0;
+    if (tapCountRef.current === 5) {
+      tapCountRef.current = 0;
       clearTimer();
       setIsScreensaverActive(false);
       navigation.navigate('Pin');
-      console.log('[DEBUG] Navigating to PIN screen');
     }
 
-    tapTimer = setTimeout(() => {
-      tapCount = 0;
+    tapTimerRef.current = setTimeout(() => {
+      tapCountRef.current = 0;
     }, 2000);
   };
 
@@ -372,13 +348,14 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       {displayMode === 'webview' ? (
         <>
           {statusBarEnabled && <StatusBar />}
-          <WebViewComponent url={url} autoReload={autoReload} onUserInteraction={onUserInteraction} />
+          <WebViewComponent url={url} autoReload={autoReload} keyboardMode={keyboardMode} onUserInteraction={onUserInteraction} />
         </>
       ) : (
         <ExternalAppOverlay
           externalAppPackage={externalAppPackage}
           isAppLaunched={isAppLaunched}
           testModeEnabled={externalAppTestMode}
+          showStatusBar={statusBarEnabled && statusBarOnReturn}
           onReturnToApp={handleReturnToExternalApp}
           onGoToSettings={handleGoToSettings}
         />

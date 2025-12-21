@@ -28,8 +28,6 @@ async function hashPin(pin: string, salt: Uint8Array): Promise<string> {
   try {
     // Check if Web Crypto API is available
     if (typeof crypto !== 'undefined' && crypto.subtle) {
-      console.log('[SecureStorage] Using Web Crypto API (PBKDF2)');
-
       // Convert PIN to bytes
       const encoder = new TextEncoder();
       const pinBytes = encoder.encode(pin);
@@ -110,7 +108,6 @@ function generateSalt(): Uint8Array {
   if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
     // Use secure random (Web Crypto API)
     crypto.getRandomValues(array);
-    console.log('[SecureStorage] Generated secure salt using crypto.getRandomValues');
   } else {
     // Fallback: Use Math.random() but warn
     console.warn('[SecureStorage] crypto.getRandomValues not available, using Math.random (INSECURE)');
@@ -164,7 +161,6 @@ export async function saveSecurePin(pin: string): Promise<boolean> {
     // Reset attempts when new PIN is set
     await resetPinAttempts();
 
-    console.log('[SecureStorage] PIN saved securely with PBKDF2');
     return true;
   } catch (error) {
     console.error('[SecureStorage] Error saving PIN:', error);
@@ -202,11 +198,8 @@ export async function verifySecurePin(inputPin: string): Promise<{
 
       if (legacyPlaintextPin) {
         // Found plaintext PIN from v1.0.0-1.0.3
-        console.log('[SecureStorage] Detected legacy plaintext PIN (v0), will migrate to v2');
-
         if (inputPin === legacyPlaintextPin) {
           // Success - migrate to v2
-          console.log('[SecureStorage] Plaintext PIN verified, migrating to v2...');
           await saveSecurePin(inputPin); // Save with PBKDF2
           await clearLegacyPlaintextPin(); // Remove plaintext
           await resetPinAttempts();
@@ -303,7 +296,6 @@ async function getPinAttempts(): Promise<PinAttempts> {
       
       // Reset attempts if more than 1 hour has passed since last attempt
       if (attempts.lastAttempt > 0 && (now - attempts.lastAttempt) > ATTEMPTS_RESET_DURATION) {
-        console.log('[SecureStorage] Attempts expired after 1 hour of inactivity - resetting counter');
         // Reset and persist to storage
         const resetAttempts: PinAttempts = {
           count: 0,
@@ -359,7 +351,6 @@ async function recordFailedAttempt(): Promise<void> {
     }
 
     await AsyncStorage.setItem(ATTEMPTS_KEY, JSON.stringify(attempts));
-    console.log(`[SecureStorage] Failed attempt recorded: ${attempts.count}/${maxAttempts}`);
   } catch (error) {
     console.error('[SecureStorage] Error recording attempt:', error);
   }
@@ -371,7 +362,6 @@ async function recordFailedAttempt(): Promise<void> {
 async function resetPinAttempts(): Promise<void> {
   try {
     await AsyncStorage.multiRemove([ATTEMPTS_KEY, LOCKOUT_KEY]);
-    console.log('[SecureStorage] PIN attempts reset');
   } catch (error) {
     console.error('[SecureStorage] Error resetting attempts:', error);
   }
@@ -444,7 +434,6 @@ export async function hasSecurePin(): Promise<boolean> {
 export async function migrateOldPin(oldPin: string | null): Promise<void> {
   try {
     if (oldPin && oldPin !== '1234') {
-      console.log('[SecureStorage] Migrating old PIN to secure storage (v2)');
       await saveSecurePin(oldPin);
     }
   } catch (error) {
@@ -460,7 +449,6 @@ export async function clearSecurePin(): Promise<void> {
     await Keychain.resetGenericPassword({ service: PIN_SERVICE });
     await resetPinAttempts();
     await clearLegacyPlaintextPin(); // Also clear any plaintext PIN
-    console.log('[SecureStorage] PIN cleared');
   } catch (error) {
     console.error('[SecureStorage] Error clearing PIN:', error);
   }
@@ -474,7 +462,6 @@ async function checkLegacyPlaintextPin(): Promise<string | null> {
     // Check old storage key used in v1.0.0-1.0.3
     const plaintextPin = await AsyncStorage.getItem('@kiosk_pin');
     if (plaintextPin && plaintextPin !== '' && plaintextPin !== '1234') {
-      console.log('[SecureStorage] Found legacy plaintext PIN in AsyncStorage');
       return plaintextPin;
     }
     return null;
@@ -490,7 +477,6 @@ async function checkLegacyPlaintextPin(): Promise<string | null> {
 async function clearLegacyPlaintextPin(): Promise<void> {
   try {
     await AsyncStorage.removeItem('@kiosk_pin');
-    console.log('[SecureStorage] Legacy plaintext PIN removed from AsyncStorage');
   } catch (error) {
     console.error('[SecureStorage] Error clearing legacy PIN:', error);
   }

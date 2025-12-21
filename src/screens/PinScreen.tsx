@@ -43,7 +43,6 @@ const PinScreen: React.FC<PinScreenProps> = ({ navigation }) => {
       if (!hasSecure) {
         // Migrate from old plaintext storage
         const oldPin = await StorageService.getPin();
-        console.log('[PinScreen] Migrating from old PIN system...');
         await migrateOldPin(oldPin);
 
         // Clear old PIN from AsyncStorage for security
@@ -68,7 +67,6 @@ const PinScreen: React.FC<PinScreenProps> = ({ navigation }) => {
     if (displayMode === 'external_app' && externalAppPackage) {
       try {
         await AppLauncherModule.launchExternalApp(externalAppPackage);
-        console.log('[PinScreen] Relaunched external app after PIN back');
       } catch (error) {
         console.error('[PinScreen] Failed to relaunch external app:', error);
       }

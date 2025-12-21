@@ -38,6 +38,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [pin, setPin] = useState<string>('');
   const [isPinConfigured, setIsPinConfigured] = useState<boolean>(false);
   const [pinMaxAttempts, setPinMaxAttempts] = useState<number>(5);
+  const [pinMaxAttemptsText, setPinMaxAttemptsText] = useState<string>('5');
   const [autoReload, setAutoReload] = useState<boolean>(false);
   const [kioskEnabled, setKioskEnabled] = useState<boolean>(false);
   const [autoLaunchEnabled, setAutoLaunchEnabled] = useState<boolean>(false);
@@ -60,6 +61,9 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [hasOverlayPermission, setHasOverlayPermission] = useState<boolean>(false);
   const [isDeviceOwner, setIsDeviceOwner] = useState<boolean>(false);
   const [statusBarEnabled, setStatusBarEnabled] = useState<boolean>(false);
+  const [statusBarOnOverlay, setStatusBarOnOverlay] = useState<boolean>(true);
+  const [statusBarOnReturn, setStatusBarOnReturn] = useState<boolean>(true);
+  const [keyboardMode, setKeyboardMode] = useState<string>('default');
 
   useEffect(() => {
     loadSettings();
@@ -73,7 +77,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
       const isOwner = await KioskModule.isDeviceOwner();
       setIsDeviceOwner(isOwner);
     } catch (error) {
-      console.log('Error checking device owner:', error);
       setIsDeviceOwner(false);
     }
   };
@@ -83,7 +86,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
       const canDraw = await OverlayPermissionModule.canDrawOverlays();
       setHasOverlayPermission(canDraw);
     } catch (error) {
-      console.log('Error checking overlay permission:', error);
+      // Silent fail
     }
   };
 
@@ -104,10 +107,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
       // Activer/désactiver HomeActivity selon le mode
       if (newMode === 'external_app') {
         await LauncherModule.enableHomeLauncher();
-        console.log('HomeActivity enabled for External App mode');
       } else {
         await LauncherModule.disableHomeLauncher();
-        console.log('HomeActivity disabled for WebView mode');
       }
     } catch (error) {
       console.error('Error changing display mode:', error);
@@ -158,15 +159,22 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedOverlayButtonVisible = await StorageService.getOverlayButtonVisible();
     const savedPinMaxAttempts = await StorageService.getPinMaxAttempts();
     const savedStatusBarEnabled = await StorageService.getStatusBarEnabled();
+    const savedStatusBarOnOverlay = await StorageService.getStatusBarOnOverlay();
+    const savedStatusBarOnReturn = await StorageService.getStatusBarOnReturn();
     const savedExternalAppTestMode = await StorageService.getExternalAppTestMode();
+    const savedKeyboardMode = await StorageService.getKeyboardMode();
 
     setDisplayMode(savedDisplayMode);
     setExternalAppPackage(savedExternalAppPackage ?? '');
     setAutoRelaunchApp(savedAutoRelaunchApp);
     setOverlayButtonVisible(savedOverlayButtonVisible);
     setPinMaxAttempts(savedPinMaxAttempts);
+    setPinMaxAttemptsText(String(savedPinMaxAttempts));
     setStatusBarEnabled(savedStatusBarEnabled);
+    setStatusBarOnOverlay(savedStatusBarOnOverlay);
+    setStatusBarOnReturn(savedStatusBarOnReturn);
     setExternalAppTestMode(savedExternalAppTestMode);
+    setKeyboardMode(savedKeyboardMode);
   };
 
   const loadCertificates = async (): Promise<void> => {
@@ -174,7 +182,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
       const certs = await CertificateModuleTyped.getAcceptedCertificates();
       setCertificates(certs);
     } catch (error) {
-      console.log('Error loading certificates:', error);
+      // Silent fail
     }
   };
 
@@ -247,9 +255,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
       try {
         const { OverlayServiceModule } = NativeModules;
         await OverlayServiceModule.setButtonOpacity(opacity);
-        console.log(`Overlay button opacity set to: ${opacity}`);
       } catch (error) {
-        console.log('Error setting button opacity:', error);
+        // Silent fail
       }
     }
   };
@@ -262,14 +269,31 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
     if (displayMode === 'external_app') {
       try {
         const { OverlayServiceModule } = NativeModules;
-        await OverlayServiceModule.setStatusBarEnabled(value);
-        console.log(`Status bar enabled set to: ${value} (external app mode)`);
+        // In external app mode, status bar on overlay depends on both enabled and onOverlay flags
+        await OverlayServiceModule.setStatusBarEnabled(value && statusBarOnOverlay);
       } catch (error) {
-        console.log('Error setting status bar enabled:', error);
+        // Silent fail
       }
-    } else {
-      console.log(`Status bar enabled set to: ${value} (webview mode - will apply on return to Kiosk)`);
     }
+  };
+
+  const handleStatusBarOnOverlayChange = async (value: boolean) => {
+    setStatusBarOnOverlay(value);
+
+    // Update status bar on overlay immediately if in external app mode
+    if (displayMode === 'external_app' && statusBarEnabled) {
+      try {
+        const { OverlayServiceModule } = NativeModules;
+        await OverlayServiceModule.setStatusBarEnabled(value);
+      } catch (error) {
+        // Silent fail
+      }
+    }
+  };
+
+  const handleStatusBarOnReturnChange = (value: boolean) => {
+    setStatusBarOnReturn(value);
+    // This affects the ExternalAppOverlay component, no native update needed
   };
 
   const handleSave = async (): Promise<void> => {
@@ -330,7 +354,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
         // Check if it looks like a valid domain (contains at least one dot)
         if (finalUrl.includes('.')) {
           finalUrl = 'https://' + finalUrl;
-          console.log('[Settings] Auto-added https:// to URL:', finalUrl);
 
           // Update the input field to show the complete URL
           setUrl(finalUrl);
@@ -415,16 +438,22 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.saveAutoRelaunchApp(autoRelaunchApp);
     await StorageService.saveOverlayButtonVisible(overlayButtonVisible);
     await StorageService.saveStatusBarEnabled(statusBarEnabled);
+    await StorageService.saveStatusBarOnOverlay(statusBarOnOverlay);
+    await StorageService.saveStatusBarOnReturn(statusBarOnReturn);
     await StorageService.saveExternalAppTestMode(externalAppTestMode);
+    await StorageService.saveKeyboardMode(keyboardMode);
 
     // Update overlay button opacity and test mode
     if (displayMode === 'external_app') {
       const opacity = overlayButtonVisible ? 1.0 : 0.0;
       try {
+        const { OverlayServiceModule } = NativeModules;
         await OverlayServiceModule.setButtonOpacity(opacity);
         await OverlayServiceModule.setTestMode(externalAppTestMode);
+        // Status bar on overlay depends on both flags
+        await OverlayServiceModule.setStatusBarEnabled(statusBarEnabled && statusBarOnOverlay);
       } catch (error) {
-        console.log('Error setting overlay settings:', error);
+        // Silent fail
       }
     }
 
@@ -449,7 +478,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
       try {
         await KioskModule.stopLockTask();
       } catch (error) {
-        console.log('Not in lock task mode');
+        // Silent fail
       }
 
       const message = displayMode === 'external_app'
@@ -499,6 +528,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
               setAutoRelaunchApp(true);
               setOverlayButtonVisible(false);
               setStatusBarEnabled(false);
+              setStatusBarOnOverlay(true);
+              setStatusBarOnReturn(true);
 
               try {
                 await KioskModule.stopLockTask();
@@ -617,6 +648,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
               setAutoRelaunchApp(true);
               setOverlayButtonVisible(false);
               setStatusBarEnabled(false);
+              setStatusBarOnOverlay(true);
+              setStatusBarOnReturn(true);
               setIsDeviceOwner(false);
 
               Alert.alert(
@@ -652,7 +685,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
         </View>
 
         {/* Vos sections existantes... */}
-        {/* Display Mode Section */}}
+        {/* Display Mode Section */}
         <View style={styles.section}>
           <Text style={styles.label}>📱 Display Mode</Text>
           <View style={styles.modeSelector}>
@@ -744,6 +777,14 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
               keyboardType="url"
               autoCapitalize="none"
             />
+            {url.trim().toLowerCase().startsWith('http://') && (
+              <View style={styles.warningBox}>
+                <Text style={styles.warningText}>
+                  ⚠️ SECURITY WARNING: This URL uses HTTP (unencrypted).{'\n'}
+                  Your data can be intercepted by attackers. Use HTTPS instead.
+                </Text>
+              </View>
+            )}
             <Text style={styles.hint}>Example: https://www.freekiosk.app</Text>
           </View>
         )}
@@ -864,13 +905,20 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
             <View style={{ marginTop: 10 }}>
               <TextInput
                 style={styles.input}
-                value={String(pinMaxAttempts)}
+                value={pinMaxAttemptsText}
                 onChangeText={(text) => {
-                  const num = parseInt(text, 10);
+                  // Permettre saisie libre (incluant suppression)
+                  setPinMaxAttemptsText(text);
+                }}
+                onBlur={() => {
+                  // Valider au blur
+                  const num = parseInt(pinMaxAttemptsText, 10);
                   if (!isNaN(num) && num >= 1 && num <= 100) {
                     setPinMaxAttempts(num);
-                  } else if (text === '') {
-                    setPinMaxAttempts(5);
+                    setPinMaxAttemptsText(String(num));
+                  } else {
+                    // Valeur invalide: revenir à la valeur précédente
+                    setPinMaxAttemptsText(String(pinMaxAttempts));
                   }
                 }}
                 keyboardType="numeric"
@@ -950,9 +998,41 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
                 ℹ️ Status bar displays: Battery (with charging indicator ⚡), Wi-Fi (✓/✗), Bluetooth (✓/✗), Volume level, Current time
               </Text>
               {displayMode === 'external_app' && (
-                <Text style={styles.infoSubText}>
-                  {'\n'}External app mode: Status bar appears as overlay on top of the app
-                </Text>
+                <>
+                  <Text style={styles.infoSubText}>
+                    {'\n'}External app mode: Configure where the status bar appears
+                  </Text>
+                  {/* Sub-option: Status bar on overlay (external app) */}
+                  <View style={[styles.switchRow, { marginTop: 12, paddingLeft: 8 }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.label, { fontSize: 14 }]}>📱 On External App (Overlay)</Text>
+                      <Text style={[styles.hint, { fontSize: 12 }]}>
+                        Show status bar overlay on top of the external app
+                      </Text>
+                    </View>
+                    <Switch
+                      value={statusBarOnOverlay}
+                      onValueChange={handleStatusBarOnOverlayChange}
+                      trackColor={{ false: '#767577', true: '#81b0ff' }}
+                      thumbColor={statusBarOnOverlay ? '#0066cc' : '#f4f3f4'}
+                    />
+                  </View>
+                  {/* Sub-option: Status bar on return screen */}
+                  <View style={[styles.switchRow, { marginTop: 8, paddingLeft: 8 }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.label, { fontSize: 14 }]}>🏠 On Return Screen</Text>
+                      <Text style={[styles.hint, { fontSize: 12 }]}>
+                        Show status bar on the "External App Running" screen
+                      </Text>
+                    </View>
+                    <Switch
+                      value={statusBarOnReturn}
+                      onValueChange={handleStatusBarOnReturnChange}
+                      trackColor={{ false: '#767577', true: '#81b0ff' }}
+                      thumbColor={statusBarOnReturn ? '#0066cc' : '#f4f3f4'}
+                    />
+                  </View>
+                </>
               )}
               {displayMode === 'webview' && (
                 <Text style={styles.infoSubText}>
@@ -1014,8 +1094,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
                 </Text>
               </View>
             )}
-          </View>
-        )}
+        </View>
 
         {/* Auto Reload - Only in WebView mode */}
         {displayMode === 'webview' && (
@@ -1031,6 +1110,55 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
                 trackColor={{ false: '#767577', true: '#81b0ff' }}
                 thumbColor={autoReload ? '#0066cc' : '#f4f3f4'}
               />
+            </View>
+          </View>
+        )}
+
+        {/* Keyboard Mode - Only in WebView mode */}
+        {displayMode === 'webview' && (
+          <View style={styles.section}>
+            <Text style={styles.label}>🔢 Keyboard Mode</Text>
+            <Text style={styles.hint}>Control which keyboard appears for input fields</Text>
+            
+            <View style={{ marginTop: 12 }}>
+              <TouchableOpacity
+                style={[styles.radioOption, keyboardMode === 'default' && styles.radioOptionSelected]}
+                onPress={() => setKeyboardMode('default')}
+              >
+                <View style={styles.radioCircle}>
+                  {keyboardMode === 'default' && <View style={styles.radioCircleSelected} />}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.radioLabel}>Default</Text>
+                  <Text style={styles.radioHint}>Respect website settings (recommended)</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.radioOption, keyboardMode === 'force_numeric' && styles.radioOptionSelected]}
+                onPress={() => setKeyboardMode('force_numeric')}
+              >
+                <View style={styles.radioCircle}>
+                  {keyboardMode === 'force_numeric' && <View style={styles.radioCircleSelected} />}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.radioLabel}>Force Numeric</Text>
+                  <Text style={styles.radioHint}>All input fields show numeric keyboard</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.radioOption, keyboardMode === 'smart' && styles.radioOptionSelected]}
+                onPress={() => setKeyboardMode('smart')}
+              >
+                <View style={styles.radioCircle}>
+                  {keyboardMode === 'smart' && <View style={styles.radioCircleSelected} />}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.radioLabel}>Smart Detection</Text>
+                  <Text style={styles.radioHint}>Detect and convert number fields only</Text>
+                </View>
+              </TouchableOpacity>
             </View>
           </View>
         )}
@@ -1727,6 +1855,46 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#666',
     fontFamily: 'monospace',
+  },
+  radioOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    marginBottom: 8,
+    backgroundColor: '#f8f8f8',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  radioOptionSelected: {
+    backgroundColor: '#e3f2fd',
+    borderColor: '#0066cc',
+  },
+  radioCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#999',
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radioCircleSelected: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#0066cc',
+  },
+  radioLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 2,
+  },
+  radioHint: {
+    fontSize: 13,
+    color: '#666',
   },
 });
 

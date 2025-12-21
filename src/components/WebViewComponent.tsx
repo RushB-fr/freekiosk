@@ -22,12 +22,14 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 interface WebViewComponentProps {
   url: string;
   autoReload: boolean;
+  keyboardMode?: string; // 'default', 'force_numeric', 'smart'
   onUserInteraction?: () => void; // callback optionnel pour interaction utilisateur
 }
 
 const WebViewComponent: React.FC<WebViewComponentProps> = ({ 
   url, 
   autoReload,
+  keyboardMode = 'default',
   onUserInteraction
 }) => {
   const navigation = useNavigation<NavigationProp>();
@@ -64,18 +66,12 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
     }
     window.__FREEKIOSK_INITIALIZED__ = true;
 
-    // Debug storage availability for Pinia/Nuxt
-    console.log('[FreeKiosk Debug] localStorage available:', typeof localStorage !== 'undefined');
-    console.log('[FreeKiosk Debug] sessionStorage available:', typeof sessionStorage !== 'undefined');
-    console.log('[FreeKiosk Debug] Cookie:', document.cookie ? 'enabled' : 'disabled');
-    
     // Ensure storage is working properly
     try {
       localStorage.setItem('__test__', '1');
       localStorage.removeItem('__test__');
-      console.log('[FreeKiosk Debug] localStorage: WORKING');
     } catch(e) {
-      console.error('[FreeKiosk Debug] localStorage: FAILED', e);
+      console.error('[FreeKiosk] localStorage FAILED:', e);
     }
 
     // Throttling pour éviter le flood de messages (critique sur Fire OS)
@@ -106,16 +102,85 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
   true;
   `;
 
+  // Script d'injection pour forcer le clavier numérique
+  const getKeyboardModeScript = (): string => {
+    if (keyboardMode === 'default') {
+      return '';
+    }
+
+    if (keyboardMode === 'force_numeric') {
+      return `
+        (function() {
+          function forceNumericKeyboard() {
+            const inputs = document.querySelectorAll('input');
+            inputs.forEach(input => {
+              // Ne pas modifier les types spéciaux
+              const type = input.type.toLowerCase();
+              if (type !== 'hidden' && type !== 'submit' && type !== 'button' && type !== 'checkbox' && type !== 'radio') {
+                input.setAttribute('inputmode', 'numeric');
+                input.setAttribute('pattern', '[0-9]*');
+              }
+            });
+          }
+          
+          // Appliquer immédiatement
+          forceNumericKeyboard();
+          
+          // Observer les changements du DOM
+          const observer = new MutationObserver(forceNumericKeyboard);
+          observer.observe(document.body, { childList: true, subtree: true });
+        })();
+      `;
+    }
+
+    if (keyboardMode === 'smart') {
+      return `
+        (function() {
+          function smartDetectNumeric() {
+            const inputs = document.querySelectorAll('input');
+            inputs.forEach(input => {
+              const type = input.type.toLowerCase();
+              const name = (input.name || '').toLowerCase();
+              const id = (input.id || '').toLowerCase();
+              const placeholder = (input.placeholder || '').toLowerCase();
+              const className = (input.className || '').toLowerCase();
+              
+              // Détecter les champs numériques
+              const isNumericType = type === 'number' || type === 'tel';
+              const hasNumericPattern = input.pattern && /[0-9]/.test(input.pattern);
+              const hasNumericName = /price|quantity|qty|amount|number|num|phone|tel|code|zip|postal|card/.test(name + id + placeholder + className);
+              
+              if (isNumericType || hasNumericPattern || hasNumericName) {
+                input.setAttribute('inputmode', 'numeric');
+                input.setAttribute('pattern', '[0-9]*');
+              }
+            });
+          }
+          
+          // Appliquer immédiatement
+          smartDetectNumeric();
+          
+          // Observer les changements du DOM
+          const observer = new MutationObserver(smartDetectNumeric);
+          observer.observe(document.body, { childList: true, subtree: true });
+        })();
+      `;
+    }
+
+    return '';
+  };
+
+  const combinedInjectedJavaScript = injectedJavaScript + getKeyboardModeScript();
+
   // Gestion des messages venant de la webview
   const onMessageHandler = (event: any) => {
     if (event.nativeEvent.data === 'user-interaction' && onUserInteraction) {
-      console.log('[FreeKiosk] User interaction detected from WebView');
       onUserInteraction();
     }
   };
 
   const handleError = (event: WebViewErrorEvent): void => {
-    console.log('[FreeKiosk] WebView error:', event.nativeEvent);
+    console.error('[FreeKiosk] WebView error:', event.nativeEvent);
     setError(true);
     setLoading(false);
     
@@ -220,7 +285,7 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
 
             {/* Footer */}
             <Text style={styles.footerText}>
-              Version 1.1.2 • by Rushb
+              Version 1.1.3 • by Rushb
             </Text>
           </Animated.View>
         </ScrollView>
@@ -243,7 +308,6 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
         onHttpError={handleHttpError}
 
         onLoadStart={() => {
-          console.log('[FreeKiosk] Load started');
           setLoading(true);
           setError(false);
 
@@ -255,12 +319,10 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
           // Fire OS/Fire Tablet workaround: Force hide loading spinner after 10s
           // This handles cases where onLoadEnd doesn't fire on SPAs or redirects
           loadingTimeoutRef.current = setTimeout(() => {
-            console.log('[FreeKiosk] Loading timeout reached - forcing spinner hide (Fire OS fix)');
             setLoading(false);
           }, 10000);
         }}
         onLoadEnd={() => {
-          console.log('[FreeKiosk] Load ended');
           setLoading(false);
 
           // Clear timeout since load completed normally
@@ -272,7 +334,6 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
         onLoadProgress={({ nativeEvent }) => {
           // For SPAs like Nuxt/Home Assistant, hide spinner when fully loaded
           if (nativeEvent.progress === 1) {
-            console.log('[FreeKiosk] Load progress 100% - hiding spinner');
             setLoading(false);
 
             // Clear timeout since we've reached 100%
@@ -286,15 +347,13 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
 
         javaScriptEnabled={true}
         domStorageEnabled={true}
-        injectedJavaScript={injectedJavaScript}
+        injectedJavaScript={combinedInjectedJavaScript}
 
         onMessage={onMessageHandler}
 
         startInLoadingState={true}
 
         onShouldStartLoadWithRequest={(request: ShouldStartLoadRequest) => {
-          console.log('[FreeKiosk] Navigation request:', request.url);
-
           // Security: Block dangerous URL schemes
           const urlLower = request.url.toLowerCase();
           if (urlLower.startsWith('file://') ||
@@ -308,7 +367,7 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
         }}
 
         onNavigationStateChange={(navState) => {
-          console.log('[FreeKiosk] Navigation state:', navState.url, 'Loading:', navState.loading);
+          // Navigation state tracking
         }}
 
         scalesPageToFit={true}
@@ -325,11 +384,10 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
         setSupportMultipleWindows={true}
         onOpenWindow={(syntheticEvent) => {
           const { nativeEvent } = syntheticEvent;
-          console.log('[FreeKiosk] New window requested:', nativeEvent.targetUrl);
           // Load the URL in the same WebView instead of opening a popup
           if (webViewRef.current && nativeEvent.targetUrl) {
             webViewRef.current.injectJavaScript(
-              `window.location.href = "${nativeEvent.targetUrl}";`
+              `window.location.href = ${JSON.stringify(nativeEvent.targetUrl)};`
             );
           }
         }}

@@ -20,7 +20,10 @@ const KEYS = {
   OVERLAY_BUTTON_VISIBLE: '@kiosk_overlay_button_visible',
   PIN_MAX_ATTEMPTS: '@kiosk_pin_max_attempts',
   STATUS_BAR_ENABLED: '@kiosk_status_bar_enabled',
+  STATUS_BAR_ON_OVERLAY: '@kiosk_status_bar_on_overlay',
+  STATUS_BAR_ON_RETURN: '@kiosk_status_bar_on_return',
   EXTERNAL_APP_TEST_MODE: '@kiosk_external_app_test_mode',
+  KEYBOARD_MODE: '@kiosk_keyboard_mode',
   // Legacy keys for backward compatibility
   SCREENSAVER_DELAY: '@screensaver_delay',
   MOTION_DETECTION_ENABLED: '@motion_detection_enabled',
@@ -146,6 +149,8 @@ export const StorageService = {
         KEYS.OVERLAY_BUTTON_VISIBLE,
         KEYS.PIN_MAX_ATTEMPTS,
         KEYS.STATUS_BAR_ENABLED,
+        KEYS.STATUS_BAR_ON_OVERLAY,
+        KEYS.STATUS_BAR_ON_RETURN,
         // Legacy keys
         KEYS.SCREENSAVER_DELAY,
         KEYS.MOTION_DETECTION_ENABLED,
@@ -494,6 +499,44 @@ export const StorageService = {
     }
   },
 
+  //STATUS BAR ON OVERLAY (External app mode)
+  saveStatusBarOnOverlay: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.STATUS_BAR_ON_OVERLAY, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving status bar on overlay:', error);
+    }
+  },
+
+  getStatusBarOnOverlay: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.STATUS_BAR_ON_OVERLAY);
+      return value === null ? true : JSON.parse(value); // Par défaut true (activée)
+    } catch (error) {
+      console.error('Error getting status bar on overlay:', error);
+      return true;
+    }
+  },
+
+  //STATUS BAR ON RETURN SCREEN (External app mode)
+  saveStatusBarOnReturn: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.STATUS_BAR_ON_RETURN, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving status bar on return:', error);
+    }
+  },
+
+  getStatusBarOnReturn: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.STATUS_BAR_ON_RETURN);
+      return value === null ? true : JSON.parse(value); // Par défaut true (activée)
+    } catch (error) {
+      console.error('Error getting status bar on return:', error);
+      return true;
+    }
+  },
+
   //EXTERNAL APP TEST MODE
   saveExternalAppTestMode: async (value: boolean): Promise<void> => {
     try {
@@ -510,6 +553,25 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting external app test mode:', error);
       return true;
+    }
+  },
+
+  // Keyboard Mode
+  saveKeyboardMode: async (mode: string): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.KEYBOARD_MODE, mode);
+    } catch (error) {
+      console.error('Error saving keyboard mode:', error);
+    }
+  },
+
+  getKeyboardMode: async (): Promise<string> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.KEYBOARD_MODE);
+      return value || 'default'; // default, force_numeric, smart
+    } catch (error) {
+      console.error('Error getting keyboard mode:', error);
+      return 'default';
     }
   },
 

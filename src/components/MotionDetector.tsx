@@ -47,7 +47,6 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
 
   const startDetection = () => {
     stopDetection();
-    console.log('[MotionDetector] Starting detection...');
 
     detectionInterval.current = setInterval(async () => {
       await captureAndCompare();
@@ -83,11 +82,10 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
       );
 
       if (hasMotion) {
-        console.log('[MotionDetector] Motion detected by native module!');
         handleMotionDetected();
       }
     } catch (error) {
-      console.log('[MotionDetector] Capture error:', error);
+      // Silent capture errors
     }
   };
 
@@ -96,7 +94,6 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
     if (now - lastMotionTime.current > THROTTLE_INTERVAL) {
       lastMotionTime.current = now;
       onMotionDetected();
-      console.log('[MotionDetector] Motion callback triggered');
     }
   };
 

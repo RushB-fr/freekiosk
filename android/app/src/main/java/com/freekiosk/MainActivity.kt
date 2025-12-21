@@ -345,7 +345,19 @@ class MainActivity : ReactActivity() {
   }
 
   override fun onBackPressed() {
-    // Bloquer le bouton retour en mode kiosk (sauf si mode test activé)
+    // Lire le mode test depuis SharedPreferences
+    val prefs = getSharedPreferences("FreeKioskSettings", Context.MODE_PRIVATE)
+    val testModeEnabled = prefs.getBoolean("test_mode_enabled", false)
+    
+    if (testModeEnabled) {
+      // En mode test: permettre le bouton retour
+      DebugLog.d("MainActivity", "Back button pressed - Test Mode enabled, allowing back")
+      super.onBackPressed()
+    } else {
+      // En mode normal: bloquer le bouton retour en mode kiosk
+      DebugLog.d("MainActivity", "Back button pressed - Kiosk Mode active, blocking back")
+      // Ne rien faire = bloquer le back button
+    }
   }
 
   private fun bringToFrontWithPinNavigation() {

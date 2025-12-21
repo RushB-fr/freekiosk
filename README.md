@@ -11,7 +11,7 @@
   </p>
   
   <p>
-    <img src="https://img.shields.io/badge/Version-1.1.2-blue.svg" alt="Version 1.1.2">
+    <img src="https://img.shields.io/badge/Version-1.1.3-blue.svg" alt="Version 1.1.3">
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT">
     <img src="https://img.shields.io/badge/Android-8.0%2B-green.svg" alt="Android 8.0+">
     <img src="https://img.shields.io/badge/Device%20Owner-Supported-brightgreen" alt="Device Owner">
@@ -217,7 +217,13 @@ Done! Your tablet is now in kiosk mode.
 
 ## 🗺️ Roadmap
 
-### ✅ v1.1.2 (Current - Dec 2025)
+### ✅ v1.1.3 (Current - Dec 2025)
+- ⌨️ **Keyboard Mode**: Default, Force Numeric, or Smart Detection
+- 📊 **Status Bar in External Mode**: Choose to display on external app overlay and/or return screen
+- 🐛 **Status Bar System**: Debug and stability fixes
+- 🐛 **PIN Code Max Attempts**: Fixed counter issue
+
+### ✅ v1.1.2 (Dec 2025)
 - 📊 **Status Bar Display**: New option to show/hide Android status bar (battery, WiFi, Bluetooth, sound)
 - 🧪 **Test Mode for External App**: Safety feature with back button (enabled by default)
 

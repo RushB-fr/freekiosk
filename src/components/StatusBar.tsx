@@ -34,7 +34,6 @@ const StatusBar: React.FC = () => {
         }
 
         const info = await SystemInfoModule.getSystemInfo();
-        console.log('[StatusBar] System info received:', JSON.stringify(info));
 
         // Validate data structure
         if (!info || !info.battery || !info.wifi || !info.bluetooth || !info.audio) {

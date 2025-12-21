@@ -11,6 +11,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ***
 
 
+## [1.1.3] - 2025-12-21
+
+
+### Added
+- ⌨️ **Keyboard Mode**: New option to control keyboard behavior
+  - Default: Use system default keyboard
+  - Force Numeric: Always show numeric keyboard
+  - Smart Detection: Automatically detect input type and show appropriate keyboard
+- 📊 **Status Bar Options for External App Mode**: New sub-options for status bar placement
+  - "On External App (Overlay)" - Show custom status bar overlay on top of the external app
+  - "On Return Screen" - Show status bar on the "External App Running" screen
+
+
+### Fixed
+- 🐛 **Status Bar System**: Debug and stability improvements for status bar display
+- 🐛 **PIN Code Max Failed Attempts**: Fixed issue with max failed attempts counter
+
+
+***
+
+
 ## [1.1.2] - 2025-12-19
 
 
@@ -200,6 +221,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ***
 
 
+[1.1.3]: https://github.com/rushb-fr/freekiosk/releases/tag/v1.1.3
 [1.1.2]: https://github.com/rushb-fr/freekiosk/releases/tag/v1.1.2
 [1.1.1]: https://github.com/rushb-fr/freekiosk/releases/tag/v1.1.1
 [1.1.0]: https://github.com/rushb-fr/freekiosk/releases/tag/v1.1.0
@@ -208,4 +230,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.0.3]: https://github.com/rushb-fr/freekiosk/releases/tag/v1.0.3
 [1.0.2]: https://github.com/rushb-fr/freekiosk/releases/tag/v1.0.2
 [1.0.1]: https://github.com/rushb-fr/freekiosk/releases/tag/v1.0.1
-[Unreleased]: https://github.com/rushb-fr/freekiosk/compare/v1.1.2...HEAD
+[Unreleased]: https://github.com/rushb-fr/freekiosk/compare/v1.1.3...HEAD
