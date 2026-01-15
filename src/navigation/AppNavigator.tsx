@@ -3,7 +3,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import KioskScreen from '../screens/KioskScreen';
 import PinScreen from '../screens/PinScreen';
-import SettingsScreen from '../screens/SettingsScreen';
+// v1.2: Use new settings screen with Material tabs
+import { SettingsScreen } from '../screens/settings';
 
 export type RootStackParamList = {
   Kiosk: undefined;
@@ -40,15 +41,7 @@ const AppNavigator: React.FC = () => {
           name="Settings" 
           component={SettingsScreen}
           options={{
-            headerShown: true,
-            title: 'Parameters',
-            headerStyle: {
-              backgroundColor: '#0066cc',
-            },
-            headerTintColor: '#fff',
-            headerTitleStyle: {
-              fontWeight: 'bold',
-            },
+            headerShown: false, // v1.2: Custom header with tabs
           }}
         />
       </Stack.Navigator>

@@ -9,8 +9,12 @@ import { StorageService } from '../utils/storage';
 import KioskModule from '../utils/KioskModule';
 import AppLauncherModule from '../utils/AppLauncherModule';
 import OverlayServiceModule from '../utils/OverlayServiceModule';
+import { ApiService } from '../utils/ApiService';
+import { ScheduledEvent, getActiveEvent } from '../types/planner';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
+
+const { HttpServerModule } = NativeModules;
 
 type KioskScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Kiosk'>;
 
@@ -51,10 +55,35 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [countdownSeconds, setCountdownSeconds] = useState<number>(0);
   const countdownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [keyboardMode, setKeyboardMode] = useState<string>('default');
+  const [allowPowerButton, setAllowPowerButton] = useState<boolean>(false);
   const appStateRef = useRef(AppState.currentState);
   const appLaunchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tapCountRef = useRef<number>(0);
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  // Return button settings (WebView mode)
+  const [returnButtonVisible, setReturnButtonVisible] = useState<boolean>(false);
+  const [returnButtonPosition, setReturnButtonPosition] = useState<string>('bottom-right');
+  
+  // URL Rotation states
+  const [urlRotationEnabled, setUrlRotationEnabled] = useState<boolean>(false);
+  const [urlRotationList, setUrlRotationList] = useState<string[]>([]);
+  const [urlRotationInterval, setUrlRotationInterval] = useState<number>(30000);
+  const [currentUrlIndex, setCurrentUrlIndex] = useState<number>(0);
+  const urlRotationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  
+  // URL Planner states
+  const [urlPlannerEnabled, setUrlPlannerEnabled] = useState<boolean>(false);
+  const [urlPlannerEvents, setUrlPlannerEvents] = useState<ScheduledEvent[]>([]);
+  const [activeScheduledEvent, setActiveScheduledEvent] = useState<ScheduledEvent | null>(null);
+  const urlPlannerTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [baseUrl, setBaseUrl] = useState<string>(''); // Original URL before planner/rotation
+  
+  // WebView reload key - increment to force reload
+  const [webViewKey, setWebViewKey] = useState<number>(0);
+  
+  // JavaScript to execute in WebView (from API)
+  const [jsToExecute, setJsToExecute] = useState<string>('');
 
   // AppState listener - détecte quand l'app revient au premier plan
   useEffect(() => {
@@ -117,6 +146,145 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       }
     };
   }, [displayMode, externalAppPackage, autoRelaunchApp]);
+
+  // API Service initialization - connect REST API to app controls
+  useEffect(() => {
+    const initApiService = async () => {
+      await ApiService.initialize({
+        onSetBrightness: async (value: number) => {
+          try {
+            // API sends 0-100, RNBrightness needs 0-1
+            const normalizedValue = value / 100;
+            await RNBrightness.setBrightnessLevel(normalizedValue);
+            setDefaultBrightness(normalizedValue);
+            // Persist to storage so Settings shows updated value
+            await StorageService.saveDefaultBrightness(normalizedValue);
+            console.log('[API] Brightness set to', value);
+          } catch (error) {
+            console.error('[API] Error setting brightness:', error);
+          }
+        },
+        onScreensaverOn: () => {
+          setIsScreensaverActive(true);
+          console.log('[API] Screensaver ON');
+        },
+        onScreensaverOff: () => {
+          setIsScreensaverActive(false);
+          resetTimer();
+          console.log('[API] Screensaver OFF');
+        },
+        onWake: () => {
+          setIsScreensaverActive(false);
+          resetTimer();
+          console.log('[API] Wake');
+        },
+        onReload: () => {
+          setWebViewKey(prev => prev + 1);
+          console.log('[API] Reload triggered');
+        },
+        onSetUrl: async (newUrl: string) => {
+          setUrl(newUrl);
+          // Persist to storage so Settings shows updated value
+          await StorageService.saveUrl(newUrl);
+          console.log('[API] URL set to', newUrl);
+        },
+        onTts: (text: string) => {
+          // TTS not implemented yet, but ready for future
+          console.log('[API] TTS request:', text);
+        },
+        onSetVolume: async (value: number) => {
+          try {
+            // API sends 0-100, native module handles it
+            if (HttpServerModule?.setVolume) {
+              await HttpServerModule.setVolume(value);
+            }
+            console.log('[API] Volume set to', value);
+          } catch (error) {
+            console.error('[API] Error setting volume:', error);
+          }
+        },
+        onRotationStart: () => {
+          setUrlRotationEnabled(true);
+          StorageService.saveUrlRotationEnabled(true);
+          console.log('[API] URL Rotation started');
+        },
+        onRotationStop: () => {
+          setUrlRotationEnabled(false);
+          StorageService.saveUrlRotationEnabled(false);
+          console.log('[API] URL Rotation stopped');
+        },
+        onToast: async (text: string) => {
+          try {
+            if (HttpServerModule?.showToast) {
+              await HttpServerModule.showToast(text);
+            }
+            console.log('[API] Toast:', text);
+          } catch (error) {
+            console.error('[API] Error showing toast:', error);
+          }
+        },
+        onLaunchApp: async (packageName: string) => {
+          try {
+            await AppLauncherModule.launchExternalApp(packageName);
+            console.log('[API] Launched app:', packageName);
+          } catch (error) {
+            console.error('[API] Error launching app:', error);
+          }
+        },
+        onExecuteJs: (code: string) => {
+          // Will be handled by WebView - need to pass down
+          setJsToExecute(code);
+          console.log('[API] Execute JS:', code.substring(0, 50));
+        },
+        onReboot: async () => {
+          try {
+            await KioskModule.reboot();
+            console.log('[API] Reboot requested');
+          } catch (error) {
+            console.error('[API] Error rebooting:', error);
+          }
+        },
+        onClearCache: () => {
+          // Force reload with cache clear
+          setWebViewKey(prev => prev + 1);
+          console.log('[API] Cache cleared (WebView reloaded)');
+        },
+        onRemoteKey: async (key: string) => {
+          try {
+            await KioskModule.sendRemoteKey(key);
+            console.log('[API] Remote key:', key);
+          } catch (error) {
+            console.error('[API] Error sending remote key:', error);
+          }
+        },
+      });
+      
+      // Auto-start the API server if enabled
+      await ApiService.autoStart();
+    };
+
+    initApiService();
+
+    return () => {
+      ApiService.destroy();
+    };
+  }, []);
+
+  // Update API status when relevant state changes
+  useEffect(() => {
+    ApiService.updateStatus({
+      currentUrl: url,
+      brightness: Math.round(defaultBrightness * 100),
+      screensaverActive: isScreensaverActive,
+      kioskMode: true, // Always in kiosk mode when this screen is active
+      canGoBack: false,
+      loading: false,
+      rotationEnabled: urlRotationEnabled,
+      rotationUrls: urlRotationList,
+      rotationInterval: Math.round(urlRotationInterval / 1000),
+      rotationCurrentIndex: currentUrlIndex,
+    });
+  }, [url, defaultBrightness, isScreensaverActive, urlRotationEnabled, urlRotationList, urlRotationInterval, currentUrlIndex]);
 
   // Countdown timer effect (transparent - no UI)
   useEffect(() => {
@@ -182,6 +350,91 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       setIsScreensaverActive(false);
     }
   }, [screensaverEnabled, inactivityEnabled, inactivityDelay]);
+
+  // URL Rotation effect
+  useEffect(() => {
+    // Clear any existing rotation timer
+    if (urlRotationTimerRef.current) {
+      clearInterval(urlRotationTimerRef.current);
+      urlRotationTimerRef.current = null;
+    }
+    
+    // Only enable rotation in webview mode with valid URLs
+    // AND when planner is not active (planner has priority)
+    if (
+      displayMode === 'webview' &&
+      urlRotationEnabled &&
+      urlRotationList.length >= 2 &&
+      urlRotationInterval >= 5000 &&
+      !activeScheduledEvent // Don't rotate when planner event is active
+    ) {
+      // Set initial URL to first in list
+      if (urlRotationList.length > 0 && currentUrlIndex === 0) {
+        setUrl(urlRotationList[0]);
+      }
+      
+      // Start rotation timer
+      urlRotationTimerRef.current = setInterval(() => {
+        setCurrentUrlIndex(prevIndex => {
+          const nextIndex = (prevIndex + 1) % urlRotationList.length;
+          setUrl(urlRotationList[nextIndex]);
+          return nextIndex;
+        });
+      }, urlRotationInterval);
+    }
+    
+    return () => {
+      if (urlRotationTimerRef.current) {
+        clearInterval(urlRotationTimerRef.current);
+        urlRotationTimerRef.current = null;
+      }
+    };
+  }, [displayMode, urlRotationEnabled, urlRotationList, urlRotationInterval, activeScheduledEvent]);
+
+  // URL Planner effect - checks every minute for scheduled events
+  useEffect(() => {
+    // Clear any existing planner timer
+    if (urlPlannerTimerRef.current) {
+      clearInterval(urlPlannerTimerRef.current);
+      urlPlannerTimerRef.current = null;
+    }
+    
+    if (displayMode !== 'webview' || !urlPlannerEnabled || urlPlannerEvents.length === 0) {
+      setActiveScheduledEvent(null);
+      return;
+    }
+    
+    // Check for active event immediately
+    const checkAndUpdateActiveEvent = () => {
+      const activeEvent = getActiveEvent(urlPlannerEvents);
+      
+      if (activeEvent && activeEvent.id !== activeScheduledEvent?.id) {
+        // New active event found
+        setActiveScheduledEvent(activeEvent);
+        setUrl(activeEvent.url);
+      } else if (!activeEvent && activeScheduledEvent) {
+        // No active event, but there was one before
+        setActiveScheduledEvent(null);
+        // Restore base URL or let rotation take over
+        if (!urlRotationEnabled || urlRotationList.length < 2) {
+          setUrl(baseUrl);
+        }
+      }
+    };
+    
+    // Check immediately
+    checkAndUpdateActiveEvent();
+    
+    // Check every minute for schedule changes
+    urlPlannerTimerRef.current = setInterval(checkAndUpdateActiveEvent, 60000);
+    
+    return () => {
+      if (urlPlannerTimerRef.current) {
+        clearInterval(urlPlannerTimerRef.current);
+        urlPlannerTimerRef.current = null;
+      }
+    };
+  }, [displayMode, urlPlannerEnabled, urlPlannerEvents, baseUrl, urlRotationEnabled, urlRotationList.length]);
 
   useEffect(() => {
     // Event emitter pour les événements natifs (MainActivity)
@@ -256,6 +509,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       const savedBackButtonMode = await StorageService.getBackButtonMode();
       const savedBackButtonTimerDelay = await StorageService.getBackButtonTimerDelay();
       const savedKeyboardMode = await StorageService.getKeyboardMode();
+      const savedAllowPowerButton = await StorageService.getAllowPowerButton();
 
       setDisplayMode(savedDisplayMode);
       setExternalAppPackage(savedExternalAppPackage);
@@ -263,12 +517,36 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       setBackButtonMode(savedBackButtonMode);
       setBackButtonTimerDelay(savedBackButtonTimerDelay);
       setKeyboardMode(savedKeyboardMode);
+      setAllowPowerButton(savedAllowPowerButton);
+      
+      // Load return button settings (for WebView mode)
+      const savedReturnButtonVisible = await StorageService.getOverlayButtonVisible();
+      const savedReturnButtonPosition = await StorageService.getOverlayButtonPosition();
+      setReturnButtonVisible(savedReturnButtonVisible);
+      setReturnButtonPosition(savedReturnButtonPosition);
+      
+      // Load URL Rotation settings
+      const savedUrlRotationEnabled = await StorageService.getUrlRotationEnabled();
+      const savedUrlRotationList = await StorageService.getUrlRotationList();
+      const savedUrlRotationInterval = await StorageService.getUrlRotationInterval();
+      setUrlRotationEnabled(savedUrlRotationEnabled);
+      setUrlRotationList(savedUrlRotationList);
+      setUrlRotationInterval(savedUrlRotationInterval * 1000); // Convert seconds to ms
+      
+      // Load URL Planner settings
+      const savedUrlPlannerEnabled = await StorageService.getUrlPlannerEnabled();
+      const savedUrlPlannerEvents = await StorageService.getUrlPlannerEvents();
+      setUrlPlannerEnabled(savedUrlPlannerEnabled);
+      setUrlPlannerEvents(savedUrlPlannerEvents);
+      
+      // Store base URL for when planner/rotation is not active
+      if (savedUrl) setBaseUrl(savedUrl);
 
       if (savedKioskEnabled) {
         try {
           // Pass external app package so it gets added to whitelist
           const packageToWhitelist = savedDisplayMode === 'external_app' && savedExternalAppPackage ? savedExternalAppPackage : undefined;
-          await KioskModule.startLockTask(packageToWhitelist);
+          await KioskModule.startLockTask(packageToWhitelist, savedAllowPowerButton);
         } catch {
           // Silent fail
         }
@@ -411,7 +689,15 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
               showTime={showTime}
             />
           )}
-          <WebViewComponent url={url} autoReload={autoReload} keyboardMode={keyboardMode} onUserInteraction={onUserInteraction} />
+          <WebViewComponent 
+            key={webViewKey} 
+            url={url} 
+            autoReload={autoReload} 
+            keyboardMode={keyboardMode} 
+            onUserInteraction={onUserInteraction}
+            jsToExecute={jsToExecute}
+            onJsExecuted={() => setJsToExecute('')}
+          />
         </>
       ) : (
         <ExternalAppOverlay
@@ -436,11 +722,25 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         sensitivity="medium"
       />
 
-      <TouchableOpacity
-        style={styles.secretButton}
-        onPress={handleSecretTap}
-        activeOpacity={1}
-      />
+      {/* Return Button - WebView mode only, positioned based on settings */}
+      {displayMode === 'webview' && (
+        <TouchableOpacity
+          style={[
+            styles.secretButton,
+            returnButtonVisible && styles.secretButtonVisible,
+            returnButtonPosition === 'top-left' && styles.secretButtonTopLeft,
+            returnButtonPosition === 'top-right' && styles.secretButtonTopRight,
+            returnButtonPosition === 'bottom-left' && styles.secretButtonBottomLeft,
+            returnButtonPosition === 'bottom-right' && styles.secretButtonBottomRight,
+          ]}
+          onPress={handleSecretTap}
+          activeOpacity={returnButtonVisible ? 0.7 : 1}
+        >
+          {returnButtonVisible && (
+            <Text style={styles.secretButtonText}>↩</Text>
+          )}
+        </TouchableOpacity>
+      )}
 
       {isScreensaverActive && screensaverEnabled && (
         <TouchableOpacity
@@ -459,11 +759,50 @@ const styles = StyleSheet.create({
   },
   secretButton: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 80,
-    height: 80,
+    width: 50,
+    height: 50,
     backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  secretButtonVisible: {
+    backgroundColor: '#2196F3',
+    borderRadius: 25,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  secretButtonText: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  secretButtonTopLeft: {
+    top: 10,
+    left: 10,
+    bottom: undefined,
+    right: undefined,
+  },
+  secretButtonTopRight: {
+    top: 10,
+    right: 10,
+    bottom: undefined,
+    left: undefined,
+  },
+  secretButtonBottomLeft: {
+    bottom: 10,
+    left: 10,
+    top: undefined,
+    right: undefined,
+  },
+  secretButtonBottomRight: {
+    bottom: 10,
+    right: 10,
+    top: undefined,
+    left: undefined,
   },
   screensaverOverlay: {
     position: 'absolute',

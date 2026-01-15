@@ -90,8 +90,8 @@ android {
         applicationId "com.freekiosk"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 13
-        versionName "1.1.4"
+        versionCode 14
+        versionName "1.2.0"
 
         manifestPlaceholders = [usesCleartextTraffic: "true"]
     }
@@ -155,9 +155,15 @@ tasks.whenTaskAdded { task ->
     }
 }
 
+// React Native Vector Icons configuration
+apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")
+
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+
+    // NanoHTTPD for REST API server
+    implementation("org.nanohttpd:nanohttpd:2.3.1")
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

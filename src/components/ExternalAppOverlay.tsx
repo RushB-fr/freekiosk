@@ -114,7 +114,7 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
           {/* Hint */}
           <View style={styles.hintContainer}>
             <Text style={styles.hintText}>
-              💡 Tip: While in the external app, tap 5× on the invisible button in the bottom-right corner to return here
+              💡 Tip: While in the external app, tap 5× on the secret button to return here (position configurable)
             </Text>
           </View>
         </View>

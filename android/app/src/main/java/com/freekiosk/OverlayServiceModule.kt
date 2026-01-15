@@ -86,6 +86,39 @@ class OverlayServiceModule(reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
+    fun setButtonPosition(position: String, promise: Promise) {
+        try {
+            // Valider la position
+            val validPositions = listOf("top-left", "top-right", "bottom-left", "bottom-right")
+            val safePosition = if (validPositions.contains(position)) position else "bottom-right"
+            
+            // Sauvegarder dans SharedPreferences
+            val prefs = reactApplicationContext.getSharedPreferences("FreeKioskSettings", android.content.Context.MODE_PRIVATE)
+            prefs.edit().putString("overlay_button_position", safePosition).apply()
+            
+            // Mettre à jour le bouton en temps réel via la méthode statique
+            OverlayService.updateButtonPosition(safePosition)
+            
+            DebugLog.d("OverlayServiceModule", "Set button position to: $safePosition")
+            promise.resolve(true)
+        } catch (e: Exception) {
+            DebugLog.errorProduction("OverlayServiceModule", "Error setting button position: ${e.message}")
+            promise.reject("ERROR", "Failed to set button position: ${e.message}")
+        }
+    }
+
+    @ReactMethod
+    fun getButtonPosition(promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("FreeKioskSettings", android.content.Context.MODE_PRIVATE)
+            val position = prefs.getString("overlay_button_position", "bottom-right")
+            promise.resolve(position)
+        } catch (e: Exception) {
+            promise.reject("ERROR", "Failed to get button position: ${e.message}")
+        }
+    }
+
+    @ReactMethod
     fun setTestMode(enabled: Boolean, promise: Promise) {
         try {
             // Sauvegarder dans SharedPreferences pour le JavaScript

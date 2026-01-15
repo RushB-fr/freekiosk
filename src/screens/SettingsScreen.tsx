@@ -55,6 +55,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [externalAppPackage, setExternalAppPackage] = useState<string>('');
   const [autoRelaunchApp, setAutoRelaunchApp] = useState<boolean>(true);
   const [overlayButtonVisible, setOverlayButtonVisible] = useState<boolean>(false);
+  const [overlayButtonPosition, setOverlayButtonPosition] = useState<string>('bottom-right');
   const [backButtonMode, setBackButtonMode] = useState<string>('test');
   const [backButtonTimerDelay, setBackButtonTimerDelay] = useState<string>('10');
   const [installedApps, setInstalledApps] = useState<AppInfo[]>([]);
@@ -71,6 +72,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [showVolume, setShowVolume] = useState<boolean>(true);
   const [showTime, setShowTime] = useState<boolean>(true);
   const [keyboardMode, setKeyboardMode] = useState<string>('default');
+  const [allowPowerButton, setAllowPowerButton] = useState<boolean>(false);
   
   // Update states
   const [checkingUpdate, setCheckingUpdate] = useState<boolean>(false);
@@ -181,6 +183,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedExternalAppPackage = await StorageService.getExternalAppPackage();
     const savedAutoRelaunchApp = await StorageService.getAutoRelaunchApp();
     const savedOverlayButtonVisible = await StorageService.getOverlayButtonVisible();
+    const savedOverlayButtonPosition = await StorageService.getOverlayButtonPosition();
     const savedPinMaxAttempts = await StorageService.getPinMaxAttempts();
     const savedStatusBarEnabled = await StorageService.getStatusBarEnabled();
     const savedStatusBarOnOverlay = await StorageService.getStatusBarOnOverlay();
@@ -193,11 +196,13 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedBackButtonMode = await StorageService.getBackButtonMode();
     const savedBackButtonTimerDelay = await StorageService.getBackButtonTimerDelay();
     const savedKeyboardMode = await StorageService.getKeyboardMode();
+    const savedAllowPowerButton = await StorageService.getAllowPowerButton();
 
     setDisplayMode(savedDisplayMode);
     setExternalAppPackage(savedExternalAppPackage ?? '');
     setAutoRelaunchApp(savedAutoRelaunchApp);
     setOverlayButtonVisible(savedOverlayButtonVisible);
+    setOverlayButtonPosition(savedOverlayButtonPosition);
     setPinMaxAttempts(savedPinMaxAttempts);
     setPinMaxAttemptsText(String(savedPinMaxAttempts));
     setStatusBarEnabled(savedStatusBarEnabled);
@@ -211,6 +216,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setBackButtonMode(savedBackButtonMode);
     setBackButtonTimerDelay(String(savedBackButtonTimerDelay));
     setKeyboardMode(savedKeyboardMode);
+    setAllowPowerButton(savedAllowPowerButton);
   };
 
   const loadCertificates = async (): Promise<void> => {
@@ -241,22 +247,17 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
   };
 
   const validatePackageName = (packageName: string): boolean => {
-    const regex = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
+    // Android package names can contain uppercase letters (e.g., com.JoonAppInc.JoonKids)
+    const regex = /^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$/;
     return regex.test(packageName);
   };
 
   const toggleAutoLaunch = async (value: boolean) => {
     setAutoLaunchEnabled(value);
+    // On sauvegarde uniquement dans SharedPreferences
+    // Le BootReceiver lit directement cette valeur au boot
+    // Plus besoin de enable/disable le composant via PackageManager
     await StorageService.saveAutoLaunch(value);
-    try {
-      if (value) {
-        await KioskModule.enableAutoLaunch();
-      } else {
-        await KioskModule.disableAutoLaunch();
-      }
-    } catch (error) {
-      Alert.alert('Error', `Failed to update auto launch: ${error}`);
-    }
   };
 
 
@@ -291,6 +292,20 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
       try {
         const { OverlayServiceModule } = NativeModules;
         await OverlayServiceModule.setButtonOpacity(opacity);
+      } catch (error) {
+        // Silent fail
+      }
+    }
+  };
+
+  const handleOverlayButtonPositionChange = async (value: string) => {
+    setOverlayButtonPosition(value);
+
+    // Update button position immediately if in external app mode
+    if (displayMode === 'external_app') {
+      try {
+        const { OverlayServiceModule } = NativeModules;
+        await OverlayServiceModule.setButtonPosition(value);
       } catch (error) {
         // Silent fail
       }
@@ -573,6 +588,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.saveExternalAppPackage(externalAppPackage);
     await StorageService.saveAutoRelaunchApp(autoRelaunchApp);
     await StorageService.saveOverlayButtonVisible(overlayButtonVisible);
+    await StorageService.saveOverlayButtonPosition(overlayButtonPosition);
     await StorageService.saveStatusBarEnabled(statusBarEnabled);
     await StorageService.saveStatusBarOnOverlay(statusBarOnOverlay);
     await StorageService.saveStatusBarOnReturn(statusBarOnReturn);
@@ -585,13 +601,15 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const timerDelay = parseInt(backButtonTimerDelay, 10);
     await StorageService.saveBackButtonTimerDelay(isNaN(timerDelay) ? 10 : Math.max(1, Math.min(3600, timerDelay)));
     await StorageService.saveKeyboardMode(keyboardMode);
+    await StorageService.saveAllowPowerButton(allowPowerButton);
 
-    // Update overlay button opacity and test mode
+    // Update overlay button opacity, position and test mode
     if (displayMode === 'external_app') {
       const opacity = overlayButtonVisible ? 1.0 : 0.0;
       try {
         const { OverlayServiceModule } = NativeModules;
         await OverlayServiceModule.setButtonOpacity(opacity);
+        await OverlayServiceModule.setButtonPosition(overlayButtonPosition);
         await OverlayServiceModule.setTestMode(backButtonMode === 'test');
         // Status bar on overlay depends on both flags
         await OverlayServiceModule.setStatusBarEnabled(statusBarEnabled && statusBarOnOverlay);
@@ -607,7 +625,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
       try {
         // Pass external app package so it gets added to whitelist
         const packageToWhitelist = displayMode === 'external_app' ? externalAppPackage : null;
-        await KioskModule.startLockTask(packageToWhitelist);
+        await KioskModule.startLockTask(packageToWhitelist, allowPowerButton);
         const message = displayMode === 'external_app'
           ? 'Configuration saved\nLock mode enabled - navigation blocked'
           : 'Configuration saved\nScreen pinning enabled - swipe gestures blocked';
@@ -940,7 +958,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
                   • Screensaver (inactivity detection, brightness control){'\n'}
                   • Motion detection{'\n'}
                   • Default brightness control{'\n\n'}
-                  To return to FreeKiosk, tap 5 times on the overlay button that appears in the bottom-right corner of the external app.
+                  To return to FreeKiosk, tap 5 times on the secret button (position configurable in settings).
                 </Text>
               </View>
 
@@ -1055,7 +1073,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.label}>👁️ Show Return Button</Text>
                   <Text style={styles.hint}>
-                    Make the return button visible on screen (otherwise tap the invisible area in bottom-right corner)
+                    Make the return button visible on screen (otherwise tap the invisible secret button area)
                   </Text>
                 </View>
                 <Switch
@@ -1139,7 +1157,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
             <View style={styles.infoBox}>
               <Text style={styles.infoTitle}>ℹ️ Return to Settings</Text>
               <Text style={styles.infoText}>
-                • Tap 5 times on the {overlayButtonVisible ? 'blue button' : 'invisible area'} in the bottom-right corner{'\n'}
+                • Tap 5 times on the secret button (position configurable){'\n'}
                 • Or use your device's app switcher (recent apps button){'\n'}
                 • Device Owner mode: Press Volume Up button 5 times rapidly
               </Text>
@@ -1691,7 +1709,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
             • Configure the URL of the web page to display{'\n'}
             • Set a secure PIN code{'\n'}
             • Enable "Pin App to Screen" for full kiosk mode{'\n'}
-            • Tap 5 times in the bottom-right corner to access settings{'\n'}
+            • Tap 5 times on the secret button to access settings (default: bottom-right corner){'\n'}
             • Enter PIN code to unlock
           </Text>
         </View>

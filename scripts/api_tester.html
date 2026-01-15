@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FreeKiosk API Tester</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #00d9ff;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 30px;
+        }
+        .config-panel {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+        .input-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #888;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        input {
+            width: 100%;
+            padding: 10px 15px;
+            border: 2px solid #2a2a4a;
+            border-radius: 8px;
+            background: #0f0f23;
+            color: #fff;
+            font-size: 14px;
+        }
+        input:focus {
+            outline: none;
+            border-color: #00d9ff;
+        }
+        .btn {
+            padding: 10px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #00d9ff;
+            color: #000;
+        }
+        .btn-primary:hover {
+            background: #00b8d9;
+        }
+        .btn-success {
+            background: #00c853;
+            color: #000;
+        }
+        .btn-success:hover {
+            background: #00a844;
+        }
+        .btn-warning {
+            background: #ff9800;
+            color: #000;
+        }
+        .btn-warning:hover {
+            background: #f57c00;
+        }
+        .btn-danger {
+            background: #f44336;
+            color: #fff;
+        }
+        .btn-danger:hover {
+            background: #d32f2f;
+        }
+        .status-panel {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .status-card {
+            background: #0f0f23;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        .status-card h3 {
+            color: #00d9ff;
+            font-size: 14px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .status-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #fff;
+        }
+        .status-label {
+            color: #666;
+            font-size: 12px;
+        }
+        .connection-status {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .connected {
+            background: #004d40;
+            color: #00e676;
+        }
+        .disconnected {
+            background: #4a0000;
+            color: #ff5252;
+        }
+        .endpoints-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        .endpoint-section {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .endpoint-section h2 {
+            color: #00d9ff;
+            font-size: 16px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #2a2a4a;
+        }
+        .endpoint-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .endpoint-item {
+            background: #0f0f23;
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+        .endpoint-info {
+            flex: 1;
+        }
+        .endpoint-method {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-right: 8px;
+        }
+        .method-get {
+            background: #1565c0;
+            color: #fff;
+        }
+        .method-post {
+            background: #2e7d32;
+            color: #fff;
+        }
+        .endpoint-path {
+            color: #fff;
+            font-family: monospace;
+        }
+        .endpoint-desc {
+            color: #666;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        .log-panel {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .log-panel h2 {
+            color: #00d9ff;
+            font-size: 16px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #log {
+            background: #0f0f23;
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log-entry {
+            padding: 5px 0;
+            border-bottom: 1px solid #1a1a2e;
+        }
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+        .log-time {
+            color: #666;
+        }
+        .log-success {
+            color: #00e676;
+        }
+        .log-error {
+            color: #ff5252;
+        }
+        .log-info {
+            color: #00d9ff;
+        }
+        .control-inputs {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .control-inputs input {
+            flex: 1;
+        }
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .slider-container input[type="range"] {
+            flex: 1;
+        }
+        .slider-value {
+            min-width: 40px;
+            text-align: center;
+            color: #00d9ff;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🖥️ FreeKiosk API Tester</h1>
+        <p class="subtitle">Interactive REST API Testing Tool</p>
+
+        <!-- Configuration -->
+        <div class="config-panel">
+            <div class="input-group">
+                <label>Kiosk IP Address</label>
+                <input type="text" id="kioskIp" value="10.0.4.3" placeholder="192.168.1.100">
+            </div>
+            <div class="input-group">
+                <label>Port</label>
+                <input type="number" id="kioskPort" value="8080" placeholder="8080">
+            </div>
+            <div class="input-group">
+                <label>API Key (optional)</label>
+                <input type="password" id="apiKey" placeholder="Leave empty if not set">
+            </div>
+            <button class="btn btn-primary" onclick="testConnection()">🔌 Connect</button>
+            <span id="connectionStatus" class="connection-status disconnected">Disconnected</span>
+        </div>
+
+        <!-- Status Panel -->
+        <div class="status-panel" id="statusPanel" style="display: none;">
+            <div class="status-grid">
+                <div class="status-card">
+                    <h3>🔋 Battery</h3>
+                    <div class="status-value" id="batteryLevel">--%</div>
+                    <div class="status-label" id="batteryStatus">Unknown</div>
+                </div>
+                <div class="status-card">
+                    <h3>☀️ Brightness</h3>
+                    <div class="status-value" id="brightness">--%</div>
+                    <div class="status-label" id="screenStatus">Unknown</div>
+                </div>
+                <div class="status-card">
+                    <h3>📶 WiFi</h3>
+                    <div class="status-value" id="wifiSignal">-- dBm</div>
+                    <div class="status-label" id="wifiStatus">Unknown</div>
+                </div>
+                <div class="status-card">
+                    <h3>📱 Device</h3>
+                    <div class="status-value" id="deviceIp">--</div>
+                    <div class="status-label" id="deviceInfo">Unknown</div>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 15px;">
+                <button class="btn btn-primary" onclick="refreshStatus()">🔄 Refresh Status</button>
+            </div>
+        </div>
+
+        <!-- Endpoints -->
+        <div class="endpoints-panel">
+            <!-- GET Endpoints -->
+            <div class="endpoint-section">
+                <h2>📥 GET Endpoints (Read-Only)</h2>
+                <div class="endpoint-list">
+                    <div class="endpoint-item">
+                        <div class="endpoint-info">
+                            <span class="endpoint-method method-get">GET</span>
+                            <span class="endpoint-path">/api/status</span>
+                            <div class="endpoint-desc">Full device status</div>
+                        </div>
+                        <button class="btn btn-primary" onclick="testGet('/api/status')">Test</button>
+                    </div>
+                    <div class="endpoint-item">
+                        <div class="endpoint-info">
+                            <span class="endpoint-method method-get">GET</span>
+                            <span class="endpoint-path">/api/battery</span>
+                            <div class="endpoint-desc">Battery information</div>
+                        </div>
+                        <button class="btn btn-primary" onclick="testGet('/api/battery')">Test</button>
+                    </div>
+                    <div class="endpoint-item">
+                        <div class="endpoint-info">
+                            <span class="endpoint-method method-get">GET</span>
+                            <span class="endpoint-path">/api/brightness</span>
+                            <div class="endpoint-desc">Current brightness</div>
+                        </div>
+                        <button class="btn btn-primary" onclick="testGet('/api/brightness')">Test</button>
+                    </div>
+                    <div class="endpoint-item">
+                        <div class="endpoint-info">
+                            <span class="endpoint-method method-get">GET</span>
+                            <span class="endpoint-path">/api/screen</span>
+                            <div class="endpoint-desc">Screen state</div>
+                        </div>
+                        <button class="btn btn-primary" onclick="testGet('/api/screen')">Test</button>
+                    </div>
+                    <div class="endpoint-item">
+                        <div class="endpoint-info">
+                            <span class="endpoint-method method-get">GET</span>
+                            <span class="endpoint-path">/api/wifi</span>
+                            <div class="endpoint-desc">WiFi information</div>
+                        </div>
+                        <button class="btn btn-primary" onclick="testGet('/api/wifi')">Test</button>
+                    </div>
+                    <div class="endpoint-item">
+                        <div class="endpoint-info">
+                            <span class="endpoint-method method-get">GET</span>
+                            <span class="endpoint-path">/api/info</span>
+                            <div class="endpoint-desc">Device info</div>
+                        </div>
+                        <button class="btn btn-primary" onclick="testGet('/api/info')">Test</button>
+                    </div>
+                    <div class="endpoint-item">
+                        <div class="endpoint-info">
+                            <span class="endpoint-method method-get">GET</span>
+                            <span class="endpoint-path">/api/health</span>
+                            <div class="endpoint-desc">Health check</div>
+                        </div>
+                        <button class="btn btn-primary" onclick="testGet('/api/health')">Test</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- POST Endpoints -->
+            <div class="endpoint-section">
+                <h2>📤 POST Endpoints (Control)</h2>
+                <div class="endpoint-list">
+                    <div class="endpoint-item">
+                        <div class="endpoint-info" style="width: 100%;">
+                            <span class="endpoint-method method-post">POST</span>
+                            <span class="endpoint-path">/api/brightness</span>
+                            <div class="endpoint-desc">Set screen brightness</div>
+                            <div class="slider-container">
+                                <input type="range" id="brightnessSlider" min="0" max="100" value="50">
+                                <span class="slider-value" id="brightnessValue">50%</span>
+                                <button class="btn btn-success" onclick="setBrightness()">Set</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="endpoint-item">
+                        <div class="endpoint-info">
+                            <span class="endpoint-method method-post">POST</span>
+                            <span class="endpoint-path">/api/screen/on</span>
+                            <div class="endpoint-desc">Turn screen on</div>
+                        </div>
+                        <button class="btn btn-success" onclick="testPost('/api/screen/on')">Execute</button>
+                    </div>
+                    <div class="endpoint-item">
+                        <div class="endpoint-info">
+                            <span class="endpoint-method method-post">POST</span>
+                            <span class="endpoint-path">/api/screen/off</span>
+                            <div class="endpoint-desc">Turn screen off</div>
+                        </div>
+                        <button class="btn btn-warning" onclick="testPost('/api/screen/off')">Execute</button>
+                    </div>
+                    <div class="endpoint-item">
+                        <div class="endpoint-info">
+                            <span class="endpoint-method method-post">POST</span>
+                            <span class="endpoint-path">/api/screensaver/on</span>
+                            <div class="endpoint-desc">Activate screensaver</div>
+                        </div>
+                        <button class="btn btn-warning" onclick="testPost('/api/screensaver/on')">Execute</button>
+                    </div>
+                    <div class="endpoint-item">
+                        <div class="endpoint-info">
+                            <span class="endpoint-method method-post">POST</span>
+                            <span class="endpoint-path">/api/screensaver/off</span>
+                            <div class="endpoint-desc">Deactivate screensaver</div>
+                        </div>
+                        <button class="btn btn-success" onclick="testPost('/api/screensaver/off')">Execute</button>
+                    </div>
+                    <div class="endpoint-item">
+                        <div class="endpoint-info">
+                            <span class="endpoint-method method-post">POST</span>
+                            <span class="endpoint-path">/api/wake</span>
+                            <div class="endpoint-desc">Wake from screensaver</div>
+                        </div>
+                        <button class="btn btn-success" onclick="testPost('/api/wake')">Execute</button>
+                    </div>
+                    <div class="endpoint-item">
+                        <div class="endpoint-info">
+                            <span class="endpoint-method method-post">POST</span>
+                            <span class="endpoint-path">/api/reload</span>
+                            <div class="endpoint-desc">Reload WebView</div>
+                        </div>
+                        <button class="btn btn-warning" onclick="testPost('/api/reload')">Execute</button>
+                    </div>
+                    <div class="endpoint-item">
+                        <div class="endpoint-info" style="width: 100%;">
+                            <span class="endpoint-method method-post">POST</span>
+                            <span class="endpoint-path">/api/url</span>
+                            <div class="endpoint-desc">Navigate to URL</div>
+                            <div class="control-inputs">
+                                <input type="text" id="urlInput" placeholder="https://example.com">
+                                <button class="btn btn-success" onclick="setUrl()">Navigate</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="endpoint-item">
+                        <div class="endpoint-info" style="width: 100%;">
+                            <span class="endpoint-method method-post">POST</span>
+                            <span class="endpoint-path">/api/tts</span>
+                            <div class="endpoint-desc">Text to speech</div>
+                            <div class="control-inputs">
+                                <input type="text" id="ttsInput" placeholder="Hello from FreeKiosk!">
+                                <button class="btn btn-success" onclick="speak()">Speak</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Log Panel -->
+        <div class="log-panel">
+            <h2>
+                📋 Request Log
+                <button class="btn btn-danger" onclick="clearLog()" style="font-size: 12px; padding: 5px 15px;">Clear</button>
+            </h2>
+            <div id="log">
+                <div class="log-entry log-info">Ready to test. Configure connection and click Connect.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Elements
+        const brightnessSlider = document.getElementById('brightnessSlider');
+        const brightnessValue = document.getElementById('brightnessValue');
+
+        // Update brightness value display
+        brightnessSlider.addEventListener('input', () => {
+            brightnessValue.textContent = brightnessSlider.value + '%';
+        });
+
+        // Get base URL
+        function getBaseUrl() {
+            const ip = document.getElementById('kioskIp').value;
+            const port = document.getElementById('kioskPort').value;
+            return `http://${ip}:${port}`;
+        }
+
+        // Get headers
+        function getHeaders() {
+            const headers = { 'Content-Type': 'application/json' };
+            const apiKey = document.getElementById('apiKey').value;
+            if (apiKey) {
+                headers['X-Api-Key'] = apiKey;
+            }
+            return headers;
+        }
+
+        // Log functions
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.innerHTML = `<span class="log-time">[${time}]</span> ${message}`;
+            logDiv.insertBefore(entry, logDiv.firstChild);
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+            log('Log cleared', 'info');
+        }
+
+        // API functions
+        async function testConnection() {
+            log('Testing connection...', 'info');
+            try {
+                const response = await fetch(`${getBaseUrl()}/api/health`, {
+                    headers: getHeaders()
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('connectionStatus').className = 'connection-status connected';
+                    document.getElementById('connectionStatus').textContent = 'Connected';
+                    document.getElementById('statusPanel').style.display = 'block';
+                    log('✓ Connected successfully!', 'success');
+                    refreshStatus();
+                } else {
+                    throw new Error(data.error || 'Connection failed');
+                }
+            } catch (error) {
+                document.getElementById('connectionStatus').className = 'connection-status disconnected';
+                document.getElementById('connectionStatus').textContent = 'Disconnected';
+                document.getElementById('statusPanel').style.display = 'none';
+                log(`✗ Connection failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function refreshStatus() {
+            try {
+                const response = await fetch(`${getBaseUrl()}/api/status`, {
+                    headers: getHeaders()
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    const d = data.data;
+                    
+                    // Battery
+                    document.getElementById('batteryLevel').textContent = d.battery.level + '%';
+                    document.getElementById('batteryStatus').textContent = 
+                        d.battery.charging ? `Charging (${d.battery.plugged})` : 'Discharging';
+                    
+                    // Brightness
+                    document.getElementById('brightness').textContent = d.screen.brightness + '%';
+                    document.getElementById('screenStatus').textContent = 
+                        d.screen.on ? (d.screen.screensaverActive ? 'Screensaver' : 'On') : 'Off';
+                    
+                    // WiFi
+                    document.getElementById('wifiSignal').textContent = d.wifi.signalStrength + ' dBm';
+                    document.getElementById('wifiStatus').textContent = 
+                        d.wifi.connected ? d.wifi.ssid : 'Disconnected';
+                    
+                    // Device
+                    document.getElementById('deviceIp').textContent = d.device.ip;
+                    document.getElementById('deviceInfo').textContent = `v${d.device.version}`;
+                    
+                    log('✓ Status refreshed', 'success');
+                }
+            } catch (error) {
+                log(`✗ Failed to refresh: ${error.message}`, 'error');
+            }
+        }
+
+        async function testGet(endpoint) {
+            log(`GET ${endpoint}`, 'info');
+            try {
+                const response = await fetch(`${getBaseUrl()}${endpoint}`, {
+                    headers: getHeaders()
+                });
+                const data = await response.json();
+                log(`✓ Response: ${JSON.stringify(data)}`, data.success ? 'success' : 'error');
+            } catch (error) {
+                log(`✗ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testPost(endpoint, body = {}) {
+            log(`POST ${endpoint} ${JSON.stringify(body)}`, 'info');
+            try {
+                const response = await fetch(`${getBaseUrl()}${endpoint}`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify(body)
+                });
+                const data = await response.json();
+                log(`✓ Response: ${JSON.stringify(data)}`, data.success ? 'success' : 'error');
+                
+                // Refresh status after control command
+                if (data.success) {
+                    setTimeout(refreshStatus, 500);
+                }
+            } catch (error) {
+                log(`✗ Error: ${error.message}`, 'error');
+            }
+        }
+
+        function setBrightness() {
+            const value = parseInt(brightnessSlider.value);
+            testPost('/api/brightness', { value });
+        }
+
+        function setUrl() {
+            const url = document.getElementById('urlInput').value;
+            if (url) {
+                testPost('/api/url', { url });
+            } else {
+                log('✗ Please enter a URL', 'error');
+            }
+        }
+
+        function speak() {
+            const text = document.getElementById('ttsInput').value;
+            if (text) {
+                testPost('/api/tts', { text });
+            } else {
+                log('✗ Please enter text to speak', 'error');
+            }
+        }
+    </script>
+</body>
+</html>

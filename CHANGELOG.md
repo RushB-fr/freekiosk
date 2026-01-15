@@ -11,6 +11,107 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ***
 
 
+## [Unreleased]
+
+### Added
+- 🔌 **Allow Power Button option**: New setting in Security tab to allow access to the power menu while in Lock Mode. Enables shutting down or restarting the device without exiting kiosk mode.
+
+### Fixed
+- 🔧 **Hard restart boot behavior**: Fixed issue where auto-launch wouldn't work after a hard restart (power + volume buttons hold). BootReceiver now verifies the auto-launch setting from storage before launching the app, ensuring consistent behavior regardless of restart method.
+
+### Changed
+- 📖 **FAQ updated**: Added entries for power button behavior, hard restart issues, and settings persistence after updates.
+
+
+***
+
+
+## [1.2.0] - 2026-01-08
+
+
+### Added
+- 🎨 **Complete Settings UI Redesign**: Modern Material Design interface with organized tabs
+  - **4 organized tabs**: General, Display, Security, Advanced
+  - **Reusable UI components**: SettingsSection, SettingsSwitch, SettingsInput, SettingsRadioGroup, SettingsSlider, SettingsButton, SettingsInfoBox
+  - **Centralized theme system**: Colors, Spacing, Typography for consistent styling
+  - **Material Design Icons**: Professional vector icons throughout settings
+
+- 🔄 **URL Rotation**: Automatically cycle through multiple URLs at configurable intervals
+  - Add/edit/delete URLs with labels
+  - Reorder URLs with drag handles
+  - Set rotation interval (5+ seconds)
+  - REST API support for rotation control
+
+- 📅 **URL Planner**: Schedule URLs based on time and date
+  - **Recurring events**: Daily schedules with day-of-week selection
+  - **One-time events**: Specific date events for special occasions
+  - Set start/end times and priority levels
+  - Visual calendar-style management
+
+- 🌐 **REST API Server**: Built-in HTTP server for Home Assistant integration (40+ endpoints)
+  
+#### Sensor Endpoints (GET)
+- `/api/status` - Complete device status in one call
+- `/api/battery` - Battery level, charging state, temperature
+- `/api/brightness` - Current screen brightness
+- `/api/screen` - Screen on/off, screensaver state
+- `/api/sensors` - Light sensor, proximity sensor, accelerometer
+- `/api/storage` - Storage capacity and usage
+- `/api/memory` - RAM capacity and usage
+- `/api/wifi` - WiFi status, SSID, signal strength, IP
+- `/api/info` - Device model, Android version, app version
+- `/api/health` - Simple health check
+- `/api/screenshot` - Capture screen as PNG image
+
+#### Control Endpoints (POST)
+- `/api/brightness` - Set screen brightness (0-100)
+- `/api/screen/on` - Turn screen on
+- `/api/screen/off` - Turn screen off
+- `/api/screensaver/on` - Activate screensaver
+- `/api/screensaver/off` - Deactivate screensaver
+- `/api/reload` - Reload WebView
+- `/api/url` - Navigate to URL
+- `/api/wake` - Wake from screensaver
+- `/api/tts` - Text-to-speech
+- `/api/volume` - Set media volume
+- `/api/toast` - Show toast notification
+- `/api/js` - Execute JavaScript in WebView
+- `/api/clearCache` - Clear WebView cache
+- `/api/app/launch` - Launch external app
+- `/api/reboot` - Reboot device (Device Owner mode required)
+
+#### Audio Endpoints (POST)
+- `/api/audio/play` - Play audio from URL
+- `/api/audio/stop` - Stop audio playback
+- `/api/audio/beep` - Play beep sound
+
+#### Remote Control Endpoints (POST) - Android TV
+- `/api/remote/up` - D-pad up
+- `/api/remote/down` - D-pad down
+- `/api/remote/left` - D-pad left
+- `/api/remote/right` - D-pad right
+- `/api/remote/select` - Select/Enter
+- `/api/remote/back` - Back button
+- `/api/remote/home` - Home button
+- `/api/remote/menu` - Menu button
+- `/api/remote/playpause` - Play/Pause
+
+#### API Features
+- Optional API Key authentication (X-Api-Key header)
+- Configurable port (default: 8080)
+- Toggle remote control permissions
+- CORS support for web integration
+- JSON responses with timestamps
+
+### Documentation
+- 📖 New `docs/REST_API.md` with complete endpoint reference
+- 🏠 Home Assistant configuration examples
+- 🔧 cURL testing examples
+
+
+***
+
+
 ## [1.1.4] - 2025-12-23
 
 
@@ -77,7 +178,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 👁️ **Overlay Button Visibility Toggle**: New option to show/hide the return button in External App Mode
   - Button is invisible by default for maximum discretion
   - Real-time opacity update when toggling visibility
-  - Visible button appears as a small blue button in bottom-right corner
+  - Button position configurable in settings (default: bottom-right)
 - 🗑️ **Device Owner Removal**: New button in Settings to remove Device Owner privileges
   - Helps with uninstallation on Android 15+
   - Automatically resets all settings after removal

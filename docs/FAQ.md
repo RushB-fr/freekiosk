@@ -46,7 +46,7 @@ text
 ## Usage
 
 ### Q: How to access settings in kiosk mode?
-**A:** Tap 5 times in the bottom-right corner, then enter your PIN code.
+**A:** Tap 5 times on the secret button (default: bottom-right corner), then enter your PIN code.
 
 ### Q: Can I use custom URLs?
 **A:** Yes! Any HTTPS/HTTP URL works (Home Assistant, dashboards, websites, web apps, etc.).
@@ -123,6 +123,15 @@ text
 - Device model
 - Android version
 - Crash logs (if possible)
+
+### Q: FreeKiosk doesn't auto-start after hard restart
+**A:** A hard restart (holding power + volume buttons for 10s) may reset the app to initial state. Make sure "Launch on Boot" is enabled in Settings → Security tab. Starting from v1.3.0, the app checks the stored setting before launching, ensuring consistent behavior.
+
+### Q: Power button doesn't work in kiosk mode
+**A:** By default, Lock Mode blocks all system features including the power menu. Starting from v1.3.0, you can enable "Allow Power Button" in Settings → Security tab → Lock Mode section. This allows shutting down the device without exiting kiosk mode.
+
+### Q: Are my settings preserved after updating FreeKiosk?
+**A:** **Yes!** All your settings (URL, PIN, display mode, etc.) are stored locally on your device and are preserved when updating FreeKiosk. You don't need to reconfigure anything after an update.
 
 ---
 

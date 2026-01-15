@@ -18,6 +18,7 @@ const KEYS = {
   EXTERNAL_APP_PACKAGE: '@kiosk_external_app_package',
   AUTO_RELAUNCH_APP: '@kiosk_auto_relaunch_app',
   OVERLAY_BUTTON_VISIBLE: '@kiosk_overlay_button_visible',
+  OVERLAY_BUTTON_POSITION: '@kiosk_overlay_button_position',
   PIN_MAX_ATTEMPTS: '@kiosk_pin_max_attempts',
   STATUS_BAR_ENABLED: '@kiosk_status_bar_enabled',
   STATUS_BAR_ON_OVERLAY: '@kiosk_status_bar_on_overlay',
@@ -31,6 +32,20 @@ const KEYS = {
   BACK_BUTTON_MODE: '@kiosk_back_button_mode',
   BACK_BUTTON_TIMER_DELAY: '@kiosk_back_button_timer_delay',
   KEYBOARD_MODE: '@kiosk_keyboard_mode',
+  // URL Rotation
+  URL_ROTATION_ENABLED: '@kiosk_url_rotation_enabled',
+  URL_ROTATION_LIST: '@kiosk_url_rotation_list',
+  URL_ROTATION_INTERVAL: '@kiosk_url_rotation_interval',
+  // URL Planner
+  URL_PLANNER_ENABLED: '@kiosk_url_planner_enabled',
+  URL_PLANNER_EVENTS: '@kiosk_url_planner_events',
+  // REST API (Home Assistant integration)
+  REST_API_ENABLED: '@kiosk_rest_api_enabled',
+  REST_API_PORT: '@kiosk_rest_api_port',
+  REST_API_KEY: '@kiosk_rest_api_key',
+  REST_API_ALLOW_CONTROL: '@kiosk_rest_api_allow_control',
+  // Power Button setting
+  ALLOW_POWER_BUTTON: '@kiosk_allow_power_button',
   // Legacy keys for backward compatibility
   SCREENSAVER_DELAY: '@screensaver_delay',
   MOTION_DETECTION_ENABLED: '@motion_detection_enabled',
@@ -154,6 +169,7 @@ export const StorageService = {
         KEYS.EXTERNAL_APP_PACKAGE,
         KEYS.AUTO_RELAUNCH_APP,
         KEYS.OVERLAY_BUTTON_VISIBLE,
+        KEYS.OVERLAY_BUTTON_POSITION,
         KEYS.PIN_MAX_ATTEMPTS,
         KEYS.STATUS_BAR_ENABLED,
         KEYS.STATUS_BAR_ON_OVERLAY,
@@ -473,6 +489,25 @@ export const StorageService = {
     }
   },
 
+  //OVERLAY BUTTON POSITION
+  saveOverlayButtonPosition: async (value: string): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.OVERLAY_BUTTON_POSITION, value);
+    } catch (error) {
+      console.error('Error saving overlay button position:', error);
+    }
+  },
+
+  getOverlayButtonPosition: async (): Promise<string> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.OVERLAY_BUTTON_POSITION);
+      return value ?? 'bottom-right'; // Par défaut bottom-right
+    } catch (error) {
+      console.error('Error getting overlay button position:', error);
+      return 'bottom-right';
+    }
+  },
+
   //PIN MAX ATTEMPTS
   savePinMaxAttempts: async (value: number): Promise<void> => {
     try {
@@ -714,6 +749,195 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting back button timer delay:', error);
       return 10;
+    }
+  },
+
+  // ============ URL ROTATION ============
+  
+  saveUrlRotationEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.URL_ROTATION_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving URL rotation enabled:', error);
+    }
+  },
+
+  getUrlRotationEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.URL_ROTATION_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting URL rotation enabled:', error);
+      return false;
+    }
+  },
+
+  saveUrlRotationList: async (urls: string[]): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.URL_ROTATION_LIST, JSON.stringify(urls));
+    } catch (error) {
+      console.error('Error saving URL rotation list:', error);
+    }
+  },
+
+  getUrlRotationList: async (): Promise<string[]> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.URL_ROTATION_LIST);
+      return value ? JSON.parse(value) : [];
+    } catch (error) {
+      console.error('Error getting URL rotation list:', error);
+      return [];
+    }
+  },
+
+  saveUrlRotationInterval: async (seconds: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.URL_ROTATION_INTERVAL, String(seconds));
+    } catch (error) {
+      console.error('Error saving URL rotation interval:', error);
+    }
+  },
+
+  getUrlRotationInterval: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.URL_ROTATION_INTERVAL);
+      const interval = value ? parseInt(value, 10) : 30;
+      return isNaN(interval) ? 30 : Math.max(5, interval);
+    } catch (error) {
+      console.error('Error getting URL rotation interval:', error);
+      return 30;
+    }
+  },
+
+  // ============ URL PLANNER ============
+  
+  saveUrlPlannerEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.URL_PLANNER_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving URL planner enabled:', error);
+    }
+  },
+
+  getUrlPlannerEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.URL_PLANNER_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting URL planner enabled:', error);
+      return false;
+    }
+  },
+
+  saveUrlPlannerEvents: async (events: any[]): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.URL_PLANNER_EVENTS, JSON.stringify(events));
+    } catch (error) {
+      console.error('Error saving URL planner events:', error);
+    }
+  },
+
+  getUrlPlannerEvents: async (): Promise<any[]> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.URL_PLANNER_EVENTS);
+      return value ? JSON.parse(value) : [];
+    } catch (error) {
+      console.error('Error getting URL planner events:', error);
+      return [];
+    }
+  },
+
+  // ============ REST API (Home Assistant) ============
+  
+  saveRestApiEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.REST_API_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving REST API enabled:', error);
+    }
+  },
+
+  getRestApiEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.REST_API_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting REST API enabled:', error);
+      return false;
+    }
+  },
+
+  saveRestApiPort: async (port: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.REST_API_PORT, port.toString());
+    } catch (error) {
+      console.error('Error saving REST API port:', error);
+    }
+  },
+
+  getRestApiPort: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.REST_API_PORT);
+      const port = value ? parseInt(value, 10) : 8080;
+      return isNaN(port) ? 8080 : port;
+    } catch (error) {
+      console.error('Error getting REST API port:', error);
+      return 8080;
+    }
+  },
+
+  saveRestApiKey: async (key: string): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.REST_API_KEY, key);
+    } catch (error) {
+      console.error('Error saving REST API key:', error);
+    }
+  },
+
+  getRestApiKey: async (): Promise<string> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.REST_API_KEY);
+      return value || '';
+    } catch (error) {
+      console.error('Error getting REST API key:', error);
+      return '';
+    }
+  },
+
+  saveRestApiAllowControl: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.REST_API_ALLOW_CONTROL, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving REST API allow control:', error);
+    }
+  },
+
+  getRestApiAllowControl: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.REST_API_ALLOW_CONTROL);
+      return value ? JSON.parse(value) : true;
+    } catch (error) {
+      console.error('Error getting REST API allow control:', error);
+      return true;
+    }
+  },
+
+  // POWER BUTTON
+  saveAllowPowerButton: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.ALLOW_POWER_BUTTON, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving allow power button:', error);
+    }
+  },
+
+  getAllowPowerButton: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.ALLOW_POWER_BUTTON);
+      return value ? JSON.parse(value) : false; // Default OFF for maximum security
+    } catch (error) {
+      console.error('Error getting allow power button:', error);
+      return false;
     }
   },
 

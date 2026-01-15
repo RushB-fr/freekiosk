@@ -33,7 +33,7 @@ Complete guide to install and configure FreeKiosk on your Android tablet.
 
 3. **Configure**
    - Open FreeKiosk
-   - Tap 5 times in bottom-right corner
+   - Tap 5 times on the secret button (default: bottom-right)
    - Enter settings
    - Set your URL
    - Set PIN code
@@ -267,7 +267,7 @@ sudo udevadm control --reload-rules
 
 ### Option 1: Via FreeKiosk App
 
-1. Tap 5 times in bottom-right corner
+1. Tap 5 times on the secret button (default: bottom-right)
 2. Enter your PIN
 3. Tap "⚠️ Remove Device Owner" button (NOT "Exit Kiosk Mode")
 4. Confirm the action

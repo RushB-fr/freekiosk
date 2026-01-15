@@ -11,11 +11,12 @@
   </p>
   
   <p>
-    <img src="https://img.shields.io/badge/Version-1.1.4-blue.svg" alt="Version 1.1.4">
+    <img src="https://img.shields.io/badge/Version-1.2.0-blue.svg" alt="Version 1.2.0">
     <a href="https://github.com/rushb-fr/freekiosk/releases"><img src="https://img.shields.io/github/downloads/rushb-fr/freekiosk/total.svg" alt="Downloads"></a>
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT">
     <img src="https://img.shields.io/badge/Android-8.0%2B-green.svg" alt="Android 8.0+">
     <img src="https://img.shields.io/badge/Device%20Owner-Supported-brightgreen" alt="Device Owner">
+    <img src="https://img.shields.io/badge/REST%20API-40%2B%20Endpoints-orange" alt="REST API">
   </p>
   
   <p><strong>A <a href="https://rushb.fr">Rushb</a> Project</strong></p>
@@ -54,6 +55,16 @@ FreeKiosk is a **completely free and open-source** kiosk mode application for An
 - **Immersive Fullscreen** - No navigation/status bars
 - **Reset Settings** - Clear configuration from within the app
 - **Exit Kiosk Mode** with restrictions deactivation
+
+### REST API (Home Assistant Ready) 🆕
+- **40+ Endpoints** - Full device control via HTTP
+- **Sensors**: Battery, brightness, light, proximity, storage, memory, WiFi
+- **Controls**: Screen on/off, brightness, volume, navigation, reload
+- **Audio**: Play sounds, TTS, beep notifications
+- **Screenshot**: Capture screen as PNG image
+- **Remote Control**: Android TV navigation (D-pad, back, home, etc.)
+- **Optional API Key** authentication
+- **[Full API Documentation](docs/REST_API.md)**
 
 ### Device Owner Mode (Advanced)
 - **Complete Device Lockdown**
@@ -147,7 +158,7 @@ text
 
 **5. Configure FreeKiosk**
 - Launch FreeKiosk
-- Tap 5 times in bottom-right corner
+- Tap 5 times on the secret button (default: bottom-right corner)
 - Enter default PIN: **1234**
 - Configure your URL
 - **Optional**: Enable "Pin App to Screen" for full lockdown
@@ -162,7 +173,7 @@ Done! Your tablet is now in kiosk mode.
 ## ⚙️ Configuration
 
 ### First Launch
-1. Tap **5 times** in the bottom-right corner
+1. Tap **5 times** on the secret button (default: bottom-right corner)
 2. Enter PIN (default: **1234**)
 3. Access Settings screen
 
@@ -187,7 +198,7 @@ Done! Your tablet is now in kiosk mode.
 - All gestures blocked
 - Recent apps disabled
 - Status bar hidden
-- Only 5-tap + PIN allows exit
+- Only 5-tap on secret button + PIN allows exit
 - Good for: public kiosks, unattended devices
 
 ---
@@ -199,10 +210,16 @@ Done! Your tablet is now in kiosk mode.
 | **Price** | 🟢 Free | 🔴 €7.90/device |
 | **Open-source** | 🟢 MIT | 🔴 Closed |
 | **Device Owner** | ✅ | ✅ |
+| **REST API** | ✅ 40+ endpoints | ✅ |
+| **Home Assistant** | ✅ | ✅ |
+| **Sensors (light, proximity)** | ✅ | ✅ |
+| **Screenshot API** | ✅ | ✅ |
+| **Audio playback** | ✅ | ✅ |
+| **Remote control** | ✅ | ✅ |
 | **HTTPS Self-signed** | ✅ | ⚠️ |
 | **In-app Reset** | ✅ | ⚠️ |
 | **Auto-start** | ✅ | ✅ |
-| **Advanced features** | Roadmap | ✅ |
+| **Camera photo API** | Roadmap | ✅ |
 | **Cloud MDM** | Roadmap | ✅ |
 
 ---
@@ -218,7 +235,21 @@ Done! Your tablet is now in kiosk mode.
 
 ## 🗺️ Roadmap
 
-### ✅ v1.1.4 (Current - Dec 2025)
+### ✅ v1.2.0 (Jan 2026) - UI Redesign, URL Management & REST API 🆕
+- 🎨 **Complete Settings UI Redesign**: Modern Material Design with 4 organized tabs (General, Display, Security, Advanced)
+- 🔄 **URL Rotation**: Automatically cycle through multiple URLs at configurable intervals
+- 📅 **URL Planner**: Schedule URLs based on time/date with recurring and one-time events
+- 🌐 **REST API Server**: Built-in HTTP server for Home Assistant integration
+- 📡 **40+ Endpoints**: Complete device control via HTTP
+- 📊 **Sensor Endpoints**: Battery, brightness, light, proximity, storage, memory, WiFi
+- 🎮 **Control Endpoints**: Screen on/off, brightness, volume, navigation, reload
+- 🔊 **Audio Endpoints**: Play URL, stop, beep sound
+- 📸 **Screenshot Endpoint**: Capture screen as PNG
+- 📺 **Remote Control**: Android TV navigation (D-pad, back, home, menu, play/pause)
+- 🔐 **API Key Authentication**: Optional security
+- 📝 **[Full API Documentation](docs/REST_API.md)**
+
+### ✅ v1.1.4 (Dec 2025)
 - 🔄 **In-App Direct Update**: Update FreeKiosk directly from within the app (Device Owner mode)
 - 🎨 **Status Bar Item Selection**: Show/hide individual items (Home, Time, Battery, WiFi, Bluetooth, Sound)
 - 🧪 **Test Mode Options**: Three test modes for External App (Test Mode, Immediate Return, Delayed Return)
@@ -290,18 +321,32 @@ Done! Your tablet is now in kiosk mode.
 - ✅ System apps suspension (Device Owner mode)
 - ✅ English language UI
 
-### v1.2.0 (Q1 2026)
-- [ ] Multi-language support (French, Spanish, German)
-- [ ] Multiple URL rotation
-- [ ] Scheduled URL changes
-- [ ] Motion detection via camera
-- [ ] Auto-brightness scheduling
+### v1.3.0 (Q1 2026)
+- [ ] 📷 Camera Photo API - Take photos via REST endpoint
+- [ ] 🔆 Auto-brightness - Adjust brightness based on light sensor
+- [ ] 📲 QR Code Config - Scan QR to configure app settings
+- [ ] 💾 Backup/Restore - Export and import configuration
+- [ ] 🎤 Acoustic Wake - Voice detection to wake from screensaver
+- [ ] 🔔 Webhook Events - Send events (motion, tap, battery) to URL
+- [ ] 🎬 Media Player - Play videos, images, playlists (digital signage)
 
-### v2.0.0 (Q2 2026)
-- [ ] **FreeKiosk Cloud** (MDM Dashboard)
-- [ ] Multi-device management
-- [ ] Remote device configuration
-- [ ] Analytics and monitoring
+### v2.0.0 (Q2 2026) - FreeKiosk Cloud
+- [ ] ☁️ **FreeKiosk Cloud** - MDM Dashboard for fleet management
+- [ ] 📱 Multi-device management - Control all tablets from one place
+- [ ] ⚙️ Remote configuration - Push settings to devices remotely
+- [ ] 📊 Analytics & monitoring - Usage stats, health checks, alerts
+- [ ] 🔄 OTA Updates - Deploy app updates to all devices
+- [ ] 👥 User management - Roles and permissions
+- [ ] 🏢 Organization support - Multi-tenant for businesses
+- [ ] 📡 Device groups - Organize devices by location/function
+
+### v2.5.0 (Q4 2026) - Integrations
+- [ ] 🏠 HACS Integration - Native Home Assistant plugin
+- [ ] 🌍 Multi-language - French, Spanish, German, Portuguese
+- [ ] 🎨 Custom Themes - Personalize UI colors and branding
+- [ ] 📡 MQTT Support - Alternative to REST for real-time events
+- [ ] 🔗 Tasker Integration - Android automation support
+- [ ] 📺 Chromecast Support - Cast content to displays
 
 ---
 

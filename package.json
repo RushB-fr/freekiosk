@@ -1,6 +1,6 @@
 {
   "name": "FreeKiosk",
-  "version": "1.1.4",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "android": "react-native run-android",
@@ -25,8 +25,10 @@
     "react-native-fs": "^2.20.0",
     "react-native-gesture-handler": "^2.28.0",
     "react-native-keychain": "^10.0.0",
+    "react-native-paper": "^5.14.5",
     "react-native-safe-area-context": "^5.6.1",
     "react-native-screens": "^4.16.0",
+    "react-native-vector-icons": "^10.3.0",
     "react-native-vision-camera": "^4.7.3",
     "react-native-webview": "^13.16.0"
   },

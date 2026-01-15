@@ -45,6 +45,10 @@ class OverlayService : Service() {
         @Volatile
         var buttonOpacity = 0.0f
 
+        // Position du bouton overlay (top-left, top-right, bottom-left, bottom-right)
+        @Volatile
+        var buttonPosition = "bottom-right"
+
         // Status bar enabled/disabled
         @Volatile
         var statusBarEnabled = false
@@ -68,6 +72,11 @@ class OverlayService : Service() {
         fun updateButtonOpacity(opacity: Float) {
             buttonOpacity = opacity
             instance?.updateButtonAlpha()
+        }
+
+        fun updateButtonPosition(position: String) {
+            buttonPosition = position
+            instance?.recreateOverlay()
         }
 
         fun updateStatusBarEnabled(enabled: Boolean) {
@@ -189,16 +198,18 @@ class OverlayService : Service() {
         try {
             val prefs = getSharedPreferences("FreeKioskSettings", Context.MODE_PRIVATE)
             buttonOpacity = prefs.getFloat("overlay_button_opacity", 0.0f)
+            buttonPosition = prefs.getString("overlay_button_position", "bottom-right") ?: "bottom-right"
             statusBarEnabled = prefs.getBoolean("status_bar_enabled", false)
             showBattery = prefs.getBoolean("status_bar_show_battery", true)
             showWifi = prefs.getBoolean("status_bar_show_wifi", true)
             showBluetooth = prefs.getBoolean("status_bar_show_bluetooth", true)
             showVolume = prefs.getBoolean("status_bar_show_volume", true)
             showTime = prefs.getBoolean("status_bar_show_time", true)
-            DebugLog.d("OverlayService", "Loaded settings - opacity: $buttonOpacity, status bar: $statusBarEnabled, items: B:$showBattery W:$showWifi BT:$showBluetooth V:$showVolume T:$showTime")
+            DebugLog.d("OverlayService", "Loaded settings - opacity: $buttonOpacity, position: $buttonPosition, status bar: $statusBarEnabled, items: B:$showBattery W:$showWifi BT:$showBluetooth V:$showVolume T:$showTime")
         } catch (e: Exception) {
             DebugLog.errorProduction("OverlayService", "Failed to load settings: ${e.message}")
             buttonOpacity = 0.0f
+            buttonPosition = "bottom-right"
             statusBarEnabled = false
             showBattery = true
             showWifi = true
@@ -256,9 +267,17 @@ class OverlayService : Service() {
 
 
     private fun createOverlay() {
+        // Déterminer la gravité selon la position configurée
+        val buttonGravity = when (buttonPosition) {
+            "top-left" -> Gravity.TOP or Gravity.START
+            "top-right" -> Gravity.TOP or Gravity.END
+            "bottom-left" -> Gravity.BOTTOM or Gravity.START
+            else -> Gravity.BOTTOM or Gravity.END // bottom-right par défaut
+        }
+
         // Créer le layout de l'overlay
         overlayView = FrameLayout(this).apply {
-            // Petit bouton discret dans le coin inférieur droit
+            // Petit bouton discret
             returnButton = Button(context).apply {
                 text = "↩"
                 setTextColor(android.graphics.Color.WHITE)
@@ -285,7 +304,7 @@ class OverlayService : Service() {
                 FrameLayout.LayoutParams.WRAP_CONTENT,  // Taille minimale
                 FrameLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                gravity = Gravity.BOTTOM or Gravity.END
+                gravity = buttonGravity
                 setMargins(0, 0, 0, 0) // Pas de marges, collé au coin
             })
         }
@@ -308,15 +327,32 @@ class OverlayService : Service() {
             PixelFormat.TRANSLUCENT
         )
 
-        params.gravity = Gravity.BOTTOM or Gravity.END  // Position coin inférieur droit
-        params.x = 0  // Pas de marge, collé au bord droit
-        params.y = 0  // Pas de marge, collé au bord bas
+        params.gravity = buttonGravity  // Position selon la configuration
+        params.x = 0  // Pas de marge
+        params.y = 0  // Pas de marge
 
         try {
             windowManager?.addView(overlayView, params)
-            DebugLog.d("OverlayService", "Overlay created successfully")
+            DebugLog.d("OverlayService", "Overlay created successfully at position: $buttonPosition")
         } catch (e: Exception) {
             DebugLog.errorProduction("OverlayService", "Failed to create overlay: ${e.message}")
+        }
+    }
+
+    // Recréer l'overlay (appelé quand la position change)
+    private fun recreateOverlay() {
+        try {
+            // Supprimer l'ancien overlay si existant
+            overlayView?.let { windowManager?.removeView(it) }
+            overlayView = null
+            returnButton = null
+
+            // Recréer avec la nouvelle position
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this)) {
+                createOverlay()
+            }
+        } catch (e: Exception) {
+            DebugLog.errorProduction("OverlayService", "Failed to recreate overlay: ${e.message}")
         }
     }
 

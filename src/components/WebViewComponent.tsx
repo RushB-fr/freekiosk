@@ -24,13 +24,17 @@ interface WebViewComponentProps {
   autoReload: boolean;
   keyboardMode?: string; // 'default', 'force_numeric', 'smart'
   onUserInteraction?: () => void; // callback optionnel pour interaction utilisateur
+  jsToExecute?: string; // JavaScript code to execute from API
+  onJsExecuted?: () => void; // callback when JS is executed
 }
 
 const WebViewComponent: React.FC<WebViewComponentProps> = ({ 
   url, 
   autoReload,
   keyboardMode = 'default',
-  onUserInteraction
+  onUserInteraction,
+  jsToExecute,
+  onJsExecuted
 }) => {
   const navigation = useNavigation<NavigationProp>();
   const webViewRef = useRef<WebView>(null);
@@ -46,6 +50,17 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
       useNativeDriver: true,
     }).start();
   }, [fadeAnim]);
+
+  // Execute JavaScript from API
+  React.useEffect(() => {
+    if (jsToExecute && webViewRef.current && !loading) {
+      webViewRef.current.injectJavaScript(jsToExecute);
+      console.log('[WebView] Executed JS from API');
+      if (onJsExecuted) {
+        onJsExecuted();
+      }
+    }
+  }, [jsToExecute, loading, onJsExecuted]);
 
   // Cleanup loading timeout on unmount
   React.useEffect(() => {
@@ -279,13 +294,13 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
             {/* Hint */}
             <View style={styles.hintContainer}>
               <Text style={styles.hintText}>
-                💡 Tip: Tap 5× in the bottom right corner to access settings
+                💡 Tip: Tap 5× on the secret button to access settings (default: bottom-right corner)
               </Text>
             </View>
 
             {/* Footer */}
             <Text style={styles.footerText}>
-              Version 1.1.4 • by Rushb
+              Version 1.2.0 • by Rushb
             </Text>
           </Animated.View>
         </ScrollView>

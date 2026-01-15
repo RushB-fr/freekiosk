@@ -177,15 +177,22 @@ class MainActivity : ReactActivity() {
     if (!devicePolicyManager.isDeviceOwnerApp(packageName)) return
 
     try {
-      // Configurer les features Lock Task pour bloquer toute navigation système
-      // LOCK_TASK_FEATURE_NONE = 0 : Bloque tout (pas de Home, Recents, notifications, etc.)
-      // On ne permet AUCUNE fonctionnalité système pendant le Lock Task
+      // Read allowPowerButton setting from AsyncStorage (SharedPreferences)
+      val prefs = getSharedPreferences("RKStorage", Context.MODE_PRIVATE)
+      val allowPowerButtonValue = prefs.getString("@kiosk_allow_power_button", null)
+      val allowPowerButton = allowPowerButtonValue == "true"
+      
+      // Configurer les features Lock Task based on allowPowerButton setting
       if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-        devicePolicyManager.setLockTaskFeatures(
-          adminComponent,
+        val lockTaskFeatures = if (allowPowerButton) {
+          // Allow only Global Actions (power menu) for power button functionality
+          DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS
+        } else {
+          // LOCK_TASK_FEATURE_NONE = 0 : Bloque tout (pas de Home, Recents, notifications, etc.)
           DevicePolicyManager.LOCK_TASK_FEATURE_NONE
-        )
-        DebugLog.d("MainActivity", "Lock task features set to NONE (full lockdown)")
+        }
+        devicePolicyManager.setLockTaskFeatures(adminComponent, lockTaskFeatures)
+        DebugLog.d("MainActivity", "Lock task features set to ${if (allowPowerButton) "GLOBAL_ACTIONS (power button enabled)" else "NONE (full lockdown)"}")
       }
 
       val samsungUpdateApps = arrayOf(

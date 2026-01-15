@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import MotionDetectionModule from '../utils/MotionDetectionModule';
@@ -11,6 +11,7 @@ interface MotionDetectorProps {
 
 const THROTTLE_INTERVAL = 2000; // Minimum 2s entre détections
 const CAPTURE_INTERVAL = 1000; // Capturer une photo par seconde
+const CAMERA_READY_DELAY = 500; // Delay before starting detection to let camera initialize
 
 // Seuils de sensibilité : ratio de pixels qui doivent changer
 const SENSITIVITY_THRESHOLDS = {
@@ -28,48 +29,54 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
   const { hasPermission } = useCameraPermission();
   const cameraRef = useRef<Camera>(null);
   const lastMotionTime = useRef<number>(0);
-  const detectionInterval = useRef<any>(null);
+  const detectionInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isMounted = useRef<boolean>(true);
+  const isCapturing = useRef<boolean>(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
+  const [isCameraReady, setIsCameraReady] = useState(false);
 
+  // Track mounted state
   useEffect(() => {
-    if (enabled && hasPermission) {
-      setIsCameraActive(true);
-      startDetection();
-    } else {
-      setIsCameraActive(false);
-      stopDetection();
-    }
-
+    isMounted.current = true;
     return () => {
-      stopDetection();
+      isMounted.current = false;
     };
-  }, [enabled, hasPermission, sensitivity]);
+  }, []);
 
-  const startDetection = () => {
-    stopDetection();
-
-    detectionInterval.current = setInterval(async () => {
-      await captureAndCompare();
-    }, CAPTURE_INTERVAL);
-  };
-
-  const stopDetection = () => {
+  const stopDetection = useCallback(() => {
     if (detectionInterval.current) {
       clearInterval(detectionInterval.current);
       detectionInterval.current = null;
     }
+    isCapturing.current = false;
     // Reset native module
     MotionDetectionModule?.reset().catch(() => {});
-  };
+  }, []);
 
-  const captureAndCompare = async () => {
-    if (!cameraRef.current || !enabled) return;
+  const captureAndCompare = useCallback(async () => {
+    // Guard against multiple concurrent captures and unmounted state
+    if (!isMounted.current || !enabled || isCapturing.current || !isCameraReady) {
+      return;
+    }
+
+    // Check if camera ref exists and is valid
+    const camera = cameraRef.current;
+    if (!camera) {
+      return;
+    }
+
+    isCapturing.current = true;
 
     try {
-      const photo = await cameraRef.current.takePhoto({
+      const photo = await camera.takePhoto({
         flash: 'off',
         enableShutterSound: false,
       });
+
+      // Check if still mounted after async operation
+      if (!isMounted.current || !enabled) {
+        return;
+      }
 
       if (!photo || !photo.path) {
         return;
@@ -81,21 +88,77 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
         SENSITIVITY_THRESHOLDS[sensitivity]
       );
 
+      // Check again after async operation
+      if (!isMounted.current || !enabled) {
+        return;
+      }
+
       if (hasMotion) {
-        handleMotionDetected();
+        const now = Date.now();
+        if (now - lastMotionTime.current > THROTTLE_INTERVAL) {
+          lastMotionTime.current = now;
+          onMotionDetected();
+        }
       }
     } catch (error) {
-      // Silent capture errors
+      // Silent capture errors - this includes the findCameraView error
+      // which happens when camera is unmounted during capture
+    } finally {
+      isCapturing.current = false;
     }
-  };
+  }, [enabled, sensitivity, onMotionDetected, isCameraReady]);
 
-  const handleMotionDetected = () => {
-    const now = Date.now();
-    if (now - lastMotionTime.current > THROTTLE_INTERVAL) {
-      lastMotionTime.current = now;
-      onMotionDetected();
+  const startDetection = useCallback(() => {
+    stopDetection();
+
+    // Add a small delay to ensure camera is fully initialized
+    setTimeout(() => {
+      if (!isMounted.current || !enabled) return;
+
+      detectionInterval.current = setInterval(() => {
+        if (isMounted.current && enabled && isCameraReady) {
+          captureAndCompare();
+        }
+      }, CAPTURE_INTERVAL);
+    }, CAMERA_READY_DELAY);
+  }, [stopDetection, captureAndCompare, enabled, isCameraReady]);
+
+  useEffect(() => {
+    if (enabled && hasPermission && device) {
+      setIsCameraActive(true);
+    } else {
+      setIsCameraActive(false);
+      setIsCameraReady(false);
+      stopDetection();
     }
-  };
+
+    return () => {
+      stopDetection();
+    };
+  }, [enabled, hasPermission, device, stopDetection]);
+
+  // Start detection only when camera is ready
+  useEffect(() => {
+    if (isCameraReady && enabled && hasPermission) {
+      startDetection();
+    }
+    return () => {
+      stopDetection();
+    };
+  }, [isCameraReady, enabled, hasPermission, startDetection, stopDetection]);
+
+  const handleCameraInitialized = useCallback(() => {
+    if (isMounted.current) {
+      setIsCameraReady(true);
+    }
+  }, []);
+
+  const handleCameraError = useCallback((error: any) => {
+    // Camera error occurred - stop detection to prevent crashes
+    console.warn('Camera error:', error);
+    setIsCameraReady(false);
+    stopDetection();
+  }, [stopDetection]);
 
   if (!enabled || !device || !hasPermission) {
     return null;
@@ -109,6 +172,8 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
         device={device}
         isActive={isCameraActive}
         photo={true}
+        onInitialized={handleCameraInitialized}
+        onError={handleCameraError}
       />
     </View>
   );

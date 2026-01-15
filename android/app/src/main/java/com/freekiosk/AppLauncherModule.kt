@@ -9,8 +9,11 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.modules.core.DeviceEventManagerModule
+import java.util.concurrent.Executors
 
 class AppLauncherModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
+
+    private val executor = Executors.newSingleThreadExecutor()
 
     override fun getName(): String {
         return "AppLauncherModule"
@@ -95,35 +98,38 @@ class AppLauncherModule(reactContext: ReactApplicationContext) : ReactContextBas
 
     @ReactMethod
     fun getInstalledApps(promise: Promise) {
-        try {
-            val pm = reactApplicationContext.packageManager
-            val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+        // Run on background thread to avoid ANR on devices with many apps
+        executor.execute {
+            try {
+                val pm = reactApplicationContext.packageManager
+                val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
 
-            val appList = mutableListOf<WritableMap>()
-            for (packageInfo in packages) {
-                // Filter: only apps with launch intents (launchable apps)
-                if (pm.getLaunchIntentForPackage(packageInfo.packageName) != null) {
-                    val appName = pm.getApplicationLabel(packageInfo).toString()
-                    val appData = Arguments.createMap()
-                    appData.putString("packageName", packageInfo.packageName)
-                    appData.putString("appName", appName)
-                    appList.add(appData)
+                val appList = mutableListOf<WritableMap>()
+                for (packageInfo in packages) {
+                    // Filter: only apps with launch intents (launchable apps)
+                    if (pm.getLaunchIntentForPackage(packageInfo.packageName) != null) {
+                        val appName = pm.getApplicationLabel(packageInfo).toString()
+                        val appData = Arguments.createMap()
+                        appData.putString("packageName", packageInfo.packageName)
+                        appData.putString("appName", appName)
+                        appList.add(appData)
+                    }
                 }
+
+                // Sort by app name
+                val sortedList = appList.sortedBy { it.getString("appName") }
+
+                // Convert to WritableArray
+                val resultArray = Arguments.createArray()
+                for (app in sortedList) {
+                    resultArray.pushMap(app)
+                }
+
+                promise.resolve(resultArray)
+            } catch (e: Exception) {
+                DebugLog.errorProduction("AppLauncherModule", "Failed to get installed apps: ${e.message}")
+                promise.reject("ERROR_GET_APPS", "Failed to get installed apps: ${e.message}")
             }
-
-            // Sort by app name
-            val sortedList = appList.sortedBy { it.getString("appName") }
-
-            // Convert to WritableArray
-            val resultArray = Arguments.createArray()
-            for (app in sortedList) {
-                resultArray.pushMap(app)
-            }
-
-            promise.resolve(resultArray)
-        } catch (e: Exception) {
-            DebugLog.errorProduction("AppLauncherModule", "Failed to get installed apps: ${e.message}")
-            promise.reject("ERROR_GET_APPS", "Failed to get installed apps: ${e.message}")
         }
     }
 
@@ -145,5 +151,10 @@ class AppLauncherModule(reactContext: ReactApplicationContext) : ReactContextBas
         reactApplicationContext
             .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
             .emit(eventName, params)
+    }
+
+    override fun onCatalystInstanceDestroy() {
+        super.onCatalystInstanceDestroy()
+        executor.shutdown()
     }
 }
