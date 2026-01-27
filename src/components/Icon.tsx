@@ -124,8 +124,14 @@ export type IconName =
   | 'test-tube'
   | 'speedometer'
   | 'gesture-tap'
+  | 'gesture-tap-button'
   | 'undo'
   | 'arrow-u-left-top'
+  // Shapes & Grid
+  | 'grid'
+  | 'rectangle-outline'
+  | 'lightbulb-outline'
+  | 'stop'
   // API & Network
   | 'api'
   | 'server-network'

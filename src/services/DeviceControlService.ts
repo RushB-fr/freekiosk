@@ -65,7 +65,7 @@ class DeviceControlServiceClass {
   private getScreensaverCallback: GetScreensaverCallback | null = null;
   private currentBrightness: number = 0.5;
   private kioskModeEnabled: boolean = false;
-  private appVersion: string = '1.2.1';
+  private appVersion: string = '1.2.2';
 
   // Register callbacks from KioskScreen
   registerWebViewCallbacks(
@@ -222,13 +222,16 @@ class DeviceControlServiceClass {
 
   async screenOn(): Promise<boolean> {
     try {
-      // Deactivate screensaver
-      if (this.screensaverCallback) {
-        this.screensaverCallback(false);
+      // Use native method to turn screen ON with WakeLock
+      if (KioskModule?.turnScreenOn) {
+        await KioskModule.turnScreenOn();
+      } else {
+        // Fallback: deactivate screensaver and restore brightness
+        if (this.screensaverCallback) {
+          this.screensaverCallback(false);
+        }
+        await RNBrightness.setBrightnessLevel(this.currentBrightness);
       }
-      
-      // Restore default brightness
-      await RNBrightness.setBrightnessLevel(this.currentBrightness);
       
       return true;
     } catch (error) {
@@ -239,9 +242,14 @@ class DeviceControlServiceClass {
 
   async screenOff(): Promise<boolean> {
     try {
-      // Activate screensaver (dims screen)
-      if (this.screensaverCallback) {
-        this.screensaverCallback(true);
+      // Use native method to turn screen OFF (dim to minimum)
+      if (KioskModule?.turnScreenOff) {
+        await KioskModule.turnScreenOff();
+      } else {
+        // Fallback: activate screensaver (dims screen)
+        if (this.screensaverCallback) {
+          this.screensaverCallback(true);
+        }
       }
       
       return true;

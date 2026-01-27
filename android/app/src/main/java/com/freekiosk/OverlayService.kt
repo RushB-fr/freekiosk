@@ -41,13 +41,10 @@ import java.util.Locale
 class OverlayService : Service() {
 
     companion object {
-        // Opacité du bouton overlay (0.0 = invisible, 1.0 = opaque)
+        // Opacité du bouton indicateur visuel (0.0 = invisible, 1.0 = opaque)
+        // Note: Le 5-tap fonctionne partout grâce à l'overlay invisible 1x1 pixel avec FLAG_WATCH_OUTSIDE_TOUCH
         @Volatile
         var buttonOpacity = 0.0f
-
-        // Position du bouton overlay (top-left, top-right, bottom-left, bottom-right)
-        @Volatile
-        var buttonPosition = "bottom-right"
 
         // Status bar enabled/disabled
         @Volatile
@@ -74,11 +71,6 @@ class OverlayService : Service() {
             instance?.updateButtonAlpha()
         }
 
-        fun updateButtonPosition(position: String) {
-            buttonPosition = position
-            instance?.recreateOverlay()
-        }
-
         fun updateStatusBarEnabled(enabled: Boolean) {
             statusBarEnabled = enabled
             instance?.recreateStatusBar()
@@ -92,11 +84,32 @@ class OverlayService : Service() {
             showTime = time
             instance?.recreateStatusBar()
         }
+
+        /**
+         * Bring the return button overlay to the front (above other overlays)
+         * Called when blocking overlays are updated to ensure return button stays accessible
+         */
+        fun bringToFront() {
+            instance?.let { service ->
+                Handler(Looper.getMainLooper()).post {
+                    service.overlayView?.let { view ->
+                        try {
+                            // Remove and re-add to bring to front
+                            service.windowManager?.removeView(view)
+                            service.createOverlay()
+                            DebugLog.d("OverlayService", "Return button brought to front")
+                        } catch (e: Exception) {
+                            DebugLog.e("OverlayService", "Failed to bring to front: ${e.message}")
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private var windowManager: WindowManager? = null
     private var overlayView: View? = null
-    private var returnButton: Button? = null
+    private var returnButton: View? = null  // Changed from Button to View (now a FrameLayout)
     private var statusBarView: View? = null
     private var batteryText: TextView? = null
     private var batteryChargingIcon: android.widget.ImageView? = null
@@ -108,8 +121,8 @@ class OverlayService : Service() {
     private var tapCount = 0
     private val tapHandler = Handler(Looper.getMainLooper())
     private val statusUpdateHandler = Handler(Looper.getMainLooper())
-    private val TAP_TIMEOUT = 2000L // 2 secondes pour faire 5 taps
-    private val REQUIRED_TAPS = 5
+    private val TAP_TIMEOUT = 1500L // 1.5 secondes pour faire N taps
+    private var requiredTaps = 5 // Default, will be overridden from intent
     private val CHANNEL_ID = "FreeKioskOverlay"
     private val NOTIFICATION_ID = 1001
     private val STATUS_UPDATE_INTERVAL = 5000L // Update every 5 seconds
@@ -198,18 +211,16 @@ class OverlayService : Service() {
         try {
             val prefs = getSharedPreferences("FreeKioskSettings", Context.MODE_PRIVATE)
             buttonOpacity = prefs.getFloat("overlay_button_opacity", 0.0f)
-            buttonPosition = prefs.getString("overlay_button_position", "bottom-right") ?: "bottom-right"
             statusBarEnabled = prefs.getBoolean("status_bar_enabled", false)
             showBattery = prefs.getBoolean("status_bar_show_battery", true)
             showWifi = prefs.getBoolean("status_bar_show_wifi", true)
             showBluetooth = prefs.getBoolean("status_bar_show_bluetooth", true)
             showVolume = prefs.getBoolean("status_bar_show_volume", true)
             showTime = prefs.getBoolean("status_bar_show_time", true)
-            DebugLog.d("OverlayService", "Loaded settings - opacity: $buttonOpacity, position: $buttonPosition, status bar: $statusBarEnabled, items: B:$showBattery W:$showWifi BT:$showBluetooth V:$showVolume T:$showTime")
+            DebugLog.d("OverlayService", "Loaded settings - opacity: $buttonOpacity, status bar: $statusBarEnabled, items: B:$showBattery W:$showWifi BT:$showBluetooth V:$showVolume T:$showTime")
         } catch (e: Exception) {
             DebugLog.errorProduction("OverlayService", "Failed to load settings: ${e.message}")
             buttonOpacity = 0.0f
-            buttonPosition = "bottom-right"
             statusBarEnabled = false
             showBattery = true
             showWifi = true
@@ -248,6 +259,12 @@ class OverlayService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Get required taps from intent (default 5)
+        intent?.getIntExtra("REQUIRED_TAPS", 5)?.let { taps ->
+            requiredTaps = taps.coerceIn(2, 10)
+            DebugLog.d("OverlayService", "Required taps set to: $requiredTaps")
+        }
+        
         // Vérifier la permission overlay avant de créer des vues
         val hasOverlayPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this)
         
@@ -267,73 +284,98 @@ class OverlayService : Service() {
 
 
     private fun createOverlay() {
-        // Déterminer la gravité selon la position configurée
-        val buttonGravity = when (buttonPosition) {
-            "top-left" -> Gravity.TOP or Gravity.START
-            "top-right" -> Gravity.TOP or Gravity.END
-            "bottom-left" -> Gravity.BOTTOM or Gravity.START
-            else -> Gravity.BOTTOM or Gravity.END // bottom-right par défaut
+        // SYSTÈME DE DÉTECTION FULLSCREEN 5-TAP:
+        // 1. Overlay INVISIBLE de 1x1 pixel avec FLAG_WATCH_OUTSIDE_TOUCH
+        //    Détecte TOUS les taps de l'écran sans bloquer l'app en dessous
+        // 2. Bouton VISIBLE optionnel en bas à droite avec FLAG_NOT_TOUCHABLE
+        //    Indicateur visuel qui ne bloque rien
+        // Résultat: L'app en dessous reste 100% clickable, 5-tap fonctionne partout!
+        
+        // Créer un overlay INVISIBLE de 1x1 pixel qui observe TOUS les taps de l'écran
+        // FLAG_WATCH_OUTSIDE_TOUCH fait que cet overlay reçoit les événements de TOUT l'écran
+        overlayView = View(this).apply {
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            
+            // Ce listener reçoit TOUS les taps de l'écran grâce à FLAG_WATCH_OUTSIDE_TOUCH
+            setOnTouchListener { _, event ->
+                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE ||
+                    event.action == android.view.MotionEvent.ACTION_DOWN) {
+                    handleTap()
+                }
+                false // Ne jamais bloquer
+            }
         }
 
-        // Créer le layout de l'overlay
-        overlayView = FrameLayout(this).apply {
-            // Petit bouton discret
+        // Créer séparément le bouton visible (optionnel, juste pour montrer où taper)
+        val buttonView = FrameLayout(this).apply {
             returnButton = Button(context).apply {
                 text = "↩"
                 setTextColor(android.graphics.Color.WHITE)
-                setBackgroundColor(android.graphics.Color.parseColor("#2196F3")) // Bleu Material Design
-                setPadding(0, 0, 0, 0)  // Pas de padding
-                textSize = 12f  // Taille de texte très réduite
-                alpha = buttonOpacity  // Utilise l'opacité configurée
-                
-                // Taille minimale pour que le bouton soit cliquable
+                setBackgroundColor(android.graphics.Color.parseColor("#2196F3"))
+                setPadding(0, 0, 0, 0)
+                textSize = 12f
+                alpha = buttonOpacity
                 minimumWidth = 0
                 minimumHeight = 0
-
-                // Arrondir les coins et ombre
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     elevation = 8f
                 }
-
-                setOnClickListener {
-                    handleTap()
-                }
+                // Pas d'onClick, le tap est géré par l'overlay invisible
             }
-
             addView(returnButton, FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,  // Taille minimale
+                FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                gravity = buttonGravity
-                setMargins(0, 0, 0, 0) // Pas de marges, collé au coin
+                gravity = Gravity.BOTTOM or Gravity.END // Toujours en bas à droite
+                setMargins(0, 0, 0, 0)
             })
         }
 
-        // Paramètres de la fenêtre overlay
-        val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        } else {
-            @Suppress("DEPRECATION")
-            WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
+        // Overlay invisible 1x1 pixel avec FLAG_WATCH_OUTSIDE_TOUCH
+        // Reçoit TOUS les taps de l'écran sans bloquer quoi que ce soit
+        val invisibleParams = WindowManager.LayoutParams(
+            1, // 1 pixel de large
+            1, // 1 pixel de haut
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            else
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_SYSTEM_ALERT,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+            WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = 0
+            y = 0
         }
 
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,  // Seulement la taille du bouton
+        // Paramètres pour le bouton visible (ne bloque pas, juste visuel en bas à droite)
+        val buttonParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
-            layoutType,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            else
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_SYSTEM_ALERT,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT
-        )
-
-        params.gravity = buttonGravity  // Position selon la configuration
-        params.x = 0  // Pas de marge
-        params.y = 0  // Pas de marge
+        ).apply {
+            gravity = Gravity.BOTTOM or Gravity.END
+            x = 0
+            y = 0
+        }
 
         try {
-            windowManager?.addView(overlayView, params)
-            DebugLog.d("OverlayService", "Overlay created successfully at position: $buttonPosition")
+            // Ajouter d'abord l'overlay invisible qui détecte les taps
+            windowManager?.addView(overlayView, invisibleParams)
+            // Puis ajouter le bouton visible par-dessus (optionnel, juste pour indiquer)
+            windowManager?.addView(buttonView, buttonParams)
+            DebugLog.d("OverlayService", "Overlay created successfully (fullscreen detection)")
         } catch (e: Exception) {
             DebugLog.errorProduction("OverlayService", "Failed to create overlay: ${e.message}")
         }
@@ -342,15 +384,19 @@ class OverlayService : Service() {
     // Recréer l'overlay (appelé quand la position change)
     private fun recreateOverlay() {
         try {
-            // Supprimer l'ancien overlay si existant
-            overlayView?.let { windowManager?.removeView(it) }
+            // Supprimer les anciens overlays si existants
+            if (overlayView?.windowToken != null) {
+                windowManager?.removeView(overlayView)
+            }
+            if (returnButton?.windowToken != null) {
+                windowManager?.removeView(returnButton?.parent as? View)
+            }
+            
             overlayView = null
             returnButton = null
 
-            // Recréer avec la nouvelle position
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this)) {
-                createOverlay()
-            }
+            // Recréer l'overlay avec la nouvelle position
+            createOverlay()
         } catch (e: Exception) {
             DebugLog.errorProduction("OverlayService", "Failed to recreate overlay: ${e.message}")
         }
@@ -770,20 +816,20 @@ class OverlayService : Service() {
 
     private fun handleTap() {
         tapCount++
-        DebugLog.d("OverlayService", "Tap count: $tapCount/$REQUIRED_TAPS")
+        DebugLog.d("OverlayService", "Tap count: $tapCount/$requiredTaps")
 
         // Réinitialiser le compteur après timeout
         tapHandler.removeCallbacksAndMessages(null)
         tapHandler.postDelayed({
-            if (tapCount < REQUIRED_TAPS) {
+            if (tapCount < requiredTaps) {
                 DebugLog.d("OverlayService", "Tap timeout - resetting counter")
                 tapCount = 0
             }
         }, TAP_TIMEOUT)
 
-        // Si 5 taps atteints, retourner à FreeKiosk
-        if (tapCount >= REQUIRED_TAPS) {
-            DebugLog.d("OverlayService", "5 taps detected! Returning to FreeKiosk")
+        // Si N taps atteints, retourner à FreeKiosk
+        if (tapCount >= requiredTaps) {
+            DebugLog.d("OverlayService", "$requiredTaps taps detected! Returning to FreeKiosk")
             tapCount = 0
             tapHandler.removeCallbacksAndMessages(null)
             returnToFreeKiosk()

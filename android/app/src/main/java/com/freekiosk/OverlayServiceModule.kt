@@ -20,7 +20,7 @@ class OverlayServiceModule(reactContext: ReactApplicationContext) :
     override fun getName(): String = NAME
 
     @ReactMethod
-    fun startOverlayService(promise: Promise) {
+    fun startOverlayService(tapCount: Int, promise: Promise) {
         try {
             // Démarrer le service même sans permission overlay
             // Le service peut toujours fonctionner en arrière-plan (timer test mode, retour auto)
@@ -32,8 +32,9 @@ class OverlayServiceModule(reactContext: ReactApplicationContext) :
             }
 
             val serviceIntent = Intent(reactApplicationContext, OverlayService::class.java)
+            serviceIntent.putExtra("REQUIRED_TAPS", tapCount.coerceIn(2, 10))
             reactApplicationContext.startService(serviceIntent)
-            DebugLog.d("OverlayServiceModule", "Started OverlayService")
+            DebugLog.d("OverlayServiceModule", "Started OverlayService with tapCount=$tapCount")
             promise.resolve(true)
         } catch (e: Exception) {
             DebugLog.errorProduction("OverlayServiceModule", "Error starting OverlayService: ${e.message}")
@@ -82,39 +83,6 @@ class OverlayServiceModule(reactContext: ReactApplicationContext) :
             promise.resolve(opacity.toDouble())
         } catch (e: Exception) {
             promise.reject("ERROR", "Failed to get button opacity: ${e.message}")
-        }
-    }
-
-    @ReactMethod
-    fun setButtonPosition(position: String, promise: Promise) {
-        try {
-            // Valider la position
-            val validPositions = listOf("top-left", "top-right", "bottom-left", "bottom-right")
-            val safePosition = if (validPositions.contains(position)) position else "bottom-right"
-            
-            // Sauvegarder dans SharedPreferences
-            val prefs = reactApplicationContext.getSharedPreferences("FreeKioskSettings", android.content.Context.MODE_PRIVATE)
-            prefs.edit().putString("overlay_button_position", safePosition).apply()
-            
-            // Mettre à jour le bouton en temps réel via la méthode statique
-            OverlayService.updateButtonPosition(safePosition)
-            
-            DebugLog.d("OverlayServiceModule", "Set button position to: $safePosition")
-            promise.resolve(true)
-        } catch (e: Exception) {
-            DebugLog.errorProduction("OverlayServiceModule", "Error setting button position: ${e.message}")
-            promise.reject("ERROR", "Failed to set button position: ${e.message}")
-        }
-    }
-
-    @ReactMethod
-    fun getButtonPosition(promise: Promise) {
-        try {
-            val prefs = reactApplicationContext.getSharedPreferences("FreeKioskSettings", android.content.Context.MODE_PRIVATE)
-            val position = prefs.getString("overlay_button_position", "bottom-right")
-            promise.resolve(position)
-        } catch (e: Exception) {
-            promise.reject("ERROR", "Failed to get button position: ${e.message}")
         }
     }
 

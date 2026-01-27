@@ -9,6 +9,8 @@ FreeKiosk includes a built-in REST API server for integration with **Home Assist
 - **Authentication**: Optional API Key (X-Api-Key header)
 - **Format**: JSON responses
 
+> 💡 **Note**: Some API features require **Device Owner mode** for full functionality (screen control, reboot). See [Installation Guide](INSTALL.md#advanced-install-device-owner-mode) for setup instructions.
+
 ## Enabling the API
 
 ### Via UI
@@ -152,7 +154,7 @@ Device information.
     "model": "SM-T510",
     "manufacturer": "samsung",
     "android": "11",
-    "appVersion": "1.2.1"
+    "appVersion": "1.2.2"
   }
 }
 ```
@@ -186,6 +188,17 @@ Turn screen on / wake device.
 
 #### `POST /api/screen/off`
 Turn screen off.
+
+> ⚠️ **Device Owner Required for Full Screen Control**
+> 
+> | Feature | Without Device Owner | With Device Owner |
+> |---------|---------------------|-------------------|
+> | `screen/off` | Activates screensaver (dims to 0%) | Actually turns off screen |
+> | `screen/on` | Exits screensaver | Wakes device from sleep |
+> | Screen state detection | Limited (server stops when screen off) | Full (server stays active) |
+> | `reboot` | ❌ Not available | ✅ Works |
+> 
+> To enable Device Owner mode, see [Installation Guide](INSTALL.md#advanced-install-device-owner-mode).
 
 #### `POST /api/screensaver/on`
 Activate screensaver mode.

@@ -7,11 +7,45 @@ All notable changes to FreeKiosk will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-
 ***
 
 
 ## [Unreleased]
+
+
+***
+## [1.2.2] - 2026-01-21
+
+### Changed
+- 🎯 **5-Tap Detection System**: Complete redesign for fullscreen detection
+  - 5-tap now works **anywhere on the screen** (not just on button)
+  - Tap 5 times rapidly anywhere to access settings - no more corner targeting required
+  - Uses invisible 1x1 pixel overlay with `FLAG_WATCH_OUTSIDE_TOUCH` for fullscreen tap detection
+  - Visual indicator is now optional (can be hidden but 5-tap still works everywhere)
+  - Underlying app remains 100% interactive (no touch blocking)
+  - Removed button position settings (visual indicator fixed in bottom-right when visible)
+  - Same behavior in both WebView and External App modes
+
+### Added
+- 🔊 **Volume 5-Tap Gesture**: Alternative to 5tap for accessing PIN screen
+  - Press Volume Up or Volume Down 5 times quickly to access settings
+  - Works even when volume is at max (use Volume Down) or min (use Volume Up)
+  - Only active when kiosk mode (lock task) is enabled
+  - Toggle in Settings > Security > "Volume 5-Tap"
+- 🎨 **Blocking Overlay**: Configurable overlay to block user interactions
+  - Touch Logger countdown feature with coordinates display
+  - Configurable via settings
+
+### Fixed
+- 🖥️ **Screen On/Off API**: Improved reliability for `/api/screen/on` and `/api/screen/off`
+  - With Device Owner: uses `lockNow()` to truly turn off screen
+  - Without Device Owner: improved brightness control (0 instead of 0.01)
+  - Properly manages `FLAG_KEEP_SCREEN_ON` flag
+- 🔧 **React Native New Architecture**: Fixed compatibility issues with BroadcastReceivers
+- 🐛 **Screensaver Wake**: Fixed screensaver not waking properly after touch or motion detection (stale closure issue)
+- 🎨 **Visual Fixes**: 
+  - Added cursor visibility in text inputs (cursorColor and selectionColor)
+  - Updated "Launch on Boot" info message to apply to all users
 
 
 ***

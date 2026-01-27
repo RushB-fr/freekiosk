@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BlockingRegion } from '../types/blockingOverlay';
 
 const KEYS = {
   URL: '@kiosk_url',
@@ -46,6 +47,12 @@ const KEYS = {
   REST_API_ALLOW_CONTROL: '@kiosk_rest_api_allow_control',
   // Power Button setting
   ALLOW_POWER_BUTTON: '@kiosk_allow_power_button',
+  // Return to Settings
+  RETURN_TAP_COUNT: '@kiosk_return_tap_count',
+  VOLUME_UP_5TAP_ENABLED: '@kiosk_volume_up_5tap_enabled',
+  // Blocking Overlays
+  BLOCKING_OVERLAYS_ENABLED: '@kiosk_blocking_overlays_enabled',
+  BLOCKING_OVERLAYS_REGIONS: '@kiosk_blocking_overlays_regions',
   // Legacy keys for backward compatibility
   SCREENSAVER_DELAY: '@screensaver_delay',
   MOTION_DETECTION_ENABLED: '@motion_detection_enabled',
@@ -958,6 +965,81 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting allow power button:', error);
       return false;
+    }
+  },
+
+  // RETURN TAP COUNT
+  saveReturnTapCount: async (value: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.RETURN_TAP_COUNT, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving return tap count:', error);
+    }
+  },
+
+  getReturnTapCount: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.RETURN_TAP_COUNT);
+      return value ? JSON.parse(value) : 5; // Default 5 taps
+    } catch (error) {
+      console.error('Error getting return tap count:', error);
+      return 5;
+    }
+  },
+
+  // VOLUME UP 5-TAP
+  saveVolumeUp5TapEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.VOLUME_UP_5TAP_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving volume up 5-tap enabled:', error);
+    }
+  },
+
+  getVolumeUp5TapEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.VOLUME_UP_5TAP_ENABLED);
+      return value ? JSON.parse(value) : true; // Default ON for backward compatibility
+    } catch (error) {
+      console.error('Error getting volume up 5-tap enabled:', error);
+      return true;
+    }
+  },
+
+  // BLOCKING OVERLAYS
+  saveBlockingOverlaysEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.BLOCKING_OVERLAYS_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving blocking overlays enabled:', error);
+    }
+  },
+
+  getBlockingOverlaysEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.BLOCKING_OVERLAYS_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting blocking overlays enabled:', error);
+      return false;
+    }
+  },
+
+  saveBlockingOverlaysRegions: async (regions: BlockingRegion[]): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.BLOCKING_OVERLAYS_REGIONS, JSON.stringify(regions));
+    } catch (error) {
+      console.error('Error saving blocking overlays regions:', error);
+    }
+  },
+
+  getBlockingOverlaysRegions: async (): Promise<BlockingRegion[]> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.BLOCKING_OVERLAYS_REGIONS);
+      return value ? JSON.parse(value) : [];
+    } catch (error) {
+      console.error('Error getting blocking overlays regions:', error);
+      return [];
     }
   },
 

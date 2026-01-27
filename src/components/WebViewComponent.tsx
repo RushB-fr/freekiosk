@@ -23,7 +23,7 @@ interface WebViewComponentProps {
   url: string;
   autoReload: boolean;
   keyboardMode?: string; // 'default', 'force_numeric', 'smart'
-  onUserInteraction?: () => void; // callback optionnel pour interaction utilisateur
+  onUserInteraction?: (event?: { isTap?: boolean }) => void; // callback optionnel pour interaction utilisateur
   jsToExecute?: string; // JavaScript code to execute from API
   onJsExecuted?: () => void; // callback when JS is executed
 }
@@ -101,8 +101,12 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
       }
     }
 
-    // Click handler - DO NOT intercept <a> tags to support SPA routing (Home Assistant, etc.)
-    // Only send interaction message without preventing default behavior
+    // Tap detection for 5-tap - Use touchend on mobile (click doesn't always fire)
+    document.addEventListener('touchend', function(e) {
+      window.ReactNativeWebView.postMessage('FIVE_TAP_CLICK');
+    }, true);
+    
+    // Click handler for desktop/fallback - Also send user-interaction for screensaver reset
     document.addEventListener('click', function(e) {
       sendInteraction();
     }, true);
@@ -110,7 +114,7 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
     // Scroll avec throttling (évite 50+ msg/sec)
     document.addEventListener('scroll', sendInteraction, true);
 
-    // Touch events avec throttling
+    // Touch events avec throttling (for screensaver only, not for tap counting)
     document.addEventListener('touchstart', sendInteraction, true);
     document.addEventListener('touchmove', sendInteraction, true);
   })();
@@ -189,8 +193,13 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
 
   // Gestion des messages venant de la webview
   const onMessageHandler = (event: any) => {
-    if (event.nativeEvent.data === 'user-interaction' && onUserInteraction) {
+    const message = event.nativeEvent.data;
+    
+    if (message === 'user-interaction' && onUserInteraction) {
       onUserInteraction();
+    } else if (message === 'FIVE_TAP_CLICK' && onUserInteraction) {
+      // Dedicated tap event for 5-tap detection
+      onUserInteraction({ isTap: true });
     }
   };
 
@@ -294,13 +303,13 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
             {/* Hint */}
             <View style={styles.hintContainer}>
               <Text style={styles.hintText}>
-                💡 Tip: Tap 5× on the secret button to access settings (default: bottom-right corner)
+                💡 Tip: Tap 5× anywhere on the screen to access settings
               </Text>
             </View>
 
             {/* Footer */}
             <Text style={styles.footerText}>
-              Version 1.2.1 • by Rushb
+              Version 1.2.2 • by Rushb
             </Text>
           </Animated.View>
         </ScrollView>

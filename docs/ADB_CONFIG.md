@@ -104,6 +104,104 @@ adb shell am start -n com.freekiosk/.MainActivity [OPTIONS]
 
 ---
 
+## Waiting for Configuration Completion
+
+The ADB command returns immediately, but FreeKiosk needs time to save settings and restart. **Use broadcast receivers to wait for completion**:
+
+### TypeScript/JavaScript Example
+
+```typescript
+private async setupKioskModeUsingFreeKiosk(packageName: string): Promise<void> {
+  console.log(`Setting up kiosk mode for ${packageName}...`);
+
+  // Start listening for EXTERNAL_APP_LAUNCHED broadcast
+  const appLaunchMonitor = this.execAsync(
+    `adb -s ${this.adbTarget} logcat -c && adb -s ${this.adbTarget} logcat | grep -m 1 "EXTERNAL_APP_LAUNCHED: ${packageName}"`
+  );
+
+  // Send configuration command with auto_start
+  const kioskCmd = `adb -s ${this.adbTarget} shell am start -n com.freekiosk/.MainActivity --es lock_package "${packageName}" --es pin "${PIN}" --ez auto_start true`;
+  await this.execAsync(kioskCmd);
+
+  // Wait for external app to be launched and visible (timeout after 30s)
+  console.log("Waiting for app to launch...");
+  await Promise.race([
+    appLaunchMonitor,
+    new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('App launch timeout after 30s')), 30000)
+    )
+  ]);
+
+  console.log(`✅ ${packageName} is now running and ready!`);
+  // Start sending video/content here
+}
+```
+
+### Bash Script Example
+
+```bash
+#!/bin/bash
+PACKAGE="com.example.app"
+PIN="1234"
+
+# Monitor logcat for completion marker in background
+adb logcat -c
+adb logcat | grep -m 1 "SETTINGS_LOADED" &
+LOGCAT_PID=$!
+
+# Send configuration
+adb shell am start -n com.freekiosk/.MainActivity \
+    --es lock_package "$PACKAGE" \
+    --es pin "$PIN" \
+    --ez auto_start true
+
+# Wait for completion (with 30s timeout)
+timeout 30 wait $LOGCAT_PID
+
+echo "Configuration complete!"
+```
+
+### Broadcast Events
+
+FreeKiosk emits these broadcasts during ADB configuration:
+
+| Broadcast Action | When | Description |
+|-----------------|------|-------------|
+| `com.freekiosk.ADB_CONFIG_SAVED` | Immediately after config saved | Database write complete, restart imminent |
+| `com.freekiosk.ADB_CONFIG_RESTARTING` | Just before restart | Process kill in 500ms |
+| `com.freekiosk.SETTINGS_LOADED` | After restart complete | App restarted and settings loaded successfully |
+| `com.freekiosk.EXTERNAL_APP_LAUNCHED` | After external app launch (auto_start=true) | External app is launched and visible (includes package_name extra) |
+
+**For WebView mode**: Wait for `SETTINGS_LOADED`  
+**For External App mode with auto_start**: Wait for `EXTERNAL_APP_LAUNCHED` to know when the app is ready to receive content
+
+### Waiting for External App Launch
+
+```bash
+#!/bin/bash
+PACKAGE="com.example.app"
+PIN="1234"
+
+# Monitor for external app launch
+adb logcat -c
+adb logcat | grep -m 1 "EXTERNAL_APP_LAUNCHED: $PACKAGE" &
+LOGCAT_PID=$!
+
+# Configure and auto-launch
+adb shell am start -n com.freekiosk/.MainActivity \
+    --es lock_package "$PACKAGE" \
+    --es pin "$PIN" \
+    --ez auto_start true
+
+# Wait for app to be visible (with 30s timeout)
+timeout 30 wait $LOGCAT_PID
+
+echo "✅ $PACKAGE is now running and ready!"
+# Start sending video/content here
+```
+
+---
+
 ## Examples
 
 ### 1. Cloud Gaming Kiosk

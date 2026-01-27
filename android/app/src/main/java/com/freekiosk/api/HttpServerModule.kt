@@ -19,13 +19,16 @@ import android.media.ToneGenerator
 import android.net.wifi.WifiManager
 import android.os.BatteryManager
 import android.os.Environment
+import android.os.PowerManager
 import android.os.StatFs
 import android.util.Log
 import android.view.View
+import android.view.WindowManager
 import android.widget.Toast
 import com.facebook.react.bridge.*
 import com.facebook.react.bridge.UiThreadUtil
 import com.facebook.react.modules.core.DeviceEventManagerModule
+import com.freekiosk.DeviceAdminReceiver
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -75,6 +78,9 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     
     // Audio playback
     private var mediaPlayer: MediaPlayer? = null
+    
+    // Screen control
+    private var wakeLock: PowerManager.WakeLock? = null
     private var toneGenerator: ToneGenerator? = null
 
     init {
@@ -199,6 +205,21 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
         }
         status.put("screen", screenStatus)
         
+        // Audio - get current volume
+        val audioStatus = JSONObject().apply {
+            try {
+                val audioManager = reactContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                val volumePercent = (currentVolume * 100) / maxVolume
+                put("volume", volumePercent)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to get volume for status: ${e.message}")
+                put("volume", 50) // Default fallback
+            }
+        }
+        status.put("audio", audioStatus)
+        
         // WebView - use values from JS
         val webviewStatus = JSONObject().apply {
             put("currentUrl", jsCurrentUrl)
@@ -211,7 +232,7 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
         val deviceStatus = JSONObject().apply {
             put("ip", getLocalIpAddress())
             put("hostname", "freekiosk")
-            put("version", "1.2.0")
+            put("version", "1.2.2")
             put("isDeviceOwner", false)
             put("kioskMode", jsKioskMode)
         }
@@ -369,6 +390,20 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                     put("command", command)
                 }
             }
+            "screenOn" -> {
+                turnScreenOn()
+                return JSONObject().apply {
+                    put("executed", true)
+                    put("command", command)
+                }
+            }
+            "screenOff" -> {
+                turnScreenOff()
+                return JSONObject().apply {
+                    put("executed", true)
+                    put("command", command)
+                }
+            }
         }
         
         // Send other commands to JS side
@@ -439,18 +474,18 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             promise.reject("VOLUME_ERROR", e.message)
         }
     }
-
     @ReactMethod
     fun getVolume(promise: Promise) {
         try {
             val audioManager = reactContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
             val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-            val percentage = (currentVolume * 100 / maxVolume)
-            promise.resolve(percentage)
+            val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            val volumePercent = (currentVolume * 100) / maxVolume
+            Log.d(TAG, "Current volume: $volumePercent% (raw: $currentVolume/$maxVolume)")
+            promise.resolve(volumePercent)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to get volume", e)
-            promise.reject("VOLUME_ERROR", e.message)
+            Log.e(TAG, "Failed to get volume: ${e.message}")
+            promise.reject("ERROR", "Failed to get volume: ${e.message}")
         }
     }
 
@@ -612,6 +647,77 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 Log.e(TAG, "Failed to play beep", e)
             }
         }.start()
+    }
+
+    // ==================== Screen Control Methods ====================
+
+    private fun turnScreenOn() {
+        UiThreadUtil.runOnUiThread {
+            try {
+                val activity = reactContext.currentActivity
+                if (activity != null) {
+                    val powerManager = reactContext.getSystemService(Context.POWER_SERVICE) as PowerManager
+                    
+                    // Release old wakeLock if exists
+                    wakeLock?.release()
+                    
+                    // Create WakeLock to turn on screen
+                    @Suppress("DEPRECATION")
+                    wakeLock = powerManager.newWakeLock(
+                        PowerManager.FULL_WAKE_LOCK or 
+                        PowerManager.ACQUIRE_CAUSES_WAKEUP or 
+                        PowerManager.ON_AFTER_RELEASE,
+                        "FreeKiosk:HttpScreenOn"
+                    )
+                    wakeLock?.acquire(10*60*1000L) // 10 minutes timeout
+                    
+                    // Re-enable FLAG_KEEP_SCREEN_ON
+                    activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    
+                    // Set screen to normal brightness (-1 = use system default)
+                    val layoutParams = activity.window.attributes
+                    layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                    activity.window.attributes = layoutParams
+                    
+                    Log.d(TAG, "Screen turned ON via HTTP API")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to turn screen on: ${e.message}")
+            }
+        }
+    }
+
+    private fun turnScreenOff() {
+        UiThreadUtil.runOnUiThread {
+            try {
+                val activity = reactContext.currentActivity
+                if (activity != null) {
+                    // Release wakeLock to allow screen to turn off
+                    wakeLock?.release()
+                    wakeLock = null
+                    
+                    // Try Device Owner lockNow() first (truly turns off screen)
+                    val dpm = reactContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as android.app.admin.DevicePolicyManager
+                    if (dpm.isDeviceOwnerApp(reactContext.packageName)) {
+                        // Device Owner can truly lock/turn off the screen
+                        dpm.lockNow()
+                        Log.d(TAG, "Screen turned OFF via Device Owner lockNow()")
+                    } else {
+                        // Fallback: dim brightness to absolute minimum
+                        // Clear FLAG_KEEP_SCREEN_ON to allow screen to turn off
+                        activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                        
+                        val layoutParams = activity.window.attributes
+                        layoutParams.screenBrightness = 0f
+                        activity.window.attributes = layoutParams
+                        
+                        Log.d(TAG, "Screen dimmed to 0 brightness (no Device Owner)")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to turn screen off: ${e.message}")
+            }
+        }
     }
 
     // ==================== Screenshot Method ====================

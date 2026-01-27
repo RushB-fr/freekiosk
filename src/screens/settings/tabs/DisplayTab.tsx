@@ -178,9 +178,12 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
               <SettingsSection variant="info">
                 <Text style={styles.infoTitle}>ℹ️ How It Works</Text>
                 <Text style={styles.infoText}>
-                  • After {inactivityDelay || '10'} minute(s) without interaction, the screen dims{' '}\n
-                  • Touch the screen to wake the device{' '}\n
-                  {motionEnabled && '• Motion in front of the camera also wakes the screen\n'}
+                  • After {inactivityDelay || '10'} minute(s) without interaction, the screen dims{`
+`}
+                  • Touch the screen to wake the device{`
+`}
+                  {motionEnabled && `• Motion in front of the camera also wakes the screen
+`}
                   • Normal brightness is restored automatically
                 </Text>
               </SettingsSection>

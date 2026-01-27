@@ -5,11 +5,13 @@ import KioskScreen from '../screens/KioskScreen';
 import PinScreen from '../screens/PinScreen';
 // v1.2: Use new settings screen with Material tabs
 import { SettingsScreen } from '../screens/settings';
+import BlockingOverlaysScreen from '../screens/settings/BlockingOverlaysScreen';
 
 export type RootStackParamList = {
   Kiosk: undefined;
   Pin: undefined;
   Settings: undefined;
+  BlockingOverlays: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -42,6 +44,13 @@ const AppNavigator: React.FC = () => {
           component={SettingsScreen}
           options={{
             headerShown: false, // v1.2: Custom header with tabs
+          }}
+        />
+        <Stack.Screen 
+          name="BlockingOverlays" 
+          component={BlockingOverlaysScreen}
+          options={{
+            headerShown: false,
           }}
         />
       </Stack.Navigator>

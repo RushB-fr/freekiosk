@@ -37,6 +37,7 @@ export interface AppStatus {
   loading: boolean;
   brightness: number;
   screensaverActive: boolean;
+  screenOn?: boolean; // Track actual screen state (from power button)
   kioskMode: boolean;
   volume?: number;
   rotationEnabled?: boolean;
@@ -55,6 +56,7 @@ class ApiServiceClass {
     loading: false,
     brightness: 50,
     screensaverActive: false,
+    screenOn: true, // Assume screen is ON by default
     kioskMode: false,
   };
   private isInitialized = false;

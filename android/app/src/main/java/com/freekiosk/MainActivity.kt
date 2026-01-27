@@ -16,10 +16,12 @@ import android.os.Looper
 import android.widget.Toast
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import com.facebook.react.bridge.Arguments
+import com.facebook.react.bridge.ReactApplicationContext
 import java.security.MessageDigest
 import android.database.sqlite.SQLiteDatabase
 import android.content.ContentValues
 import android.view.KeyEvent
+import android.content.IntentFilter
 
 class MainActivity : ReactActivity() {
 
@@ -42,10 +44,11 @@ class MainActivity : ReactActivity() {
   private var isDeviceOwner = false
   private var isVoluntaryReturn = false  // Flag pour éviter double événement
 
-  // Volume key 5-tap detection
-  private var volumeUpTapCount = 0
-  private var volumeUpLastTapTime = 0L
-  private val volumeUpTapTimeout = 2000L // 2 seconds timeout between taps
+  // Screen state receiver
+  private var screenStateReceiver: ScreenStateReceiver? = null
+  
+  // Volume change receiver (also handles 5-tap gesture detection)
+  private var volumeChangeReceiver: VolumeChangeReceiver? = null
 
   override fun getMainComponentName(): String = "FreeKiosk"
 
@@ -60,6 +63,12 @@ class MainActivity : ReactActivity() {
 
     devicePolicyManager = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
     adminComponent = ComponentName(this, DeviceAdminReceiver::class.java)
+
+    // Register screen state receiver to track screen on/off events
+    registerScreenStateReceiver()
+    
+    // Register volume change receiver to track volume changes
+    registerVolumeChangeReceiver()
 
     // Handle ADB configuration - if config applied, app will restart
     if (handleAdbConfig(intent)) {
@@ -110,27 +119,24 @@ class MainActivity : ReactActivity() {
 
   private fun sendNavigateToPinEvent() {
     try {
-      val reactInstanceManager = reactNativeHost?.reactInstanceManager
-      val reactContext = reactInstanceManager?.currentReactContext
-      reactContext?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-        ?.emit("navigateToPin", null)
-      DebugLog.d("MainActivity", "Sent navigateToPin event")
+      // Use KioskModule's static method to send event to React Native
+      // This works with the new architecture
+      KioskModule.sendEventFromNative("navigateToPin", null)
+      android.util.Log.d("MainActivity", "Sent navigateToPin event via KioskModule")
     } catch (e: Exception) {
-      DebugLog.errorProduction("MainActivity", "Failed to send navigateToPin event: ${e.message}")
+      android.util.Log.e("MainActivity", "Failed to send navigateToPin event: ${e.message}")
     }
   }
 
   private fun sendAppReturnedEvent(voluntary: Boolean = false) {
     try {
-      val reactInstanceManager = reactNativeHost?.reactInstanceManager
-      val reactContext = reactInstanceManager?.currentReactContext
+      // Use KioskModule's static method to send event to React Native
       val params = Arguments.createMap()
       params.putBoolean("voluntary", voluntary)
-      reactContext?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-        ?.emit("onAppReturned", params)
-      DebugLog.d("MainActivity", "Sent onAppReturned event (voluntary=$voluntary)")
+      KioskModule.sendEventFromNative("onAppReturned", params)
+      android.util.Log.d("MainActivity", "Sent onAppReturned event (voluntary=$voluntary)")
     } catch (e: Exception) {
-      DebugLog.errorProduction("MainActivity", "Failed to send onAppReturned event: ${e.message}")
+      android.util.Log.e("MainActivity", "Failed to send onAppReturned event: ${e.message}")
     }
   }
 
@@ -282,6 +288,16 @@ class MainActivity : ReactActivity() {
     super.onResume()
 
     readExternalAppConfig()
+    
+    // Re-register screen state receiver in case it was lost
+    if (screenStateReceiver == null) {
+      registerScreenStateReceiver()
+    }
+    
+    // Re-register volume change receiver in case it was lost
+    if (volumeChangeReceiver == null) {
+      registerVolumeChangeReceiver()
+    }
 
     // Vérifier si c'est un retour volontaire (depuis l'intent de l'overlay - 5 taps)
     val voluntaryReturn = intent?.getBooleanExtra("voluntaryReturn", false) ?: false
@@ -381,6 +397,65 @@ class MainActivity : ReactActivity() {
     )
   }
 
+  // Volume Up 5-tap tracking
+  private var volumeUpTapCount = 0
+  private var volumeUpLastTapTime = 0L
+  private val volumeUpTapTimeout = 2000L
+
+  override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+    android.util.Log.d("MainActivity", "onKeyDown: keyCode=$keyCode")
+    
+    // Intercept Volume Up key events
+    if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+      // Check if feature is enabled
+      val volumeUp5TapEnabled = getAsyncStorageValue("@kiosk_volume_up_5tap_enabled", "true") == "true"
+      
+      if (volumeUp5TapEnabled) {
+        val currentTime = System.currentTimeMillis()
+        
+        // Reset counter if timeout exceeded
+        if (currentTime - volumeUpLastTapTime > volumeUpTapTimeout) {
+          volumeUpTapCount = 0
+        }
+        
+        volumeUpTapCount++
+        volumeUpLastTapTime = currentTime
+        
+        android.util.Log.d("MainActivity", "Volume Up pressed! Count: $volumeUpTapCount")
+        
+        if (volumeUpTapCount >= 5) {
+          volumeUpTapCount = 0
+          android.util.Log.d("MainActivity", "5-tap Volume Up detected! Navigating to PIN")
+          
+          blockAutoRelaunch = true
+          
+          Handler(Looper.getMainLooper()).postDelayed({
+            sendNavigateToPinEvent()
+          }, 100)
+          
+          return true // Consume the 5th tap - don't change volume
+        }
+      }
+    } else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+      // Volume Down resets the counter
+      if (volumeUpTapCount > 0) {
+        android.util.Log.d("MainActivity", "Volume Down pressed, resetting counter")
+        volumeUpTapCount = 0
+      }
+    }
+    
+    // Let the event propagate normally
+    return super.onKeyDown(keyCode, event)
+  }
+
+  override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+    // Just pass through, but log for debugging
+    if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+      android.util.Log.d("MainActivity", "onKeyUp: keyCode=$keyCode")
+    }
+    return super.onKeyUp(keyCode, event)
+  }
+
   override fun onBackPressed() {
     // Lire le mode test depuis SharedPreferences
     val prefs = getSharedPreferences("FreeKioskSettings", Context.MODE_PRIVATE)
@@ -397,41 +472,33 @@ class MainActivity : ReactActivity() {
     }
   }
 
-  override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-    // Handle Volume Up key for 5-tap gesture to access settings
-    if (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP && event.action == KeyEvent.ACTION_DOWN) {
-      val currentTime = System.currentTimeMillis()
+  /**
+   * Read a value from AsyncStorage (React Native SQLite database)
+   * AsyncStorage uses SQLite database "RKStorage" with table "catalystLocalStorage"
+   */
+  private fun getAsyncStorageValue(key: String, defaultValue: String): String {
+    return try {
+      val dbPath = getDatabasePath("RKStorage").absolutePath
+      val db = android.database.sqlite.SQLiteDatabase.openDatabase(dbPath, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY)
       
-      // Reset counter if timeout exceeded
-      if (currentTime - volumeUpLastTapTime > volumeUpTapTimeout) {
-        volumeUpTapCount = 0
+      val cursor = db.rawQuery(
+        "SELECT value FROM catalystLocalStorage WHERE key = ?",
+        arrayOf(key)
+      )
+      
+      val value = if (cursor.moveToFirst()) {
+        cursor.getString(0)
+      } else {
+        defaultValue
       }
       
-      volumeUpTapCount++
-      volumeUpLastTapTime = currentTime
-      
-      DebugLog.d("MainActivity", "Volume Up tap count: $volumeUpTapCount")
-      
-      if (volumeUpTapCount == 5) {
-        volumeUpTapCount = 0
-        
-        // Set flag to block auto-relaunch
-        blockAutoRelaunch = true
-        DebugLog.d("MainActivity", "5-tap Volume Up detected, navigating to PIN")
-        
-        // Send event to React Native to navigate to PIN screen
-        Handler(Looper.getMainLooper()).postDelayed({
-          sendNavigateToPinEvent()
-        }, 100)
-        
-        return true // Consume the event
-      }
-      
-      // Allow normal volume up behavior (volume increase)
-      return super.dispatchKeyEvent(event)
+      cursor.close()
+      db.close()
+      value
+    } catch (e: Exception) {
+      DebugLog.d("MainActivity", "Error reading AsyncStorage key $key: ${e.message}")
+      defaultValue
     }
-    
-    return super.dispatchKeyEvent(event)
   }
 
   private fun bringToFrontWithPinNavigation() {
@@ -644,8 +711,16 @@ class MainActivity : ReactActivity() {
     android.util.Log.i("FreeKiosk-ADB", "Config applied: $configType")
     showAdbToast("✅ ADB Config applied: $configType")
     
+    // Broadcast that config is saved (before restart)
+    sendBroadcast(Intent("com.freekiosk.ADB_CONFIG_SAVED").apply {
+      putExtra("config_type", configType)
+    })
+    
     // Restart in a handler to allow database sync to complete
     Handler(Looper.getMainLooper()).postDelayed({
+      // Broadcast that restart is starting
+      sendBroadcast(Intent("com.freekiosk.ADB_CONFIG_RESTARTING"))
+      
       // Create restart intent
       val restartIntent = packageManager.getLaunchIntentForPackage(packageName)
       restartIntent?.apply {
@@ -659,6 +734,15 @@ class MainActivity : ReactActivity() {
           launchIntent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
           if (launchIntent != null) {
             startActivity(launchIntent)
+            android.util.Log.i("FreeKiosk-ADB", "Auto-starting external app: $lockPackage")
+            
+            // Broadcast that external app is launching (delayed to ensure it's visible)
+            Handler(Looper.getMainLooper()).postDelayed({
+              sendBroadcast(Intent("com.freekiosk.EXTERNAL_APP_LAUNCHED").apply {
+                putExtra("package_name", lockPackage)
+              })
+              android.util.Log.i("FreeKiosk-ADB", "Broadcasted EXTERNAL_APP_LAUNCHED: $lockPackage")
+            }, 1000)
           }
         } catch (e: Exception) {
           android.util.Log.e("FreeKiosk-ADB", "Failed to auto-start $lockPackage: ${e.message}")
@@ -890,5 +974,84 @@ class MainActivity : ReactActivity() {
   override fun onDestroy() {
     super.onDestroy()
     disableKioskRestrictions()
+    
+    // Clean up blocking overlays
+    try {
+      BlockingOverlayManager.getInstance(this).destroy()
+      DebugLog.d("MainActivity", "Blocking overlays cleaned up")
+    } catch (e: Exception) {
+      DebugLog.errorProduction("MainActivity", "Error cleaning up blocking overlays: ${e.message}")
+    }
+    
+    // Unregister screen state receiver
+    try {
+      if (screenStateReceiver != null) {
+        unregisterReceiver(screenStateReceiver)
+        screenStateReceiver = null
+        DebugLog.d("MainActivity", "Screen state receiver unregistered")
+      }
+    } catch (e: Exception) {
+      DebugLog.errorProduction("MainActivity", "Error unregistering screen state receiver: ${e.message}")
+    }
+    
+    // Unregister volume change receiver
+    try {
+      if (volumeChangeReceiver != null) {
+        unregisterReceiver(volumeChangeReceiver)
+        volumeChangeReceiver = null
+        DebugLog.d("MainActivity", "Volume change receiver unregistered")
+      }
+    } catch (e: Exception) {
+      DebugLog.errorProduction("MainActivity", "Error unregistering volume change receiver: ${e.message}")
+    }
+  }
+
+  /**
+   * Register broadcast receiver to detect screen on/off events
+   * Safe to call multiple times - will skip if already registered
+   */
+  private fun registerScreenStateReceiver() {
+    try {
+      // Skip if already registered
+      if (screenStateReceiver != null) {
+        android.util.Log.d("MainActivity", "Screen state receiver already registered")
+        return
+      }
+      
+      screenStateReceiver = ScreenStateReceiver()
+      
+      val filter = IntentFilter()
+      filter.addAction(Intent.ACTION_SCREEN_ON)
+      filter.addAction(Intent.ACTION_SCREEN_OFF)
+      
+      registerReceiver(screenStateReceiver, filter)
+      android.util.Log.d("MainActivity", "Screen state receiver registered successfully")
+    } catch (e: Exception) {
+      android.util.Log.e("MainActivity", "Error registering screen state receiver: ${e.message}")
+    }
+  }
+
+  /**
+   * Register broadcast receiver to detect volume changes from hardware buttons
+   * Safe to call multiple times - will skip if already registered
+   */
+  private fun registerVolumeChangeReceiver() {
+    try {
+      // Skip if already registered
+      if (volumeChangeReceiver != null) {
+        android.util.Log.d("MainActivity", "Volume change receiver already registered")
+        return
+      }
+      
+      volumeChangeReceiver = VolumeChangeReceiver()
+      
+      val filter = IntentFilter()
+      filter.addAction("android.media.VOLUME_CHANGED_ACTION")
+      
+      registerReceiver(volumeChangeReceiver, filter)
+      android.util.Log.d("MainActivity", "Volume change receiver registered successfully")
+    } catch (e: Exception) {
+      android.util.Log.e("MainActivity", "Error registering volume change receiver: ${e.message}")
+    }
   }
 }

@@ -83,7 +83,6 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [externalAppPackage, setExternalAppPackage] = useState<string>('');
   const [autoRelaunchApp, setAutoRelaunchApp] = useState<boolean>(true);
   const [overlayButtonVisible, setOverlayButtonVisible] = useState<boolean>(false);
-  const [overlayButtonPosition, setOverlayButtonPosition] = useState<string>('bottom-right');
   const [backButtonMode, setBackButtonMode] = useState<string>('test');
   const [backButtonTimerDelay, setBackButtonTimerDelay] = useState<string>('10');
   const [installedApps, setInstalledApps] = useState<AppInfo[]>([]);
@@ -101,6 +100,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [showTime, setShowTime] = useState<boolean>(true);
   const [keyboardMode, setKeyboardMode] = useState<string>('default');
   const [allowPowerButton, setAllowPowerButton] = useState<boolean>(false);
+  const [returnTapCount, setReturnTapCount] = useState<string>('5');
+  const [volumeUp5TapEnabled, setVolumeUp5TapEnabled] = useState<boolean>(true);
   
   // URL Rotation states
   const [urlRotationEnabled, setUrlRotationEnabled] = useState<boolean>(false);
@@ -193,7 +194,6 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedExternalAppPackage = await StorageService.getExternalAppPackage();
     const savedAutoRelaunchApp = await StorageService.getAutoRelaunchApp();
     const savedOverlayButtonVisible = await StorageService.getOverlayButtonVisible();
-    const savedOverlayButtonPosition = await StorageService.getOverlayButtonPosition();
     const savedPinMaxAttempts = await StorageService.getPinMaxAttempts();
     const savedStatusBarEnabled = await StorageService.getStatusBarEnabled();
     const savedStatusBarOnOverlay = await StorageService.getStatusBarOnOverlay();
@@ -207,6 +207,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedBackButtonTimerDelay = await StorageService.getBackButtonTimerDelay();
     const savedKeyboardMode = await StorageService.getKeyboardMode();
     const savedAllowPowerButton = await StorageService.getAllowPowerButton();
+    const savedReturnTapCount = await StorageService.getReturnTapCount();
+    const savedVolumeUp5TapEnabled = await StorageService.getVolumeUp5TapEnabled();
     
     // URL Rotation settings
     const savedUrlRotationEnabled = await StorageService.getUrlRotationEnabled();
@@ -221,7 +223,6 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setExternalAppPackage(savedExternalAppPackage ?? '');
     setAutoRelaunchApp(savedAutoRelaunchApp);
     setOverlayButtonVisible(savedOverlayButtonVisible);
-    setOverlayButtonPosition(savedOverlayButtonPosition);
     setPinMaxAttempts(savedPinMaxAttempts);
     setPinMaxAttemptsText(String(savedPinMaxAttempts));
     setStatusBarEnabled(savedStatusBarEnabled);
@@ -236,6 +237,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setBackButtonTimerDelay(String(savedBackButtonTimerDelay));
     setKeyboardMode(savedKeyboardMode);
     setAllowPowerButton(savedAllowPowerButton);
+    setReturnTapCount(String(savedReturnTapCount));
+    setVolumeUp5TapEnabled(savedVolumeUp5TapEnabled);
     setUrlRotationEnabled(savedUrlRotationEnabled);
     setUrlRotationList(savedUrlRotationList);
     setUrlRotationInterval(String(savedUrlRotationInterval));
@@ -331,18 +334,6 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       try {
         const { OverlayServiceModule } = NativeModules;
         await OverlayServiceModule.setButtonOpacity(opacity);
-      } catch (error) {
-        // Silent fail
-      }
-    }
-  };
-
-  const handleOverlayButtonPositionChange = async (value: string) => {
-    setOverlayButtonPosition(value);
-    if (displayMode === 'external_app') {
-      try {
-        const { OverlayServiceModule } = NativeModules;
-        await OverlayServiceModule.setButtonPosition(value);
       } catch (error) {
         // Silent fail
       }
@@ -537,7 +528,6 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.saveExternalAppPackage(externalAppPackage);
     await StorageService.saveAutoRelaunchApp(autoRelaunchApp);
     await StorageService.saveOverlayButtonVisible(overlayButtonVisible);
-    await StorageService.saveOverlayButtonPosition(overlayButtonPosition);
     await StorageService.saveStatusBarEnabled(statusBarEnabled);
     await StorageService.saveStatusBarOnOverlay(statusBarOnOverlay);
     await StorageService.saveStatusBarOnReturn(statusBarOnReturn);
@@ -551,6 +541,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.saveBackButtonTimerDelay(isNaN(timerDelay) ? 10 : Math.max(1, Math.min(3600, timerDelay)));
     await StorageService.saveKeyboardMode(keyboardMode);
     await StorageService.saveAllowPowerButton(allowPowerButton);
+    const tapCount = parseInt(returnTapCount, 10);
+    await StorageService.saveReturnTapCount(isNaN(tapCount) ? 5 : Math.max(2, Math.min(10, tapCount)));
+    await StorageService.saveVolumeUp5TapEnabled(volumeUp5TapEnabled);
     
     // Save URL Rotation settings (webview only)
     if (displayMode === 'webview') {
@@ -573,7 +566,6 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       try {
         const { OverlayServiceModule } = NativeModules;
         await OverlayServiceModule.setButtonOpacity(opacity);
-        await OverlayServiceModule.setButtonPosition(overlayButtonPosition);
         await OverlayServiceModule.setTestMode(backButtonMode === 'test');
         await OverlayServiceModule.setStatusBarEnabled(statusBarEnabled && statusBarOnOverlay);
         await OverlayServiceModule.setStatusBarItems(showBattery, showWifi, showBluetooth, showVolume, showTime);
@@ -862,18 +854,21 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
           <SecurityTab
             displayMode={displayMode}
             isDeviceOwner={isDeviceOwner}
+            navigation={navigation}
             kioskEnabled={kioskEnabled}
             onKioskEnabledChange={setKioskEnabled}
             allowPowerButton={allowPowerButton}
             onAllowPowerButtonChange={setAllowPowerButton}
+            returnTapCount={returnTapCount}
+            onReturnTapCountChange={setReturnTapCount}
+            volumeUp5TapEnabled={volumeUp5TapEnabled}
+            onVolumeUp5TapEnabledChange={setVolumeUp5TapEnabled}
+            overlayButtonVisible={overlayButtonVisible}
+            onOverlayButtonVisibleChange={handleOverlayButtonVisibleChange}
             autoLaunchEnabled={autoLaunchEnabled}
             onAutoLaunchChange={toggleAutoLaunch}
             autoRelaunchApp={autoRelaunchApp}
             onAutoRelaunchAppChange={setAutoRelaunchApp}
-            overlayButtonVisible={overlayButtonVisible}
-            onOverlayButtonVisibleChange={handleOverlayButtonVisibleChange}
-            overlayButtonPosition={overlayButtonPosition}
-            onOverlayButtonPositionChange={handleOverlayButtonPositionChange}
             backButtonMode={backButtonMode}
             onBackButtonModeChange={setBackButtonMode}
             backButtonTimerDelay={backButtonTimerDelay}

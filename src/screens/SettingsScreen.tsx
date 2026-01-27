@@ -74,6 +74,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [showTime, setShowTime] = useState<boolean>(true);
   const [keyboardMode, setKeyboardMode] = useState<string>('default');
   const [allowPowerButton, setAllowPowerButton] = useState<boolean>(false);
+  const [volumeUp5TapEnabled, setVolumeUp5TapEnabled] = useState<boolean>(true);
   
   // Update states
   const [checkingUpdate, setCheckingUpdate] = useState<boolean>(false);
@@ -198,6 +199,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedBackButtonTimerDelay = await StorageService.getBackButtonTimerDelay();
     const savedKeyboardMode = await StorageService.getKeyboardMode();
     const savedAllowPowerButton = await StorageService.getAllowPowerButton();
+    const savedVolumeUp5TapEnabled = await StorageService.getVolumeUp5TapEnabled();
 
     setDisplayMode(savedDisplayMode);
     setExternalAppPackage(savedExternalAppPackage ?? '');
@@ -218,6 +220,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setBackButtonTimerDelay(String(savedBackButtonTimerDelay));
     setKeyboardMode(savedKeyboardMode);
     setAllowPowerButton(savedAllowPowerButton);
+    setVolumeUp5TapEnabled(savedVolumeUp5TapEnabled);
   };
 
   const loadCertificates = async (): Promise<void> => {
@@ -603,6 +606,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.saveBackButtonTimerDelay(isNaN(timerDelay) ? 10 : Math.max(1, Math.min(3600, timerDelay)));
     await StorageService.saveKeyboardMode(keyboardMode);
     await StorageService.saveAllowPowerButton(allowPowerButton);
+    await StorageService.saveVolumeUp5TapEnabled(volumeUp5TapEnabled);
 
     // Update overlay button opacity, position and test mode
     if (displayMode === 'external_app') {
@@ -1713,7 +1717,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
             • Configure the URL of the web page to display{'\n'}
             • Set a secure PIN code{'\n'}
             • Enable "Pin App to Screen" for full kiosk mode{'\n'}
-            • Tap 5 times on the secret button to access settings (default: bottom-right corner){'\n'}
+            • Tap 5 times anywhere on screen to access settings{'\n'}
             • Enter PIN code to unlock
           </Text>
         </View>

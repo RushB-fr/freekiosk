@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, NativeEventEmitter, NativeModules, AppState } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, StyleSheet, TouchableOpacity, Text, NativeEventEmitter, NativeModules, AppState, DeviceEventEmitter } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RNBrightness from 'react-native-brightness-newarch';
+import { useIsFocused } from '@react-navigation/native';
 import WebViewComponent from '../components/WebViewComponent';
 import StatusBar from '../components/StatusBar';
 import MotionDetector from '../components/MotionDetector';
@@ -10,6 +11,7 @@ import { StorageService } from '../utils/storage';
 import KioskModule from '../utils/KioskModule';
 import AppLauncherModule from '../utils/AppLauncherModule';
 import OverlayServiceModule from '../utils/OverlayServiceModule';
+import BlockingOverlayModule from '../utils/BlockingOverlayModule';
 import { ApiService } from '../utils/ApiService';
 import { ScheduledEvent, getActiveEvent } from '../types/planner';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -24,6 +26,7 @@ interface KioskScreenProps {
 }
 
 const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
+  const isFocused = useIsFocused();
   const [url, setUrl] = useState<string>('');
   const [autoReload, setAutoReload] = useState<boolean>(false);
   const [screensaverEnabled, setScreensaverEnabled] = useState(false);
@@ -33,6 +36,8 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [inactivityEnabled, setInactivityEnabled] = useState(true);
   const [inactivityDelay, setInactivityDelay] = useState(600000);
   const [motionEnabled, setMotionEnabled] = useState(false);
+  const [isPreCheckingMotion, setIsPreCheckingMotion] = useState(false); // Pré-vérification avant activation screensaver
+  const preCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [statusBarEnabled, setStatusBarEnabled] = useState(false);
   const [statusBarOnOverlay, setStatusBarOnOverlay] = useState(true);
   const [statusBarOnReturn, setStatusBarOnReturn] = useState(true);
@@ -62,9 +67,10 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const tapCountRef = useRef<number>(0);
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
-  // Return button settings (WebView mode)
+  // Return button settings (WebView mode) - Visual indicator only
+  // N-tap detection is handled via onUserInteraction callback from WebView
   const [returnButtonVisible, setReturnButtonVisible] = useState<boolean>(false);
-  const [returnButtonPosition, setReturnButtonPosition] = useState<string>('bottom-right');
+  const [returnTapCount, setReturnTapCount] = useState<number>(5);
   
   // URL Rotation states
   const [urlRotationEnabled, setUrlRotationEnabled] = useState<boolean>(false);
@@ -147,6 +153,29 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       }
     };
   }, [displayMode, externalAppPackage, autoRelaunchApp]);
+
+  // Désactiver le screensaver quand l'écran perd le focus (navigation vers Settings)
+  useEffect(() => {
+    if (!isFocused) {
+      if (isScreensaverActive) {
+        console.log('[KioskScreen] Screen lost focus, disabling screensaver');
+        setIsScreensaverActive(false);
+      }
+      if (isPreCheckingMotion) {
+        console.log('[KioskScreen] Screen lost focus, stopping motion surveillance');
+        setIsPreCheckingMotion(false);
+      }
+      clearTimer();
+      // Restaurer la luminosité normale
+      (async () => {
+        try {
+          await RNBrightness.setBrightnessLevel(defaultBrightness);
+        } catch (error) {
+          console.error('[KioskScreen] Error restoring brightness:', error);
+        }
+      })();
+    }
+  }, [isFocused, isScreensaverActive, isPreCheckingMotion, defaultBrightness]);
 
   // API Service initialization - connect REST API to app controls
   useEffect(() => {
@@ -280,6 +309,80 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     };
   }, []);
 
+  // Listen for screen state changes from native (power button pressed)
+  useEffect(() => {
+    // Check initial screen state
+    const checkInitialScreenState = async () => {
+      try {
+        if (KioskModule?.isScreenOn) {
+          const isOn = await KioskModule.isScreenOn();
+          console.log('[KioskScreen] Initial screen state:', isOn ? 'ON' : 'OFF');
+          ApiService.updateStatus({ screenOn: isOn });
+        }
+      } catch (error) {
+        console.error('[KioskScreen] Error checking initial screen state:', error);
+      }
+    };
+    
+    checkInitialScreenState();
+    
+    const screenStateListener = DeviceEventEmitter.addListener(
+      'onScreenStateChanged',
+      (isScreenOn: boolean) => {
+        console.log('[KioskScreen] Screen state changed:', isScreenOn ? 'ON' : 'OFF');
+        
+        // Update API status with new screen state
+        ApiService.updateStatus({
+          screenOn: isScreenOn,
+        });
+        
+        // If screen turned on, deactivate screensaver
+        if (isScreenOn && isScreensaverActive) {
+          setIsScreensaverActive(false);
+          resetTimer();
+        }
+      }
+    );
+
+    return () => {
+      screenStateListener.remove();
+    };
+  }, [isScreensaverActive]);
+
+  // Listen for volume changes from hardware buttons
+  useEffect(() => {
+    // Check initial volume
+    const checkInitialVolume = async () => {
+      try {
+        if (HttpServerModule?.getVolume) {
+          const currentVolume = await HttpServerModule.getVolume();
+          console.log('[KioskScreen] Initial volume:', currentVolume);
+          ApiService.updateStatus({ volume: currentVolume });
+        }
+      } catch (error) {
+        console.error('[KioskScreen] Error checking initial volume:', error);
+      }
+    };
+    
+    checkInitialVolume();
+    
+    const volumeListener = DeviceEventEmitter.addListener(
+      'onVolumeChanged',
+      (volumePercent: number) => {
+        console.log('[KioskScreen] Volume changed to:', volumePercent);
+        
+        // Update API status with new volume
+        ApiService.updateStatus({
+          volume: volumePercent,
+        });
+      }
+    );
+
+    return () => {
+      volumeListener.remove();
+    };
+  }, []);
+
   // Update API status when relevant state changes
   useEffect(() => {
     ApiService.updateStatus({
@@ -328,10 +431,24 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       await loadSettings();
     });
 
-    const unsubscribeBlur = navigation.addListener('blur', () => {
+    const unsubscribeBlur = navigation.addListener('blur', async () => {
       clearTimer();
       setIsScreensaverActive(false);
       // On ne restaure pas la luminosité volontairement
+      
+      // Désactiver les overlays de blocage quand on quitte le kiosk
+      try {
+        await BlockingOverlayModule.setEnabled(false);
+      } catch (e) {
+        // Silent fail
+      }
+      
+      // Arrêter le service overlay natif en mode WebView (si actif pour les blocking overlays)
+      try {
+        await OverlayServiceModule.stopOverlayService();
+      } catch (e) {
+        // Silent fail - might not be running
+      }
     });
 
     return () => {
@@ -504,6 +621,13 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       if (savedUrl) setUrl(savedUrl);
       setAutoReload(savedAutoReload);
       setScreensaverEnabled(savedScreensaverEnabled ?? false);
+      
+      // Broadcast that settings are loaded (for ADB config waiting)
+      try {
+        await KioskModule.broadcastSettingsLoaded();
+      } catch (e) {
+        // Silently fail if broadcast not needed
+      }
       setDefaultBrightness(savedDefaultBrightness ?? 0.5);
       setScreensaverBrightness(savedScreensaverBrightness ?? 0);
       setInactivityEnabled(savedInactivityEnabled ?? true);
@@ -538,9 +662,9 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       
       // Load return button settings (for WebView mode)
       const savedReturnButtonVisible = await StorageService.getOverlayButtonVisible();
-      const savedReturnButtonPosition = await StorageService.getOverlayButtonPosition();
+      const savedReturnTapCount = await StorageService.getReturnTapCount();
       setReturnButtonVisible(savedReturnButtonVisible);
-      setReturnButtonPosition(savedReturnButtonPosition);
+      setReturnTapCount(savedReturnTapCount);
       
       // Load URL Rotation settings
       const savedUrlRotationEnabled = await StorageService.getUrlRotationEnabled();
@@ -558,6 +682,44 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       
       // Store base URL for when planner/rotation is not active
       if (savedUrl) setBaseUrl(savedUrl);
+      
+      // Load and apply Blocking Overlays settings
+      // SECURITY: Only enable blocking overlays if kiosk mode is enabled AND device is in lock task mode
+      // This prevents the feature from being abused without proper security context
+      const savedBlockingOverlaysEnabled = await StorageService.getBlockingOverlaysEnabled();
+      const savedBlockingOverlaysRegions = await StorageService.getBlockingOverlaysRegions();
+      
+      let blockingOverlaysActive = false;
+      if (savedKioskEnabled && savedBlockingOverlaysEnabled) {
+        // Check if we're actually in lock task mode (device owner)
+        try {
+          const isLocked = await KioskModule.isInLockTaskMode();
+          if (isLocked) {
+            await BlockingOverlayModule.applyConfiguration(true, savedBlockingOverlaysRegions);
+            blockingOverlaysActive = true;
+          } else {
+            // Not in lock task mode - don't enable blocking overlays for security
+            console.log('[KioskScreen] Blocking overlays disabled: not in lock task mode');
+            await BlockingOverlayModule.setEnabled(false);
+          }
+        } catch (e) {
+          // If we can't check, don't enable for safety
+          await BlockingOverlayModule.setEnabled(false);
+        }
+      } else {
+        // Kiosk mode or blocking overlays disabled
+        await BlockingOverlayModule.setEnabled(false);
+      }
+      
+      // WebView mode: 5-tap detection is handled via onUserInteraction callback
+      // No need for native overlay, stop it if running
+      if (savedDisplayMode === 'webview') {
+        try {
+          await OverlayServiceModule.stopOverlayService();
+        } catch (e) {
+          // Silent fail - might not be running
+        }
+      }
 
       if (savedKioskEnabled) {
         try {
@@ -588,7 +750,21 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     clearTimer();
     if (screensaverEnabled && inactivityEnabled) {
       timerRef.current = setTimeout(() => {
-        setIsScreensaverActive(true);
+        // Si motion detection activée, surveiller le mouvement avant d'activer le screensaver
+        if (motionEnabled) {
+          console.log('[KioskScreen] Timer expiré - activation surveillance mouvement');
+          setIsPreCheckingMotion(true);
+          // Démarrer un timer de 10 secondes - si aucun mouvement détecté, activer screensaver
+          preCheckTimerRef.current = setTimeout(() => {
+            console.log('[KioskScreen] 10s sans mouvement détecté, activation du screensaver');
+            setIsScreensaverActive(true);
+            // Garder isPreCheckingMotion à false car le screensaver prend le relais
+            setIsPreCheckingMotion(false);
+          }, 10000); // 10 secondes pour détecter une présence
+        } else {
+          // Pas de motion detection, activer directement
+          setIsScreensaverActive(true);
+        }
       }, inactivityDelay);
     }
   };
@@ -598,26 +774,140 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-  };
-
-  const onUserInteraction = () => {
-    resetTimer();
-    if (isScreensaverActive) {
-      setIsScreensaverActive(false);
+    if (preCheckTimerRef.current) {
+      clearTimeout(preCheckTimerRef.current);
+      preCheckTimerRef.current = null;
     }
+    setIsPreCheckingMotion(false);
   };
 
-  const onScreensaverTap = () => {
+  // Ref for 5-tap debounce (prevent multiple events per tap)
+  const lastTapTimeRef = useRef<number>(0);
+  
+  // Ref to track screensaver state for callbacks (avoid stale closures)
+  const isScreensaverActiveRef = useRef(isScreensaverActive);
+  useEffect(() => {
+    isScreensaverActiveRef.current = isScreensaverActive;
+  }, [isScreensaverActive]);
+
+  // Ref to track pre-checking state for callbacks
+  const isPreCheckingMotionRef = useRef(isPreCheckingMotion);
+  useEffect(() => {
+    isPreCheckingMotionRef.current = isPreCheckingMotion;
+  }, [isPreCheckingMotion]);
+
+  const onUserInteraction = useCallback(async (event?: { isTap?: boolean }) => {
+    // Toute interaction utilisateur sort du mode surveillance et relance le timer normal
+    if (isPreCheckingMotionRef.current) {
+      console.log('[KioskScreen] Interaction utilisateur - sortie mode surveillance');
+      if (preCheckTimerRef.current) {
+        clearTimeout(preCheckTimerRef.current);
+        preCheckTimerRef.current = null;
+      }
+      setIsPreCheckingMotion(false);
+    }
+    
+    resetTimer();
+    if (isScreensaverActiveRef.current) {
+      setIsScreensaverActive(false);
+      // Restaurer immédiatement la luminosité
+      try {
+        await RNBrightness.setBrightnessLevel(defaultBrightness);
+      } catch (error) {
+        console.error('[KioskScreen] Error restoring brightness on interaction:', error);
+      }
+    }
+    
+    // N-tap detection for WebView mode - Only count dedicated 'tap' events from clicks
+    if (displayMode === 'webview' && event?.isTap) {
+      const now = Date.now();
+      
+      // Premier tap : démarrer le chrono global
+      if (tapCountRef.current === 0) {
+        lastTapTimeRef.current = now;
+      }
+      
+      tapCountRef.current += 1;
+      console.log(`[${returnTapCount}-tap] Count: ${tapCountRef.current}/${returnTapCount}`);
+      
+      // If N taps reached, go to PIN screen
+      if (tapCountRef.current >= returnTapCount) {
+        console.log(`[${returnTapCount}-tap] ✅ ${returnTapCount} taps reached! Going to PIN`);
+        tapCountRef.current = 0;
+        if (tapTimerRef.current) {
+          clearTimeout(tapTimerRef.current);
+        }
+        clearTimer();
+        setIsScreensaverActive(false);
+        navigation.navigate('Pin');
+        return;
+      }
+      
+      // Timeout global : reset si plus de 1.5 secondes depuis le premier tap
+      if (tapTimerRef.current) {
+        clearTimeout(tapTimerRef.current);
+      }
+      
+      tapTimerRef.current = setTimeout(() => {
+        const elapsed = Date.now() - lastTapTimeRef.current;
+        console.log(`[${returnTapCount}-tap] ⏱ Timeout - ${elapsed}ms elapsed, resetting count`);
+        tapCountRef.current = 0;
+      }, 1500 - (now - lastTapTimeRef.current));
+    }
+  }, [displayMode, navigation, resetTimer, clearTimer, returnTapCount, defaultBrightness]);
+
+
+  const onScreensaverTap = useCallback(async () => {
+    // Sortir du mode surveillance si actif
+    if (isPreCheckingMotionRef.current) {
+      console.log('[KioskScreen] Tap sur screensaver - sortie mode surveillance');
+      if (preCheckTimerRef.current) {
+        clearTimeout(preCheckTimerRef.current);
+        preCheckTimerRef.current = null;
+      }
+      setIsPreCheckingMotion(false);
+    }
+    
     setIsScreensaverActive(false);
     resetTimer();
-  };
-
-  const onMotionDetected = () => {
-    if (isScreensaverActive) {
-      setIsScreensaverActive(false);
-      resetTimer(); // IMPORTANT: Reset timer after waking up
+    // Restaurer immédiatement la luminosité
+    try {
+      await RNBrightness.setBrightnessLevel(defaultBrightness);
+    } catch (error) {
+      console.error('[KioskScreen] Error restoring brightness on tap:', error);
     }
-  };
+  }, [resetTimer, defaultBrightness]);
+
+  const onMotionDetected = useCallback(async () => {
+    // Cas 1: Surveillance en cours (avant activation screensaver) - quelqu'un est présent !
+    if (isPreCheckingMotionRef.current && !isScreensaverActiveRef.current) {
+      console.log('[KioskScreen] Mouvement détecté pendant surveillance - relance du timer complet');
+      // Annuler le timer de surveillance
+      if (preCheckTimerRef.current) {
+        clearTimeout(preCheckTimerRef.current);
+        preCheckTimerRef.current = null;
+      }
+      // Sortir du mode surveillance
+      setIsPreCheckingMotion(false);
+      // RELANCER LE TIMER COMPLET d'inactivité (ex: 10 minutes)
+      resetTimer();
+      return;
+    }
+    
+    // Cas 2: Screensaver déjà actif - le réveiller
+    if (isScreensaverActiveRef.current) {
+      console.log('[KioskScreen] Mouvement détecté, réveil du screensaver');
+      setIsScreensaverActive(false);
+      // Restaurer immédiatement la luminosité
+      try {
+        await RNBrightness.setBrightnessLevel(defaultBrightness);
+      } catch (error) {
+        console.error('[KioskScreen] Error restoring brightness on motion:', error);
+      }
+      // RELANCER LE TIMER COMPLET d'inactivité
+      resetTimer();
+    }
+  }, [defaultBrightness, resetTimer]);
 
   const enableScreensaverEffects = async () => {
     try {
@@ -637,7 +927,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
 
       // Démarrer l'OverlayService AVANT de lancer l'app externe
       try {
-        await OverlayServiceModule.startOverlayService();
+        await OverlayServiceModule.startOverlayService(returnTapCount);
       } catch (overlayError) {
         console.warn('[KioskScreen] Failed to start overlay service:', overlayError);
         // Continue anyway - l'app externe peut toujours être lancée
@@ -669,7 +959,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     tapCountRef.current++;
     if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
 
-    if (tapCountRef.current === 5) {
+    if (tapCountRef.current === returnTapCount) {
       tapCountRef.current = 0;
       clearTimer();
       setIsScreensaverActive(false);
@@ -732,31 +1022,19 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         />
       )}
 
-      {/* Motion Detector - Only active when screensaver is ON */}
+      {/* Motion Detector - Active during pre-check OR when screensaver is ON (only if screen is focused) */}
       <MotionDetector
-        enabled={motionEnabled && isScreensaverActive}
+        enabled={isFocused && motionEnabled && (isPreCheckingMotion || isScreensaverActive)}
         onMotionDetected={onMotionDetected}
         sensitivity="medium"
       />
 
-      {/* Return Button - WebView mode only, positioned based on settings */}
-      {displayMode === 'webview' && (
-        <TouchableOpacity
-          style={[
-            styles.secretButton,
-            returnButtonVisible && styles.secretButtonVisible,
-            returnButtonPosition === 'top-left' && styles.secretButtonTopLeft,
-            returnButtonPosition === 'top-right' && styles.secretButtonTopRight,
-            returnButtonPosition === 'bottom-left' && styles.secretButtonBottomLeft,
-            returnButtonPosition === 'bottom-right' && styles.secretButtonBottomRight,
-          ]}
-          onPress={handleSecretTap}
-          activeOpacity={returnButtonVisible ? 0.7 : 1}
-        >
-          {returnButtonVisible && (
-            <Text style={styles.secretButtonText}>↩</Text>
-          )}
-        </TouchableOpacity>
+      {/* Visual Indicator for 5-tap (optional) - WebView mode only */}
+      {/* 5-tap detection is handled via onUserInteraction callback from WebView */}
+      {displayMode === 'webview' && returnButtonVisible && (
+        <View style={styles.visualIndicator} pointerEvents="none">
+          <Text style={styles.visualIndicatorText}>↩</Text>
+        </View>
       )}
 
       {isScreensaverActive && screensaverEnabled && (
@@ -774,52 +1052,27 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  secretButton: {
+  visualIndicator: {
     position: 'absolute',
+    bottom: 20,
+    right: 20,
     width: 50,
     height: 50,
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 999,
-  },
-  secretButtonVisible: {
     backgroundColor: '#2196F3',
     borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
+    zIndex: 1000,
   },
-  secretButtonText: {
+  visualIndicatorText: {
     color: '#FFFFFF',
     fontSize: 20,
     fontWeight: 'bold',
-  },
-  secretButtonTopLeft: {
-    top: 10,
-    left: 10,
-    bottom: undefined,
-    right: undefined,
-  },
-  secretButtonTopRight: {
-    top: 10,
-    right: 10,
-    bottom: undefined,
-    left: undefined,
-  },
-  secretButtonBottomLeft: {
-    bottom: 10,
-    left: 10,
-    top: undefined,
-    right: undefined,
-  },
-  secretButtonBottomRight: {
-    bottom: 10,
-    right: 10,
-    top: undefined,
-    left: undefined,
   },
   screensaverOverlay: {
     position: 'absolute',

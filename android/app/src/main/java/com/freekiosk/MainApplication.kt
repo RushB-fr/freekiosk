@@ -26,6 +26,7 @@ class MainApplication : Application(), ReactApplication {
           add(SystemInfoPackage())
           add(UpdatePackage())
           add(HttpServerPackage())
+          add(BlockingOverlayPackage())
         },
     )
   }

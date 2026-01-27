@@ -71,6 +71,15 @@ const SettingsInput: React.FC<SettingsInputProps> = ({
         editable={!disabled}
         multiline={multiline}
         onBlur={onBlur}
+        cursorColor={Colors.primary}
+        selectionColor={Colors.primaryLight}
+        caretHidden={false}
+        underlineColorAndroid="transparent"
+        autoCorrect={false}
+        spellCheck={false}
+        textContentType="none"
+        importantForAutofill="no"
+        autoComplete="off"
       />
       
       {error && <Text style={styles.error}>{error}</Text>}
@@ -98,11 +107,12 @@ const styles = StyleSheet.create({
     color: Colors.textDisabled,
   },
   input: {
-    height: Spacing.inputHeight,
+    minHeight: Spacing.inputHeight,
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: Spacing.inputRadius,
     paddingHorizontal: Spacing.inputPadding,
+    paddingVertical: Spacing.sm,
     fontSize: 16,
     backgroundColor: Colors.surfaceVariant,
     color: Colors.textPrimary,

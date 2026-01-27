@@ -11,7 +11,7 @@
   </p>
   
   <p>
-    <img src="https://img.shields.io/badge/Version-1.2.1-blue.svg" alt="Version 1.2.1">
+    <img src="https://img.shields.io/badge/Version-1.2.2-blue.svg" alt="Version 1.2.2">
     <a href="https://github.com/rushb-fr/freekiosk/releases"><img src="https://img.shields.io/github/downloads/rushb-fr/freekiosk/total.svg" alt="Downloads"></a>
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT">
     <img src="https://img.shields.io/badge/Android-8.0%2B-green.svg" alt="Android 8.0+">
@@ -85,11 +85,13 @@ FreeKiosk is a **completely free and open-source** kiosk mode application for An
 
 ### External App Mode (Beta)
 - **Launch Any App** - Select from installed apps picker
-- **5-Tap Return** - Floating overlay button to exit
+- **5-Tap Anywhere** - Tap 5 times rapidly anywhere on screen to access settings (no corner targeting needed)
+- **Optional Visual Indicator** - Show bottom-right indicator (5-tap works everywhere regardless)
 - **Auto-Relaunch** - Automatically restart app on Home/Back press
 - **Lock Task Support** - Full kiosk lockdown for external apps
 - **PIN Protection** - Require PIN to access settings
 - **Test Mode** - Safety back button (enabled by default)
+- **Blocking Overlay** - Touch Logger with countdown and coordinate display
 
 ### Flexibility
 - **Toggle Screen Pinning ON/OFF** - User decides the security level
@@ -167,7 +169,7 @@ text
 
 **Option A: Via UI**
 - Launch FreeKiosk
-- Tap 5 times on the secret button (default: bottom-right corner)
+- Tap 5 times anywhere on the screen (optional visual indicator available)
 - Enter default PIN: **1234**
 - Configure your URL
 - **Optional**: Enable "Pin App to Screen" for full lockdown
@@ -196,7 +198,7 @@ Done! Your tablet is now in kiosk mode.
 ## ⚙️ Configuration
 
 ### First Launch
-1. Tap **5 times** on the secret button (default: bottom-right corner)
+1. Tap **5 times** anywhere on the screen (optional visual indicator available)
 2. Enter PIN (default: **1234**)
 3. Access Settings screen
 
@@ -221,7 +223,7 @@ Done! Your tablet is now in kiosk mode.
 - All gestures blocked
 - Recent apps disabled
 - Status bar hidden
-- Only 5-tap on secret button + PIN allows exit
+- Only 5-tap anywhere on screen + PIN allows exit
 - Good for: public kiosks, unattended devices
 
 ---
@@ -258,12 +260,22 @@ Done! Your tablet is now in kiosk mode.
 
 ## 🗺️ Roadmap
 
-### ✅ v1.2.1 (Jan 2026) - ADB Configuration & Headless Provisioning 🆕
+### ✅ v1.2.2 (Jan 2026) - Volume 5-Tap & Screen Control Fixes 🆕
+- 🔊 **Volume 5-Tap Gesture**: Alternative to shake for accessing PIN screen
+  - Press Volume Up/Down 5 times quickly to access settings
+  - Works when volume is at max or min
+  - Only active when kiosk mode is enabled
+- 🖥️ **Screen On/Off API Fix**: Improved reliability for Device Owner and non-Device Owner modes
+- 🔧 **React Native New Architecture**: Fixed compatibility with BroadcastReceivers
+
+### ✅ v1.2.1 (Jan 2026) - ADB Configuration & Headless Provisioning
 - 🔌 **ADB Configuration Support**: Configure FreeKiosk via command line for automated deployment
--  **Headless Provisioning**: Set locked app, URL, and all settings without UI interaction
+- 📦 **Headless Provisioning**: Set locked app, URL, and all settings without UI interaction
 - 🚀 **Auto-restart & Launch**: Automatically restart and launch external app after configuration
 - 📝 **JSON & Parameter Support**: Full JSON config or individual parameters via ADB
-- 🛠️ **Mass Deployment Ready**: Perfect for CI/CD and enterprise provisioning- 💾 **Backup & Restore**: Export/import complete FreeKiosk configuration to/from JSON file- 🔌 **Allow Power Button**: New security setting to allow power menu access in Lock Mode
+- 🛠️ **Mass Deployment Ready**: Perfect for CI/CD and enterprise provisioning
+- 💾 **Backup & Restore**: Export/import complete FreeKiosk configuration to/from JSON file
+- 🔌 **Allow Power Button**: New security setting to allow power menu access in Lock Mode
 - 🔧 **REST API Fixes**: Improved server stability and error handling
 - 📖 **[ADB Configuration Guide](docs/ADB_CONFIG.md)** with examples and scripts
 

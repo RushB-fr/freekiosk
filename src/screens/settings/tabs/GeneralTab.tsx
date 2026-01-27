@@ -126,10 +126,15 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
           <>
             <SettingsInfoBox variant="warning" title="⚠️ BETA Feature">
               <Text style={styles.infoText}>
-                External App mode is in beta. Some features are not available:{'\n'}
-                • Screensaver{'\n'}
-                • Motion detection{'\n'}
-                • Brightness control{'\n\n'}
+                External App mode is in beta. Some features are not available:{`
+`}
+                • Screensaver{`
+`}
+                • Motion detection{`
+`}
+                • Brightness control{`
+
+`}
                 To return to FreeKiosk, tap 5 times on the secret button (position configurable in Security settings).
               </Text>
             </SettingsInfoBox>
@@ -137,9 +142,12 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
             {!isDeviceOwner && (
               <SettingsInfoBox variant="error" title="🔒 Device Owner Recommended">
                 <Text style={styles.infoText}>
-                  Without Device Owner:{'\n'}
-                  • Navigation buttons remain accessible{'\n'}
-                  • User can exit the app freely{'\n'}
+                  Without Device Owner:{`
+`}
+                  • Navigation buttons remain accessible{`
+`}
+                  • User can exit the app freely{`
+`}
                   • Lock mode may not work properly
                 </Text>
               </SettingsInfoBox>
@@ -152,10 +160,14 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
       <SettingsSection variant="info">
         <Text style={styles.infoTitle}>ℹ️ How to Use</Text>
         <Text style={styles.infoText}>
-          • Configure the URL of the web page to display{'\n'}
-          • Set a secure PIN code{'\n'}
-          • Enable "Lock Mode" for full kiosk mode{'\n'}
-          • Tap 5 times on the secret button to access settings (default: bottom-right){'\n'}
+          • Configure the URL of the web page to display{`
+`}
+          • Set a secure PIN code{`
+`}
+          • Enable "Lock Mode" for full kiosk mode{`
+`}
+          • Tap 5 times on the secret button to access settings (default: bottom-right){`
+`}
           • Enter PIN code to unlock
         </Text>
       </SettingsSection>
@@ -175,7 +187,8 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
           {url.trim().toLowerCase().startsWith('http://') && (
             <SettingsInfoBox variant="warning">
               <Text style={styles.infoText}>
-                ⚠️ SECURITY: This URL uses HTTP (unencrypted).{'\n'}
+                ⚠️ SECURITY: This URL uses HTTP (unencrypted).{`
+`}
                 Your data can be intercepted. Use HTTPS instead.
               </Text>
             </SettingsInfoBox>
@@ -237,7 +250,8 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
             <>
               <SettingsInfoBox variant="info">
                 <Text style={styles.infoText}>
-                  📌 Scheduled events take priority over URL Rotation.{'\n'}
+                  📌 Scheduled events take priority over URL Rotation.{`
+`}
                   One-time events take priority over recurring events.
                 </Text>
               </SettingsInfoBox>

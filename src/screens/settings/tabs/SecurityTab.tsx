@@ -18,6 +18,7 @@ import { Colors, Spacing, Typography } from '../../../theme';
 interface SecurityTabProps {
   displayMode: 'webview' | 'external_app';
   isDeviceOwner: boolean;
+  navigation?: any; // Navigation prop for sub-screens
   
   // Lock mode
   kioskEnabled: boolean;
@@ -27,6 +28,14 @@ interface SecurityTabProps {
   allowPowerButton: boolean;
   onAllowPowerButtonChange: (value: boolean) => void;
   
+  // Return to Settings
+  returnTapCount: string;
+  onReturnTapCountChange: (value: string) => void;
+  volumeUp5TapEnabled: boolean;
+  onVolumeUp5TapEnabledChange: (value: boolean) => void;
+  overlayButtonVisible: boolean;
+  onOverlayButtonVisibleChange: (value: boolean) => void;
+  
   // Auto launch
   autoLaunchEnabled: boolean;
   onAutoLaunchChange: (value: boolean) => void;
@@ -34,10 +43,6 @@ interface SecurityTabProps {
   // External app specific
   autoRelaunchApp: boolean;
   onAutoRelaunchAppChange: (value: boolean) => void;
-  overlayButtonVisible: boolean;
-  onOverlayButtonVisibleChange: (value: boolean) => void;
-  overlayButtonPosition: string;
-  onOverlayButtonPositionChange: (value: string) => void;
   backButtonMode: string;
   onBackButtonModeChange: (value: string) => void;
   backButtonTimerDelay: string;
@@ -47,33 +52,26 @@ interface SecurityTabProps {
 const SecurityTab: React.FC<SecurityTabProps> = ({
   displayMode,
   isDeviceOwner,
+  navigation,
   kioskEnabled,
   onKioskEnabledChange,
   allowPowerButton,
   onAllowPowerButtonChange,
+  returnTapCount,
+  onReturnTapCountChange,
+  volumeUp5TapEnabled,
+  onVolumeUp5TapEnabledChange,
+  overlayButtonVisible,
+  onOverlayButtonVisibleChange,
   autoLaunchEnabled,
   onAutoLaunchChange,
   autoRelaunchApp,
   onAutoRelaunchAppChange,
-  overlayButtonVisible,
-  onOverlayButtonVisibleChange,
-  overlayButtonPosition,
-  onOverlayButtonPositionChange,
   backButtonMode,
   onBackButtonModeChange,
   backButtonTimerDelay,
   onBackButtonTimerDelayChange,
 }) => {
-  // Helper to get position label for info text
-  const getPositionLabel = (position: string) => {
-    switch (position) {
-      case 'top-left': return 'top-left corner';
-      case 'top-right': return 'top-right corner';
-      case 'bottom-left': return 'bottom-left corner';
-      default: return 'bottom-right corner';
-    }
-  };
-
   return (
     <View>
       {/* Lock Mode */}
@@ -120,7 +118,7 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
         {kioskEnabled && displayMode === 'external_app' && isDeviceOwner && (
           <SettingsInfoBox variant="info">
             <Text style={styles.infoText}>
-              ℹ️ Lock Mode enabled: Only overlay 5-tap + PIN code allows exit from external app
+              ℹ️ Lock Mode enabled: Only 5-tap anywhere on screen + PIN code allows exit from external app
             </Text>
           </SettingsInfoBox>
         )}
@@ -148,9 +146,9 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
           onValueChange={onAutoLaunchChange}
         />
         
-        <SettingsInfoBox variant="warning">
+        <SettingsInfoBox variant="info">
           <Text style={styles.infoText}>
-            ⚠️ For non-Device Owner devices, enable "Display over other apps" permission in system settings.
+            ℹ️ Make sure "Appear on top" permission is enabled in system settings for reliable auto-launch.
           </Text>
         </SettingsInfoBox>
         
@@ -162,58 +160,78 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
         />
       </SettingsSection>
       
-      {/* Return Button Settings - Available for both modes */}
-      <SettingsSection title="Return Button" icon="gesture-tap">
+      {/* Return to Settings */}
+      <SettingsSection title="Return to Settings" icon="gesture-tap">
+        <SettingsInput
+          label="Number of Screen Taps (2-10)"
+          hint="Tap anywhere on screen this many times rapidly to access settings"
+          value={returnTapCount}
+          onChangeText={(text) => {
+            const filtered = text.replace(/[^0-9]/g, '');
+            onReturnTapCountChange(filtered);
+          }}
+          keyboardType="numeric"
+          placeholder="5"
+          maxLength={2}
+          error={returnTapCount !== '' && (parseInt(returnTapCount, 10) < 2 || parseInt(returnTapCount, 10) > 10) ? 'Must be between 2 and 10' : undefined}
+        />
+        
         <SettingsSwitch
-          label="👁️ Show Return Button"
-          hint={displayMode === 'webview' 
-            ? "Make the return button visible on screen (otherwise tap the invisible area)"
-            : "Make the return button visible over the external app (otherwise tap the invisible area)"
-          }
+          label="👁️ Show Visual Indicator"
+          hint="Display a small visual indicator (bottom-right). Taps work anywhere regardless of this setting."
           value={overlayButtonVisible}
           onValueChange={onOverlayButtonVisibleChange}
         />
         
-        <View style={styles.divider} />
-        
-        <SettingsRadioGroup
-          label="📍 Return Button Position"
-          hint="Position of the return button on screen. Change this if it blocks your app's or website's buttons."
-          options={[
-            {
-              value: 'bottom-right',
-              label: 'Bottom Right',
-              icon: 'chevron-down',
-              hint: 'Default position',
-            },
-            {
-              value: 'bottom-left',
-              label: 'Bottom Left',
-              icon: 'chevron-down',
-              hint: 'Bottom left corner',
-            },
-            {
-              value: 'top-right',
-              label: 'Top Right',
-              icon: 'chevron-up',
-              hint: 'Top right corner',
-            },
-            {
-              value: 'top-left',
-              label: 'Top Left',
-              icon: 'chevron-up',
-              hint: 'Top left corner',
-            },
-          ]}
-          value={overlayButtonPosition}
-          onValueChange={onOverlayButtonPositionChange}
-        />
+        {displayMode === 'webview' && (
+          <>
+            <View style={styles.divider} />
+            <SettingsSwitch
+              label="🔊 Volume Button Alternative"
+              hint="Also allow pressing Volume Up/Down button multiple times to access settings"
+              value={volumeUp5TapEnabled}
+              onValueChange={onVolumeUp5TapEnabledChange}
+            />
+          </>
+        )}
         
         <SettingsInfoBox variant="info">
           <Text style={styles.infoText}>
-            ℹ️ Tap the return button 5 times to access settings (PIN required if Lock Mode is enabled)
+            ℹ️ Tap anywhere on screen {returnTapCount || '5'} times rapidly to access settings{kioskEnabled && ' (PIN required)'}
           </Text>
         </SettingsInfoBox>
+      </SettingsSection>
+      
+      {/* Touch Blocking Overlays - Requires Lock Mode + Device Owner for security */}
+      <SettingsSection title="Touch Blocking" icon="gesture-tap-button">
+        <SettingsInfoBox variant="info">
+          <Text style={styles.infoText}>
+            ℹ️ Block touch input on specific screen areas (e.g., navigation bars, toolbars) to prevent users from interacting with certain parts of {displayMode === 'webview' ? 'the website' : 'external apps'}.
+          </Text>
+        </SettingsInfoBox>
+        
+        {(!kioskEnabled || !isDeviceOwner) && (
+          <SettingsInfoBox variant="warning">
+            <Text style={styles.infoText}>
+              ⚠️ Requires Lock Mode enabled AND Device Owner privileges for security reasons. Blocking overlays will only be active when both conditions are met.
+            </Text>
+          </SettingsInfoBox>
+        )}
+        
+        <SettingsButton
+          title="Configure Blocking Overlays"
+          icon="rectangle-outline"
+          variant={kioskEnabled && isDeviceOwner ? "primary" : "secondary"}
+          onPress={() => navigation?.navigate('BlockingOverlays')}
+        />
+        
+        {kioskEnabled && isDeviceOwner && (
+          <SettingsInfoBox variant="success">
+            <Text style={styles.infoText}>
+              ✅ Lock Mode + Device Owner active. Blocking overlays will work.
+            </Text>
+          </SettingsInfoBox>
+        )}
       </SettingsSection>
       
       {/* External App Specific Settings */}
@@ -280,9 +298,9 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
       <SettingsSection variant="info">
         <Text style={styles.infoTitle}>ℹ️ Return to Settings</Text>
         <Text style={styles.infoText}>
-          • Tap 5 times on the {overlayButtonVisible ? 'blue button' : 'invisible area'} in the {getPositionLabel(overlayButtonPosition)}{'\n'}
-          {displayMode === 'external_app' && '• Or use the recent apps selector\n'}
-          • Device Owner mode: Press Volume Up button 5 times rapidly
+          • Tap {returnTapCount || '5'} times anywhere on the screen {overlayButtonVisible && '(visual indicator in bottom-right)'}
+          {displayMode === 'external_app' && '\n• Or use the recent apps selector'}
+          {displayMode === 'webview' && volumeUp5TapEnabled && `\n• Or press Volume Up/Down ${returnTapCount || '5'} times rapidly`}
         </Text>
       </SettingsSection>
     </View>

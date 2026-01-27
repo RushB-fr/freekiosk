@@ -4,6 +4,7 @@ import android.app.ActivityManager
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.SystemClock
 import android.view.KeyEvent
@@ -12,11 +13,52 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.Promise
 import android.app.Instrumentation
+import android.os.PowerManager
+import android.view.WindowManager
+import com.facebook.react.modules.core.DeviceEventManagerModule
 
 class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
+    private var wakeLock: PowerManager.WakeLock? = null
+
+    companion object {
+        // Store the current instance to allow sending events from MainActivity
+        @Volatile
+        private var currentInstance: KioskModule? = null
+        
+        /**
+         * Send an event to React Native from outside the module (e.g., from MainActivity)
+         * This is used for the 5-tap Volume Up gesture
+         */
+        fun sendEventFromNative(eventName: String, params: Any? = null) {
+            try {
+                currentInstance?.reactApplicationContext
+                    ?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                    ?.emit(eventName, params)
+                android.util.Log.d("KioskModule", "Event '$eventName' sent to React Native")
+            } catch (e: Exception) {
+                android.util.Log.e("KioskModule", "Failed to send event '$eventName': ${e.message}")
+            }
+        }
+    }
+
+    init {
+        currentInstance = this
+    }
+
     override fun getName(): String {
         return "KioskModule"
+    }
+
+    override fun invalidate() {
+        super.invalidate()
+        // Release WakeLock when module is destroyed to prevent battery drain
+        wakeLock?.release()
+        wakeLock = null
+        if (currentInstance == this) {
+            currentInstance = null
+        }
+        android.util.Log.d("KioskModule", "Module invalidated, WakeLock released")
     }
 
     @ReactMethod
@@ -297,6 +339,123 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     }
 
     /**
+     * Turn screen ON using WakeLock
+     * This will turn on the screen even if it was turned off with power button or lockNow()
+     */
+    @ReactMethod
+    fun turnScreenOn(promise: Promise) {
+        try {
+            val activity = reactApplicationContext.currentActivity
+            if (activity != null) {
+                activity.runOnUiThread {
+                    try {
+                        val powerManager = reactApplicationContext.getSystemService(Context.POWER_SERVICE) as PowerManager
+                        
+                        // Release old wakeLock if exists
+                        wakeLock?.release()
+                        
+                        // Create WakeLock to turn on screen
+                        // FULL_WAKE_LOCK is deprecated but SCREEN_BRIGHT_WAKE_LOCK + ACQUIRE_CAUSES_WAKEUP should work
+                        @Suppress("DEPRECATION")
+                        wakeLock = powerManager.newWakeLock(
+                            PowerManager.FULL_WAKE_LOCK or 
+                            PowerManager.ACQUIRE_CAUSES_WAKEUP or 
+                            PowerManager.ON_AFTER_RELEASE,
+                            "FreeKiosk:ScreenOn"
+                        )
+                        wakeLock?.acquire(10*60*1000L) // 10 minutes timeout
+                        
+                        // Re-enable FLAG_KEEP_SCREEN_ON if it was cleared
+                        activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                        
+                        // Set screen to normal brightness (-1 = use system default)
+                        val layoutParams = activity.window.attributes
+                        layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                        activity.window.attributes = layoutParams
+                        
+                        android.util.Log.d("KioskModule", "Screen turned ON via WakeLock")
+                        promise.resolve(true)
+                    } catch (e: Exception) {
+                        android.util.Log.e("KioskModule", "Failed to turn screen on: ${e.message}")
+                        promise.reject("ERROR", "Failed to turn screen on: ${e.message}")
+                    }
+                }
+            } else {
+                promise.reject("ERROR", "Activity not available")
+            }
+        } catch (e: Exception) {
+            promise.reject("ERROR", "Failed to turn screen on: ${e.message}")
+        }
+    }
+
+    /**
+     * Turn screen OFF
+     * With Device Owner: uses lockNow() to truly turn off the screen
+     * Without Device Owner: dims brightness to 0 (may not work on all devices)
+     */
+    @ReactMethod
+    fun turnScreenOff(promise: Promise) {
+        try {
+            val activity = reactApplicationContext.currentActivity
+            if (activity != null) {
+                activity.runOnUiThread {
+                    try {
+                        // Release wakeLock to allow screen to turn off
+                        wakeLock?.release()
+                        wakeLock = null
+                        
+                        // Try Device Owner lockNow() first (truly turns off screen)
+                        val dpm = reactApplicationContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as android.app.admin.DevicePolicyManager
+                        if (dpm.isDeviceOwnerApp(reactApplicationContext.packageName)) {
+                            // Device Owner can truly lock/turn off the screen
+                            val adminComponent = android.content.ComponentName(reactApplicationContext, DeviceAdminReceiver::class.java)
+                            dpm.lockNow()
+                            android.util.Log.d("KioskModule", "Screen turned OFF via Device Owner lockNow()")
+                            promise.resolve(true)
+                        } else {
+                            // Fallback: dim brightness to absolute minimum (0)
+                            // Also clear FLAG_KEEP_SCREEN_ON if set
+                            activity.window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                            
+                            val layoutParams = activity.window.attributes
+                            layoutParams.screenBrightness = 0f  // 0 = system default (screen off), 0.01 was too bright
+                            activity.window.attributes = layoutParams
+                            
+                            android.util.Log.d("KioskModule", "Screen dimmed to 0 brightness (no Device Owner)")
+                            promise.resolve(true)
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("KioskModule", "Failed to turn screen off: ${e.message}")
+                        promise.reject("ERROR", "Failed to turn screen off: ${e.message}")
+                    }
+                }
+            } else {
+                promise.reject("ERROR", "Activity not available")
+            }
+        } catch (e: Exception) {
+            promise.reject("ERROR", "Failed to turn screen off: ${e.message}")
+        }
+    }
+
+    /**
+     * Check if screen is currently ON or OFF
+     * Returns true if screen is interactive (on), false if off
+     */
+    @ReactMethod
+    fun isScreenOn(promise: Promise) {
+        try {
+            val powerManager = reactApplicationContext.getSystemService(Context.POWER_SERVICE) as PowerManager
+            val isScreenOn = powerManager.isInteractive
+            
+            android.util.Log.d("KioskModule", "Screen state: ${if (isScreenOn) "ON" else "OFF"}")
+            promise.resolve(isScreenOn)
+        } catch (e: Exception) {
+            android.util.Log.e("KioskModule", "Failed to check screen state: ${e.message}")
+            promise.reject("ERROR", "Failed to check screen state: ${e.message}")
+        }
+    }
+
+    /**
      * Save PIN hash for ADB verification
      * Called when PIN is set via React Native UI to keep ADB config in sync
      */
@@ -337,6 +496,22 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
         } catch (e: Exception) {
             android.util.Log.e("KioskModule", "Failed to clear ADB PIN hash: ${e.message}")
             promise.reject("ERROR", "Failed to clear ADB PIN hash: ${e.message}")
+        }
+    }
+
+    /**
+     * Broadcast that settings are loaded (called after ADB config restart)
+     */
+    @ReactMethod
+    fun broadcastSettingsLoaded(promise: Promise) {
+        try {
+            val intent = Intent("com.freekiosk.SETTINGS_LOADED")
+            reactApplicationContext.sendBroadcast(intent)
+            android.util.Log.i("KioskModule", "Broadcasted SETTINGS_LOADED")
+            promise.resolve(true)
+        } catch (e: Exception) {
+            android.util.Log.e("KioskModule", "Failed to broadcast: ${e.message}")
+            promise.reject("ERROR", "Failed to broadcast: ${e.message}")
         }
     }
 
