@@ -3,10 +3,14 @@ import { View, StyleSheet } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import MotionDetectionModule from '../utils/MotionDetectionModule';
 
+export type MotionStatus = 'idle' | 'active' | 'error' | 'no-camera';
+
 interface MotionDetectorProps {
   enabled: boolean;
   onMotionDetected: () => void;
   sensitivity: 'low' | 'medium' | 'high';
+  cameraPosition?: 'front' | 'back';
+  onStatusChange?: (status: MotionStatus) => void;
 }
 
 const THROTTLE_INTERVAL = 2000; // Minimum 2s entre détections
@@ -23,9 +27,11 @@ const SENSITIVITY_THRESHOLDS = {
 const MotionDetector: React.FC<MotionDetectorProps> = ({
   enabled,
   onMotionDetected,
-  sensitivity
+  sensitivity,
+  cameraPosition = 'front',
+  onStatusChange,
 }) => {
-  const device = useCameraDevice('front');
+  const device = useCameraDevice(cameraPosition);
   const { hasPermission } = useCameraPermission();
   const cameraRef = useRef<Camera>(null);
   const lastMotionTime = useRef<number>(0);
@@ -38,10 +44,12 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
   // Track mounted state
   useEffect(() => {
     isMounted.current = true;
+    console.log(`[MotionDetection] Initializing with ${cameraPosition} camera`);
     return () => {
       isMounted.current = false;
+      console.log('[MotionDetection] Component unmounted');
     };
-  }, []);
+  }, [cameraPosition]);
 
   const stopDetection = useCallback(() => {
     if (detectionInterval.current) {
@@ -149,16 +157,28 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
 
   const handleCameraInitialized = useCallback(() => {
     if (isMounted.current) {
+      console.log(`[MotionDetection] Camera initialized successfully (${cameraPosition})`);
       setIsCameraReady(true);
+      onStatusChange?.('active');
     }
-  }, []);
+  }, [cameraPosition, onStatusChange]);
 
   const handleCameraError = useCallback((error: any) => {
-    // Camera error occurred - stop detection to prevent crashes
-    console.warn('Camera error:', error);
+    console.error(`[MotionDetection] Camera error (${cameraPosition}):`, error);
     setIsCameraReady(false);
     stopDetection();
-  }, [stopDetection]);
+    onStatusChange?.('error');
+  }, [cameraPosition, stopDetection, onStatusChange]);
+
+  // Check if camera is available and notify status
+  useEffect(() => {
+    if (!device && enabled) {
+      console.warn(`[MotionDetection] No ${cameraPosition} camera available on this device`);
+      onStatusChange?.('no-camera');
+    } else if (!enabled) {
+      onStatusChange?.('idle');
+    }
+  }, [device, enabled, cameraPosition, onStatusChange]);
 
   if (!enabled || !device || !hasPermission) {
     return null;

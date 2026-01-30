@@ -56,6 +56,9 @@ const StatusBar: React.FC<StatusBarProps> = ({
           return;
         }
 
+        // Log battery level to debug update issues
+        console.log('[StatusBar] Battery updated:', info.battery.level, '%', info.battery.isCharging ? '⚡' : '');
+
         setSystemInfo(info);
 
         // Update time
@@ -68,11 +71,18 @@ const StatusBar: React.FC<StatusBarProps> = ({
       }
     };
 
+    // Initial update
     updateStatusBar();
+    
+    // Set up interval to update every 5 seconds
     const interval = setInterval(updateStatusBar, 5000);
 
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      clearInterval(interval);
+      // Clean up state when unmounting
+      setSystemInfo(null);
+    };
+  }, [showBattery, showWifi, showBluetooth, showVolume, showTime]);
 
   if (!systemInfo) {
     return null;

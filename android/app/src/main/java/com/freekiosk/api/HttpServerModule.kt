@@ -65,6 +65,11 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     private var jsRotationInterval: Int = 30
     private var jsRotationCurrentIndex: Int = 0
     
+    // Auto-brightness status (updated via updateStatus method)
+    private var jsAutoBrightnessEnabled: Boolean = false
+    private var jsAutoBrightnessMin: Int = 10
+    private var jsAutoBrightnessMax: Int = 100
+    
     // Sensor data
     private var sensorManager: SensorManager? = null
     private var lightSensor: Sensor? = null
@@ -263,6 +268,15 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
         }
         status.put("sensors", sensorsStatus)
         
+        // Auto-brightness
+        val autoBrightnessStatus = JSONObject().apply {
+            put("enabled", jsAutoBrightnessEnabled)
+            put("min", jsAutoBrightnessMin)
+            put("max", jsAutoBrightnessMax)
+            put("currentLightLevel", lightValue)
+        }
+        status.put("autoBrightness", autoBrightnessStatus)
+        
         // Storage
         val storageStatus = getStorageInfo()
         status.put("storage", storageStatus)
@@ -404,6 +418,46 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                     put("command", command)
                 }
             }
+            "autoBrightnessEnable" -> {
+                val min = params?.optInt("min", 10) ?: 10
+                val max = params?.optInt("max", 100) ?: 100
+                // Send to JS for handling
+                sendEvent("onApiCommand", Arguments.createMap().apply {
+                    putString("command", "autoBrightnessEnable")
+                    putString("params", JSONObject().apply {
+                        put("min", min)
+                        put("max", max)
+                    }.toString())
+                })
+                return JSONObject().apply {
+                    put("executed", true)
+                    put("command", command)
+                    put("min", min)
+                    put("max", max)
+                }
+            }
+            "autoBrightnessDisable" -> {
+                sendEvent("onApiCommand", Arguments.createMap().apply {
+                    putString("command", "autoBrightnessDisable")
+                    putString("params", "{}")
+                })
+                return JSONObject().apply {
+                    put("executed", true)
+                    put("command", command)
+                }
+            }
+            "getAutoBrightness" -> {
+                return JSONObject().apply {
+                    put("executed", true)
+                    put("command", command)
+                    put("autoBrightness", JSONObject().apply {
+                        put("enabled", jsAutoBrightnessEnabled)
+                        put("min", jsAutoBrightnessMin)
+                        put("max", jsAutoBrightnessMax)
+                        put("currentLightLevel", lightValue)
+                    })
+                }
+            }
         }
         
         // Send other commands to JS side
@@ -444,7 +498,11 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 val urlsArray = status.getJSONArray("rotationUrls")
                 jsRotationUrls = (0 until urlsArray.length()).map { urlsArray.getString(it) }
             }
-            Log.d(TAG, "Status updated: url=$jsCurrentUrl, screensaver=$jsScreensaverActive, rotation=$jsRotationEnabled")
+            // Auto-brightness status
+            if (status.has("autoBrightnessEnabled")) jsAutoBrightnessEnabled = status.getBoolean("autoBrightnessEnabled")
+            if (status.has("autoBrightnessMin")) jsAutoBrightnessMin = status.getInt("autoBrightnessMin")
+            if (status.has("autoBrightnessMax")) jsAutoBrightnessMax = status.getInt("autoBrightnessMax")
+            Log.d(TAG, "Status updated: url=$jsCurrentUrl, screensaver=$jsScreensaverActive, rotation=$jsRotationEnabled, autoBrightness=$jsAutoBrightnessEnabled")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse status update from JS", e)
         }

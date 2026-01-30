@@ -62,48 +62,46 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
 }) => {
   return (
     <View>
-      {/* App Updates - Only for Device Owners */}
-      {isDeviceOwner && (
-        <SettingsSection title="Updates" icon="update">
-          <View style={styles.versionRow}>
-            <Text style={styles.versionLabel}>Current Version</Text>
-            <Text style={styles.versionValue}>{currentVersion}</Text>
-          </View>
-          
-          {updateAvailable && updateInfo && (
-            <SettingsInfoBox variant="success" title="🎉 Update Available">
-              <Text style={styles.infoText}>
-                Version {updateInfo.version} is available!
-                {updateInfo.notes && `\n\n${updateInfo.notes.substring(0, 150)}...`}
-              </Text>
-            </SettingsInfoBox>
-          )}
-          
+      {/* App Updates - Available for all users */}
+      <SettingsSection title="Updates" icon="update">
+        <View style={styles.versionRow}>
+          <Text style={styles.versionLabel}>Current Version</Text>
+          <Text style={styles.versionValue}>{currentVersion}</Text>
+        </View>
+        
+        {updateAvailable && updateInfo && (
+          <SettingsInfoBox variant="success" title="🎉 Update Available">
+            <Text style={styles.infoText}>
+              Version {updateInfo.version} is available!
+              {updateInfo.notes && `\n\n${updateInfo.notes.substring(0, 150)}...`}
+            </Text>
+          </SettingsInfoBox>
+        )}
+        
+        <SettingsButton
+          title={checkingUpdate ? 'Checking...' : downloading ? 'Downloading...' : 'Check for Updates'}
+          icon={checkingUpdate ? 'timer-sand' : downloading ? 'download' : 'magnify'}
+          variant="primary"
+          onPress={onCheckForUpdates}
+          disabled={checkingUpdate || downloading}
+          loading={checkingUpdate}
+        />
+        
+        {updateAvailable && updateInfo && (
           <SettingsButton
-            title={checkingUpdate ? 'Checking...' : downloading ? 'Downloading...' : 'Check for Updates'}
-            icon={checkingUpdate ? 'timer-sand' : downloading ? 'download' : 'magnify'}
-            variant="primary"
-            onPress={onCheckForUpdates}
-            disabled={checkingUpdate || downloading}
-            loading={checkingUpdate}
+            title={downloading ? 'Downloading...' : 'Download & Install'}
+            icon="download"
+            variant="success"
+            onPress={onDownloadUpdate}
+            disabled={downloading}
+            loading={downloading}
           />
-          
-          {updateAvailable && updateInfo && (
-            <SettingsButton
-              title={downloading ? 'Downloading...' : 'Download & Install'}
-              icon="download"
-              variant="success"
-              onPress={onDownloadUpdate}
-              disabled={downloading}
-              loading={downloading}
-            />
-          )}
-          
-          <Text style={styles.hint}>
-            Device Owner mode: Manual updates via GitHub.
-          </Text>
-        </SettingsSection>
-      )}
+        )}
+        
+        <Text style={styles.hint}>
+          {isDeviceOwner ? 'Device Owner mode: Manual updates via GitHub.' : 'Download and install updates from GitHub.'}
+        </Text>
+      </SettingsSection>
       
       {/* SSL Certificates - WebView only */}
       {displayMode === 'webview' && (

@@ -24,13 +24,24 @@ class HomeActivity : AppCompatActivity() {
         val displayMode = prefs.getString("@kiosk_display_mode", "webview")
         val externalAppPackage = prefs.getString("@kiosk_external_app_package", "")
         val externalAppActivity = prefs.getString("@kiosk_external_app_activity", "")
+        
+        // Load tap settings
+        val tapCountStr = prefs.getString("@kiosk_return_tap_count", "5")
+        val tapTimeoutStr = prefs.getString("@kiosk_return_tap_timeout", "1500")
+        val tapCount = try { tapCountStr?.toInt() ?: 5 } catch (e: Exception) { 5 }
+        val tapTimeout = try { tapTimeoutStr?.toLong() ?: 1500L } catch (e: Exception) { 1500L }
+        
+        // Load return mode settings
+        val returnMode = prefs.getString("@kiosk_return_mode", "tap_anywhere") ?: "tap_anywhere"
+        val buttonPosition = prefs.getString("@kiosk_return_button_position", "bottom-right") ?: "bottom-right"
 
         DebugLog.d("HomeActivity", "Display mode: $displayMode")
         DebugLog.d("HomeActivity", "External app: $externalAppPackage / $externalAppActivity")
+        DebugLog.d("HomeActivity", "Tap settings: count=$tapCount, timeout=${tapTimeout}ms, mode=$returnMode, position=$buttonPosition")
 
         if (displayMode == "external_app" && !externalAppPackage.isNullOrEmpty()) {
             // Démarrer l'OverlayService avec le bouton de retour
-            startOverlayService()
+            startOverlayService(tapCount, tapTimeout, returnMode, buttonPosition)
 
             // Lancer l'application externe
             launchExternalApp(externalAppPackage, externalAppActivity)
@@ -43,7 +54,7 @@ class HomeActivity : AppCompatActivity() {
         finish()
     }
 
-    private fun startOverlayService() {
+    private fun startOverlayService(tapCount: Int, tapTimeout: Long, returnMode: String, buttonPosition: String) {
         try {
             // Vérifier la permission overlay (Android M+)
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
@@ -54,8 +65,12 @@ class HomeActivity : AppCompatActivity() {
             }
 
             val serviceIntent = Intent(this, OverlayService::class.java)
+            serviceIntent.putExtra("REQUIRED_TAPS", tapCount.coerceIn(2, 20))
+            serviceIntent.putExtra("TAP_TIMEOUT", tapTimeout.coerceIn(500L, 5000L))
+            serviceIntent.putExtra("RETURN_MODE", returnMode)
+            serviceIntent.putExtra("BUTTON_POSITION", buttonPosition)
             startService(serviceIntent)
-            DebugLog.d("HomeActivity", "Started OverlayService from HomeActivity")
+            DebugLog.d("HomeActivity", "Started OverlayService from HomeActivity with tapCount=$tapCount, tapTimeout=${tapTimeout}ms, mode=$returnMode, position=$buttonPosition")
         } catch (e: Exception) {
             DebugLog.errorProduction("HomeActivity", "Error starting OverlayService: ${e.message}")
         }

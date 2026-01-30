@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlockingRegion } from '../types/blockingOverlay';
+import { saveSecureApiKey, getSecureApiKey, clearSecureApiKey } from './secureStorage';
 
 const KEYS = {
   URL: '@kiosk_url',
@@ -33,6 +34,8 @@ const KEYS = {
   BACK_BUTTON_MODE: '@kiosk_back_button_mode',
   BACK_BUTTON_TIMER_DELAY: '@kiosk_back_button_timer_delay',
   KEYBOARD_MODE: '@kiosk_keyboard_mode',
+  // PIN Mode
+  PIN_MODE: '@kiosk_pin_mode', // 'numeric' or 'alphanumeric'
   // URL Rotation
   URL_ROTATION_ENABLED: '@kiosk_url_rotation_enabled',
   URL_ROTATION_LIST: '@kiosk_url_rotation_list',
@@ -49,10 +52,25 @@ const KEYS = {
   ALLOW_POWER_BUTTON: '@kiosk_allow_power_button',
   // Return to Settings
   RETURN_TAP_COUNT: '@kiosk_return_tap_count',
+  RETURN_TAP_TIMEOUT: '@kiosk_return_tap_timeout',
+  RETURN_MODE: '@kiosk_return_mode', // 'tap_anywhere' | 'button'
+  RETURN_BUTTON_POSITION: '@kiosk_return_button_position', // 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
   VOLUME_UP_5TAP_ENABLED: '@kiosk_volume_up_5tap_enabled',
   // Blocking Overlays
   BLOCKING_OVERLAYS_ENABLED: '@kiosk_blocking_overlays_enabled',
   BLOCKING_OVERLAYS_REGIONS: '@kiosk_blocking_overlays_regions',
+  // Camera preference for motion detection
+  MOTION_CAMERA_POSITION: '@motion_camera_position',
+  // WebView Back Button
+  WEBVIEW_BACK_BUTTON_ENABLED: '@kiosk_webview_back_button_enabled',
+  WEBVIEW_BACK_BUTTON_X_PERCENT: '@kiosk_webview_back_button_x_percent',
+  WEBVIEW_BACK_BUTTON_Y_PERCENT: '@kiosk_webview_back_button_y_percent',
+  // Auto-Brightness
+  AUTO_BRIGHTNESS_ENABLED: '@kiosk_auto_brightness_enabled',
+  AUTO_BRIGHTNESS_MIN: '@kiosk_auto_brightness_min',
+  AUTO_BRIGHTNESS_MAX: '@kiosk_auto_brightness_max',
+  AUTO_BRIGHTNESS_UPDATE_INTERVAL: '@kiosk_auto_brightness_update_interval',
+  AUTO_BRIGHTNESS_SAVED_MANUAL: '@kiosk_auto_brightness_saved_manual',
   // Legacy keys for backward compatibility
   SCREENSAVER_DELAY: '@screensaver_delay',
   MOTION_DETECTION_ENABLED: '@motion_detection_enabled',
@@ -180,6 +198,7 @@ export const StorageService = {
         KEYS.OVERLAY_BUTTON_VISIBLE,
         KEYS.OVERLAY_BUTTON_POSITION,
         KEYS.PIN_MAX_ATTEMPTS,
+        KEYS.PIN_MODE,
         KEYS.STATUS_BAR_ENABLED,
         KEYS.STATUS_BAR_ON_OVERLAY,
         KEYS.STATUS_BAR_ON_RETURN,
@@ -206,12 +225,32 @@ export const StorageService = {
         KEYS.REST_API_ALLOW_CONTROL,
         // Power Button
         KEYS.ALLOW_POWER_BUTTON,
+        // Return to Settings
+        KEYS.RETURN_TAP_COUNT,
+        KEYS.VOLUME_UP_5TAP_ENABLED,
+        // Blocking Overlays
+        KEYS.BLOCKING_OVERLAYS_ENABLED,
+        KEYS.BLOCKING_OVERLAYS_REGIONS,
+        // Camera preference
+        KEYS.MOTION_CAMERA_POSITION,
+        // WebView Back Button
+        KEYS.WEBVIEW_BACK_BUTTON_ENABLED,
+        KEYS.WEBVIEW_BACK_BUTTON_X_PERCENT,
+        KEYS.WEBVIEW_BACK_BUTTON_Y_PERCENT,
+        // Auto-Brightness
+        KEYS.AUTO_BRIGHTNESS_ENABLED,
+        KEYS.AUTO_BRIGHTNESS_MIN,
+        KEYS.AUTO_BRIGHTNESS_MAX,
+        KEYS.AUTO_BRIGHTNESS_UPDATE_INTERVAL,
+        KEYS.AUTO_BRIGHTNESS_SAVED_MANUAL,
         // Legacy keys
         KEYS.SCREENSAVER_DELAY,
         KEYS.MOTION_DETECTION_ENABLED,
         KEYS.MOTION_SENSITIVITY,
         KEYS.MOTION_DELAY,
       ]);
+      // Also clear secure API key from Keychain
+      await clearSecureApiKey();
     } catch (error) {
       console.error('Error clearing all storage keys:', error);
     }
@@ -329,6 +368,26 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting motion delay:', error);
       return 30000;
+    }
+  },
+
+  // MOTION CAMERA POSITION
+  saveMotionCameraPosition: async (value: 'front' | 'back'): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MOTION_CAMERA_POSITION, value);
+    } catch (error) {
+      console.error('Error saving motion camera position:', error);
+    }
+  },
+
+  getMotionCameraPosition: async (): Promise<'front' | 'back'> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MOTION_CAMERA_POSITION);
+      // Default 'front' = comportement actuel si clé absente
+      return (value as 'front' | 'back') || 'front';
+    } catch (error) {
+      console.error('Error getting motion camera position:', error);
+      return 'front'; // Fallback = comportement actuel
     }
   },
 
@@ -551,6 +610,25 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting PIN max attempts:', error);
       return 5;
+    }
+  },
+
+  //PIN MODE (numeric or alphanumeric)
+  savePinMode: async (mode: 'numeric' | 'alphanumeric'): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.PIN_MODE, mode);
+    } catch (error) {
+      console.error('Error saving PIN mode:', error);
+    }
+  },
+
+  getPinMode: async (): Promise<'numeric' | 'alphanumeric'> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.PIN_MODE);
+      return (value as 'numeric' | 'alphanumeric') || 'numeric'; // Default: numeric
+    } catch (error) {
+      console.error('Error getting PIN mode:', error);
+      return 'numeric';
     }
   },
 
@@ -915,7 +993,7 @@ export const StorageService = {
 
   saveRestApiKey: async (key: string): Promise<void> => {
     try {
-      await AsyncStorage.setItem(KEYS.REST_API_KEY, key);
+      await saveSecureApiKey(key);
     } catch (error) {
       console.error('Error saving REST API key:', error);
     }
@@ -923,8 +1001,7 @@ export const StorageService = {
 
   getRestApiKey: async (): Promise<string> => {
     try {
-      const value = await AsyncStorage.getItem(KEYS.REST_API_KEY);
-      return value || '';
+      return await getSecureApiKey();
     } catch (error) {
       console.error('Error getting REST API key:', error);
       return '';
@@ -987,6 +1064,63 @@ export const StorageService = {
     }
   },
 
+  // RETURN TAP TIMEOUT (milliseconds)
+  saveReturnTapTimeout: async (value: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.RETURN_TAP_TIMEOUT, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving return tap timeout:', error);
+    }
+  },
+
+  getReturnTapTimeout: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.RETURN_TAP_TIMEOUT);
+      return value ? JSON.parse(value) : 1500; // Default 1500ms
+    } catch (error) {
+      console.error('Error getting return tap timeout:', error);
+      return 1500;
+    }
+  },
+
+  // RETURN MODE ('tap_anywhere' or 'button')
+  saveReturnMode: async (value: string): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.RETURN_MODE, value);
+    } catch (error) {
+      console.error('Error saving return mode:', error);
+    }
+  },
+
+  getReturnMode: async (): Promise<string> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.RETURN_MODE);
+      return value || 'tap_anywhere'; // Default tap_anywhere
+    } catch (error) {
+      console.error('Error getting return mode:', error);
+      return 'tap_anywhere';
+    }
+  },
+
+  // RETURN BUTTON POSITION
+  saveReturnButtonPosition: async (value: string): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.RETURN_BUTTON_POSITION, value);
+    } catch (error) {
+      console.error('Error saving return button position:', error);
+    }
+  },
+
+  getReturnButtonPosition: async (): Promise<string> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.RETURN_BUTTON_POSITION);
+      return value || 'bottom-right'; // Default bottom-right
+    } catch (error) {
+      console.error('Error getting return button position:', error);
+      return 'bottom-right';
+    }
+  },
+
   // VOLUME UP 5-TAP
   saveVolumeUp5TapEnabled: async (value: boolean): Promise<void> => {
     try {
@@ -1040,6 +1174,152 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting blocking overlays regions:', error);
       return [];
+    }
+  },
+
+  // WebView Back Button
+  saveWebViewBackButtonEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.WEBVIEW_BACK_BUTTON_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving webview back button enabled:', error);
+    }
+  },
+
+  getWebViewBackButtonEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.WEBVIEW_BACK_BUTTON_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting webview back button enabled:', error);
+      return false;
+    }
+  },
+
+  saveWebViewBackButtonXPercent: async (value: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.WEBVIEW_BACK_BUTTON_X_PERCENT, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving webview back button X percent:', error);
+    }
+  },
+
+  getWebViewBackButtonXPercent: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.WEBVIEW_BACK_BUTTON_X_PERCENT);
+      return value ? JSON.parse(value) : 2; // 2% from left by default
+    } catch (error) {
+      console.error('Error getting webview back button X percent:', error);
+      return 2;
+    }
+  },
+
+  saveWebViewBackButtonYPercent: async (value: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.WEBVIEW_BACK_BUTTON_Y_PERCENT, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving webview back button Y percent:', error);
+    }
+  },
+
+  getWebViewBackButtonYPercent: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.WEBVIEW_BACK_BUTTON_Y_PERCENT);
+      return value ? JSON.parse(value) : 10; // 10% from top by default (to avoid StatusBar)
+    } catch (error) {
+      console.error('Error getting webview back button Y percent:', error);
+      return 10;
+    }
+  },
+
+  // AUTO-BRIGHTNESS
+  saveAutoBrightnessEnabled: async (enabled: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.AUTO_BRIGHTNESS_ENABLED, JSON.stringify(enabled));
+    } catch (error) {
+      console.error('Error saving auto brightness enabled:', error);
+    }
+  },
+
+  getAutoBrightnessEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.AUTO_BRIGHTNESS_ENABLED);
+      return value ? JSON.parse(value) : false; // Default: OFF for backward compatibility
+    } catch (error) {
+      console.error('Error getting auto brightness enabled:', error);
+      return false;
+    }
+  },
+
+  saveAutoBrightnessMin: async (value: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.AUTO_BRIGHTNESS_MIN, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving auto brightness min:', error);
+    }
+  },
+
+  getAutoBrightnessMin: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.AUTO_BRIGHTNESS_MIN);
+      return value ? JSON.parse(value) : 0.1; // Default: 10%
+    } catch (error) {
+      console.error('Error getting auto brightness min:', error);
+      return 0.1;
+    }
+  },
+
+  saveAutoBrightnessMax: async (value: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.AUTO_BRIGHTNESS_MAX, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving auto brightness max:', error);
+    }
+  },
+
+  getAutoBrightnessMax: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.AUTO_BRIGHTNESS_MAX);
+      return value ? JSON.parse(value) : 1.0; // Default: 100%
+    } catch (error) {
+      console.error('Error getting auto brightness max:', error);
+      return 1.0;
+    }
+  },
+
+  saveAutoBrightnessUpdateInterval: async (value: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.AUTO_BRIGHTNESS_UPDATE_INTERVAL, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving auto brightness update interval:', error);
+    }
+  },
+
+  getAutoBrightnessUpdateInterval: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.AUTO_BRIGHTNESS_UPDATE_INTERVAL);
+      return value ? JSON.parse(value) : 1000; // Default: 1 second
+    } catch (error) {
+      console.error('Error getting auto brightness update interval:', error);
+      return 1000;
+    }
+  },
+
+  saveAutoBrightnessSavedManual: async (value: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.AUTO_BRIGHTNESS_SAVED_MANUAL, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving auto brightness saved manual:', error);
+    }
+  },
+
+  getAutoBrightnessSavedManual: async (): Promise<number | null> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.AUTO_BRIGHTNESS_SAVED_MANUAL);
+      return value ? JSON.parse(value) : null; // Null if never saved
+    } catch (error) {
+      console.error('Error getting auto brightness saved manual:', error);
+      return null;
     }
   },
 

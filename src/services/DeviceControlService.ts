@@ -65,7 +65,7 @@ class DeviceControlServiceClass {
   private getScreensaverCallback: GetScreensaverCallback | null = null;
   private currentBrightness: number = 0.5;
   private kioskModeEnabled: boolean = false;
-  private appVersion: string = '1.2.2';
+  private appVersion: string = '1.2.3';
 
   // Register callbacks from KioskScreen
   registerWebViewCallbacks(

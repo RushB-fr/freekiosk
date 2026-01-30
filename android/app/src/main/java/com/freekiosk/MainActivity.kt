@@ -674,6 +674,13 @@ class MainActivity : ReactActivity() {
       setAsyncStorageValue(db, "@kiosk_rest_api_key", it)
     }
     
+    intent.getStringExtra("pin_mode")?.let {
+      // Only accept valid values: "numeric" or "alphanumeric"
+      if (it == "numeric" || it == "alphanumeric") {
+        setAsyncStorageValue(db, "@kiosk_pin_mode", it)
+      }
+    }
+    
     // Commit all changes to database
     db.setTransactionSuccessful()
     db.endTransaction()
@@ -736,13 +743,39 @@ class MainActivity : ReactActivity() {
             startActivity(launchIntent)
             android.util.Log.i("FreeKiosk-ADB", "Auto-starting external app: $lockPackage")
             
-            // Broadcast that external app is launching (delayed to ensure it's visible)
-            Handler(Looper.getMainLooper()).postDelayed({
-              sendBroadcast(Intent("com.freekiosk.EXTERNAL_APP_LAUNCHED").apply {
-                putExtra("package_name", lockPackage)
-              })
-              android.util.Log.i("FreeKiosk-ADB", "Broadcasted EXTERNAL_APP_LAUNCHED: $lockPackage")
-            }, 1000)
+            // Verify external app is in foreground before broadcasting (with retry)
+            val maxRetries = 10
+            val retryDelayMs = 500L
+            var retryCount = 0
+            
+            fun checkAndBroadcast() {
+              val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+              val runningTasks = am.getRunningTasks(1)
+              val topPackage = runningTasks.firstOrNull()?.topActivity?.packageName
+              
+              if (topPackage == lockPackage) {
+                // App is in foreground, broadcast success
+                sendBroadcast(Intent("com.freekiosk.EXTERNAL_APP_LAUNCHED").apply {
+                  putExtra("package_name", lockPackage)
+                })
+                android.util.Log.i("FreeKiosk-ADB", "Broadcasted EXTERNAL_APP_LAUNCHED: $lockPackage (verified in foreground)")
+              } else if (retryCount < maxRetries) {
+                // App not yet in foreground, retry
+                retryCount++
+                android.util.Log.d("FreeKiosk-ADB", "Waiting for $lockPackage to be in foreground (attempt $retryCount/$maxRetries, current: $topPackage)")
+                Handler(Looper.getMainLooper()).postDelayed({ checkAndBroadcast() }, retryDelayMs)
+              } else {
+                // Max retries reached, broadcast anyway but log warning
+                sendBroadcast(Intent("com.freekiosk.EXTERNAL_APP_LAUNCHED").apply {
+                  putExtra("package_name", lockPackage)
+                  putExtra("verified", false)
+                })
+                android.util.Log.w("FreeKiosk-ADB", "Broadcasted EXTERNAL_APP_LAUNCHED: $lockPackage (NOT verified - timeout after ${maxRetries * retryDelayMs}ms, top: $topPackage)")
+              }
+            }
+            
+            // Start verification after initial delay
+            Handler(Looper.getMainLooper()).postDelayed({ checkAndBroadcast() }, 500)
           }
         } catch (e: Exception) {
           android.util.Log.e("FreeKiosk-ADB", "Failed to auto-start $lockPackage: ${e.message}")
@@ -853,7 +886,8 @@ class MainActivity : ReactActivity() {
       "rest_api_key" to "@kiosk_rest_api_key",
       "allow_power_button" to "@kiosk_allow_power_button",
       "back_button_mode" to "@kiosk_back_button_mode",
-      "default_brightness" to "@default_brightness"
+      "default_brightness" to "@default_brightness",
+      "pin_mode" to "@kiosk_pin_mode"
     )
     
     for ((jsonKey, storageKey) in keyMapping) {

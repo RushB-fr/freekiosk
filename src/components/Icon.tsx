@@ -28,6 +28,7 @@ export type IconName =
   | 'brightness-6'
   | 'brightness-4'
   | 'brightness-7'
+  | 'brightness-auto'
   | 'moon-waning-crescent'
   | 'weather-night'
   | 'eye'
@@ -127,9 +128,15 @@ export type IconName =
   | 'gesture-tap-button'
   | 'undo'
   | 'arrow-u-left-top'
+  // Arrow directions
+  | 'arrow-top-left'
+  | 'arrow-top-right'
+  | 'arrow-bottom-left'
+  | 'arrow-bottom-right'
   // Shapes & Grid
   | 'grid'
   | 'rectangle-outline'
+  | 'square-outline'
   | 'lightbulb-outline'
   | 'stop'
   // API & Network
@@ -186,6 +193,7 @@ export const IconMap = {
   
   // Display Tab
   brightness: 'brightness-6' as IconName,
+  brightnessAuto: 'brightness-auto' as IconName,
   screensaver: 'weather-night' as IconName,
   inactivityDelay: 'timer-sand' as IconName,
   motionDetection: 'motion-sensor' as IconName,

@@ -55,25 +55,40 @@ class SystemInfoModule(reactContext: ReactApplicationContext) : ReactContextBase
         val batteryInfo = Arguments.createMap()
 
         try {
-            val batteryStatus: Intent? = reactApplicationContext.registerReceiver(
-                null,
-                IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-            )
-
-            if (batteryStatus != null) {
-                val level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-                val scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-                val batteryPct = (level * 100 / scale.toFloat()).toInt()
-
-                val status = batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+            // Use BatteryManager for real-time battery status (API 21+)
+            // This ensures we always get fresh data, not cached broadcast
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                val batteryManager = reactApplicationContext.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+                
+                val batteryPct = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                val status = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_STATUS)
                 val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
                                 status == BatteryManager.BATTERY_STATUS_FULL
 
                 batteryInfo.putInt("level", batteryPct)
                 batteryInfo.putBoolean("isCharging", isCharging)
             } else {
-                batteryInfo.putInt("level", -1)
-                batteryInfo.putBoolean("isCharging", false)
+                // Fallback for older Android versions (< API 21)
+                val batteryStatus: Intent? = reactApplicationContext.registerReceiver(
+                    null,
+                    IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+                )
+
+                if (batteryStatus != null) {
+                    val level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                    val scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+                    val batteryPct = (level * 100 / scale.toFloat()).toInt()
+
+                    val status = batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+                    val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                                    status == BatteryManager.BATTERY_STATUS_FULL
+
+                    batteryInfo.putInt("level", batteryPct)
+                    batteryInfo.putBoolean("isCharging", isCharging)
+                } else {
+                    batteryInfo.putInt("level", -1)
+                    batteryInfo.putBoolean("isCharging", false)
+                }
             }
         } catch (e: Exception) {
             DebugLog.errorProduction("SystemInfo", "Battery error: ${e.message}")

@@ -29,6 +29,8 @@ export interface ApiCallbacks {
   onReboot?: () => void;
   onClearCache?: () => void;
   onRemoteKey?: (key: string) => void;
+  onAutoBrightnessEnable?: (min: number, max: number) => void;
+  onAutoBrightnessDisable?: () => void;
 }
 
 export interface AppStatus {
@@ -44,6 +46,9 @@ export interface AppStatus {
   rotationUrls?: string[];
   rotationInterval?: number;
   rotationCurrentIndex?: number;
+  autoBrightnessEnabled?: boolean;
+  autoBrightnessMin?: number;
+  autoBrightnessMax?: number;
 }
 
 class ApiServiceClass {
@@ -224,6 +229,20 @@ class ApiServiceClass {
         case 'remoteKey':
           if (this.callbacks.onRemoteKey && params.key) {
             this.callbacks.onRemoteKey(params.key);
+          }
+          break;
+          
+        case 'autoBrightnessEnable':
+          if (this.callbacks.onAutoBrightnessEnable) {
+            const min = params.min !== undefined ? params.min : 10;
+            const max = params.max !== undefined ? params.max : 100;
+            this.callbacks.onAutoBrightnessEnable(min, max);
+          }
+          break;
+          
+        case 'autoBrightnessDisable':
+          if (this.callbacks.onAutoBrightnessDisable) {
+            this.callbacks.onAutoBrightnessDisable();
           }
           break;
           

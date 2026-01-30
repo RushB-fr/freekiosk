@@ -88,6 +88,12 @@ adb shell am start -n com.freekiosk/.MainActivity [OPTIONS]
 | `--es auto_relaunch "true"` | String | - | Auto-relaunch if app crashes |
 | `--es status_bar "true"` | String | - | Show custom status bar |
 
+### Password Options
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `--es pin_mode "numeric"` | String | `numeric` | PIN input mode: `numeric` (4-6 digits) or `alphanumeric` (letters, numbers, special chars) |
+
 ### REST API Options
 
 | Parameter | Type | Description |

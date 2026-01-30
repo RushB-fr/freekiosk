@@ -11,7 +11,7 @@
   </p>
   
   <p>
-    <img src="https://img.shields.io/badge/Version-1.2.2-blue.svg" alt="Version 1.2.2">
+    <img src="https://img.shields.io/badge/Version-1.2.3-blue.svg" alt="Version 1.2.3">
     <a href="https://github.com/rushb-fr/freekiosk/releases"><img src="https://img.shields.io/github/downloads/rushb-fr/freekiosk/total.svg" alt="Downloads"></a>
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT">
     <img src="https://img.shields.io/badge/Android-8.0%2B-green.svg" alt="Android 8.0+">
@@ -51,7 +51,7 @@ FreeKiosk is a **completely free and open-source** kiosk mode application for An
 - **Optional Screen Pinning** - Choose between full lock or normal mode
 - **WebView Display** for any URL (dashboards, websites, etc.)
 - **HTTPS Support** - Including self-signed certificates
-- **PIN Code Protection** (4-6 digits)
+- **Password Protection** - Default: Numeric PIN (4-6 digits). Optional: Advanced mode with alphanumeric passwords (letters, numbers, special characters)
 - **Immersive Fullscreen** - No navigation/status bars
 - **Reset Settings** - Clear configuration from within the app
 - **Exit Kiosk Mode** with restrictions deactivation
@@ -260,7 +260,16 @@ Done! Your tablet is now in kiosk mode.
 
 ## 🗺️ Roadmap
 
-### ✅ v1.2.2 (Jan 2026) - Volume 5-Tap & Screen Control Fixes 🆕
+### ✅ v1.2.3 (Jan 2026) - Auto Brightness & Security Improvements 🆕
+- 📷 **Motion Detection Camera Selection**: Choose which camera to use for motion detection (front/back)
+- 🔘 **Flexible PIN Access Button**: Choose between fixed corner button or tap-anywhere mode for accessing settings
+- ⬅️ **WebView Back Button**: Optional back navigation button in WebView for easier browsing
+- ☀️ **Auto Brightness**: Automatic brightness adjustment based on ambient light sensor
+- 🔐 **Enhanced PIN System**: Improved PIN mode with advanced password option
+- 🔒 **REST API Key Security**: API key now stored in Android Keychain (encrypted) with automatic migration
+- 🔧 **Bug Fixes**: Fixed blocking overlay display issues and auto-update reliability
+
+### ✅ v1.2.2 (Jan 2026) - Volume 5-Tap & Screen Control Fixes
 - 🔊 **Volume 5-Tap Gesture**: Alternative to shake for accessing PIN screen
   - Press Volume Up/Down 5 times quickly to access settings
   - Works when volume is at max or min
@@ -367,9 +376,9 @@ Done! Your tablet is now in kiosk mode.
 
 ### v1.3.0 (Q1 2026)
 - [ ] 📷 Camera Photo API - Take photos via REST endpoint
-- [ ] 🔆 Auto-brightness - Adjust brightness based on light sensor
+- [X] 🔆 Auto-brightness - Adjust brightness based on light sensor
 - [ ] 📲 QR Code Config - Scan QR to configure app settings
-- [ ] 💾 Backup/Restore - Export and import configuration
+- [X] 💾 Backup/Restore - Export and import configuration
 - [ ] 🎤 Acoustic Wake - Voice detection to wake from screensaver
 - [ ] 🔔 Webhook Events - Send events (motion, tap, battery) to URL
 - [ ] 🎬 Media Player - Play videos, images, playlists (digital signage)

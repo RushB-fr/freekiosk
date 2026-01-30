@@ -50,6 +50,7 @@ Returns complete device status in one call.
     "device": { "model": "SM-T510", "manufacturer": "samsung", "android": "11" },
     "wifi": { "connected": true, "ssid": "Home", "rssi": -45, "ip": "192.168.1.50" },
     "sensors": { "light": 150.5, "proximity": 5, "accelerometer": {...} },
+    "autoBrightness": { "enabled": true, "min": 10, "max": 100, "currentLightLevel": 150.5 },
     "kiosk": { "enabled": true, "pinEnabled": true },
     "audio": { "volume": 50 },
     "storage": { "totalMB": 32000, "availableMB": 15000 },
@@ -178,9 +179,36 @@ Returns a PNG image of the current screen.
 ### Control Commands (POST)
 
 #### `POST /api/brightness`
-Set screen brightness.
+Set screen brightness (disables auto-brightness if enabled).
 ```json
 { "value": 75 }
+```
+
+#### `POST /api/autoBrightness/enable`
+Enable automatic brightness adjustment based on ambient light sensor.
+```json
+{ "min": 10, "max": 100 }
+```
+- `min`: Minimum brightness percentage (0-100, default: 10)
+- `max`: Maximum brightness percentage (0-100, default: 100)
+
+> 💡 Uses a logarithmic curve for natural perception. Brightness is calculated based on ambient light level (10-1000 lux range).
+
+#### `POST /api/autoBrightness/disable`
+Disable automatic brightness and restore previous manual brightness setting.
+
+#### `GET /api/autoBrightness`
+Get current auto-brightness status.
+```json
+{
+  "success": true,
+  "data": {
+    "enabled": true,
+    "min": 10,
+    "max": 100,
+    "currentLightLevel": 250.5
+  }
+}
 ```
 
 #### `POST /api/screen/on`

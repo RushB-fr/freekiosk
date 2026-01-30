@@ -7,6 +7,8 @@ const { KioskModule } = NativeModules;
 
 // Constants
 const PIN_SERVICE = 'freekiosk_pin';
+const API_KEY_SERVICE = 'freekiosk_api_key';
+const LEGACY_API_KEY = '@kiosk_rest_api_key'; // Legacy AsyncStorage key for migration
 const ATTEMPTS_KEY = '@kiosk_pin_attempts';
 const LOCKOUT_KEY = '@kiosk_pin_lockout';
 const DEFAULT_MAX_ATTEMPTS = 5;
@@ -503,5 +505,113 @@ async function clearLegacyPlaintextPin(): Promise<void> {
     await AsyncStorage.removeItem('@kiosk_pin');
   } catch (error) {
     console.error('[SecureStorage] Error clearing legacy PIN:', error);
+  }
+}
+
+// ============================================
+// REST API KEY SECURE STORAGE
+// ============================================
+
+/**
+ * Save REST API key securely in Keychain
+ * Migrates from AsyncStorage if exists (backward compatibility)
+ */
+export async function saveSecureApiKey(apiKey: string): Promise<boolean> {
+  try {
+    if (!apiKey || apiKey.trim() === '') {
+      // Empty key - remove from both storages
+      await clearSecureApiKey();
+      return true;
+    }
+
+    // Store in Keychain
+    await Keychain.setGenericPassword(
+      'api_key',
+      apiKey,
+      {
+        service: API_KEY_SERVICE,
+        accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED,
+      }
+    );
+
+    // Clear legacy storage if exists (migration cleanup)
+    await clearLegacyApiKey();
+
+    console.log('[SecureStorage] API key saved to Keychain');
+    return true;
+  } catch (error) {
+    console.error('[SecureStorage] Error saving API key:', error);
+    return false;
+  }
+}
+
+/**
+ * Get REST API key from secure storage
+ * Supports migration from legacy AsyncStorage (backward compatibility)
+ */
+export async function getSecureApiKey(): Promise<string> {
+  try {
+    // First, try to get from Keychain
+    const credentials = await Keychain.getGenericPassword({ service: API_KEY_SERVICE });
+
+    if (credentials && credentials.password) {
+      return credentials.password;
+    }
+
+    // If not in Keychain, check legacy AsyncStorage (migration)
+    const legacyKey = await checkLegacyApiKey();
+    if (legacyKey) {
+      console.log('[SecureStorage] Migrating API key from AsyncStorage to Keychain');
+      // Migrate to Keychain
+      await saveSecureApiKey(legacyKey);
+      // Return the migrated key
+      return legacyKey;
+    }
+
+    // No key found anywhere
+    return '';
+  } catch (error) {
+    console.error('[SecureStorage] Error getting API key:', error);
+    return '';
+  }
+}
+
+/**
+ * Clear REST API key from secure storage
+ */
+export async function clearSecureApiKey(): Promise<void> {
+  try {
+    await Keychain.resetGenericPassword({ service: API_KEY_SERVICE });
+    await clearLegacyApiKey();
+    console.log('[SecureStorage] API key cleared');
+  } catch (error) {
+    console.error('[SecureStorage] Error clearing API key:', error);
+  }
+}
+
+/**
+ * Check for legacy API key in AsyncStorage
+ */
+async function checkLegacyApiKey(): Promise<string | null> {
+  try {
+    const legacyKey = await AsyncStorage.getItem(LEGACY_API_KEY);
+    if (legacyKey && legacyKey !== '') {
+      return legacyKey;
+    }
+    return null;
+  } catch (error) {
+    console.error('[SecureStorage] Error checking legacy API key:', error);
+    return null;
+  }
+}
+
+/**
+ * Clear legacy API key from AsyncStorage
+ */
+async function clearLegacyApiKey(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(LEGACY_API_KEY);
+  } catch (error) {
+    console.error('[SecureStorage] Error clearing legacy API key:', error);
   }
 }

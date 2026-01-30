@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useImperativeHandle, forwardRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -23,25 +23,42 @@ interface WebViewComponentProps {
   url: string;
   autoReload: boolean;
   keyboardMode?: string; // 'default', 'force_numeric', 'smart'
-  onUserInteraction?: (event?: { isTap?: boolean }) => void; // callback optionnel pour interaction utilisateur
+  onUserInteraction?: (event?: { isTap?: boolean; x?: number; y?: number }) => void; // callback optionnel pour interaction utilisateur
   jsToExecute?: string; // JavaScript code to execute from API
   onJsExecuted?: () => void; // callback when JS is executed
+  showBackButton?: boolean; // Enable web navigation back button
+  onNavigationStateChange?: (canGoBack: boolean) => void; // Callback for web navigation state
 }
 
-const WebViewComponent: React.FC<WebViewComponentProps> = ({ 
+export interface WebViewComponentRef {
+  goBack: () => void;
+}
+
+const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(({ 
   url, 
   autoReload,
   keyboardMode = 'default',
   onUserInteraction,
   jsToExecute,
-  onJsExecuted
-}) => {
+  onJsExecuted,
+  showBackButton = false,
+  onNavigationStateChange
+}, ref) => {
   const navigation = useNavigation<NavigationProp>();
   const webViewRef = useRef<WebView>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<boolean>(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const loadingTimeoutRef = useRef<any>(null);
+
+  // Expose goBack method to parent via ref
+  useImperativeHandle(ref, () => ({
+    goBack: () => {
+      if (webViewRef.current) {
+        webViewRef.current.goBack();
+      }
+    }
+  }));
 
   React.useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -102,8 +119,16 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
     }
 
     // Tap detection for 5-tap - Use touchend on mobile (click doesn't always fire)
+    // Send coordinates for spatial proximity detection
     document.addEventListener('touchend', function(e) {
-      window.ReactNativeWebView.postMessage('FIVE_TAP_CLICK');
+      if (e.changedTouches && e.changedTouches.length > 0) {
+        var touch = e.changedTouches[0];
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'FIVE_TAP_CLICK',
+          x: touch.clientX,
+          y: touch.clientY
+        }));
+      }
     }, true);
     
     // Click handler for desktop/fallback - Also send user-interaction for screensaver reset
@@ -197,8 +222,18 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
     
     if (message === 'user-interaction' && onUserInteraction) {
       onUserInteraction();
+    } else if (message.startsWith('{') && onUserInteraction) {
+      // Parse JSON message (tap with coordinates)
+      try {
+        const data = JSON.parse(message);
+        if (data.type === 'FIVE_TAP_CLICK') {
+          onUserInteraction({ isTap: true, x: data.x, y: data.y });
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
     } else if (message === 'FIVE_TAP_CLICK' && onUserInteraction) {
-      // Dedicated tap event for 5-tap detection
+      // Legacy: Dedicated tap event for 5-tap detection (no coordinates)
       onUserInteraction({ isTap: true });
     }
   };
@@ -309,7 +344,7 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
 
             {/* Footer */}
             <Text style={styles.footerText}>
-              Version 1.2.2 • by Rushb
+              Version 1.2.3 • by Rushb
             </Text>
           </Animated.View>
         </ScrollView>
@@ -391,7 +426,10 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
         }}
 
         onNavigationStateChange={(navState) => {
-          // Navigation state tracking
+          // Track web navigation state (for back button)
+          if (showBackButton && onNavigationStateChange) {
+            onNavigationStateChange(navState.canGoBack);
+          }
         }}
 
         scalesPageToFit={true}
@@ -449,7 +487,7 @@ const WebViewComponent: React.FC<WebViewComponentProps> = ({
       )}
     </View>
   );
-};
+});
 
 
 const FeatureItem: React.FC<{ icon: string; text: string }> = ({ icon, text }) => (
@@ -656,5 +694,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold' 
   },
 });
+
+WebViewComponent.displayName = 'WebViewComponent';
 
 export default WebViewComponent;

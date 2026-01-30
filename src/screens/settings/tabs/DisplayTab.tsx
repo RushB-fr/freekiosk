@@ -22,6 +22,16 @@ interface DisplayTabProps {
   defaultBrightness: number;
   onDefaultBrightnessChange: (value: number) => void;
   
+  // Auto-brightness
+  autoBrightnessEnabled: boolean;
+  onAutoBrightnessEnabledChange: (value: boolean) => void;
+  autoBrightnessMin: number;
+  onAutoBrightnessMinChange: (value: number) => void;
+  autoBrightnessMax: number;
+  onAutoBrightnessMaxChange: (value: number) => void;
+  currentLightLevel: number;
+  hasLightSensor: boolean;
+  
   // Status bar
   statusBarEnabled: boolean;
   onStatusBarEnabledChange: (value: boolean) => void;
@@ -57,12 +67,23 @@ interface DisplayTabProps {
   // Motion detection
   motionEnabled: boolean;
   onMotionEnabledChange: (value: boolean) => void;
+  motionCameraPosition: 'front' | 'back';
+  onMotionCameraPositionChange: (value: 'front' | 'back') => void;
+  availableCameras: Array<{position: 'front' | 'back', id: string}>;
 }
 
 const DisplayTab: React.FC<DisplayTabProps> = ({
   displayMode,
   defaultBrightness,
   onDefaultBrightnessChange,
+  autoBrightnessEnabled,
+  onAutoBrightnessEnabledChange,
+  autoBrightnessMin,
+  onAutoBrightnessMinChange,
+  autoBrightnessMax,
+  onAutoBrightnessMaxChange,
+  currentLightLevel,
+  hasLightSensor,
   statusBarEnabled,
   onStatusBarEnabledChange,
   statusBarOnOverlay,
@@ -89,21 +110,111 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
   onInactivityDelayChange,
   motionEnabled,
   onMotionEnabledChange,
+  motionCameraPosition,
+  onMotionCameraPositionChange,
+  availableCameras,
 }) => {
+  const handleCameraPositionChange = (value: string) => {
+    if (value === 'front' || value === 'back') {
+      onMotionCameraPositionChange(value);
+    }
+  };
+
+  // Générer les options de caméra en fonction des caméras disponibles (dédupliquées par position)
+  const uniquePositions = Array.from(new Set(availableCameras.map(cam => cam.position)));
+  const cameraOptions = uniquePositions.map(position => ({
+    label: position === 'front' ? 'Front Camera' : 'Back Camera',
+    value: position,
+  }));
+
+  // Vérifier si la caméra sélectionnée est disponible
+  const selectedCameraAvailable = availableCameras.some(cam => cam.position === motionCameraPosition);
+
   return (
     <View>
       {/* Default Brightness - Only in WebView mode */}
       {displayMode === 'webview' && (
-        <SettingsSection title="Default Brightness" icon="brightness-6">
+        <SettingsSection title="Manual Brightness" icon="brightness-6">
           <SettingsSlider
             label=""
-            hint="Screen brightness level (0% - 100%)"
+            hint={autoBrightnessEnabled 
+              ? "Disabled while auto-brightness is active" 
+              : "Screen brightness level (0% - 100%)"}
             value={defaultBrightness}
             onValueChange={onDefaultBrightnessChange}
             minimumValue={0}
             maximumValue={1}
             step={0.01}
+            disabled={autoBrightnessEnabled}
           />
+          {autoBrightnessEnabled && (
+            <SettingsInfoBox variant="warning">
+              <Text style={styles.infoText}>
+                ⚠️ Manual brightness control is disabled while auto-brightness is active
+              </Text>
+            </SettingsInfoBox>
+          )}
+        </SettingsSection>
+      )}
+      
+      {/* Auto-Brightness - WebView only */}
+      {displayMode === 'webview' && (
+        <SettingsSection title="Auto-Brightness" icon="brightness-auto">
+          <SettingsSwitch
+            label="Enable Auto-Brightness"
+            hint="Automatically adjust screen brightness based on ambient light"
+            value={autoBrightnessEnabled}
+            onValueChange={onAutoBrightnessEnabledChange}
+            disabled={!hasLightSensor}
+          />
+          
+          {!hasLightSensor && (
+            <SettingsInfoBox variant="error">
+              <Text style={styles.infoText}>
+                ⚠️ Light sensor not available on this device
+              </Text>
+            </SettingsInfoBox>
+          )}
+          
+          {hasLightSensor && autoBrightnessEnabled && (
+            <>
+              <SettingsSlider
+                label="Minimum Brightness"
+                hint="Lowest brightness in dark conditions"
+                value={autoBrightnessMin}
+                onValueChange={onAutoBrightnessMinChange}
+                minimumValue={0}
+                maximumValue={1}
+                step={0.05}
+                presets={[
+                  { label: '5%', value: 0.05 },
+                  { label: '10%', value: 0.1 },
+                  { label: '20%', value: 0.2 },
+                ]}
+              />
+              
+              <SettingsSlider
+                label="Maximum Brightness"
+                hint="Highest brightness in bright conditions"
+                value={autoBrightnessMax}
+                onValueChange={onAutoBrightnessMaxChange}
+                minimumValue={0}
+                maximumValue={1}
+                step={0.05}
+                presets={[
+                  { label: '80%', value: 0.8 },
+                  { label: '90%', value: 0.9 },
+                  { label: '100%', value: 1.0 },
+                ]}
+              />
+              
+              <SettingsInfoBox variant="info">
+                <Text style={styles.infoText}>
+                  💡 Current Light Level: {currentLightLevel.toFixed(1)} lux
+                </Text>
+              </SettingsInfoBox>
+            </>
+          )}
         </SettingsSection>
       )}
       
@@ -166,11 +277,44 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                 />
                 
                 {motionEnabled && (
-                  <SettingsInfoBox variant="warning">
-                    <Text style={styles.infoText}>
-                      ⚠️ BETA Feature: Motion detection is experimental and may affect performance.
-                    </Text>
-                  </SettingsInfoBox>
+                  <>
+                    {availableCameras.length === 0 && (
+                      <SettingsInfoBox variant="error">
+                        <Text style={styles.infoText}>
+                          ⚠️ No camera detected on this device
+                        </Text>
+                      </SettingsInfoBox>
+                    )}
+                    
+                    {availableCameras.length === 1 && (
+                      <SettingsInfoBox variant="info">
+                        <Text style={styles.infoText}>
+                          📹 Using {availableCameras[0].position === 'front' ? 'Front' : 'Back'} Camera (only camera available)
+                        </Text>
+                      </SettingsInfoBox>
+                    )}
+                    
+                    {availableCameras.length > 1 && (
+                      <>
+                        <SettingsRadioGroup
+                          label="Camera Position"
+                          hint="Select which camera to use for motion detection"
+                          options={cameraOptions}
+                          value={motionCameraPosition}
+                          onValueChange={handleCameraPositionChange}
+                        />
+                        
+                        {!selectedCameraAvailable && (
+                          <SettingsInfoBox variant="warning">
+                            <Text style={styles.infoText}>
+                              ⚠️ Selected camera not available on this device
+                            </Text>
+                          </SettingsInfoBox>
+                        )}
+                      </>
+                    )}
+
+                  </>
                 )}
               </SettingsSection>
               

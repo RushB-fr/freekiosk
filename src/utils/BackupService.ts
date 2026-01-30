@@ -6,7 +6,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform, PermissionsAndroid, Alert } from 'react-native';
 import RNFS from 'react-native-fs';
-import { hasSecurePin } from './secureStorage';
+import { hasSecurePin, getSecureApiKey, saveSecureApiKey } from './secureStorage';
 
 // All storage keys to backup
 const BACKUP_KEYS = [
@@ -47,9 +47,15 @@ const BACKUP_KEYS = [
   '@kiosk_url_planner_events',
   '@kiosk_rest_api_enabled',
   '@kiosk_rest_api_port',
-  '@kiosk_rest_api_key',
+  // Note: @kiosk_rest_api_key is handled separately via Keychain (secure storage)
   '@kiosk_rest_api_allow_control',
   '@kiosk_allow_power_button',
+  // Auto-Brightness
+  '@kiosk_auto_brightness_enabled',
+  '@kiosk_auto_brightness_min',
+  '@kiosk_auto_brightness_max',
+  '@kiosk_auto_brightness_update_interval',
+  '@kiosk_auto_brightness_saved_manual',
   // Legacy keys
   '@screensaver_delay',
   '@motion_detection_enabled',
@@ -158,6 +164,16 @@ export async function exportBackup(): Promise<{ success: boolean; filePath?: str
       } catch (e) {
         console.warn(`Failed to read key ${key}:`, e);
       }
+    }
+
+    // Get API key from secure storage (Keychain)
+    try {
+      const apiKey = await getSecureApiKey();
+      if (apiKey) {
+        settings['@kiosk_rest_api_key'] = apiKey;
+      }
+    } catch (e) {
+      console.warn('Failed to read API key from secure storage:', e);
     }
 
     // Check if PIN is configured (but don't export the PIN itself for security)
@@ -277,7 +293,13 @@ export async function importBackup(filePath: string): Promise<{ success: boolean
       try {
         const value = backupData.settings[key];
         if (value !== null && value !== undefined) {
-          await AsyncStorage.setItem(key, value);
+          // Handle API key separately - save to secure storage (Keychain)
+          if (key === '@kiosk_rest_api_key') {
+            await saveSecureApiKey(value);
+            console.log('[BackupService] API key imported to secure storage');
+          } else {
+            await AsyncStorage.setItem(key, value);
+          }
         }
       } catch (e) {
         console.warn(`Failed to import key ${key}:`, e);

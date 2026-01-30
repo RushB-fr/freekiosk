@@ -14,6 +14,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ***
+## [1.2.3] - 2026-01-30
+
+### Added
+- 📷 **Motion Detection Camera Selection**: Choose which camera to use for motion detection (front/back)
+- 🔘 **Flexible Settings Access Button**: Choose between fixed corner button or tap-anywhere mode for accessing settings
+- ⬅️ **WebView Back Button**: Optional back navigation button in WebView for easier browsing
+- ☀️ **Auto Brightness**: Automatic brightness adjustment based on ambient light sensor
+  - Configurable min/max brightness range
+
+### Changed
+- 🔒 **REST API Key Security**: Migrated API key storage from AsyncStorage to Android Keychain (encrypted)
+  - Automatic migration from previous versions (backward compatible)
+  - Backup/restore fully supports secure API key storage
+- 🔐 **Password System**: Enhanced flexibility with optional advanced mode
+  - Default: Numeric PIN (4-6 digits) - simple and fast
+  - Optional: Advanced Password Mode - enable alphanumeric passwords with letters, numbers, and special characters
+  - Toggle in Settings > Password > "Advanced Password Mode"
+
+### Fixed
+- 🎨 **Blocking Overlay Display**: Fixed display issues with blocking overlays
+- 🔄 **Auto Update System**: Fixed auto-update reliability issues
+
+
+***
 ## [1.2.2] - 2026-01-21
 
 ### Changed
@@ -348,7 +372,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ✅ Optional screen pinning toggle (ON/OFF in settings)
 - ✅ WebView display for any URL
 - ✅ HTTPS self-signed certificate support
-- ✅ PIN code protection (4-6 digits configurable)
+- ✅ Password protection (4+ characters, alphanumeric support)
 - ✅ Reset settings button (clear all config from app)
 - ✅ Settings screen with URL and PIN configuration
 - ✅ Auto-start on device boot

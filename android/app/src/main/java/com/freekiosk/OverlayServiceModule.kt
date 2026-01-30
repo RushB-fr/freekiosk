@@ -20,7 +20,7 @@ class OverlayServiceModule(reactContext: ReactApplicationContext) :
     override fun getName(): String = NAME
 
     @ReactMethod
-    fun startOverlayService(tapCount: Int, promise: Promise) {
+    fun startOverlayService(tapCount: Int, tapTimeout: Int, returnMode: String, buttonPosition: String, promise: Promise) {
         try {
             // Démarrer le service même sans permission overlay
             // Le service peut toujours fonctionner en arrière-plan (timer test mode, retour auto)
@@ -32,9 +32,12 @@ class OverlayServiceModule(reactContext: ReactApplicationContext) :
             }
 
             val serviceIntent = Intent(reactApplicationContext, OverlayService::class.java)
-            serviceIntent.putExtra("REQUIRED_TAPS", tapCount.coerceIn(2, 10))
+            serviceIntent.putExtra("REQUIRED_TAPS", tapCount.coerceIn(2, 20))
+            serviceIntent.putExtra("TAP_TIMEOUT", tapTimeout.coerceIn(500, 5000).toLong())
+            serviceIntent.putExtra("RETURN_MODE", returnMode)
+            serviceIntent.putExtra("BUTTON_POSITION", buttonPosition)
             reactApplicationContext.startService(serviceIntent)
-            DebugLog.d("OverlayServiceModule", "Started OverlayService with tapCount=$tapCount")
+            DebugLog.d("OverlayServiceModule", "Started OverlayService with tapCount=$tapCount, tapTimeout=${tapTimeout}ms, mode=$returnMode, position=$buttonPosition")
             promise.resolve(true)
         } catch (e: Exception) {
             DebugLog.errorProduction("OverlayServiceModule", "Error starting OverlayService: ${e.message}")

@@ -29,12 +29,18 @@ interface SecurityTabProps {
   onAllowPowerButtonChange: (value: boolean) => void;
   
   // Return to Settings
+  returnMode: string; // 'tap_anywhere' | 'button'
+  onReturnModeChange: (value: string) => void;
   returnTapCount: string;
   onReturnTapCountChange: (value: string) => void;
-  volumeUp5TapEnabled: boolean;
-  onVolumeUp5TapEnabledChange: (value: boolean) => void;
+  returnTapTimeout: string;
+  onReturnTapTimeoutChange: (value: string) => void;
+  returnButtonPosition: string; // 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+  onReturnButtonPositionChange: (value: string) => void;
   overlayButtonVisible: boolean;
   onOverlayButtonVisibleChange: (value: boolean) => void;
+  volumeUp5TapEnabled: boolean;
+  onVolumeUp5TapEnabledChange: (value: boolean) => void;
   
   // Auto launch
   autoLaunchEnabled: boolean;
@@ -57,12 +63,18 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
   onKioskEnabledChange,
   allowPowerButton,
   onAllowPowerButtonChange,
+  returnMode,
+  onReturnModeChange,
   returnTapCount,
   onReturnTapCountChange,
-  volumeUp5TapEnabled,
-  onVolumeUp5TapEnabledChange,
+  returnTapTimeout,
+  onReturnTapTimeoutChange,
+  returnButtonPosition,
+  onReturnButtonPositionChange,
   overlayButtonVisible,
   onOverlayButtonVisibleChange,
+  volumeUp5TapEnabled,
+  onVolumeUp5TapEnabledChange,
   autoLaunchEnabled,
   onAutoLaunchChange,
   autoRelaunchApp,
@@ -162,9 +174,30 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
       
       {/* Return to Settings */}
       <SettingsSection title="Return to Settings" icon="gesture-tap">
+        <SettingsRadioGroup
+          hint="Choose how to return to settings"
+          options={[
+            {
+              value: 'tap_anywhere',
+              label: 'Tap Anywhere',
+              icon: 'gesture-tap',
+              hint: 'Tap N times anywhere on screen',
+            },
+            {
+              value: 'button',
+              label: 'Fixed Button',
+              icon: 'square-outline',
+              hint: 'Tap N times on a corner button',
+            },
+          ]}
+          value={returnMode}
+          onValueChange={onReturnModeChange}
+        />
+        <View style={styles.divider} />
+        
         <SettingsInput
-          label="Number of Screen Taps (2-10)"
-          hint="Tap anywhere on screen this many times rapidly to access settings"
+          label="Number of Taps (2-20)"
+          hint={returnMode === 'button' ? 'Tap this many times to access settings' : 'Tap anywhere on screen this many times rapidly to access settings'}
           value={returnTapCount}
           onChangeText={(text) => {
             const filtered = text.replace(/[^0-9]/g, '');
@@ -173,15 +206,52 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
           keyboardType="numeric"
           placeholder="5"
           maxLength={2}
-          error={returnTapCount !== '' && (parseInt(returnTapCount, 10) < 2 || parseInt(returnTapCount, 10) > 10) ? 'Must be between 2 and 10' : undefined}
+          error={returnTapCount !== '' && (parseInt(returnTapCount, 10) < 2 || parseInt(returnTapCount, 10) > 20) ? 'Must be between 2 and 20' : undefined}
         />
         
-        <SettingsSwitch
-          label="👁️ Show Visual Indicator"
-          hint="Display a small visual indicator (bottom-right). Taps work anywhere regardless of this setting."
-          value={overlayButtonVisible}
-          onValueChange={onOverlayButtonVisibleChange}
+        <SettingsInput
+          label="Detection Timeout (500-5000 ms)"
+          hint="Time window to complete all taps. Higher values make detection easier but may trigger accidentally."
+          value={returnTapTimeout}
+          onChangeText={(text) => {
+            const filtered = text.replace(/[^0-9]/g, '');
+            onReturnTapTimeoutChange(filtered);
+          }}
+          keyboardType="numeric"
+          placeholder="1500"
+          maxLength={4}
+          error={returnTapTimeout !== '' && (parseInt(returnTapTimeout, 10) < 500 || parseInt(returnTapTimeout, 10) > 5000) ? 'Must be between 500 and 5000' : undefined}
         />
+        
+        {returnMode === 'button' && (
+          <>
+            <View style={styles.divider} />
+            {displayMode === 'external_app' && (
+              <>
+                <SettingsRadioGroup
+                  hint="Button position on screen"
+                  options={[
+                    { value: 'top-left', label: 'Top Left', icon: 'arrow-top-left' },
+                    { value: 'top-right', label: 'Top Right', icon: 'arrow-top-right' },
+                    { value: 'bottom-left', label: 'Bottom Left', icon: 'arrow-bottom-left' },
+                    { value: 'bottom-right', label: 'Bottom Right', icon: 'arrow-bottom-right' },
+                  ]}
+                  value={returnButtonPosition}
+                  onValueChange={onReturnButtonPositionChange}
+                />
+                <View style={styles.divider} />
+              </>
+            )}
+            <SettingsSwitch
+              label="👁️ Show Button"
+              hint={displayMode === 'external_app' 
+                ? "Make the return button visible. When hidden, it's still active but invisible." 
+                : "Show a visual button indicator"}
+              value={overlayButtonVisible}
+              onValueChange={onOverlayButtonVisibleChange}
+            />
+          </>
+        )}
         
         {displayMode === 'webview' && (
           <>
@@ -197,12 +267,15 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
         
         <SettingsInfoBox variant="info">
           <Text style={styles.infoText}>
-            ℹ️ Tap anywhere on screen {returnTapCount || '5'} times rapidly to access settings{kioskEnabled && ' (PIN required)'}
+            ℹ️ {returnMode === 'button' && displayMode === 'external_app' 
+              ? `Tap the return button (${returnButtonPosition}) ${returnTapCount || '5'} times to access settings`
+              : `Tap anywhere on screen ${returnTapCount || '5'} times within ${returnTapTimeout ? `${(parseInt(returnTapTimeout, 10) / 1000).toFixed(1)}s` : '1.5s'} to access settings`}
+            {kioskEnabled && ' (PIN required)'}
           </Text>
         </SettingsInfoBox>
       </SettingsSection>
       
-      {/* Touch Blocking Overlays - Requires Lock Mode + Device Owner for security */}
+      {/* Touch Blocking Overlays - Works without Device Owner but less secure */}
       <SettingsSection title="Touch Blocking" icon="gesture-tap-button">
         <SettingsInfoBox variant="info">
           <Text style={styles.infoText}>
@@ -213,7 +286,7 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
         {(!kioskEnabled || !isDeviceOwner) && (
           <SettingsInfoBox variant="warning">
             <Text style={styles.infoText}>
-              ⚠️ Requires Lock Mode enabled AND Device Owner privileges for security reasons. Blocking overlays will only be active when both conditions are met.
+              ⚠️ Without Lock Mode + Device Owner, users can still exit the app via Home/Back buttons. For maximum security, enable both.
             </Text>
           </SettingsInfoBox>
         )}
@@ -221,14 +294,14 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
         <SettingsButton
           title="Configure Blocking Overlays"
           icon="rectangle-outline"
-          variant={kioskEnabled && isDeviceOwner ? "primary" : "secondary"}
+          variant="primary"
           onPress={() => navigation?.navigate('BlockingOverlays')}
         />
         
         {kioskEnabled && isDeviceOwner && (
           <SettingsInfoBox variant="success">
             <Text style={styles.infoText}>
-              ✅ Lock Mode + Device Owner active. Blocking overlays will work.
+              ✅ Lock Mode + Device Owner active. Maximum security enabled.
             </Text>
           </SettingsInfoBox>
         )}
@@ -298,7 +371,9 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
       <SettingsSection variant="info">
         <Text style={styles.infoTitle}>ℹ️ Return to Settings</Text>
         <Text style={styles.infoText}>
-          • Tap {returnTapCount || '5'} times anywhere on the screen {overlayButtonVisible && '(visual indicator in bottom-right)'}
+          {displayMode === 'external_app' && returnMode === 'button'
+            ? `• Tap the return button (${returnButtonPosition}) ${returnTapCount || '5'} times${overlayButtonVisible ? '' : ' (invisible)'}`
+            : `• Tap ${returnTapCount || '5'} times anywhere on the screen within ${returnTapTimeout ? `${(parseInt(returnTapTimeout, 10) / 1000).toFixed(1)}s` : '1.5s'}${overlayButtonVisible ? ' (visual indicator visible)' : ''}`}
           {displayMode === 'external_app' && '\n• Or use the recent apps selector'}
           {displayMode === 'webview' && volumeUp5TapEnabled && `\n• Or press Volume Up/Down ${returnTapCount || '5'} times rapidly`}
         </Text>

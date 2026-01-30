@@ -43,9 +43,12 @@ interface GeneralTabProps {
   pin: string;
   onPinChange: (pin: string) => void;
   isPinConfigured: boolean;
+  pinModeChanged: boolean;
   pinMaxAttemptsText: string;
   onPinMaxAttemptsChange: (text: string) => void;
   onPinMaxAttemptsBlur: () => void;
+  pinMode: 'numeric' | 'alphanumeric';
+  onPinModeChange: (mode: 'numeric' | 'alphanumeric') => void;
   
   // Auto reload (webview only)
   autoReload: boolean;
@@ -68,6 +71,15 @@ interface GeneralTabProps {
   onAddOneTimeEvent: () => void;
   onEditEvent: (event: ScheduledEvent) => void;
   
+  // WebView Back Button (webview only)
+  webViewBackButtonEnabled: boolean;
+  onWebViewBackButtonEnabledChange: (value: boolean) => void;
+  webViewBackButtonXPercent: string;
+  onWebViewBackButtonXPercentChange: (value: string) => void;
+  webViewBackButtonYPercent: string;
+  onWebViewBackButtonYPercentChange: (value: string) => void;
+  onResetWebViewBackButtonPosition: () => void;
+  
   // Navigation
   onBackToKiosk: () => void;
 }
@@ -87,9 +99,12 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
   pin,
   onPinChange,
   isPinConfigured,
+  pinModeChanged,
   pinMaxAttemptsText,
   onPinMaxAttemptsChange,
   onPinMaxAttemptsBlur,
+  pinMode,
+  onPinModeChange,
   autoReload,
   onAutoReloadChange,
   urlRotationEnabled,
@@ -105,6 +120,13 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
   onAddRecurringEvent,
   onAddOneTimeEvent,
   onEditEvent,
+  webViewBackButtonEnabled,
+  onWebViewBackButtonEnabledChange,
+  webViewBackButtonXPercent,
+  onWebViewBackButtonXPercentChange,
+  webViewBackButtonYPercent,
+  onWebViewBackButtonYPercentChange,
+  onResetWebViewBackButtonPosition,
   onBackToKiosk,
 }) => {
   return (
@@ -320,19 +342,32 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
         </>
       )}
       
-      {/* PIN Configuration */}
-      <SettingsSection title="PIN Code" icon="pin">
+      {/* Password Configuration */}
+      <SettingsSection title="Password" icon="pin">
+        <SettingsSwitch
+          label="Advanced Password Mode"
+          hint="Enable alphanumeric passwords with special characters. Disable for numeric PIN only (4-6 digits)."
+          value={pinMode === 'alphanumeric'}
+          onValueChange={(enabled) => onPinModeChange(enabled ? 'alphanumeric' : 'numeric')}
+        />
+        
         <SettingsInput
           label=""
           value={pin}
           onChangeText={onPinChange}
-          placeholder={isPinConfigured ? '••••' : '1234'}
-          keyboardType="numeric"
+          placeholder={isPinConfigured && !pinModeChanged ? '••••' : '1234'}
+          keyboardType={pinMode === 'alphanumeric' ? 'default' : 'numeric'}
           secureTextEntry
-          maxLength={6}
-          hint={isPinConfigured
-            ? '✓ PIN configured - Leave empty to keep current PIN'
-            : 'Minimum 4 digits (default: 1234)'}
+          maxLength={pinMode === 'alphanumeric' ? undefined : 6}
+          autoCapitalize={pinMode === 'alphanumeric' ? 'none' : undefined}
+          error={pinModeChanged && !pin ? '⚠️ New password required after mode change' : undefined}
+          hint={pinModeChanged
+            ? '⚠️ Mode changed - You MUST enter a new password'
+            : isPinConfigured
+              ? '✓ Password configured - Leave empty to keep current password'
+              : pinMode === 'alphanumeric'
+                ? 'Minimum 4 characters. Can include letters, numbers, and special characters.'
+                : 'Numeric PIN: 4-6 digits (default: 1234)'}
         />
         
         <View style={styles.pinAttemptsContainer}>
@@ -344,7 +379,7 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
             keyboardType="numeric"
             maxLength={3}
             placeholder="5"
-            hint="Number of incorrect attempts allowed (1-100)"
+            hint="Number of incorrect password attempts allowed (1-100)"
           />
         </View>
       </SettingsSection>
@@ -358,6 +393,57 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
             value={autoReload}
             onValueChange={onAutoReloadChange}
           />
+        </SettingsSection>
+      )}
+      
+      {/* WebView Back Button - WebView only */}
+      {displayMode === 'webview' && (
+        <SettingsSection title="Web Navigation Button" icon="arrow-left-circle">
+          <SettingsSwitch
+            label="Enable Back Button"
+            hint="Show a floating button to navigate back in web history (NOT app navigation)"
+            value={webViewBackButtonEnabled}
+            onValueChange={onWebViewBackButtonEnabledChange}
+          />
+          
+          {webViewBackButtonEnabled && (
+            <>
+              <View style={styles.rotationSpacer} />
+              <SettingsInfoBox variant="info">
+                <Text style={styles.infoText}>
+                  ℹ️ This button only navigates within the web page history.{`
+`}
+                  It will NOT exit the kiosk mode or return to settings.
+                </Text>
+              </SettingsInfoBox>
+              
+              <View style={styles.rotationSpacer} />
+              <SettingsInput
+                label="Position X (%)"
+                value={webViewBackButtonXPercent}
+                onChangeText={onWebViewBackButtonXPercentChange}
+                placeholder="2"
+                keyboardType="numeric"
+                hint="Horizontal position: 0% (left) to 100% (right)"
+              />
+              
+              <SettingsInput
+                label="Position Y (%)"
+                value={webViewBackButtonYPercent}
+                onChangeText={onWebViewBackButtonYPercentChange}
+                placeholder="10"
+                keyboardType="numeric"
+                hint="Vertical position: 0% (top) to 100% (bottom)"
+              />
+              
+              <SettingsButton
+                title="Reset to Default Position"
+                icon="restore"
+                variant="outline"
+                onPress={onResetWebViewBackButtonPosition}
+              />
+            </>
+          )}
         </SettingsSection>
       )}
       

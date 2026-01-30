@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, NativeModules } from 'react-native';
 import PinInput from '../components/PinInput';
 import { StorageService } from '../utils/storage';
 import { migrateOldPin, hasSecurePin } from '../utils/secureStorage';
@@ -63,9 +63,20 @@ const PinScreen: React.FC<PinScreenProps> = ({ navigation }) => {
   };
 
   const handleBack = async (): Promise<void> => {
-    // If in external app mode, relaunch the external app
+    // If in external app mode, relaunch the external app with overlay service
     if (displayMode === 'external_app' && externalAppPackage) {
       try {
+        // Load return settings
+        const returnTapCount = await StorageService.getReturnTapCount();
+        const returnTapTimeout = await StorageService.getReturnTapTimeout();
+        const returnMode = await StorageService.getReturnMode();
+        const returnButtonPosition = await StorageService.getReturnButtonPosition();
+        
+        // Start OverlayService BEFORE launching the external app
+        const { OverlayServiceModule } = NativeModules;
+        await OverlayServiceModule.startOverlayService(returnTapCount, returnTapTimeout, returnMode, returnButtonPosition);
+        console.log('[PinScreen] OverlayService started');
+        
         await AppLauncherModule.launchExternalApp(externalAppPackage);
       } catch (error) {
         console.error('[PinScreen] Failed to relaunch external app:', error);

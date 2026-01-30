@@ -63,7 +63,7 @@ class VolumeChangeReceiver : BroadcastReceiver() {
         
         // Get required tap count from storage (default 5)
         val requiredTaps = try {
-            getAsyncStorageValue(context, "@kiosk_return_tap_count", "5").toInt().coerceIn(2, 10)
+            getAsyncStorageValue(context, "@kiosk_return_tap_count", "5").toInt().coerceIn(2, 20)
         } catch (e: Exception) {
             5
         }

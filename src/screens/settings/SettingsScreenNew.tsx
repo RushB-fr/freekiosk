@@ -25,6 +25,7 @@ import AppLauncherModule, { AppInfo } from '../../utils/AppLauncherModule';
 import OverlayPermissionModule from '../../utils/OverlayPermissionModule';
 import LauncherModule from '../../utils/LauncherModule';
 import UpdateModule from '../../utils/UpdateModule';
+import AutoBrightnessModule from '../../utils/AutoBrightnessModule';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/AppNavigator';
 
@@ -66,6 +67,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [url, setUrl] = useState<string>('');
   const [pin, setPin] = useState<string>('');
   const [isPinConfigured, setIsPinConfigured] = useState<boolean>(false);
+  const [pinMode, setPinMode] = useState<'numeric' | 'alphanumeric'>('numeric');
+  const [initialPinMode, setInitialPinMode] = useState<'numeric' | 'alphanumeric'>('numeric');
+  const [pinModeChanged, setPinModeChanged] = useState<boolean>(false);
   const [pinMaxAttempts, setPinMaxAttempts] = useState<number>(5);
   const [pinMaxAttemptsText, setPinMaxAttemptsText] = useState<string>('5');
   const [autoReload, setAutoReload] = useState<boolean>(false);
@@ -74,6 +78,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [screensaverEnabled, setScreensaverEnabled] = useState<boolean>(false);
   const [inactivityDelay, setInactivityDelay] = useState<string>('10');
   const [motionEnabled, setMotionEnabled] = useState<boolean>(false);
+  const [motionCameraPosition, setMotionCameraPosition] = useState<'front' | 'back'>('front');
+  const [availableCameras, setAvailableCameras] = useState<Array<{position: 'front' | 'back', id: string}>>([]);
   const [screensaverBrightness, setScreensaverBrightness] = useState<number>(0);
   const [defaultBrightness, setDefaultBrightness] = useState<number>(0.5);
   const [certificates, setCertificates] = useState<CertificateInfo[]>([]);
@@ -100,7 +106,10 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [showTime, setShowTime] = useState<boolean>(true);
   const [keyboardMode, setKeyboardMode] = useState<string>('default');
   const [allowPowerButton, setAllowPowerButton] = useState<boolean>(false);
+  const [returnMode, setReturnMode] = useState<string>('tap_anywhere');
   const [returnTapCount, setReturnTapCount] = useState<string>('5');
+  const [returnTapTimeout, setReturnTapTimeout] = useState<string>('1500');
+  const [returnButtonPosition, setReturnButtonPosition] = useState<string>('bottom-right');
   const [volumeUp5TapEnabled, setVolumeUp5TapEnabled] = useState<boolean>(true);
   
   // URL Rotation states
@@ -115,6 +124,18 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [showOneTimeEditor, setShowOneTimeEditor] = useState<boolean>(false);
   const [editingEvent, setEditingEvent] = useState<any | null>(null);
   
+  // WebView Back Button states
+  const [webViewBackButtonEnabled, setWebViewBackButtonEnabled] = useState<boolean>(false);
+  const [webViewBackButtonXPercent, setWebViewBackButtonXPercent] = useState<string>('2');
+  const [webViewBackButtonYPercent, setWebViewBackButtonYPercent] = useState<string>('10');
+  
+  // Auto-Brightness states
+  const [autoBrightnessEnabled, setAutoBrightnessEnabled] = useState<boolean>(false);
+  const [autoBrightnessMin, setAutoBrightnessMin] = useState<number>(0.1);
+  const [autoBrightnessMax, setAutoBrightnessMax] = useState<number>(1.0);
+  const [currentLightLevel, setCurrentLightLevel] = useState<number>(0);
+  const [hasLightSensor, setHasLightSensor] = useState<boolean>(true);
+  
   // Update states
   const [checkingUpdate, setCheckingUpdate] = useState<boolean>(false);
   const [updateAvailable, setUpdateAvailable] = useState<boolean>(false);
@@ -128,9 +149,26 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     checkOverlayPermission();
     checkDeviceOwner();
     loadCurrentVersion();
+    checkLightSensor();
   }, []);
 
   // ============ LOAD FUNCTIONS ============
+  
+  const checkLightSensor = async () => {
+    try {
+      const sensorAvailable = await AutoBrightnessModule.hasLightSensor();
+      setHasLightSensor(sensorAvailable);
+      
+      // Get current light level for display
+      if (sensorAvailable) {
+        const lightInfo = await AutoBrightnessModule.getCurrentLightLevel();
+        setCurrentLightLevel(lightInfo.lux);
+      }
+    } catch (error) {
+      console.error('[Settings] Error checking light sensor:', error);
+      setHasLightSensor(false);
+    }
+  };
   
   const loadCurrentVersion = async () => {
     try {
@@ -168,6 +206,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedDefaultBrightness = await StorageService.getDefaultBrightness();
     const savedInactivityDelay = await StorageService.getScreensaverInactivityDelay();
     const savedMotionEnabled = await StorageService.getScreensaverMotionEnabled();
+    const savedMotionCameraPosition = await StorageService.getMotionCameraPosition();
     const savedScreensaverBrightness = await StorageService.getScreensaverBrightness();
     const hasPinConfigured = await hasSecurePin();
     
@@ -181,7 +220,21 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setScreensaverEnabled(savedScreensaverEnabled ?? false);
     setDefaultBrightness(savedDefaultBrightness ?? 0.5);
     setMotionEnabled(savedMotionEnabled ?? false);
+    setMotionCameraPosition(savedMotionCameraPosition ?? 'front');
     setScreensaverBrightness(savedScreensaverBrightness ?? 0);
+
+    // Detect available cameras
+    try {
+      const devices = await Camera.getAvailableCameraDevices();
+      const cameras = devices
+        .filter(d => d.position === 'front' || d.position === 'back')
+        .map(d => ({ position: d.position as 'front' | 'back', id: d.id }));
+      setAvailableCameras(cameras);
+      console.log('[Settings] Available cameras:', cameras);
+    } catch (error) {
+      console.error('[Settings] Error detecting cameras:', error);
+      setAvailableCameras([]);
+    }
 
     if (savedInactivityDelay && !isNaN(savedInactivityDelay)) {
       setInactivityDelay(String(Math.floor(savedInactivityDelay / 60000)));
@@ -207,7 +260,10 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedBackButtonTimerDelay = await StorageService.getBackButtonTimerDelay();
     const savedKeyboardMode = await StorageService.getKeyboardMode();
     const savedAllowPowerButton = await StorageService.getAllowPowerButton();
+    const savedReturnMode = await StorageService.getReturnMode();
     const savedReturnTapCount = await StorageService.getReturnTapCount();
+    const savedReturnTapTimeout = await StorageService.getReturnTapTimeout();
+    const savedReturnButtonPosition = await StorageService.getReturnButtonPosition();
     const savedVolumeUp5TapEnabled = await StorageService.getVolumeUp5TapEnabled();
     
     // URL Rotation settings
@@ -219,12 +275,26 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedUrlPlannerEnabled = await StorageService.getUrlPlannerEnabled();
     const savedUrlPlannerEvents = await StorageService.getUrlPlannerEvents();
 
+    // WebView Back Button settings
+    const savedWebViewBackButtonEnabled = await StorageService.getWebViewBackButtonEnabled();
+    const savedWebViewBackButtonXPercent = await StorageService.getWebViewBackButtonXPercent();
+    const savedWebViewBackButtonYPercent = await StorageService.getWebViewBackButtonYPercent();
+    
+    // Auto-Brightness settings
+    const savedAutoBrightnessEnabled = await StorageService.getAutoBrightnessEnabled();
+    const savedAutoBrightnessMin = await StorageService.getAutoBrightnessMin();
+    const savedAutoBrightnessMax = await StorageService.getAutoBrightnessMax();
+
     setDisplayMode(savedDisplayMode);
     setExternalAppPackage(savedExternalAppPackage ?? '');
     setAutoRelaunchApp(savedAutoRelaunchApp);
     setOverlayButtonVisible(savedOverlayButtonVisible);
     setPinMaxAttempts(savedPinMaxAttempts);
     setPinMaxAttemptsText(String(savedPinMaxAttempts));
+    const savedPinMode = await StorageService.getPinMode();
+    setPinMode(savedPinMode);
+    setInitialPinMode(savedPinMode);
+    setPinModeChanged(false);
     setStatusBarEnabled(savedStatusBarEnabled);
     setStatusBarOnOverlay(savedStatusBarOnOverlay);
     setStatusBarOnReturn(savedStatusBarOnReturn);
@@ -237,13 +307,22 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setBackButtonTimerDelay(String(savedBackButtonTimerDelay));
     setKeyboardMode(savedKeyboardMode);
     setAllowPowerButton(savedAllowPowerButton);
+    setReturnMode(savedReturnMode);
     setReturnTapCount(String(savedReturnTapCount));
+    setReturnTapTimeout(String(savedReturnTapTimeout));
+    setReturnButtonPosition(savedReturnButtonPosition);
     setVolumeUp5TapEnabled(savedVolumeUp5TapEnabled);
     setUrlRotationEnabled(savedUrlRotationEnabled);
     setUrlRotationList(savedUrlRotationList);
     setUrlRotationInterval(String(savedUrlRotationInterval));
     setUrlPlannerEnabled(savedUrlPlannerEnabled);
     setUrlPlannerEvents(savedUrlPlannerEvents);
+    setWebViewBackButtonEnabled(savedWebViewBackButtonEnabled);
+    setWebViewBackButtonXPercent(String(savedWebViewBackButtonXPercent));
+    setWebViewBackButtonYPercent(String(savedWebViewBackButtonYPercent));
+    setAutoBrightnessEnabled(savedAutoBrightnessEnabled);
+    setAutoBrightnessMin(savedAutoBrightnessMin);
+    setAutoBrightnessMax(savedAutoBrightnessMax);
   };
 
   const loadCertificates = async (): Promise<void> => {
@@ -307,6 +386,16 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
 
   const toggleMotionDetection = async (value: boolean) => {
     if (value) {
+      // Check if cameras are available (use already detected list)
+      if (availableCameras.length === 0) {
+        Alert.alert(
+          'No Camera Available',
+          'Your device does not have any cameras available. This could be because:\n\n• Cameras are disabled in your ROM/system\n• Hardware issue\n\nYou can use the REST API with an external motion sensor instead.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
       const permission = await Camera.requestCameraPermission();
       if (permission === 'denied') {
         Alert.alert(
@@ -325,6 +414,11 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     } else {
       setMotionEnabled(false);
     }
+  };
+
+  const handleMotionCameraPositionChange = async (value: 'front' | 'back') => {
+    setMotionCameraPosition(value);
+    await StorageService.saveMotionCameraPosition(value);
   };
 
   const handleOverlayButtonVisibleChange = async (value: boolean) => {
@@ -364,7 +458,42 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     }
   };
 
+  // Handle auto-brightness toggle with save/restore of manual brightness
+  const handleAutoBrightnessToggle = async (enabled: boolean) => {
+    if (enabled) {
+      // Save current manual brightness before enabling auto
+      await StorageService.saveAutoBrightnessSavedManual(defaultBrightness);
+      setAutoBrightnessEnabled(true);
+    } else {
+      // Restore saved manual brightness when disabling auto
+      setAutoBrightnessEnabled(false);
+      const savedManual = await StorageService.getAutoBrightnessSavedManual();
+      if (savedManual !== null) {
+        setDefaultBrightness(savedManual);
+      }
+    }
+  };
+
   // ============ UPDATE FUNCTIONS ============
+
+  /**
+   * Compare semantic versions (e.g., "1.1.4" vs "1.2.2")
+   * Returns: 1 if v1 > v2, -1 if v1 < v2, 0 if equal
+   */
+  const compareVersions = (v1: string, v2: string): number => {
+    const parts1 = v1.split('.').map(Number);
+    const parts2 = v2.split('.').map(Number);
+    
+    for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+      const num1 = parts1[i] || 0;
+      const num2 = parts2[i] || 0;
+      
+      if (num1 > num2) return 1;
+      if (num1 < num2) return -1;
+    }
+    
+    return 0;
+  };
 
   const handleCheckForUpdates = async () => {
     setCheckingUpdate(true);
@@ -377,7 +506,13 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       const currentVer = currentVersionInfo.versionName;
       const latestVer = latestUpdate.version;
       
-      if (latestVer !== currentVer) {
+      console.log(`Version comparison: current=${currentVer}, latest=${latestVer}`);
+      
+      // Use semantic version comparison instead of simple string equality
+      const versionComparison = compareVersions(latestVer, currentVer);
+      
+      if (versionComparison > 0) {
+        // Latest version is newer than current
         setUpdateAvailable(true);
         setUpdateInfo(latestUpdate);
         Alert.alert(
@@ -472,11 +607,27 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     }
 
     // PIN validation
-    if (pin && pin.length > 0 && pin.length < 4) {
-      Alert.alert('Error', 'PIN code must contain at least 4 digits');
+    // If mode changed, a new password is REQUIRED
+    if (pinModeChanged && !pin) {
+      Alert.alert('Error', 'Password mode changed - you must enter a new password');
       return;
+    }
+    
+    if (pin && pin.length > 0) {
+      if (pin.length < 4) {
+        Alert.alert('Error', 'Password must be at least 4 characters');
+        return;
+      }
+      if (pinMode === 'numeric' && !/^\d+$/.test(pin)) {
+        Alert.alert('Error', 'In numeric PIN mode, only digits (0-9) are allowed. Enable "Advanced Password Mode" to use letters and special characters.');
+        return;
+      }
+      if (pinMode === 'numeric' && pin.length > 6) {
+        Alert.alert('Error', 'Numeric PIN must be 4-6 digits. Enable "Advanced Password Mode" for longer passwords.');
+        return;
+      }
     } else if (!isPinConfigured && !pin) {
-      Alert.alert('Error', 'Please enter a PIN code');
+      Alert.alert('Error', 'Please enter a password');
       return;
     }
 
@@ -504,9 +655,13 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       await saveSecurePin(pin);
       await StorageService.savePin('');
       setIsPinConfigured(true);
+      // Reset mode change tracking after successful password save
+      setInitialPinMode(pinMode);
+      setPinModeChanged(false);
     }
 
     await StorageService.savePinMaxAttempts(pinMaxAttemptsNumber);
+    await StorageService.savePinMode(pinMode);
 
     if (displayMode === 'webview') {
       await StorageService.saveAutoReload(autoReload);
@@ -517,10 +672,16 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       await StorageService.saveScreensaverInactivityDelay(inactivityDelayNumber * 60000);
       await StorageService.saveScreensaverMotionEnabled(motionEnabled);
       await StorageService.saveScreensaverBrightness(screensaverBrightness);
+      
+      // Auto-brightness settings
+      await StorageService.saveAutoBrightnessEnabled(autoBrightnessEnabled);
+      await StorageService.saveAutoBrightnessMin(autoBrightnessMin);
+      await StorageService.saveAutoBrightnessMax(autoBrightnessMax);
     } else {
       await StorageService.saveAutoReload(false);
       await StorageService.saveKioskEnabled(kioskEnabled);
       await StorageService.saveScreensaverEnabled(false);
+      await StorageService.saveAutoBrightnessEnabled(false);
     }
 
     await StorageService.saveAutoLaunch(autoLaunchEnabled);
@@ -541,8 +702,12 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.saveBackButtonTimerDelay(isNaN(timerDelay) ? 10 : Math.max(1, Math.min(3600, timerDelay)));
     await StorageService.saveKeyboardMode(keyboardMode);
     await StorageService.saveAllowPowerButton(allowPowerButton);
+    await StorageService.saveReturnMode(returnMode);
     const tapCount = parseInt(returnTapCount, 10);
-    await StorageService.saveReturnTapCount(isNaN(tapCount) ? 5 : Math.max(2, Math.min(10, tapCount)));
+    await StorageService.saveReturnTapCount(isNaN(tapCount) ? 5 : Math.max(2, Math.min(20, tapCount)));
+    const tapTimeout = parseInt(returnTapTimeout, 10);
+    await StorageService.saveReturnTapTimeout(isNaN(tapTimeout) ? 1500 : Math.max(500, Math.min(5000, tapTimeout)));
+    await StorageService.saveReturnButtonPosition(returnButtonPosition);
     await StorageService.saveVolumeUp5TapEnabled(volumeUp5TapEnabled);
     
     // Save URL Rotation settings (webview only)
@@ -555,9 +720,17 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       // Save URL Planner settings
       await StorageService.saveUrlPlannerEnabled(urlPlannerEnabled);
       await StorageService.saveUrlPlannerEvents(urlPlannerEvents);
+      
+      // Save WebView Back Button settings
+      await StorageService.saveWebViewBackButtonEnabled(webViewBackButtonEnabled);
+      const xPercent = parseFloat(webViewBackButtonXPercent);
+      const yPercent = parseFloat(webViewBackButtonYPercent);
+      await StorageService.saveWebViewBackButtonXPercent(isNaN(xPercent) ? 2 : Math.max(0, Math.min(100, xPercent)));
+      await StorageService.saveWebViewBackButtonYPercent(isNaN(yPercent) ? 10 : Math.max(0, Math.min(100, yPercent)));
     } else {
       await StorageService.saveUrlRotationEnabled(false);
       await StorageService.saveUrlPlannerEnabled(false);
+      await StorageService.saveWebViewBackButtonEnabled(false);
     }
 
     // Update overlay settings
@@ -569,6 +742,12 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
         await OverlayServiceModule.setTestMode(backButtonMode === 'test');
         await OverlayServiceModule.setStatusBarEnabled(statusBarEnabled && statusBarOnOverlay);
         await OverlayServiceModule.setStatusBarItems(showBattery, showWifi, showBluetooth, showVolume, showTime);
+        
+        // Restart OverlayService with new settings
+        const finalTapCount = isNaN(tapCount) ? 5 : Math.max(2, Math.min(20, tapCount));
+        const finalTapTimeout = isNaN(tapTimeout) ? 1500 : Math.max(500, Math.min(5000, tapTimeout));
+        await OverlayServiceModule.stopOverlayService();
+        await OverlayServiceModule.startOverlayService(finalTapCount, finalTapTimeout, returnMode, returnButtonPosition);
       } catch (error) {
         // Silent fail
       }
@@ -618,6 +797,11 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
+              // Stop auto-brightness if running
+              try {
+                await AutoBrightnessModule.stopAutoBrightness();
+              } catch {}
+              
               await StorageService.clearAll();
               await CertificateModuleTyped.clearAcceptedCertificates();
               await clearSecurePin();
@@ -627,7 +811,11 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
               setUrl('');
               setPin('');
               setIsPinConfigured(false);
+              setPinMode('numeric');
+              setInitialPinMode('numeric');
+              setPinModeChanged(false);
               setPinMaxAttempts(5);
+              setPinMaxAttemptsText('5');
               setAutoReload(false);
               setKioskEnabled(false);
               setAutoLaunchEnabled(false);
@@ -644,6 +832,15 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
               setStatusBarEnabled(false);
               setStatusBarOnOverlay(true);
               setStatusBarOnReturn(true);
+              setReturnMode('tap_anywhere');
+              setReturnTapCount('5');
+              setReturnTapTimeout('1500');
+              setReturnButtonPosition('bottom-right');
+              
+              // Reset auto-brightness state
+              setAutoBrightnessEnabled(false);
+              setAutoBrightnessMin(0.1);
+              setAutoBrightnessMax(1.0);
 
               try {
                 await KioskModule.stopLockTask();
@@ -772,6 +969,15 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             pin={pin}
             onPinChange={setPin}
             isPinConfigured={isPinConfigured}
+            pinModeChanged={pinModeChanged}
+            pinMode={pinMode}
+            onPinModeChange={(newMode) => {
+              setPinMode(newMode);
+              // Track if mode changed from initial
+              setPinModeChanged(newMode !== initialPinMode);
+              // Clear password when mode changes
+              setPin('');
+            }}
             pinMaxAttemptsText={pinMaxAttemptsText}
             onPinMaxAttemptsChange={setPinMaxAttemptsText}
             onPinMaxAttemptsBlur={() => {
@@ -810,6 +1016,16 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
                 setShowOneTimeEditor(true);
               }
             }}
+            webViewBackButtonEnabled={webViewBackButtonEnabled}
+            onWebViewBackButtonEnabledChange={setWebViewBackButtonEnabled}
+            webViewBackButtonXPercent={webViewBackButtonXPercent}
+            onWebViewBackButtonXPercentChange={setWebViewBackButtonXPercent}
+            webViewBackButtonYPercent={webViewBackButtonYPercent}
+            onWebViewBackButtonYPercentChange={setWebViewBackButtonYPercent}
+            onResetWebViewBackButtonPosition={() => {
+              setWebViewBackButtonXPercent('2');
+              setWebViewBackButtonYPercent('10');
+            }}
             onBackToKiosk={() => navigation.navigate('Kiosk')}
           />
         );
@@ -820,6 +1036,14 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             displayMode={displayMode}
             defaultBrightness={defaultBrightness}
             onDefaultBrightnessChange={setDefaultBrightness}
+            autoBrightnessEnabled={autoBrightnessEnabled}
+            onAutoBrightnessEnabledChange={handleAutoBrightnessToggle}
+            autoBrightnessMin={autoBrightnessMin}
+            onAutoBrightnessMinChange={setAutoBrightnessMin}
+            autoBrightnessMax={autoBrightnessMax}
+            onAutoBrightnessMaxChange={setAutoBrightnessMax}
+            currentLightLevel={currentLightLevel}
+            hasLightSensor={hasLightSensor}
             statusBarEnabled={statusBarEnabled}
             onStatusBarEnabledChange={handleStatusBarEnabledChange}
             statusBarOnOverlay={statusBarOnOverlay}
@@ -846,6 +1070,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             onInactivityDelayChange={setInactivityDelay}
             motionEnabled={motionEnabled}
             onMotionEnabledChange={toggleMotionDetection}
+            motionCameraPosition={motionCameraPosition}
+            onMotionCameraPositionChange={handleMotionCameraPositionChange}
+            availableCameras={availableCameras}
           />
         );
       
@@ -859,12 +1086,18 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             onKioskEnabledChange={setKioskEnabled}
             allowPowerButton={allowPowerButton}
             onAllowPowerButtonChange={setAllowPowerButton}
+            returnMode={returnMode}
+            onReturnModeChange={setReturnMode}
             returnTapCount={returnTapCount}
             onReturnTapCountChange={setReturnTapCount}
-            volumeUp5TapEnabled={volumeUp5TapEnabled}
-            onVolumeUp5TapEnabledChange={setVolumeUp5TapEnabled}
+            returnTapTimeout={returnTapTimeout}
+            onReturnTapTimeoutChange={setReturnTapTimeout}
+            returnButtonPosition={returnButtonPosition}
+            onReturnButtonPositionChange={setReturnButtonPosition}
             overlayButtonVisible={overlayButtonVisible}
             onOverlayButtonVisibleChange={handleOverlayButtonVisibleChange}
+            volumeUp5TapEnabled={volumeUp5TapEnabled}
+            onVolumeUp5TapEnabledChange={setVolumeUp5TapEnabled}
             autoLaunchEnabled={autoLaunchEnabled}
             onAutoLaunchChange={toggleAutoLaunch}
             autoRelaunchApp={autoRelaunchApp}
