@@ -12,8 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+***
+
+## [1.2.4] - 2026-02-05
+
+### Fixed
+- 🖼️ **Screen Saver**: Bug fixes for screen saver functionality
+- 🔒 **Blocking Overlay**: Bug fixes for blocking overlay display and behavior
+- 🌐 **REST API**: Bug fixes for REST API endpoints
+- 🔄 **Auto Relaunch External App**: Bug fixes for automatic external app relaunching
 
 ***
+
 ## [1.2.3] - 2026-01-30
 
 ### Added

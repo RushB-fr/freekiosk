@@ -858,6 +858,17 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       if (savedBlockingOverlaysEnabled) {
         await BlockingOverlayModule.applyConfiguration(true, savedBlockingOverlaysRegions);
         blockingOverlaysActive = true;
+        
+        // Recalculate overlays after a short delay to ensure screen dimensions are correct
+        // This fixes issues at boot where dimensions might not be immediately available
+        setTimeout(async () => {
+          try {
+            await BlockingOverlayModule.updateOverlays();
+            console.log('[KioskScreen] Blocking overlays recalculated after boot delay');
+          } catch (e) {
+            console.error('[KioskScreen] Failed to recalculate overlays:', e);
+          }
+        }, 1000);
       } else {
         await BlockingOverlayModule.setEnabled(false);
       }
@@ -1113,8 +1124,15 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
 
       // Démarrer l'OverlayService AVANT de lancer l'app externe
       try {
-        await OverlayServiceModule.startOverlayService(finalTapCount, finalTapTimeout, finalReturnMode, finalButtonPosition);
-        console.log(`[KioskScreen] OverlayService started with tapCount=${finalTapCount}, tapTimeout=${finalTapTimeout}, mode=${finalReturnMode}, position=${finalButtonPosition}`);
+        await OverlayServiceModule.startOverlayService(
+          finalTapCount, 
+          finalTapTimeout, 
+          finalReturnMode, 
+          finalButtonPosition,
+          packageName, // Pass locked package for monitoring
+          autoRelaunchApp // Pass auto-relaunch setting
+        );
+        console.log(`[KioskScreen] OverlayService started with tapCount=${finalTapCount}, tapTimeout=${finalTapTimeout}, mode=${finalReturnMode}, position=${finalButtonPosition}, package=${packageName}, autoRelaunch=${autoRelaunchApp}`);
       } catch (overlayError) {
         console.warn('[KioskScreen] Failed to start overlay service:', overlayError);
         // Continue anyway - l'app externe peut toujours être lancée
@@ -1293,9 +1311,15 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         </View>
       )}
 
+      {/* Screensaver overlay - black when brightness=0%, transparent when dimming */}
       {isScreensaverActive && screensaverEnabled && (
         <TouchableOpacity
-          style={styles.screensaverOverlay}
+          style={[
+            styles.screensaverOverlay,
+            screensaverBrightness === 0 
+              ? styles.screensaverBlack 
+              : styles.screensaverTransparent
+          ]}
           activeOpacity={1}
           onPress={onScreensaverTap}
         />
@@ -1348,9 +1372,14 @@ const styles = StyleSheet.create({
   screensaverOverlay: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
+    zIndex: 1000,
+  },
+  screensaverBlack: {
     backgroundColor: '#000',
     opacity: 1,
-    zIndex: 1000,
+  },
+  screensaverTransparent: {
+    backgroundColor: 'transparent',
   },
 });
 

@@ -732,55 +732,20 @@ class MainActivity : ReactActivity() {
       val restartIntent = packageManager.getLaunchIntentForPackage(packageName)
       restartIntent?.apply {
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        
+        // Pass auto_start flag to the new instance so it can launch the external app
+        // AFTER settings are loaded and kiosk mode is activated
+        if (intent.getBooleanExtra("auto_start", false) && lockPackage != null) {
+          putExtra("adb_auto_start", true)
+          android.util.Log.i("FreeKiosk-ADB", "Will auto-start external app after restart")
+        }
       }
       
-      // Auto-start external app if requested
-      if (intent.getBooleanExtra("auto_start", false) && lockPackage != null) {
-        try {
-          val launchIntent = packageManager.getLaunchIntentForPackage(lockPackage)
-          launchIntent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-          if (launchIntent != null) {
-            startActivity(launchIntent)
-            android.util.Log.i("FreeKiosk-ADB", "Auto-starting external app: $lockPackage")
-            
-            // Verify external app is in foreground before broadcasting (with retry)
-            val maxRetries = 10
-            val retryDelayMs = 500L
-            var retryCount = 0
-            
-            fun checkAndBroadcast() {
-              val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-              val runningTasks = am.getRunningTasks(1)
-              val topPackage = runningTasks.firstOrNull()?.topActivity?.packageName
-              
-              if (topPackage == lockPackage) {
-                // App is in foreground, broadcast success
-                sendBroadcast(Intent("com.freekiosk.EXTERNAL_APP_LAUNCHED").apply {
-                  putExtra("package_name", lockPackage)
-                })
-                android.util.Log.i("FreeKiosk-ADB", "Broadcasted EXTERNAL_APP_LAUNCHED: $lockPackage (verified in foreground)")
-              } else if (retryCount < maxRetries) {
-                // App not yet in foreground, retry
-                retryCount++
-                android.util.Log.d("FreeKiosk-ADB", "Waiting for $lockPackage to be in foreground (attempt $retryCount/$maxRetries, current: $topPackage)")
-                Handler(Looper.getMainLooper()).postDelayed({ checkAndBroadcast() }, retryDelayMs)
-              } else {
-                // Max retries reached, broadcast anyway but log warning
-                sendBroadcast(Intent("com.freekiosk.EXTERNAL_APP_LAUNCHED").apply {
-                  putExtra("package_name", lockPackage)
-                  putExtra("verified", false)
-                })
-                android.util.Log.w("FreeKiosk-ADB", "Broadcasted EXTERNAL_APP_LAUNCHED: $lockPackage (NOT verified - timeout after ${maxRetries * retryDelayMs}ms, top: $topPackage)")
-              }
-            }
-            
-            // Start verification after initial delay
-            Handler(Looper.getMainLooper()).postDelayed({ checkAndBroadcast() }, 500)
-          }
-        } catch (e: Exception) {
-          android.util.Log.e("FreeKiosk-ADB", "Failed to auto-start $lockPackage: ${e.message}")
-        }
-      } else if (restartIntent != null) {
+      // Don't launch external app here - let FreeKiosk restart and handle it properly
+      // This ensures kiosk mode is activated first, then app is launched
+      
+      // Start the new instance
+      if (restartIntent != null) {
         startActivity(restartIntent)
       }
       
@@ -1086,6 +1051,22 @@ class MainActivity : ReactActivity() {
       android.util.Log.d("MainActivity", "Volume change receiver registered successfully")
     } catch (e: Exception) {
       android.util.Log.e("MainActivity", "Error registering volume change receiver: ${e.message}")
+    }
+  }
+
+  /**
+   * Handle configuration changes (rotation, screen size, etc.)
+   */
+  override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+    super.onConfigurationChanged(newConfig)
+    
+    // Notify blocking overlay manager about configuration change
+    try {
+      val manager = BlockingOverlayManager.getInstance(this)
+      manager.onConfigurationChanged(newConfig)
+      DebugLog.d("MainActivity", "Configuration changed - blocking overlays updated")
+    } catch (e: Exception) {
+      DebugLog.e("MainActivity", "Error handling configuration change: ${e.message}")
     }
   }
 }

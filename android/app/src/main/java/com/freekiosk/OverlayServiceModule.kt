@@ -20,7 +20,7 @@ class OverlayServiceModule(reactContext: ReactApplicationContext) :
     override fun getName(): String = NAME
 
     @ReactMethod
-    fun startOverlayService(tapCount: Int, tapTimeout: Int, returnMode: String, buttonPosition: String, promise: Promise) {
+    fun startOverlayService(tapCount: Int, tapTimeout: Int, returnMode: String, buttonPosition: String, lockedPackage: String?, autoRelaunch: Boolean, promise: Promise) {
         try {
             // Démarrer le service même sans permission overlay
             // Le service peut toujours fonctionner en arrière-plan (timer test mode, retour auto)
@@ -36,6 +36,14 @@ class OverlayServiceModule(reactContext: ReactApplicationContext) :
             serviceIntent.putExtra("TAP_TIMEOUT", tapTimeout.coerceIn(500, 5000).toLong())
             serviceIntent.putExtra("RETURN_MODE", returnMode)
             serviceIntent.putExtra("BUTTON_POSITION", buttonPosition)
+            
+            // Add auto-relaunch monitoring parameters
+            if (lockedPackage != null && lockedPackage.isNotEmpty()) {
+                serviceIntent.putExtra("LOCKED_PACKAGE", lockedPackage)
+                serviceIntent.putExtra("AUTO_RELAUNCH", autoRelaunch)
+                DebugLog.d("OverlayServiceModule", "Auto-relaunch monitoring enabled for: $lockedPackage (autoRelaunch=$autoRelaunch)")
+            }
+            
             reactApplicationContext.startService(serviceIntent)
             DebugLog.d("OverlayServiceModule", "Started OverlayService with tapCount=$tapCount, tapTimeout=${tapTimeout}ms, mode=$returnMode, position=$buttonPosition")
             promise.resolve(true)

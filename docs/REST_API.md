@@ -9,7 +9,7 @@ FreeKiosk includes a built-in REST API server for integration with **Home Assist
 - **Authentication**: Optional API Key (X-Api-Key header)
 - **Format**: JSON responses
 
-> 💡 **Note**: Some API features require **Device Owner mode** for full functionality (screen control, reboot). See [Installation Guide](INSTALL.md#advanced-install-device-owner-mode) for setup instructions.
+> 💡 **Note**: Some API features require **Device Owner mode** for full functionality (true screen off, reboot). The HTTP server remains accessible even when the screen is off (v1.2.4+). See [Installation Guide](INSTALL.md#advanced-install-device-owner-mode) for Device Owner setup instructions.
 
 ## Enabling the API
 
@@ -221,10 +221,16 @@ Turn screen off.
 > 
 > | Feature | Without Device Owner | With Device Owner |
 > |---------|---------------------|-------------------|
-> | `screen/off` | Activates screensaver (dims to 0%) | Actually turns off screen |
-> | `screen/on` | Exits screensaver | Wakes device from sleep |
-> | Screen state detection | Limited (server stops when screen off) | Full (server stays active) |
+> | `screen/off` | ⚠️ Dims to 0% brightness (screen stays on) | ✅ Actually turns off screen via `lockNow()` |
+> | `screen/on` | Restores brightness | Wakes device from sleep |
+> | Screen state detection | ✅ Works (physical button detected) | ✅ Works (all methods detected) |
+> | HTTP Server availability | ✅ Always accessible (v1.2.4+) | ✅ Always accessible |
 > | `reboot` | ❌ Not available | ✅ Works |
+> 
+> **Why can't regular apps turn off the screen?**  
+> Android security prevents non-system apps from turning off the screen to protect against malicious apps. Only Device Owner apps have this privilege via `DevicePolicyManager.lockNow()`. Without Device Owner, `/api/screen/off` can only dim the screen to minimum brightness.
+> 
+> **Workaround**: Use the physical power button to turn off the screen, then use `/api/screen/on` to turn it back on remotely.
 > 
 > To enable Device Owner mode, see [Installation Guide](INSTALL.md#advanced-install-device-owner-mode).
 

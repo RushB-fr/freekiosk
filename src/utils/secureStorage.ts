@@ -434,11 +434,19 @@ export async function getLockoutStatus(): Promise<{
 
 /**
  * Check if PIN exists (for migration from old system)
+ * Returns true if there's a PIN in Keychain OR a legacy PIN in AsyncStorage
  */
 export async function hasSecurePin(): Promise<boolean> {
   try {
+    // Check Keychain first
     const credentials = await Keychain.getGenericPassword({ service: PIN_SERVICE });
-    return !!credentials;
+    if (credentials) {
+      return true;
+    }
+    
+    // Check for legacy plaintext PIN in AsyncStorage
+    const legacyPin = await checkLegacyPlaintextPin();
+    return !!legacyPin;
   } catch (error) {
     return false;
   }

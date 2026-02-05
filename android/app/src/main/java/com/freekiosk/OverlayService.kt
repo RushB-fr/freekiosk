@@ -4,6 +4,8 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.app.usage.UsageStats
+import android.app.usage.UsageStatsManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -129,6 +131,12 @@ class OverlayService : Service() {
     private val CHANNEL_ID = "FreeKioskOverlay"
     private val NOTIFICATION_ID = 1001
     private val STATUS_UPDATE_INTERVAL = 5000L // Update every 5 seconds
+    
+    // Auto-relaunch monitoring
+    private var lockedPackage: String? = null // Package name of the locked app to monitor
+    private var autoRelaunchEnabled = false // Whether auto-relaunch is enabled
+    private val foregroundMonitorHandler = Handler(Looper.getMainLooper())
+    private val FOREGROUND_CHECK_INTERVAL = 2000L // Check every 2 seconds
     // BroadcastReceiver pour détecter quand l'écran s'allume
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -287,6 +295,24 @@ class OverlayService : Service() {
         intent?.getStringExtra("BUTTON_POSITION")?.let { position ->
             buttonPosition = position
             DebugLog.d("OverlayService", "Button position set to: $buttonPosition")
+        }
+        
+        // Get locked package and auto-relaunch settings for monitoring
+        intent?.getStringExtra("LOCKED_PACKAGE")?.let { pkg ->
+            lockedPackage = pkg
+            DebugLog.d("OverlayService", "Locked package set to: $lockedPackage")
+        }
+        
+        intent?.getBooleanExtra("AUTO_RELAUNCH", false)?.let { enabled ->
+            autoRelaunchEnabled = enabled
+            DebugLog.d("OverlayService", "Auto-relaunch enabled: $autoRelaunchEnabled")
+        }
+        
+        // Start monitoring if auto-relaunch is enabled and we have a locked package
+        if (autoRelaunchEnabled && lockedPackage != null) {
+            startForegroundMonitoring()
+        } else {
+            stopForegroundMonitoring()
         }
         
         // Vérifier la permission overlay avant de créer des vues
@@ -1024,12 +1050,126 @@ class OverlayService : Service() {
         }
     }
 
+    /**
+     * Start monitoring the foreground app to detect when the locked app exits
+     */
+    private fun startForegroundMonitoring() {
+        stopForegroundMonitoring() // Clear any existing monitoring
+        
+        DebugLog.d("OverlayService", "Starting foreground monitoring for package: $lockedPackage")
+        
+        foregroundMonitorHandler.post(object : Runnable {
+            override fun run() {
+                if (autoRelaunchEnabled && lockedPackage != null) {
+                    checkForegroundApp()
+                    foregroundMonitorHandler.postDelayed(this, FOREGROUND_CHECK_INTERVAL)
+                }
+            }
+        })
+    }
+
+    /**
+     * Stop monitoring the foreground app
+     */
+    private fun stopForegroundMonitoring() {
+        foregroundMonitorHandler.removeCallbacksAndMessages(null)
+        DebugLog.d("OverlayService", "Foreground monitoring stopped")
+    }
+
+    /**
+     * Check if the locked app is still in foreground, bring FreeKiosk back if not
+     */
+    private fun checkForegroundApp() {
+        try {
+            val topPackage = getForegroundPackage()
+            
+            if (topPackage == null) {
+                DebugLog.d("OverlayService", "Could not determine foreground app")
+                return
+            }
+            
+            // If locked app is not in foreground and FreeKiosk is not in foreground
+            if (topPackage != lockedPackage && topPackage != packageName) {
+                DebugLog.d("OverlayService", "Locked app ($lockedPackage) not in foreground (current: $topPackage) - bringing FreeKiosk back")
+                
+                // Bring FreeKiosk back to foreground
+                bringFreeKioskToFront()
+            }
+        } catch (e: Exception) {
+            DebugLog.errorProduction("OverlayService", "Error checking foreground app: ${e.message}")
+        }
+    }
+
+    /**
+     * Get the package name of the app currently in the foreground
+     * Uses UsageStatsManager which requires PACKAGE_USAGE_STATS permission
+     * This permission is automatically granted if app is Device Owner
+     */
+    private fun getForegroundPackage(): String? {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
+                val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
+                if (usageStatsManager != null) {
+                    val currentTime = System.currentTimeMillis()
+                    // Query events from last 5 seconds
+                    val stats = usageStatsManager.queryUsageStats(
+                        UsageStatsManager.INTERVAL_BEST,
+                        currentTime - 5000,
+                        currentTime
+                    )
+                    
+                    if (stats != null && stats.isNotEmpty()) {
+                        // Find the most recently used app
+                        val mostRecent = stats.maxByOrNull { it.lastTimeUsed }
+                        return mostRecent?.packageName
+                    }
+                }
+            } else {
+                // Fallback for older Android versions (< 5.1)
+                @Suppress("DEPRECATION")
+                val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                @Suppress("DEPRECATION")
+                val runningTasks = am.getRunningTasks(1)
+                return runningTasks.firstOrNull()?.topActivity?.packageName
+            }
+        } catch (e: Exception) {
+            DebugLog.d("OverlayService", "Error getting foreground package: ${e.message}")
+        }
+        return null
+    }
+
+    /**
+     * Bring FreeKiosk to the foreground without destroying overlays
+     * This will trigger the AppState listener in KioskScreen which will relaunch the external app
+     */
+    private fun bringFreeKioskToFront() {
+        try {
+            DebugLog.d("OverlayService", "Bringing FreeKiosk to foreground")
+            
+            val intent = Intent(this, MainActivity::class.java)
+            intent.addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            )
+            
+            // Don't set voluntaryReturn - we want the auto-relaunch to happen
+            startActivity(intent)
+            DebugLog.d("OverlayService", "FreeKiosk brought to front - AppState listener will handle relaunch")
+        } catch (e: Exception) {
+            DebugLog.errorProduction("OverlayService", "Failed to bring FreeKiosk to front: ${e.message}")
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         instance = null
         try {
             // Arrêter les mises à jour de la status bar
             stopStatusUpdates()
+            
+            // Arrêter le monitoring du foreground
+            stopForegroundMonitoring()
 
             // Désenregistrer le receiver
             try {
@@ -1112,6 +1252,31 @@ class OverlayService : Service() {
         super.onTaskRemoved(rootIntent)
         DebugLog.d("OverlayService", "Task removed - stopping overlay service")
         stopSelf()
+    }
+
+    /**
+     * Handle configuration changes (rotation, screen size, etc.)
+     */
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        
+        DebugLog.d("OverlayService", "Configuration changed - recreating overlays")
+        
+        // Notify blocking overlay manager
+        try {
+            val manager = BlockingOverlayManager.getInstance(this)
+            manager.onConfigurationChanged(newConfig)
+        } catch (e: Exception) {
+            DebugLog.e("OverlayService", "Error updating blocking overlays: ${e.message}")
+        }
+        
+        // Recreate the return button and status bar with new dimensions
+        try {
+            destroyOverlay()
+            createOverlay()
+        } catch (e: Exception) {
+            DebugLog.e("OverlayService", "Error recreating overlay on config change: ${e.message}")
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

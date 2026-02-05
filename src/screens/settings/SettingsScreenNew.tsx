@@ -747,7 +747,14 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
         const finalTapCount = isNaN(tapCount) ? 5 : Math.max(2, Math.min(20, tapCount));
         const finalTapTimeout = isNaN(tapTimeout) ? 1500 : Math.max(500, Math.min(5000, tapTimeout));
         await OverlayServiceModule.stopOverlayService();
-        await OverlayServiceModule.startOverlayService(finalTapCount, finalTapTimeout, returnMode, returnButtonPosition);
+        await OverlayServiceModule.startOverlayService(
+          finalTapCount, 
+          finalTapTimeout, 
+          returnMode, 
+          returnButtonPosition,
+          externalAppPackage,
+          autoRelaunchApp
+        );
       } catch (error) {
         // Silent fail
       }

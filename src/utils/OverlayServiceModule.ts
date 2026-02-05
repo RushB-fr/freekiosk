@@ -1,7 +1,14 @@
 import { NativeModules } from 'react-native';
 
 interface OverlayServiceModuleType {
-  startOverlayService(tapCount: number, tapTimeout: number, returnMode: string, buttonPosition: string): Promise<boolean>;
+  startOverlayService(
+    tapCount: number, 
+    tapTimeout: number, 
+    returnMode: string, 
+    buttonPosition: string,
+    lockedPackage?: string | null,
+    autoRelaunch?: boolean
+  ): Promise<boolean>;
   stopOverlayService(): Promise<boolean>;
   setButtonOpacity(opacity: number): Promise<boolean>;
   getButtonOpacity(): Promise<number>;

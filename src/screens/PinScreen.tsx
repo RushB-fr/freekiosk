@@ -71,11 +71,19 @@ const PinScreen: React.FC<PinScreenProps> = ({ navigation }) => {
         const returnTapTimeout = await StorageService.getReturnTapTimeout();
         const returnMode = await StorageService.getReturnMode();
         const returnButtonPosition = await StorageService.getReturnButtonPosition();
+        const autoRelaunch = await StorageService.getAutoRelaunchApp();
         
         // Start OverlayService BEFORE launching the external app
         const { OverlayServiceModule } = NativeModules;
-        await OverlayServiceModule.startOverlayService(returnTapCount, returnTapTimeout, returnMode, returnButtonPosition);
-        console.log('[PinScreen] OverlayService started');
+        await OverlayServiceModule.startOverlayService(
+          returnTapCount, 
+          returnTapTimeout, 
+          returnMode, 
+          returnButtonPosition,
+          externalAppPackage,
+          autoRelaunch
+        );
+        console.log('[PinScreen] OverlayService started with auto-relaunch monitoring');
         
         await AppLauncherModule.launchExternalApp(externalAppPackage);
       } catch (error) {

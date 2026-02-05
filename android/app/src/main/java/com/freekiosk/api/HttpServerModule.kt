@@ -87,6 +87,10 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     // Screen control
     private var wakeLock: PowerManager.WakeLock? = null
     private var toneGenerator: ToneGenerator? = null
+    
+    // Server lifecycle management
+    private var wifiLock: WifiManager.WifiLock? = null
+    private var cpuWakeLock: PowerManager.WakeLock? = null
 
     init {
         initSensors()
@@ -135,6 +139,9 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 return
             }
 
+            // Acquire locks to keep server running even when screen is off
+            acquireServerLocks()
+
             server = KioskHttpServer(
                 port = port,
                 apiKey = if (apiKey.isNullOrEmpty()) null else apiKey,
@@ -146,7 +153,7 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
 
             server?.start()
             
-            Log.i(TAG, "HTTP Server started on port $port")
+            Log.i(TAG, "HTTP Server started on port $port with locks acquired")
             
             val result = Arguments.createMap().apply {
                 putBoolean("success", true)
@@ -166,7 +173,8 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
         try {
             server?.stop()
             server = null
-            Log.i(TAG, "HTTP Server stopped")
+            releaseServerLocks()
+            Log.i(TAG, "HTTP Server stopped and locks released")
             promise.resolve(true)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to stop server", e)
@@ -188,6 +196,55 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
         promise.resolve(result)
     }
 
+    /**
+     * Acquire WifiLock and CPU WakeLock to keep server running when screen is off
+     */
+    private fun acquireServerLocks() {
+        try {
+            // WiFi Lock - prevents WiFi from going to sleep
+            val wifiManager = reactContext.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            wifiLock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "FreeKiosk:HttpServer")
+            wifiLock?.acquire()
+            Log.d(TAG, "WifiLock acquired for HTTP Server")
+            
+            // CPU Partial Wake Lock - keeps CPU running for background processing
+            val powerManager = reactContext.getSystemService(Context.POWER_SERVICE) as PowerManager
+            cpuWakeLock = powerManager.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "FreeKiosk:HttpServerCPU"
+            )
+            cpuWakeLock?.acquire()
+            Log.d(TAG, "CPU WakeLock acquired for HTTP Server")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to acquire server locks: ${e.message}")
+        }
+    }
+    
+    /**
+     * Release WifiLock and CPU WakeLock when server stops
+     */
+    private fun releaseServerLocks() {
+        try {
+            wifiLock?.let {
+                if (it.isHeld) {
+                    it.release()
+                    Log.d(TAG, "WifiLock released")
+                }
+            }
+            wifiLock = null
+            
+            cpuWakeLock?.let {
+                if (it.isHeld) {
+                    it.release()
+                    Log.d(TAG, "CPU WakeLock released")
+                }
+            }
+            cpuWakeLock = null
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to release server locks: ${e.message}")
+        }
+    }
+
     @ReactMethod
     fun getLocalIp(promise: Promise) {
         promise.resolve(getLocalIpAddress())
@@ -202,9 +259,12 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
         val batteryStatus = getBatteryInfo()
         status.put("battery", batteryStatus)
         
-        // Screen - use values from JS
+        // Screen - use values from JS + actual screen state
         val screenStatus = JSONObject().apply {
-            put("on", true)
+            // Get actual screen state from PowerManager
+            val powerManager = reactContext.getSystemService(Context.POWER_SERVICE) as PowerManager
+            val isScreenOn = powerManager.isInteractive
+            put("on", isScreenOn)
             put("brightness", jsBrightness)
             put("screensaverActive", jsScreensaverActive)
         }
@@ -237,7 +297,7 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
         val deviceStatus = JSONObject().apply {
             put("ip", getLocalIpAddress())
             put("hostname", "freekiosk")
-            put("version", "1.2.2")
+            put("version", "1.2.3")
             put("isDeviceOwner", false)
             put("kioskMode", jsKioskMode)
         }
@@ -810,6 +870,26 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
         } catch (e: Exception) {
             Log.e(TAG, "Failed to capture screenshot", e)
             null
+        }
+    }
+    
+    /**
+     * Clean up resources when module is destroyed
+     */
+    override fun onCatalystInstanceDestroy() {
+        super.onCatalystInstanceDestroy()
+        try {
+            server?.stop()
+            server = null
+            releaseServerLocks()
+            mediaPlayer?.release()
+            mediaPlayer = null
+            toneGenerator?.release()
+            toneGenerator = null
+            sensorManager?.unregisterListener(this)
+            Log.d(TAG, "HttpServerModule cleaned up")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during cleanup: ${e.message}")
         }
     }
 }

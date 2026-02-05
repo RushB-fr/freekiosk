@@ -71,6 +71,19 @@ class AppLauncherModule(reactContext: ReactApplicationContext) : ReactContextBas
 
                 // Send event to React Native
                 sendEvent("onAppLaunched", null)
+                
+                // Broadcast for ADB monitoring (same as ADB auto_start behavior)
+                // Send after short delay to let app start
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    try {
+                        reactApplicationContext.sendBroadcast(Intent("com.freekiosk.EXTERNAL_APP_LAUNCHED").apply {
+                            putExtra("package_name", packageName)
+                        })
+                        DebugLog.d("AppLauncherModule", "Broadcasted EXTERNAL_APP_LAUNCHED: $packageName")
+                    } catch (e: Exception) {
+                        DebugLog.d("AppLauncherModule", "Failed to broadcast: ${e.message}")
+                    }
+                }, 1000)
 
                 promise.resolve(true)
             } else {
