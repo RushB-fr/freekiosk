@@ -261,11 +261,10 @@ Done! Your tablet is now in kiosk mode.
 
 ## 🗺️ Roadmap
 
-### ✅ v1.2.7 (Feb 2026) - Android 16 System UI Hardening 🆕
-- 🛡️ **System UI Hardening**: Improved fullscreen immersive mode for modern Android versions
-  - `WindowInsetsController` API for Android 11+ with `BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`
-  - `SYSTEM_UI_FLAG_LOW_PROFILE` fallback for older versions
-  - Prevents system UI elements from appearing when swiping from screen edges
+### ✅ v1.2.7 (Feb 2026) - Navigation Lock Fix 🆕
+- 🔒 **Navigation Buttons Blocked in Lock Mode**: Fixed Home/Recents buttons not properly blocked in kiosk lock mode
+  - `LOCK_TASK_FEATURE_NONE` correctly blocks all system navigation by default
+  - Updated `hideSystemUI()` to modern `WindowInsetsController` API for Android 11+
 
 ### ✅ v1.2.6 (Feb 2026) - Screen Sleep Scheduler, Inactivity Return & Improvements
 - 🏠 **Inactivity Return to Home**: Auto-navigate back to start page after inactivity timeout

@@ -17,11 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.2.7] - 2026-02-09
 
 ### Fixed
-- 🛡️ **Android 16 System UI Hardening**: Improved fullscreen immersive mode for modern Android versions
-  - Added `WindowInsetsController` API for Android 11+ (API 30+) with `BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`
-  - Hides status bars, navigation bars, and system bars using modern `WindowInsets.Type` API
+- � **Navigation Buttons Blocked in Lock Mode**: Fixed navigation buttons (Home, Recents) not being properly blocked in kiosk lock mode
+  - Ensured `LOCK_TASK_FEATURE_NONE` correctly blocks all system navigation by default
+  - Only `GLOBAL_ACTIONS` (power button) and `NOTIFICATIONS` are conditionally enabled based on user settings
+  - Updated `hideSystemUI()` to use modern `WindowInsetsController` API for Android 11+ (API 30+)
   - Added `SYSTEM_UI_FLAG_LOW_PROFILE` fallback for older Android versions
-  - Prevents system UI elements from appearing when swiping from screen edges
 
 ***
 
