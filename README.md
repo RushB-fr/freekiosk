@@ -11,7 +11,7 @@
   </p>
   
   <p>
-    <img src="https://img.shields.io/badge/Version-1.2.7-blue.svg" alt="Version 1.2.7">
+    <img src="https://img.shields.io/badge/Version-1.2.8-blue.svg" alt="Version 1.2.8">
     <a href="https://github.com/rushb-fr/freekiosk/releases"><img src="https://img.shields.io/github/downloads/rushb-fr/freekiosk/total.svg" alt="Downloads"></a>
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT">
     <img src="https://img.shields.io/badge/Android-8.0%2B-green.svg" alt="Android 8.0+">
@@ -261,7 +261,20 @@ Done! Your tablet is now in kiosk mode.
 
 ## 🗺️ Roadmap
 
-### ✅ v1.2.7 (Feb 2026) - Navigation Lock Fix 🆕
+### ✅ v1.2.8 (Feb 2026) - Print, URL Filtering & Boot Fixes 🆕
+- 🖨️ **WebView Print Support**: Native Android printing via `window.print()` interception
+  - Supports all connected printers (WiFi, Bluetooth, USB, Cloud Print, PDF)
+- 🔗 **URL Filtering (Blacklist / Whitelist)**: Control which URLs users can navigate to
+  - Blacklist or Whitelist mode with wildcard pattern support
+  - Works with traditional navigation and SPA/client-side routing
+- ⬅️ **Back Button Mode via ADB**: `back_button_mode` parameter synced to native SharedPreferences
+- ⚠️ **Usage Stats Permission Warning**: Permission check and grant button in Settings
+- 🔧 **Back Button Fix**: Fixed back button completely blocked when `test_mode=false`
+- 🔀 **ADB Config Fix**: `lock_package` now takes priority over `url` for display mode
+- 🔄 **Auto Launch on Boot Fix**: Fixed wrong AsyncStorage database name in native Kotlin files
+- 🔒 **Settings Buttons Fix**: Lock task temporarily stopped before opening system settings
+
+### ✅ v1.2.7 (Feb 2026) - Navigation Lock Fix
 - 🔒 **Navigation Buttons Blocked in Lock Mode**: Fixed Home/Recents buttons not properly blocked in kiosk lock mode
   - `LOCK_TASK_FEATURE_NONE` correctly blocks all system navigation by default
   - Updated `hideSystemUI()` to modern `WindowInsetsController` API for Android 11+

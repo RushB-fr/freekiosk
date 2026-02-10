@@ -43,13 +43,36 @@ class AppLauncherModule(reactContext: ReactApplicationContext) : ReactContextBas
                             val adminComponent = android.content.ComponentName(reactApplicationContext, DeviceAdminReceiver::class.java)
                             
                             if (dpm.isDeviceOwnerApp(reactApplicationContext.packageName)) {
-                                // S'assurer que LOCK_TASK_FEATURE_NONE est appliqué (bloque navigation)
+                                // Configure lock task features respecting user settings
                                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                                    dpm.setLockTaskFeatures(
-                                        adminComponent,
-                                        android.app.admin.DevicePolicyManager.LOCK_TASK_FEATURE_NONE
-                                    )
-                                    DebugLog.d("AppLauncherModule", "Lock task features set to NONE before launching external app")
+                                    var lockTaskFeatures = android.app.admin.DevicePolicyManager.LOCK_TASK_FEATURE_NONE
+                                    
+                                    // Read user settings from AsyncStorage
+                                    try {
+                                        val dbPath = reactApplicationContext.getDatabasePath("RKStorage").absolutePath
+                                        val db = android.database.sqlite.SQLiteDatabase.openDatabase(dbPath, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY)
+                                        val cursor = db.rawQuery("SELECT value FROM catalystLocalStorage WHERE key = ?", arrayOf("@kiosk_allow_power_button"))
+                                        val allowPowerButton = if (cursor.moveToFirst()) cursor.getString(0) == "true" else false
+                                        cursor.close()
+                                        
+                                        val cursor2 = db.rawQuery("SELECT value FROM catalystLocalStorage WHERE key = ?", arrayOf("@kiosk_allow_notifications"))
+                                        val allowNotifications = if (cursor2.moveToFirst()) cursor2.getString(0) == "true" else false
+                                        cursor2.close()
+                                        db.close()
+                                        
+                                        if (allowPowerButton) {
+                                            lockTaskFeatures = lockTaskFeatures or android.app.admin.DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS
+                                        }
+                                        if (allowNotifications) {
+                                            lockTaskFeatures = lockTaskFeatures or android.app.admin.DevicePolicyManager.LOCK_TASK_FEATURE_NOTIFICATIONS
+                                        }
+                                        DebugLog.d("AppLauncherModule", "Lock task features: powerButton=$allowPowerButton, notifications=$allowNotifications (flags=$lockTaskFeatures)")
+                                    } catch (e: Exception) {
+                                        DebugLog.d("AppLauncherModule", "Could not read settings, using LOCK_TASK_FEATURE_NONE: ${e.message}")
+                                    }
+                                    
+                                    dpm.setLockTaskFeatures(adminComponent, lockTaskFeatures)
+                                    DebugLog.d("AppLauncherModule", "Lock task features applied before launching external app")
                                 }
                                 
                                 // Mettre à jour la whitelist pour inclure cette app

@@ -153,6 +153,12 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [inactivityReturnResetOnNav, setInactivityReturnResetOnNav] = useState<boolean>(true);
   const [inactivityReturnClearCache, setInactivityReturnClearCache] = useState<boolean>(false);
   
+  // URL Filtering states
+  const [urlFilterEnabled, setUrlFilterEnabled] = useState<boolean>(false);
+  const [urlFilterMode, setUrlFilterMode] = useState<string>('blacklist');
+  const [urlFilterList, setUrlFilterList] = useState<string[]>([]);
+  const [urlFilterShowFeedback, setUrlFilterShowFeedback] = useState<boolean>(false);
+  
   // Update states
   const [checkingUpdate, setCheckingUpdate] = useState<boolean>(false);
   const [updateAvailable, setUpdateAvailable] = useState<boolean>(false);
@@ -224,8 +230,24 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     }
   };
 
+  const openSystemSettingsSafely = async () => {
+    try {
+      // Stop lock task temporarily so Android allows leaving the app
+      await KioskModule.stopLockTask();
+    } catch (e) {
+      // Not in lock task, that's fine
+    }
+    Linking.openSettings();
+  };
+
   const requestUsageStatsPermission = async () => {
     try {
+      // Stop lock task temporarily so Android allows leaving the app
+      try {
+        await KioskModule.stopLockTask();
+      } catch (e) {
+        // Not in lock task, that's fine
+      }
       await KioskModule.requestUsageStatsPermission();
       // Re-check after a delay (user needs to toggle in system settings)
       setTimeout(() => checkUsageStatsPermission(), 2000);
@@ -254,6 +276,15 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setAutoReload(savedAutoReload);
     setKioskEnabled(savedKioskEnabled);
     setAutoLaunchEnabled(savedAutoLaunch ?? false);
+    // Ensure BootReceiver component state matches the setting
+    // This fixes installations where the component was previously disabled
+    try {
+      if (savedAutoLaunch) {
+        await KioskModule.enableAutoLaunch();
+      }
+    } catch (e) {
+      // Silent fail
+    }
     setScreensaverEnabled(savedScreensaverEnabled ?? false);
     setDefaultBrightness(savedDefaultBrightness ?? 0.5);
     setMotionEnabled(savedMotionEnabled ?? false);
@@ -380,6 +411,16 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setInactivityReturnDelay(String(savedInactivityReturnDelay));
     setInactivityReturnResetOnNav(savedInactivityReturnResetOnNav);
     setInactivityReturnClearCache(savedInactivityReturnClearCache);
+
+    // URL Filtering settings
+    const savedUrlFilterEnabled = await StorageService.getUrlFilterEnabled();
+    const savedUrlFilterMode = await StorageService.getUrlFilterMode();
+    const savedUrlFilterList = await StorageService.getUrlFilterList();
+    const savedUrlFilterShowFeedback = await StorageService.getUrlFilterShowFeedback();
+    setUrlFilterEnabled(savedUrlFilterEnabled);
+    setUrlFilterMode(savedUrlFilterMode);
+    setUrlFilterList(savedUrlFilterList);
+    setUrlFilterShowFeedback(savedUrlFilterShowFeedback);
   };
 
   const loadCertificates = async (): Promise<void> => {
@@ -395,6 +436,12 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
 
   const requestOverlayPermission = async () => {
     try {
+      // Stop lock task temporarily so Android allows leaving the app
+      try {
+        await KioskModule.stopLockTask();
+      } catch (e) {
+        // Not in lock task, that's fine
+      }
       await OverlayPermissionModule.requestOverlayPermission();
       setTimeout(() => checkOverlayPermission(), 1000);
     } catch (error) {
@@ -435,10 +482,19 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
 
   const toggleAutoLaunch = async (value: boolean) => {
     setAutoLaunchEnabled(value);
-    // On sauvegarde uniquement dans SharedPreferences
-    // Le BootReceiver lit directement cette valeur au boot
-    // Plus besoin de enable/disable le composant via PackageManager
+    // Save in AsyncStorage (read by BootReceiver at boot)
     await StorageService.saveAutoLaunch(value);
+    // Enable/disable the BootReceiver component in PackageManager
+    // This ensures Android delivers BOOT_COMPLETED broadcast to the receiver
+    try {
+      if (value) {
+        await KioskModule.enableAutoLaunch();
+      } else {
+        await KioskModule.disableAutoLaunch();
+      }
+    } catch (error) {
+      console.warn('Failed to toggle BootReceiver component:', error);
+    }
   };
 
   const toggleMotionDetection = async (value: boolean) => {
@@ -460,7 +516,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
           'Camera access is needed for motion detection.',
           [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => Linking.openSettings() }
+            { text: 'Open Settings', onPress: () => openSystemSettingsSafely() }
           ]
         );
         return;
@@ -808,6 +864,12 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       await StorageService.saveUrlPlannerEnabled(false);
       await StorageService.saveWebViewBackButtonEnabled(false);
     }
+
+    // Save URL Filtering settings
+    await StorageService.saveUrlFilterEnabled(urlFilterEnabled);
+    await StorageService.saveUrlFilterMode(urlFilterMode);
+    await StorageService.saveUrlFilterList(urlFilterList);
+    await StorageService.saveUrlFilterShowFeedback(urlFilterShowFeedback);
 
     // Update overlay settings
     if (displayMode === 'external_app') {
@@ -1220,12 +1282,21 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             onVolumeUp5TapEnabledChange={setVolumeUp5TapEnabled}
             autoLaunchEnabled={autoLaunchEnabled}
             onAutoLaunchChange={toggleAutoLaunch}
+            onOpenSystemSettings={openSystemSettingsSafely}
             autoRelaunchApp={autoRelaunchApp}
             onAutoRelaunchAppChange={setAutoRelaunchApp}
             backButtonMode={backButtonMode}
             onBackButtonModeChange={setBackButtonMode}
             backButtonTimerDelay={backButtonTimerDelay}
             onBackButtonTimerDelayChange={setBackButtonTimerDelay}
+            urlFilterEnabled={urlFilterEnabled}
+            onUrlFilterEnabledChange={setUrlFilterEnabled}
+            urlFilterMode={urlFilterMode}
+            onUrlFilterModeChange={setUrlFilterMode}
+            urlFilterList={urlFilterList}
+            onUrlFilterListChange={setUrlFilterList}
+            urlFilterShowFeedback={urlFilterShowFeedback}
+            onUrlFilterShowFeedbackChange={setUrlFilterShowFeedback}
           />
         );
       

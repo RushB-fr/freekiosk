@@ -492,6 +492,19 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                     put("command", command)
                 }
             }
+            "wake" -> {
+                // Wake must also turn on the physical screen (after lockNow)
+                turnScreenOn()
+                // Also send to JS to deactivate screensaver overlay
+                sendEvent("onApiCommand", Arguments.createMap().apply {
+                    putString("command", "wake")
+                    putString("params", "{}")
+                })
+                return JSONObject().apply {
+                    put("executed", true)
+                    put("command", command)
+                }
+            }
             "autoBrightnessEnable" -> {
                 val min = params?.optInt("min", 10) ?: 10
                 val max = params?.optInt("max", 100) ?: 100
@@ -855,6 +868,17 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                     val layoutParams = activity.window.attributes
                     layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
                     activity.window.attributes = layoutParams
+                    
+                    // Release wakeLock after a short delay — FLAG_KEEP_SCREEN_ON handles persistence
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        try {
+                            wakeLock?.release()
+                            wakeLock = null
+                            Log.d(TAG, "WakeLock released after screen on (FLAG_KEEP_SCREEN_ON active)")
+                        } catch (e: Exception) {
+                            // Already released
+                        }
+                    }, 5000) // 5 seconds is enough for screen to fully wake
                     
                     Log.d(TAG, "Screen turned ON via HTTP API")
                 }

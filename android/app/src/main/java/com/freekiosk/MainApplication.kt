@@ -28,6 +28,7 @@ class MainApplication : Application(), ReactApplication {
           add(HttpServerPackage())
           add(BlockingOverlayPackage())
           add(AutoBrightnessPackage())
+          add(PrintPackage())
         },
     )
   }

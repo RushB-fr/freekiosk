@@ -15,6 +15,7 @@ interface OverlayServiceModuleType {
   setStatusBarEnabled(enabled: boolean): Promise<boolean>;
   getStatusBarEnabled(): Promise<boolean>;
   setTestMode(enabled: boolean): Promise<boolean>;
+  setBackButtonMode(mode: string): Promise<boolean>;
 }
 
 const OverlayServiceModule: OverlayServiceModuleType = NativeModules.OverlayServiceModule;

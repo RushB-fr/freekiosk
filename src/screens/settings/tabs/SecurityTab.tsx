@@ -12,6 +12,8 @@ import {
   SettingsInput,
   SettingsInfoBox,
   SettingsButton,
+  SettingsModeSelector,
+  UrlListEditor,
 } from '../../../components/settings';
 import { Colors, Spacing, Typography } from '../../../theme';
 
@@ -49,6 +51,7 @@ interface SecurityTabProps {
   // Auto launch
   autoLaunchEnabled: boolean;
   onAutoLaunchChange: (value: boolean) => void;
+  onOpenSystemSettings: () => void;
   
   // External app specific
   autoRelaunchApp: boolean;
@@ -57,6 +60,16 @@ interface SecurityTabProps {
   onBackButtonModeChange: (value: string) => void;
   backButtonTimerDelay: string;
   onBackButtonTimerDelayChange: (value: string) => void;
+  
+  // URL Filtering
+  urlFilterEnabled: boolean;
+  onUrlFilterEnabledChange: (value: boolean) => void;
+  urlFilterMode: string; // 'blacklist' | 'whitelist'
+  onUrlFilterModeChange: (value: string) => void;
+  urlFilterList: string[];
+  onUrlFilterListChange: (patterns: string[]) => void;
+  urlFilterShowFeedback: boolean;
+  onUrlFilterShowFeedbackChange: (value: boolean) => void;
 }
 
 const SecurityTab: React.FC<SecurityTabProps> = ({
@@ -83,12 +96,21 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
   onVolumeUp5TapEnabledChange,
   autoLaunchEnabled,
   onAutoLaunchChange,
+  onOpenSystemSettings,
   autoRelaunchApp,
   onAutoRelaunchAppChange,
   backButtonMode,
   onBackButtonModeChange,
   backButtonTimerDelay,
   onBackButtonTimerDelayChange,
+  urlFilterEnabled,
+  onUrlFilterEnabledChange,
+  urlFilterMode,
+  onUrlFilterModeChange,
+  urlFilterList,
+  onUrlFilterListChange,
+  urlFilterShowFeedback,
+  onUrlFilterShowFeedbackChange,
 }) => {
   return (
     <View>
@@ -146,8 +168,8 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
           <>
             <View style={styles.divider} />
             <SettingsSwitch
-              label="🔌 Allow Power Button"
-              hint="Allow access to power menu to shut down or restart device. When disabled, power button only turns screen on/off."
+              label="🔌 Allow Power Menu"
+              hint="When enabled, long-pressing the power button shows the power menu (Restart/Shutdown). When disabled, long-pressing the power button has no effect — it can only turn the screen on/off with a short press."
               value={allowPowerButton}
               onValueChange={onAllowPowerButtonChange}
             />
@@ -181,7 +203,7 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
           title="Open System Settings"
           icon="cog-outline"
           variant="primary"
-          onPress={() => Linking.openSettings()}
+          onPress={onOpenSystemSettings}
         />
       </SettingsSection>
       
@@ -319,6 +341,84 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
           </SettingsInfoBox>
         )}
       </SettingsSection>
+      
+      {/* URL Filtering - Blacklist/Whitelist (WebView mode only) */}
+      {displayMode === 'webview' && (
+        <SettingsSection title="URL Filtering" icon="shield-lock">
+          <SettingsSwitch
+            label="Enable URL Filtering"
+            hint="Control which URLs can be accessed in the kiosk browser"
+            value={urlFilterEnabled}
+            onValueChange={onUrlFilterEnabledChange}
+          />
+          
+          {urlFilterEnabled && (
+            <>
+              <View style={styles.divider} />
+              
+              <SettingsModeSelector
+                label="Filter Mode"
+                options={[
+                  {
+                    value: 'blacklist',
+                    label: 'Blacklist',
+                    icon: 'close-circle',
+                  },
+                  {
+                    value: 'whitelist',
+                    label: 'Whitelist',
+                    icon: 'check-circle-outline',
+                  },
+                ]}
+                value={urlFilterMode}
+                onValueChange={onUrlFilterModeChange}
+                hint={urlFilterMode === 'blacklist' 
+                  ? 'URLs matching these patterns will be blocked. The main kiosk URL is always allowed, even if it matches a pattern.' 
+                  : 'Only the main kiosk URL and URLs matching these patterns will be allowed. With an empty list, only your kiosk URL can be accessed.'}
+              />
+              
+              <View style={styles.divider} />
+              
+              <UrlListEditor
+                urls={urlFilterList}
+                onUrlsChange={onUrlFilterListChange}
+                maxUrls={0}
+                patternMode={true}
+                placeholder={urlFilterMode === 'blacklist' ? '*facebook.com*' : '*mysite.com/*'}
+                emptyTitle="No patterns added yet"
+                emptyHint={urlFilterMode === 'blacklist' 
+                  ? 'Add URL patterns to block' 
+                  : 'Only your main kiosk URL is currently allowed. Add patterns to allow more URLs.'}
+              />
+              
+              <SettingsInfoBox variant="info">
+                <Text style={styles.infoText}>
+                  {'ℹ️ Use * as wildcard to match any characters.\n\n'}
+                  {'Examples:\n'}
+                  {'• *facebook.com* → matches any URL containing facebook.com\n'}
+                  {'• */privacy* → matches any path containing /privacy\n'}
+                  {'• https://example.com/admin/* → matches all admin pages'}
+                </Text>
+              </SettingsInfoBox>
+              
+              <SettingsInfoBox variant="success">
+                <Text style={styles.infoText}>
+                  {'✅ The main kiosk URL configured in General settings is always allowed, even if it matches a blacklist pattern. You don\'t need to add it to the whitelist.'}
+                </Text>
+              </SettingsInfoBox>
+              
+              <View style={styles.divider} />
+              
+              <SettingsSwitch
+                label="Show Blocked Notification"
+                hint="Briefly display a toast message when a URL is blocked"
+                value={urlFilterShowFeedback}
+                onValueChange={onUrlFilterShowFeedbackChange}
+              />
+            </>
+          )}
+        </SettingsSection>
+      )}
       
       {/* External App Specific Settings */}
       {displayMode === 'external_app' && (

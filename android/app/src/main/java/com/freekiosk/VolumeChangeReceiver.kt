@@ -122,9 +122,9 @@ class VolumeChangeReceiver : BroadcastReceiver() {
     
     private fun getAsyncStorageValue(context: Context, key: String, defaultValue: String): String {
         try {
-            val dbPath = context.getDatabasePath("AsyncStorage").absolutePath
+            val dbPath = context.getDatabasePath("RKStorage").absolutePath
             val db = SQLiteDatabase.openDatabase(dbPath, null, SQLiteDatabase.OPEN_READONLY)
-            val cursor = db.rawQuery("SELECT value FROM Storage WHERE key = ?", arrayOf(key))
+            val cursor = db.rawQuery("SELECT value FROM catalystLocalStorage WHERE key = ?", arrayOf(key))
             
             val value = if (cursor.moveToFirst()) {
                 cursor.getString(0) ?: defaultValue

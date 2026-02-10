@@ -12,12 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Settings Buttons Broken in Lock Mode**: Fixed "Open System Settings", "Grant Usage Access" and camera permission buttons not working when lock mode is active
+  - Lock task is now temporarily stopped before opening system settings, allowing Android to navigate away
+  - Lock task is automatically re-enabled when the user saves settings
+
 ***
 
 ## [1.2.7] - 2026-02-09
 
 ### Fixed
-- � **Navigation Buttons Blocked in Lock Mode**: Fixed navigation buttons (Home, Recents) not being properly blocked in kiosk lock mode
+- **Navigation Buttons Blocked in Lock Mode**: Fixed navigation buttons (Home, Recents) not being properly blocked in kiosk lock mode
   - Ensured `LOCK_TASK_FEATURE_NONE` correctly blocks all system navigation by default
   - Only `GLOBAL_ACTIONS` (power button) and `NOTIFICATIONS` are conditionally enabled based on user settings
   - Updated `hideSystemUI()` to use modern `WindowInsetsController` API for Android 11+ (API 30+)

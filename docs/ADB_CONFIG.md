@@ -87,8 +87,8 @@ adb shell am start -n com.freekiosk/.MainActivity [OPTIONS]
 | `--ez auto_start true` | Boolean | - | Auto-launch the locked app after config |
 | `--es auto_launch "true"` | String | - | Auto-launch on boot (alternative to `auto_start`) |
 | `--es auto_relaunch "true"` | String | - | Auto-relaunch if app crashes/exits |
-| `--es test_mode "false"` | String | `"true"` | `"false"` = production (back button blocked, auto-relaunch on 5-tap). `"true"` = testing (back button allowed, stay on FreeKiosk after 5-tap) |
-| `--es back_button_mode "immediate"` | String | `"test"` | Behavior after 5-tap return: `"test"` (stay on FreeKiosk), `"timer"` (countdown then relaunch), `"immediate"` (instant relaunch). Auto-set by `test_mode` if not specified |
+| `--es test_mode "false"` | String | `"true"` | `"false"` = production (sets `back_button_mode` to `immediate`). `"true"` = testing (sets `back_button_mode` to `test`). Shortcut for `back_button_mode` |
+| `--es back_button_mode "immediate"` | String | `"test"` | Behavior when returning to FreeKiosk via Android back button: `"test"` (stay on FreeKiosk, back button allowed), `"timer"` (countdown then relaunch app), `"immediate"` (instantly relaunch app). If `test_mode` is also set, `back_button_mode` takes priority |
 | `--es status_bar "true"` | String | - | Show custom status bar |
 
 ### Password Options
@@ -226,7 +226,7 @@ adb shell am start -n com.freekiosk/.MainActivity \
     --ez auto_start true
 ```
 
-> **Note**: `test_mode "false"` blocks the back button and sets auto-relaunch on 5-tap return (production behavior). Omit it or set to `"true"` during testing to allow back button and stay on FreeKiosk after 5-tap.
+> **Note**: `test_mode "false"` sets `back_button_mode` to `immediate`, meaning the Android back button will instantly relaunch the app. Omit it or set to `"true"` during testing to allow the back button to return to FreeKiosk without auto-relaunch.
 
 ### 2. Hotel Room Tablet
 
@@ -335,7 +335,10 @@ adb shell dpm set-device-owner com.freekiosk/.DeviceAdminReceiver
 echo "⏳ Waiting for device..."
 sleep 2
 
-echo "📱 Configuring FreeKiosk..."
+echo "� Granting Usage Stats permission (required for foreground monitoring)..."
+adb shell appops set com.freekiosk android:get_usage_stats allow
+
+echo "�📱 Configuring FreeKiosk..."
 adb shell am start -n com.freekiosk/.MainActivity \
     --es lock_package "$PACKAGE" \
     --es pin "$PIN" \
@@ -367,7 +370,10 @@ adb shell dpm set-device-owner com.freekiosk/.DeviceAdminReceiver
 
 Start-Sleep -Seconds 2
 
-Write-Host "📱 Configuring FreeKiosk..."
+Write-Host "� Granting Usage Stats permission..."
+adb shell appops set com.freekiosk android:get_usage_stats allow
+
+Write-Host "�📱 Configuring FreeKiosk..."
 # Note: JSON escaping in PowerShell is complex, use individual parameters
 adb shell am start -n com.freekiosk/.MainActivity `
     --es lock_package $Package `

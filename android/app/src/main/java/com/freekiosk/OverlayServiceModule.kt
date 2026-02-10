@@ -113,6 +113,21 @@ class OverlayServiceModule(reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
+    fun setBackButtonMode(mode: String, promise: Promise) {
+        try {
+            // Sync back_button_mode to SharedPreferences so onBackPressed() can read it
+            val prefs = reactApplicationContext.getSharedPreferences("FreeKioskSettings", android.content.Context.MODE_PRIVATE)
+            prefs.edit().putString("back_button_mode", mode).apply()
+            
+            DebugLog.d("OverlayServiceModule", "Set back button mode to: $mode")
+            promise.resolve(true)
+        } catch (e: Exception) {
+            DebugLog.errorProduction("OverlayServiceModule", "Error setting back button mode: ${e.message}")
+            promise.reject("ERROR", "Failed to set back button mode: ${e.message}")
+        }
+    }
+
+    @ReactMethod
     fun setStatusBarEnabled(enabled: Boolean, promise: Promise) {
         try {
             // Sauvegarder dans SharedPreferences

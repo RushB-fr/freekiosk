@@ -1,4 +1,4 @@
-import React, { useRef, useState, useImperativeHandle, forwardRef } from 'react';
+import React, { useRef, useState, useMemo, useCallback, useImperativeHandle, forwardRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -14,6 +14,7 @@ import {
 import { WebView } from 'react-native-webview';
 import type { WebViewErrorEvent, ShouldStartLoadRequest } from 'react-native-webview/lib/WebViewTypes';
 import { useNavigation } from '@react-navigation/native';
+import PrintModule from '../utils/PrintModule';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
@@ -29,6 +30,9 @@ interface WebViewComponentProps {
   showBackButton?: boolean; // Enable web navigation back button
   onNavigationStateChange?: (canGoBack: boolean) => void; // Callback for web navigation state
   onPageNavigated?: (url: string) => void; // Callback when page URL changes (for inactivity return)
+  urlFilterMode?: string; // 'whitelist' or 'blacklist'
+  urlFilterPatterns?: string[]; // URL patterns to filter
+  urlFilterShowFeedback?: boolean; // Show feedback when URL is blocked
 }
 
 export interface WebViewComponentRef {
@@ -44,14 +48,84 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   onJsExecuted,
   showBackButton = false,
   onNavigationStateChange,
-  onPageNavigated
+  onPageNavigated,
+  urlFilterMode,
+  urlFilterPatterns,
+  urlFilterShowFeedback = false
 }, ref) => {
   const navigation = useNavigation<NavigationProp>();
   const webViewRef = useRef<WebView>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<boolean>(false);
+  const [blockedUrlMessage, setBlockedUrlMessage] = useState<string | null>(null);
+  const blockedUrlTimerRef = useRef<any>(null);
+  const isGoingBackRef = useRef<boolean>(false); // Prevent goBack loop for URL filter
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const loadingTimeoutRef = useRef<any>(null);
+
+  // Pre-compile URL filter patterns into RegExp for performance
+  const compiledFilterPatterns = useMemo(() => {
+    if (!urlFilterPatterns || urlFilterPatterns.length === 0) return [];
+    return urlFilterPatterns.map(pattern => {
+      try {
+        // Strip leading/trailing whitespace
+        let p = pattern.trim();
+        if (!p) return null;
+
+        // Escape regex special chars except *, then convert * to .*
+        const escaped = p.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+
+        // If the pattern already starts with a protocol (http/https), anchor it
+        // Otherwise, allow any protocol prefix and make trailing slash optional
+        const hasProtocol = /^https?:\/\//i.test(p);
+        if (hasProtocol) {
+          // Exact match with optional trailing slash
+          return new RegExp(`^${escaped}\\/?$`, 'i');
+        } else {
+          // No protocol: allow https?:// prefix, optional trailing slash
+          return new RegExp(`^https?:\\/\\/${escaped}\\/?$`, 'i');
+        }
+      } catch {
+        return null;
+      }
+    }).filter(Boolean) as RegExp[];
+  }, [urlFilterPatterns]);
+
+  // Check if a URL should be blocked by the filter
+  const isUrlBlocked = useCallback((targetUrl: string): boolean => {
+    if (!urlFilterMode) return false;
+
+    // Blacklist with empty list = nothing to block
+    if (urlFilterMode === 'blacklist' && compiledFilterPatterns.length === 0) return false;
+
+    // Always allow the main kiosk URL (regardless of mode)
+    // This prevents the kiosk from blocking its own page
+    if (targetUrl === url || targetUrl === url + '/' || url === targetUrl + '/') return false;
+
+    if (urlFilterMode === 'blacklist') {
+      // Blacklist: block if URL matches any pattern
+      return compiledFilterPatterns.some(regex => regex.test(targetUrl));
+    } else {
+      // Whitelist: block everything except main URL + matched patterns
+      // Empty list = only main URL allowed (strictest mode)
+      if (compiledFilterPatterns.length === 0) return true;
+      // Check if target matches any whitelist pattern
+      if (compiledFilterPatterns.some(regex => regex.test(targetUrl))) return false;
+      // No match = blocked
+      return true;
+    }
+  }, [urlFilterMode, compiledFilterPatterns, url]);
+
+  // Show brief feedback when URL is blocked
+  const showBlockedFeedback = useCallback((blockedUrl: string) => {
+    if (!urlFilterShowFeedback) return;
+    // Extract hostname from URL using regex (avoid URL constructor type issues in RN)
+    const hostMatch = blockedUrl.match(/^https?:\/\/([^/]+)/);
+    const hostname = hostMatch ? hostMatch[1] : blockedUrl;
+    setBlockedUrlMessage(`🚫 ${hostname}`);
+    if (blockedUrlTimerRef.current) clearTimeout(blockedUrlTimerRef.current);
+    blockedUrlTimerRef.current = setTimeout(() => setBlockedUrlMessage(null), 2000);
+  }, [urlFilterShowFeedback]);
 
   // Expose goBack method to parent via ref
   useImperativeHandle(ref, () => ({
@@ -107,6 +181,14 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
     } catch(e) {
       console.error('[FreeKiosk] localStorage FAILED:', e);
     }
+
+    // Intercept window.print() to use native Android print
+    window.print = function() {
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'PRINT_REQUEST',
+        title: document.title || ''
+      }));
+    };
 
     // Throttling pour éviter le flood de messages (critique sur Fire OS)
     let lastInteraction = 0;
@@ -224,12 +306,17 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
     
     if (message === 'user-interaction' && onUserInteraction) {
       onUserInteraction();
-    } else if (message.startsWith('{') && onUserInteraction) {
-      // Parse JSON message (tap with coordinates)
+    } else if (message.startsWith('{')) {
+      // Parse JSON message
       try {
         const data = JSON.parse(message);
-        if (data.type === 'FIVE_TAP_CLICK') {
+        if (data.type === 'FIVE_TAP_CLICK' && onUserInteraction) {
           onUserInteraction({ isTap: true, x: data.x, y: data.y });
+        } else if (data.type === 'PRINT_REQUEST') {
+          // Handle print request from window.print()
+          PrintModule.printWebView(data.title || 'FreeKiosk Print')
+            .then(() => console.log('[WebView] Print job started'))
+            .catch((err: any) => console.error('[WebView] Print failed:', err));
         }
       } catch (e) {
         // Ignore parse errors
@@ -346,7 +433,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
 
             {/* Footer */}
             <Text style={styles.footerText}>
-              Version 1.2.7 • by Rushb
+              Version 1.2.8 • by Rushb
             </Text>
           </Animated.View>
         </ScrollView>
@@ -424,6 +511,12 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
             return false;
           }
 
+          // URL Filtering (blacklist/whitelist)
+          if (isUrlBlocked(request.url)) {
+            showBlockedFeedback(request.url);
+            return false;
+          }
+
           return true;
         }}
 
@@ -435,6 +528,18 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
           // Report URL changes for inactivity return feature
           if (onPageNavigated && navState.url) {
             onPageNavigated(navState.url);
+          }
+          // URL Filtering: catch SPA/client-side navigations (pushState, router.push)
+          // that don't trigger onShouldStartLoadWithRequest
+          if (navState.url && !isGoingBackRef.current && isUrlBlocked(navState.url)) {
+            showBlockedFeedback(navState.url);
+            // Navigate back to cancel the SPA navigation
+            isGoingBackRef.current = true;
+            if (webViewRef.current) {
+              webViewRef.current.goBack();
+            }
+            // Reset guard after a short delay
+            setTimeout(() => { isGoingBackRef.current = false; }, 500);
           }
         }}
 
@@ -452,6 +557,11 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
         setSupportMultipleWindows={true}
         onOpenWindow={(syntheticEvent) => {
           const { nativeEvent } = syntheticEvent;
+          // URL Filtering: block popups to filtered URLs
+          if (nativeEvent.targetUrl && isUrlBlocked(nativeEvent.targetUrl)) {
+            showBlockedFeedback(nativeEvent.targetUrl);
+            return;
+          }
           // Load the URL in the same WebView instead of opening a popup
           if (webViewRef.current && nativeEvent.targetUrl) {
             webViewRef.current.injectJavaScript(
@@ -489,6 +599,12 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
           <TouchableOpacity style={styles.reloadButton} onPress={handleReload}>
             <Text style={styles.reloadText}>🔄 Reload Now</Text>
           </TouchableOpacity>
+        </View>
+      )}
+
+      {blockedUrlMessage && (
+        <View style={styles.blockedToast}>
+          <Text style={styles.blockedToastText}>{blockedUrlMessage}</Text>
         </View>
       )}
     </View>
@@ -698,6 +814,20 @@ const styles = StyleSheet.create({
     color: '#fff', 
     fontSize: 16, 
     fontWeight: 'bold' 
+  },
+  blockedToast: {
+    position: 'absolute',
+    bottom: 40,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  blockedToastText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

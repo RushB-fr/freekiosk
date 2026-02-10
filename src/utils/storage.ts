@@ -83,6 +83,11 @@ const KEYS = {
   INACTIVITY_RETURN_DELAY: '@kiosk_inactivity_return_delay',
   INACTIVITY_RETURN_RESET_ON_NAV: '@kiosk_inactivity_return_reset_on_nav',
   INACTIVITY_RETURN_CLEAR_CACHE: '@kiosk_inactivity_return_clear_cache',
+  // URL Filtering (Blacklist/Whitelist)
+  URL_FILTER_ENABLED: '@kiosk_url_filter_enabled',
+  URL_FILTER_MODE: '@kiosk_url_filter_mode', // 'blacklist' | 'whitelist'
+  URL_FILTER_LIST: '@kiosk_url_filter_list',
+  URL_FILTER_SHOW_FEEDBACK: '@kiosk_url_filter_show_feedback',
   // Legacy keys for backward compatibility
   SCREENSAVER_DELAY: '@screensaver_delay',
   MOTION_DETECTION_ENABLED: '@motion_detection_enabled',
@@ -245,6 +250,10 @@ export const StorageService = {
         // Blocking Overlays
         KEYS.BLOCKING_OVERLAYS_ENABLED,
         KEYS.BLOCKING_OVERLAYS_REGIONS,
+        // Return to Settings (missing keys)
+        KEYS.RETURN_TAP_TIMEOUT,
+        KEYS.RETURN_MODE,
+        KEYS.RETURN_BUTTON_POSITION,
         // Camera preference
         KEYS.MOTION_CAMERA_POSITION,
         // WebView Back Button
@@ -257,6 +266,20 @@ export const StorageService = {
         KEYS.AUTO_BRIGHTNESS_MAX,
         KEYS.AUTO_BRIGHTNESS_UPDATE_INTERVAL,
         KEYS.AUTO_BRIGHTNESS_SAVED_MANUAL,
+        // Screen Sleep Scheduler
+        KEYS.SCREEN_SCHEDULER_ENABLED,
+        KEYS.SCREEN_SCHEDULER_RULES,
+        KEYS.SCREEN_SCHEDULER_WAKE_ON_TOUCH,
+        // Inactivity Return to Home
+        KEYS.INACTIVITY_RETURN_ENABLED,
+        KEYS.INACTIVITY_RETURN_DELAY,
+        KEYS.INACTIVITY_RETURN_RESET_ON_NAV,
+        KEYS.INACTIVITY_RETURN_CLEAR_CACHE,
+        // URL Filtering
+        KEYS.URL_FILTER_ENABLED,
+        KEYS.URL_FILTER_MODE,
+        KEYS.URL_FILTER_LIST,
+        KEYS.URL_FILTER_SHOW_FEEDBACK,
         // Legacy keys
         KEYS.SCREENSAVER_DELAY,
         KEYS.MOTION_DETECTION_ENABLED,
@@ -1482,6 +1505,80 @@ export const StorageService = {
       return value ? JSON.parse(value) : false; // Default: OFF
     } catch (error) {
       console.error('Error getting inactivity return clear cache:', error);
+      return false;
+    }
+  },
+
+  // ============ URL FILTERING ============
+
+  saveUrlFilterEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.URL_FILTER_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving URL filter enabled:', error);
+    }
+  },
+
+  getUrlFilterEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.URL_FILTER_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting URL filter enabled:', error);
+      return false;
+    }
+  },
+
+  saveUrlFilterMode: async (mode: string): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.URL_FILTER_MODE, mode);
+    } catch (error) {
+      console.error('Error saving URL filter mode:', error);
+    }
+  },
+
+  getUrlFilterMode: async (): Promise<string> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.URL_FILTER_MODE);
+      return value || 'blacklist';
+    } catch (error) {
+      console.error('Error getting URL filter mode:', error);
+      return 'blacklist';
+    }
+  },
+
+  saveUrlFilterList: async (patterns: string[]): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.URL_FILTER_LIST, JSON.stringify(patterns));
+    } catch (error) {
+      console.error('Error saving URL filter list:', error);
+    }
+  },
+
+  getUrlFilterList: async (): Promise<string[]> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.URL_FILTER_LIST);
+      return value ? JSON.parse(value) : [];
+    } catch (error) {
+      console.error('Error getting URL filter list:', error);
+      return [];
+    }
+  },
+
+  saveUrlFilterShowFeedback: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.URL_FILTER_SHOW_FEEDBACK, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving URL filter show feedback:', error);
+    }
+  },
+
+  getUrlFilterShowFeedback: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.URL_FILTER_SHOW_FEEDBACK);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting URL filter show feedback:', error);
       return false;
     }
   },

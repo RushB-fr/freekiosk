@@ -17,19 +17,33 @@ import { Colors, Spacing, Typography } from '../../theme';
 interface UrlListEditorProps {
   urls: string[];
   onUrlsChange: (urls: string[]) => void;
-  maxUrls?: number;
+  maxUrls?: number; // 0 or undefined = unlimited (for patterns), default 10 for URLs
+  /** Pattern mode: accept wildcards (*), skip URL normalization */
+  patternMode?: boolean;
+  placeholder?: string;
+  emptyTitle?: string;
+  emptyHint?: string;
 }
 
 const UrlListEditor: React.FC<UrlListEditorProps> = ({
   urls,
   onUrlsChange,
   maxUrls = 10,
+  patternMode = false,
+  placeholder,
+  emptyTitle,
+  emptyHint,
 }) => {
   const [newUrl, setNewUrl] = useState('');
 
   const validateUrl = (url: string): boolean => {
     const trimmed = url.trim().toLowerCase();
     if (!trimmed) return false;
+    
+    if (patternMode) {
+      // Pattern mode: just needs some content, wildcards are OK
+      return trimmed.length >= 2;
+    }
     
     // Basic validation - must have a domain
     if (!trimmed.includes('.')) return false;
@@ -46,6 +60,12 @@ const UrlListEditor: React.FC<UrlListEditorProps> = ({
 
   const normalizeUrl = (url: string): string => {
     let trimmed = url.trim();
+    
+    if (patternMode) {
+      // Pattern mode: keep as-is (preserve wildcards)
+      return trimmed;
+    }
+    
     const lower = trimmed.toLowerCase();
     
     // Add https:// if no protocol
@@ -58,17 +78,20 @@ const UrlListEditor: React.FC<UrlListEditorProps> = ({
 
   const handleAddUrl = () => {
     if (!newUrl.trim()) {
-      Alert.alert('Error', 'Please enter a URL');
+      Alert.alert('Error', patternMode ? 'Please enter a pattern' : 'Please enter a URL');
       return;
     }
 
     if (!validateUrl(newUrl)) {
-      Alert.alert('Invalid URL', 'Please enter a valid URL (e.g., example.com)');
+      Alert.alert(
+        patternMode ? 'Invalid Pattern' : 'Invalid URL', 
+        patternMode ? 'Please enter a valid pattern (e.g., *facebook.com*)' : 'Please enter a valid URL (e.g., example.com)'
+      );
       return;
     }
 
-    if (urls.length >= maxUrls) {
-      Alert.alert('Limit Reached', `Maximum ${maxUrls} URLs allowed`);
+    if (maxUrls > 0 && urls.length >= maxUrls) {
+      Alert.alert('Limit Reached', `Maximum ${maxUrls} entries allowed`);
       return;
     }
 
@@ -148,9 +171,9 @@ const UrlListEditor: React.FC<UrlListEditorProps> = ({
         </View>
       ) : (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyStateIcon}>📋</Text>
-          <Text style={styles.emptyStateText}>No URLs added yet</Text>
-          <Text style={styles.emptyStateHint}>Add URLs below to start rotation</Text>
+          <Text style={styles.emptyStateIcon}>{patternMode ? '🔗' : '📋'}</Text>
+          <Text style={styles.emptyStateText}>{emptyTitle || 'No URLs added yet'}</Text>
+          <Text style={styles.emptyStateHint}>{emptyHint || 'Add URLs below to start rotation'}</Text>
         </View>
       )}
 
@@ -161,7 +184,7 @@ const UrlListEditor: React.FC<UrlListEditorProps> = ({
             style={styles.input}
             value={newUrl}
             onChangeText={setNewUrl}
-            placeholder="https://example.com"
+            placeholder={placeholder || 'https://example.com'}
             placeholderTextColor={Colors.textHint}
             keyboardType="url"
             autoCapitalize="none"
@@ -169,16 +192,16 @@ const UrlListEditor: React.FC<UrlListEditorProps> = ({
             onSubmitEditing={handleAddUrl}
           />
           <TouchableOpacity
-            style={[styles.addButton, urls.length >= maxUrls && styles.addButtonDisabled]}
+            style={[styles.addButton, (maxUrls > 0 && urls.length >= maxUrls) && styles.addButtonDisabled]}
             onPress={handleAddUrl}
-            disabled={urls.length >= maxUrls}
+            disabled={maxUrls > 0 && urls.length >= maxUrls}
           >
             <Text style={styles.addButtonText}>+</Text>
           </TouchableOpacity>
         </View>
         
         <Text style={styles.countText}>
-          {urls.length} / {maxUrls} URLs
+          {maxUrls > 0 ? `${urls.length} / ${maxUrls} ${patternMode ? 'patterns' : 'URLs'}` : `${urls.length} ${patternMode ? 'patterns' : 'URLs'}`}
         </Text>
       </View>
     </View>

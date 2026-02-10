@@ -123,6 +123,9 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const inactivityReturnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentWebViewUrlRef = useRef<string>(''); // Track current WebView URL for return logic
 
+  // Track focus transitions (true→false) to avoid false cleanup triggers
+  const prevIsFocusedRef = useRef<boolean>(true);
+
   // WebView reload key - increment to force reload
   const [webViewKey, setWebViewKey] = useState<number>(0);
   
@@ -135,6 +138,12 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [webViewBackButtonXPercent, setWebViewBackButtonXPercent] = useState<number>(2);
   const [webViewBackButtonYPercent, setWebViewBackButtonYPercent] = useState<number>(10);
   const [canGoBack, setCanGoBack] = useState<boolean>(false);
+
+  // URL Filtering states
+  const [urlFilterEnabled, setUrlFilterEnabled] = useState<boolean>(false);
+  const [urlFilterMode, setUrlFilterMode] = useState<'blacklist' | 'whitelist'>('blacklist');
+  const [urlFilterList, setUrlFilterList] = useState<string[]>([]);
+  const [urlFilterShowFeedback, setUrlFilterShowFeedback] = useState<boolean>(false);
 
   // AppState listener - détecte quand l'app revient au premier plan
   useEffect(() => {
@@ -174,9 +183,9 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
             return;
           }
           
-          // Mode immediate: relancer directement
-          // 3. Sinon, relancer automatiquement l'app externe
-          if (displayMode === 'external_app' && externalAppPackage && autoRelaunchApp) {
+          // Mode immediate: relancer directement (pas besoin de autoRelaunchApp)
+          if (displayMode === 'external_app' && externalAppPackage) {
+            console.log('[KioskScreen] Immediate mode: relaunching', externalAppPackage);
             // Petit délai pour laisser l'UI se stabiliser
             appLaunchTimeoutRef.current = setTimeout(() => {
               launchExternalApp(externalAppPackage);
@@ -196,11 +205,13 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         clearTimeout(appLaunchTimeoutRef.current);
       }
     };
-  }, [displayMode, externalAppPackage, autoRelaunchApp]);
+  }, [displayMode, externalAppPackage]);
 
   // Auto-brightness: pause when screensaver activates, resume when it deactivates
   useEffect(() => {
     const handleAutoBrightnessForScreensaver = async () => {
+      // Skip if scheduled sleep is active (handled separately)
+      if (isScheduledSleep) return;
       if (!autoBrightnessEnabled) return;
       
       if (isScreensaverActive) {
@@ -228,11 +239,16 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     };
     
     handleAutoBrightnessForScreensaver();
-  }, [isScreensaverActive, autoBrightnessEnabled, autoBrightnessMin, autoBrightnessMax, autoBrightnessInterval, screensaverBrightness]);
+  }, [isScreensaverActive, autoBrightnessEnabled, autoBrightnessMin, autoBrightnessMax, autoBrightnessInterval, screensaverBrightness, isScheduledSleep]);
 
   // Désactiver le screensaver quand l'écran perd le focus (navigation vers Settings)
+  // Only triggers cleanup on actual focus→blur transition (not when other deps change)
   useEffect(() => {
-    if (!isFocused) {
+    const wasFocused = prevIsFocusedRef.current;
+    prevIsFocusedRef.current = isFocused;
+
+    // Only run cleanup when transitioning from focused → unfocused
+    if (wasFocused && !isFocused) {
       if (isScreensaverActive) {
         console.log('[KioskScreen] Screen lost focus, disabling screensaver');
         setIsScreensaverActive(false);
@@ -286,14 +302,18 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
             console.error('[API] Error setting brightness:', error);
           }
         },
-        onScreensaverOn: () => {
-          setIsScreensaverActive(true);
-          console.log('[API] Screensaver ON');
+        onScreensaverOn: async () => {
+          setScreensaverEnabled(true);
+          await StorageService.saveScreensaverEnabled(true);
+          console.log('[API] Screensaver setting ENABLED');
         },
-        onScreensaverOff: () => {
+        onScreensaverOff: async () => {
+          setScreensaverEnabled(false);
+          await StorageService.saveScreensaverEnabled(false);
+          // If screensaver is currently active, deactivate it too
           setIsScreensaverActive(false);
           resetTimer();
-          console.log('[API] Screensaver OFF');
+          console.log('[API] Screensaver setting DISABLED');
         },
         onScreenOn: () => {
           setIsScreensaverActive(false);
@@ -315,6 +335,8 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         },
         onSetUrl: async (newUrl: string) => {
           setUrl(newUrl);
+          setBaseUrl(newUrl); // Update baseUrl so InactivityReturn uses the new URL as home
+          setWebViewKey(prev => prev + 1);
           // Persist to storage so Settings shows updated value
           await StorageService.saveUrl(newUrl);
           console.log('[API] URL set to', newUrl);
@@ -784,7 +806,6 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     isScheduledSleepRef.current = true;
     ApiService.updateStatus({ scheduledSleep: true });
     DeviceControlService.setScheduledSleep(true);
-    setIsScreensaverActive(true);
 
     try {
       // Stop auto-brightness if active
@@ -813,7 +834,6 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     isScheduledSleepRef.current = false;
     ApiService.updateStatus({ scheduledSleep: false });
     DeviceControlService.setScheduledSleep(false);
-    setIsScreensaverActive(false);
     resetTimer(); // Restart inactivity timer
 
     try {
@@ -1137,6 +1157,16 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       setInactivityReturnResetOnNav(savedInactivityReturnResetOnNav);
       setInactivityReturnClearCache(savedInactivityReturnClearCache);
       
+      // Load URL Filtering settings
+      const savedUrlFilterEnabled = bool(K.URL_FILTER_ENABLED, false);
+      const savedUrlFilterMode = str(K.URL_FILTER_MODE) || 'blacklist';
+      const savedUrlFilterList = jsonParse(K.URL_FILTER_LIST, []) as string[];
+      const savedUrlFilterShowFeedback = bool(K.URL_FILTER_SHOW_FEEDBACK, false);
+      setUrlFilterEnabled(savedUrlFilterEnabled);
+      setUrlFilterMode(savedUrlFilterMode as 'blacklist' | 'whitelist');
+      setUrlFilterList(savedUrlFilterList);
+      setUrlFilterShowFeedback(savedUrlFilterShowFeedback);
+      
       // Start auto-brightness if enabled (only in webview mode)
       if (savedAutoBrightnessEnabled && savedDisplayMode === 'webview') {
         try {
@@ -1203,13 +1233,20 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       // Launch external app if in external_app mode
       console.log('[KioskScreen] Checking external app launch: displayMode=' + savedDisplayMode + ', package=' + savedExternalAppPackage);
       if (savedDisplayMode === 'external_app' && savedExternalAppPackage) {
-        // Sync test mode to native SharedPrefs before starting overlay
+        // Sync test mode and back button mode to native SharedPrefs before starting overlay
         const savedTestMode = bool(K.EXTERNAL_APP_TEST_MODE, true);
+        const savedBackBtnMode = str(K.BACK_BUTTON_MODE) || 'test';
         try {
           await OverlayServiceModule.setTestMode(savedTestMode);
           console.log('[KioskScreen] Test mode synced to native:', savedTestMode);
         } catch (e) {
           console.warn('[KioskScreen] Failed to sync test mode:', e);
+        }
+        try {
+          await OverlayServiceModule.setBackButtonMode(savedBackBtnMode);
+          console.log('[KioskScreen] Back button mode synced to native:', savedBackBtnMode);
+        } catch (e) {
+          console.warn('[KioskScreen] Failed to sync back button mode:', e);
         }
         console.log('[KioskScreen] Launching external app:', savedExternalAppPackage);
         await launchExternalApp(savedExternalAppPackage, savedReturnTapCount, savedReturnTapTimeout, savedReturnMode, savedReturnButtonPosition);
@@ -1695,6 +1732,9 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
                 markUserInteraction();
               }
             }}
+            urlFilterMode={urlFilterEnabled ? urlFilterMode : undefined}
+            urlFilterPatterns={urlFilterEnabled ? urlFilterList : undefined}
+            urlFilterShowFeedback={urlFilterShowFeedback}
           />
         </>
       ) : (
@@ -1770,6 +1810,15 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           ]}
           activeOpacity={1}
           onPress={onScreensaverTap}
+        />
+      )}
+
+      {/* Scheduled Sleep overlay - always black, independent from screensaver */}
+      {isScheduledSleep && (
+        <TouchableOpacity
+          style={[styles.screensaverOverlay, styles.screensaverBlack]}
+          activeOpacity={1}
+          onPress={screenSchedulerWakeOnTouch ? onScreensaverTap : undefined}
         />
       )}
     </View>

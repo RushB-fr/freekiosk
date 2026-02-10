@@ -121,9 +121,9 @@ class HomeActivity : AppCompatActivity() {
 
     private fun getAsyncStorageValue(key: String, defaultValue: String): String {
         return try {
-            val dbPath = getDatabasePath("AsyncStorage").absolutePath
+            val dbPath = getDatabasePath("RKStorage").absolutePath
             val db = android.database.sqlite.SQLiteDatabase.openDatabase(dbPath, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY)
-            val cursor = db.rawQuery("SELECT value FROM Storage WHERE key = ?", arrayOf(key))
+            val cursor = db.rawQuery("SELECT value FROM catalystLocalStorage WHERE key = ?", arrayOf(key))
             val value = if (cursor.moveToFirst()) {
                 cursor.getString(0) ?: defaultValue
             } else {

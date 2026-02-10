@@ -306,10 +306,10 @@ Turn screen off.
 > To enable Device Owner mode, see [Installation Guide](INSTALL.md#advanced-install-device-owner-mode).
 
 #### `GET|POST /api/screensaver/on`
-Activate screensaver mode.
+Enable the screensaver setting. The screensaver will activate automatically after the configured inactivity timeout.
 
 #### `GET|POST /api/screensaver/off`
-Deactivate screensaver mode.
+Disable the screensaver setting. The screensaver will no longer activate on inactivity. If the screensaver is currently active, it will be deactivated.
 
 #### `GET|POST /api/reload`
 Reload the current WebView page.

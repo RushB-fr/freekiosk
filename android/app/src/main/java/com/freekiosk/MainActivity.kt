@@ -11,6 +11,7 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
@@ -79,6 +80,7 @@ class MainActivity : ReactActivity() {
     }
 
     readExternalAppConfig()
+    ensureBootReceiverEnabled()
     hideSystemUI()
     checkAndStartLockTask()
 
@@ -334,8 +336,9 @@ class MainActivity : ReactActivity() {
     // Relancer Lock Task si nécessaire (WebView ET External App)
     if (kioskEnabled && devicePolicyManager.isDeviceOwnerApp(packageName)) {
       if (!isTaskLocked()) {
+        enableKioskRestrictions()
         startLockTask()
-        DebugLog.d("MainActivity", "Re-started lock task on resume")
+        DebugLog.d("MainActivity", "Re-started lock task on resume (with kiosk restrictions)")
       }
     }
   }
@@ -468,32 +471,40 @@ class MainActivity : ReactActivity() {
   }
 
   override fun onBackPressed() {
-    // Lire le mode test depuis SharedPreferences
     val prefs = getSharedPreferences("FreeKioskSettings", Context.MODE_PRIVATE)
-    val testModeEnabled = prefs.getBoolean("test_mode_enabled", false)
+    val backButtonMode = prefs.getString("back_button_mode", "test") ?: "test"
     
-    if (testModeEnabled) {
-      // En mode test: permettre le bouton retour
-      DebugLog.d("MainActivity", "Back button pressed - Test Mode enabled, allowing back")
-      super.onBackPressed()
-    } else {
-      // En mode normal: bloquer le bouton retour en mode kiosk
-      DebugLog.d("MainActivity", "Back button pressed - Kiosk Mode active, blocking back")
-      // Ne rien faire = bloquer le back button
+    android.util.Log.i("FreeKiosk", "Back button pressed - back_button_mode=$backButtonMode")
+    
+    when (backButtonMode) {
+      "test" -> {
+        // Mode test: allow back button (shows FreeKiosk, user can see test UI)
+        android.util.Log.i("FreeKiosk", "Back button: test mode - allowing back")
+        super.onBackPressed()
+      }
+      "immediate", "timer" -> {
+        // Mode immediate/timer: allow back, AppState listener in JS will handle relaunch
+        android.util.Log.i("FreeKiosk", "Back button: $backButtonMode mode - allowing back for JS handling")
+        super.onBackPressed()
+      }
+      else -> {
+        // Unknown mode: block back button for safety
+        android.util.Log.i("FreeKiosk", "Back button: unknown mode '$backButtonMode' - blocking")
+      }
     }
   }
 
   /**
    * Read a value from AsyncStorage (React Native SQLite database)
-   * AsyncStorage v2.x uses database "AsyncStorage" with table "Storage"
+   * Uses database "RKStorage" with table "catalystLocalStorage"
    */
   private fun getAsyncStorageValue(key: String, defaultValue: String): String {
     return try {
-      val dbPath = getDatabasePath("AsyncStorage").absolutePath
+      val dbPath = getDatabasePath("RKStorage").absolutePath
       val db = android.database.sqlite.SQLiteDatabase.openDatabase(dbPath, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY)
       
       val cursor = db.rawQuery(
-        "SELECT value FROM Storage WHERE key = ?",
+        "SELECT value FROM catalystLocalStorage WHERE key = ?",
         arrayOf(key)
       )
       
@@ -535,6 +546,34 @@ class MainActivity : ReactActivity() {
       DebugLog.d("MainActivity", "External app config: mode=$displayMode, package=$externalAppPackage, isDeviceOwner=$isDeviceOwner")
     } catch (e: Exception) {
       DebugLog.errorProduction("MainActivity", "Error reading external app config: ${e.message}")
+    }
+  }
+
+  /**
+   * Ensure the BootReceiver component is enabled when auto-launch is ON.
+   * Fixes a regression where toggleAutoLaunch stopped calling enableAutoLaunch(),
+   * leaving the component disabled in PackageManager even though AsyncStorage says "true".
+   */
+  private fun ensureBootReceiverEnabled() {
+    try {
+      val autoLaunchValue = getAsyncStorageValue("@kiosk_auto_launch", "false")
+      val autoLaunchEnabled = autoLaunchValue == "true"
+      
+      if (autoLaunchEnabled) {
+        val componentName = ComponentName(this, BootReceiver::class.java)
+        val currentState = packageManager.getComponentEnabledSetting(componentName)
+        if (currentState != PackageManager.COMPONENT_ENABLED_STATE_ENABLED && 
+            currentState != PackageManager.COMPONENT_ENABLED_STATE_DEFAULT) {
+          packageManager.setComponentEnabledSetting(
+            componentName,
+            PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+            PackageManager.DONT_KILL_APP
+          )
+          DebugLog.d("MainActivity", "BootReceiver re-enabled (was disabled)")
+        }
+      }
+    } catch (e: Exception) {
+      DebugLog.d("MainActivity", "Error ensuring BootReceiver state: ${e.message}")
     }
   }
 
@@ -647,7 +686,11 @@ class MainActivity : ReactActivity() {
     
     if (url != null) {
       editor.putString("@kiosk_url", url)
-      editor.putString("@kiosk_display_mode", "webview")
+      // Only set display_mode to webview if lock_package was NOT provided
+      // lock_package takes priority over url for display_mode
+      if (lockPackage == null) {
+        editor.putString("@kiosk_display_mode", "webview")
+      }
     }
     
     // Handle additional options - only set if explicitly provided
@@ -805,12 +848,11 @@ class MainActivity : ReactActivity() {
   
   /**
    * Open the AsyncStorage SQLite database (create if not exists)
-   * AsyncStorage v2.x uses database name "AsyncStorage" with table "Storage"
-   * (v1.x used "RKStorage" with table "catalystLocalStorage")
+   * Uses database "RKStorage" with table "catalystLocalStorage"
    */
   private fun openAsyncStorageDb(): SQLiteDatabase? {
     return try {
-      val dbPath = getDatabasePath("AsyncStorage").absolutePath
+      val dbPath = getDatabasePath("RKStorage").absolutePath
       
       // Create parent directory if it doesn't exist
       val dbFile = java.io.File(dbPath)
@@ -823,19 +865,14 @@ class MainActivity : ReactActivity() {
       // Open or create database
       val db = SQLiteDatabase.openOrCreateDatabase(dbPath, null)
       
-      // Ensure the Storage table exists (same schema as AsyncStorage v2 Room uses)
+      // Ensure the catalystLocalStorage table exists (same schema as AsyncStorage)
       db.execSQL("""
-        CREATE TABLE IF NOT EXISTS Storage (
+        CREATE TABLE IF NOT EXISTS catalystLocalStorage (
           `key` TEXT NOT NULL,
           `value` TEXT,
           PRIMARY KEY(`key`)
         )
       """.trimIndent())
-      
-      // Also set the Room version so Room doesn't try to recreate/migrate
-      db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
-      // Set version to 2 (DATABASE_VERSION in StorageSupplier)
-      db.version = 2
       
       db
     } catch (e: Exception) {
@@ -852,7 +889,7 @@ class MainActivity : ReactActivity() {
       put("key", key)
       put("value", value)
     }
-    db.insertWithOnConflict("Storage", null, contentValues, SQLiteDatabase.CONFLICT_REPLACE)
+    db.insertWithOnConflict("catalystLocalStorage", null, contentValues, SQLiteDatabase.CONFLICT_REPLACE)
   }
 
   /**

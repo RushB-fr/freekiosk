@@ -619,11 +619,11 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      */
     fun savePinToStorage(pin: String): Boolean {
         return try {
-            val dbPath = reactApplicationContext.getDatabasePath("AsyncStorage").absolutePath
+            val dbPath = reactApplicationContext.getDatabasePath("RKStorage").absolutePath
             val db = android.database.sqlite.SQLiteDatabase.openOrCreateDatabase(dbPath, null)
             
             db.execSQL("""
-                CREATE TABLE IF NOT EXISTS Storage (
+                CREATE TABLE IF NOT EXISTS catalystLocalStorage (
                   `key` TEXT NOT NULL,
                   `value` TEXT,
                   PRIMARY KEY(`key`)
@@ -634,7 +634,7 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                 put("key", "@kiosk_pin")
                 put("value", pin)
             }
-            db.insertWithOnConflict("Storage", null, contentValues, android.database.sqlite.SQLiteDatabase.CONFLICT_REPLACE)
+            db.insertWithOnConflict("catalystLocalStorage", null, contentValues, android.database.sqlite.SQLiteDatabase.CONFLICT_REPLACE)
             db.close()
             
             android.util.Log.i("KioskModule", "PIN saved to AsyncStorage for UI")
@@ -649,7 +649,8 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
 
     /**
      * Schedule a native alarm to wake the screen at a specific time.
-     * Uses AlarmManager.setExactAndAllowWhileIdle() to fire reliably even in Doze mode.
+     * Uses AlarmManager.setAndAllowWhileIdle() to fire reliably even in Doze mode.
+     * Uses inexact alarm (no SCHEDULE_EXACT_ALARM permission needed for Play Store).
      * This is critical because JS timers are suspended when the screen is off via lockNow().
      *
      * @param wakeTimeMs Unix timestamp in milliseconds for the wake time
@@ -670,8 +671,8 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                 android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
             )
 
-            // setExactAndAllowWhileIdle works even in Doze mode
-            alarmManager.setExactAndAllowWhileIdle(
+            // setAndAllowWhileIdle works in Doze mode without SCHEDULE_EXACT_ALARM permission
+            alarmManager.setAndAllowWhileIdle(
                 android.app.AlarmManager.RTC_WAKEUP,
                 wakeTimeMs.toLong(),
                 pendingIntent
@@ -711,7 +712,8 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                 android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
             )
 
-            alarmManager.setExactAndAllowWhileIdle(
+            // setAndAllowWhileIdle works in Doze mode without SCHEDULE_EXACT_ALARM permission
+            alarmManager.setAndAllowWhileIdle(
                 android.app.AlarmManager.RTC_WAKEUP,
                 sleepTimeMs.toLong(),
                 pendingIntent
