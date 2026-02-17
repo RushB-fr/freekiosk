@@ -58,15 +58,22 @@ class AppLauncherModule(reactContext: ReactApplicationContext) : ReactContextBas
                                         val cursor2 = db.rawQuery("SELECT value FROM catalystLocalStorage WHERE key = ?", arrayOf("@kiosk_allow_notifications"))
                                         val allowNotifications = if (cursor2.moveToFirst()) cursor2.getString(0) == "true" else false
                                         cursor2.close()
+                                        
+                                        val cursor3 = db.rawQuery("SELECT value FROM catalystLocalStorage WHERE key = ?", arrayOf("@kiosk_allow_system_info"))
+                                        val allowSystemInfo = if (cursor3.moveToFirst()) cursor3.getString(0) == "true" else false
+                                        cursor3.close()
                                         db.close()
                                         
+                                        if (allowSystemInfo) {
+                                            lockTaskFeatures = lockTaskFeatures or android.app.admin.DevicePolicyManager.LOCK_TASK_FEATURE_SYSTEM_INFO
+                                        }
                                         if (allowPowerButton) {
                                             lockTaskFeatures = lockTaskFeatures or android.app.admin.DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS
                                         }
                                         if (allowNotifications) {
                                             lockTaskFeatures = lockTaskFeatures or android.app.admin.DevicePolicyManager.LOCK_TASK_FEATURE_NOTIFICATIONS
                                         }
-                                        DebugLog.d("AppLauncherModule", "Lock task features: powerButton=$allowPowerButton, notifications=$allowNotifications (flags=$lockTaskFeatures)")
+                                        DebugLog.d("AppLauncherModule", "Lock task features: powerButton=$allowPowerButton, notifications=$allowNotifications, systemInfo=$allowSystemInfo (flags=$lockTaskFeatures)")
                                     } catch (e: Exception) {
                                         DebugLog.d("AppLauncherModule", "Could not read settings, using LOCK_TASK_FEATURE_NONE: ${e.message}")
                                     }

@@ -343,8 +343,8 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           console.log('[API] URL set to', newUrl);
         },
         onTts: (text: string) => {
-          // TTS not implemented yet, but ready for future
-          console.log('[API] TTS request:', text);
+          // TTS is handled natively by HttpServerModule TextToSpeech
+          console.log('[API] TTS request (handled natively):', text);
         },
         onSetVolume: async (value: number) => {
           try {
@@ -399,9 +399,13 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           }
         },
         onClearCache: () => {
-          // Force reload with cache clear
+          // Native side clears WebView cache/cookies/storage
+          // JS side forces a full WebView reload by remounting
+          if (webViewRef.current) {
+            webViewRef.current.clearCache();
+          }
           setWebViewKey(prev => prev + 1);
-          console.log('[API] Cache cleared (WebView reloaded)');
+          console.log('[API] Cache cleared (native + WebView remount)');
         },
         onRemoteKey: async (key: string) => {
           try {
@@ -621,6 +625,11 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       clearTimer();
       clearInactivityReturnTimer();
       setIsScreensaverActive(false);
+      // Stop the scheduler interval to prevent sleep re-entry while on PIN/Settings
+      if (screenSchedulerTimerRef.current) {
+        clearInterval(screenSchedulerTimerRef.current);
+        screenSchedulerTimerRef.current = null;
+      }
       setIsScheduledSleep(false); // Reset scheduled sleep when leaving kiosk screen
       isScheduledSleepRef.current = false;
       ApiService.updateStatus({ scheduledSleep: false });
@@ -890,6 +899,11 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   }, [screenSchedulerEnabled, screenSchedulerRules, exitScheduledSleep, enterScheduledSleep]);
 
   // JS-side scheduler check (setInterval) — entry into sleep + backup for wake
+  // IMPORTANT: We use isScheduledSleepRef.current (not the state variable) inside
+  // checkScreenSchedule to avoid a feedback loop. If isScheduledSleep were in the
+  // dependency array, every call to enterScheduledSleep/exitScheduledSleep would
+  // re-trigger this effect and immediately re-evaluate, making it impossible to
+  // wake the screen during a sleep window.
   useEffect(() => {
     // Clear any existing scheduler timer
     if (screenSchedulerTimerRef.current) {
@@ -899,7 +913,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
 
     if (!screenSchedulerEnabled || screenSchedulerRules.length === 0) {
       // Scheduler disabled — cancel any pending native alarms and wake if needed
-      if (isScheduledSleep) {
+      if (isScheduledSleepRef.current) {
         console.log('[ScreenScheduler] Scheduler disabled — waking screen');
         (async () => {
           try {
@@ -918,10 +932,10 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       const activeRule = getActiveSleepRule(screenSchedulerRules, new Date());
       const shouldSleep = activeRule !== null;
 
-      if (shouldSleep && !isScheduledSleep) {
+      if (shouldSleep && !isScheduledSleepRef.current) {
         // Enter sleep — this is the primary entry path
         enterScheduledSleep(activeRule!);
-      } else if (!shouldSleep && isScheduledSleep) {
+      } else if (!shouldSleep && isScheduledSleepRef.current) {
         // Wake up — this is the backup path (JS timer still running, e.g., non-Device-Owner)
         // In Device Owner mode, the native alarm handles wake instead
         exitScheduledSleep();
@@ -942,7 +956,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         screenSchedulerTimerRef.current = null;
       }
     };
-  }, [screenSchedulerEnabled, screenSchedulerRules, isScheduledSleep, enterScheduledSleep, exitScheduledSleep]);
+  }, [screenSchedulerEnabled, screenSchedulerRules, enterScheduledSleep, exitScheduledSleep]);
 
 
   useEffect(() => {
@@ -1083,6 +1097,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       const savedKeyboardMode = str(K.KEYBOARD_MODE) ?? 'default';
       const savedAllowPowerButton = bool(K.ALLOW_POWER_BUTTON, false);
       const savedAllowNotifications = bool(K.ALLOW_NOTIFICATIONS, false);
+      const savedAllowSystemInfo = bool(K.ALLOW_SYSTEM_INFO, false);
 
       setDisplayMode(savedDisplayMode);
       setExternalAppPackage(savedExternalAppPackage);
@@ -1221,7 +1236,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         try {
           // Pass external app package so it gets added to whitelist
           const packageToWhitelist = savedDisplayMode === 'external_app' && savedExternalAppPackage ? savedExternalAppPackage : undefined;
-          await KioskModule.startLockTask(packageToWhitelist, savedAllowPowerButton, savedAllowNotifications);
+          await KioskModule.startLockTask(packageToWhitelist, savedAllowPowerButton, savedAllowNotifications, savedAllowSystemInfo);
         } catch {
           // Silent fail
         }
@@ -1424,6 +1439,13 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         return;
       }
     }
+
+    // If in scheduled sleep and wake on touch IS enabled, wake the screen temporarily
+    // The scheduler interval will re-enter sleep at the next 30s check if still in window
+    if (isScheduledSleepRef.current && screenSchedulerWakeOnTouchRef.current) {
+      console.log('[KioskScreen] Waking from scheduled sleep via touch (temporary)');
+      await exitScheduledSleep();
+    }
     
     // Toute interaction utilisateur sort du mode surveillance et relance le timer normal
     if (isPreCheckingMotionRef.current) {
@@ -1493,6 +1515,14 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         }
         clearTimer();
         setIsScreensaverActive(false);
+        
+        // If in scheduled sleep, exit it before navigating to PIN
+        // (even if wake-on-touch is disabled, we MUST wake for settings access)
+        if (isScheduledSleepRef.current) {
+          console.log('[KioskScreen] Exiting scheduled sleep for PIN navigation');
+          await exitScheduledSleep();
+        }
+        
         navigation.navigate('Pin');
         return;
       }
@@ -1508,7 +1538,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         tapCountRef.current = 0;
       }, returnTapTimeout - (now - lastTapTimeRef.current));
     }
-  }, [displayMode, navigation, resetTimer, clearTimer, markUserInteraction, returnTapCount, returnTapTimeout, defaultBrightness, TAP_PROXIMITY_RADIUS]);
+  }, [displayMode, navigation, resetTimer, clearTimer, markUserInteraction, returnTapCount, returnTapTimeout, defaultBrightness, TAP_PROXIMITY_RADIUS, exitScheduledSleep]);
 
 
   const onScreensaverTap = useCallback(async () => {
@@ -1518,11 +1548,11 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       return;
     }
     
-    // If waking from scheduled sleep via touch, mark as temporarily awake
+    // If waking from scheduled sleep via touch, actually exit sleep to restore brightness
+    // The scheduler interval will re-enter sleep at the next 30s check if still in window
     if (isScheduledSleepRef.current && screenSchedulerWakeOnTouchRef.current) {
-      console.log('[KioskScreen] Waking from scheduled sleep via touch (temporary)');
-      // Don't clear isScheduledSleep — the scheduler timer will re-evaluate
-      // The screen will turn off again at the next 30s check
+      console.log('[KioskScreen] Waking from scheduled sleep via screensaver tap (temporary)');
+      await exitScheduledSleep();
     }
     
     // Sortir du mode surveillance si actif
@@ -1545,7 +1575,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         console.error('[KioskScreen] Error restoring brightness on tap:', error);
       }
     }
-  }, [resetTimer, defaultBrightness, autoBrightnessEnabled]);
+  }, [resetTimer, defaultBrightness, autoBrightnessEnabled, exitScheduledSleep]);
 
   const onMotionDetected = useCallback(async () => {
     // Don't wake on motion during scheduled sleep

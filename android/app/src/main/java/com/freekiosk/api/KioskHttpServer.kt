@@ -69,9 +69,11 @@ class KioskHttpServer(
                 method == Method.GET && uri == "/api/sensors" -> handleGetSensors()
                 method == Method.GET && uri == "/api/storage" -> handleGetStorage()
                 method == Method.GET && uri == "/api/memory" -> handleGetMemory()
+                method == Method.GET && uri == "/api/volume" -> handleGetVolume()
                 method == Method.GET && uri == "/api/screenshot" -> handleScreenshot()
                 method == Method.GET && uri == "/api/camera/photo" -> handleCameraPhoto(session)
                 method == Method.GET && uri == "/api/camera/list" -> handleCameraList()
+                method == Method.GET && uri == "/api/location" -> handleGetLocation()
                 method == Method.GET && uri == "/" -> handleRoot()
 
                 // POST endpoints requiring a body (POST only, GET returns 405)
@@ -84,6 +86,7 @@ class KioskHttpServer(
                 method == Method.POST && uri == "/api/app/launch" -> handleLaunchApp(session)
                 method == Method.POST && uri == "/api/js" -> handleExecuteJs(session)
                 method == Method.POST && uri == "/api/audio/play" -> handleAudioPlay(session)
+                method == Method.POST && uri == "/api/remote/text" -> handleKeyboardText(session)
 
                 // Control endpoints (accept both GET and POST for convenience)
                 isGetOrPost && uri == "/api/screen/on" -> handleScreenOn()
@@ -94,6 +97,8 @@ class KioskHttpServer(
                 isGetOrPost && uri == "/api/wake" -> handleWake()
                 isGetOrPost && uri == "/api/reboot" -> handleReboot()
                 isGetOrPost && uri == "/api/clearCache" -> handleClearCache()
+                isGetOrPost && uri == "/api/lock" -> handleLockDevice()
+                isGetOrPost && uri == "/api/restart-ui" -> handleRestartUi()
                 isGetOrPost && uri == "/api/audio/stop" -> handleAudioStop()
                 isGetOrPost && uri == "/api/audio/beep" -> handleAudioBeep()
                 
@@ -112,10 +117,15 @@ class KioskHttpServer(
                 isGetOrPost && uri == "/api/remote/menu" -> handleRemoteKey("menu")
                 isGetOrPost && uri == "/api/remote/playpause" -> handleRemoteKey("playpause")
 
+                // Keyboard emulation (accept both GET and POST)
+                isGetOrPost && uri == "/api/remote/keyboard" -> handleKeyboardCombo(session)
+                isGetOrPost && uri.startsWith("/api/remote/keyboard/") -> handleKeyboardKey(uri)
+
                 // Method Not Allowed: valid POST endpoints called with GET
                 method == Method.GET && uri in listOf(
                     "/api/brightness", "/api/url", "/api/navigate", "/api/tts",
-                    "/api/volume", "/api/toast", "/api/app/launch", "/api/js", "/api/audio/play"
+                    "/api/toast", "/api/app/launch", "/api/js", "/api/audio/play",
+                    "/api/remote/text"
                 ) -> jsonError(Response.Status.METHOD_NOT_ALLOWED, "This endpoint requires POST with a JSON body")
 
                 else -> jsonError(Response.Status.NOT_FOUND, "Endpoint not found")
@@ -151,6 +161,8 @@ class KioskHttpServer(
                     put("/api/health - Health check")
                     put("/api/camera/photo - Take photo (params: camera=front|back, quality=0-100)")
                     put("/api/camera/list - List available cameras")
+                    put("/api/volume - Get current volume {level, maxLevel}")
+                    put("/api/location - GPS coordinates (latitude, longitude, accuracy)")
                 })
                 put("POST", JSONArray().apply {
                     put("/api/brightness - Set brightness {value: 0-100}")
@@ -162,6 +174,7 @@ class KioskHttpServer(
                     put("/api/app/launch - Launch app {package: string}")
                     put("/api/js - Execute JavaScript {code: string}")
                     put("/api/audio/play - Play audio {url: string, loop: bool, volume: 0-100}")
+                    put("/api/remote/text - Type text {text: string}")
                 })
                 put("GET or POST", JSONArray().apply {
                     put("/api/screen/on - Turn screen on")
@@ -171,12 +184,16 @@ class KioskHttpServer(
                     put("/api/reload - Reload WebView")
                     put("/api/wake - Wake from screensaver")
                     put("/api/reboot - Reboot device (Device Owner)")
-                    put("/api/clearCache - Clear WebView cache")
+                    put("/api/clearCache - Clear WebView cache, cookies and storage")
+                    put("/api/lock - Lock device (Device Owner)")
+                    put("/api/restart-ui - Restart the app UI")
                     put("/api/audio/stop - Stop audio playback")
                     put("/api/audio/beep - Play beep sound")
                     put("/api/rotation/start - Start URL rotation")
                     put("/api/rotation/stop - Stop URL rotation")
                     put("/api/remote/* - Remote control (up/down/left/right/select/back/home/menu/playpause)")
+                    put("/api/remote/keyboard/{key} - Keyboard key emulation (a-z, 0-9, f1-f12, space, enter, etc.)")
+                    put("/api/remote/keyboard?map=ctrl+c - Keyboard shortcut with modifiers (ctrl, alt, shift, meta)")
                 })
             })
         }
@@ -225,6 +242,15 @@ class KioskHttpServer(
         val status = statusProvider()
         val wifi = status.optJSONObject("wifi") ?: JSONObject()
         return jsonSuccess(wifi)
+    }
+
+    private fun handleGetVolume(): Response {
+        val status = statusProvider()
+        val audio = status.optJSONObject("audio") ?: JSONObject()
+        return jsonSuccess(JSONObject().apply {
+            put("level", audio.optInt("volume", 50))
+            put("maxLevel", 100)
+        })
     }
 
     // ==================== POST Handlers ====================
@@ -430,9 +456,67 @@ class KioskHttpServer(
         return jsonSuccess(result)
     }
 
+    private fun handleLockDevice(): Response {
+        checkControlAllowed()?.let { return it }
+        val result = commandHandler("lockDevice", null)
+        return jsonSuccess(result)
+    }
+
+    private fun handleRestartUi(): Response {
+        checkControlAllowed()?.let { return it }
+        val result = commandHandler("restartUi", null)
+        return jsonSuccess(result)
+    }
+
     private fun handleRemoteKey(key: String): Response {
         checkControlAllowed()?.let { return it }
         val result = commandHandler("remoteKey", JSONObject().put("key", key))
+        return jsonSuccess(result)
+    }
+
+    // ==================== Keyboard Emulation Handlers ====================
+
+    private fun handleKeyboardKey(uri: String): Response {
+        checkControlAllowed()?.let { return it }
+        val key = uri.removePrefix("/api/remote/keyboard/")
+        if (key.isEmpty()) {
+            return jsonError(Response.Status.BAD_REQUEST, "Key name is required in URL path, e.g. /api/remote/keyboard/a")
+        }
+        val result = commandHandler("keyboardKey", JSONObject().put("key", key))
+        if (result.optBoolean("executed", false)) {
+            return jsonSuccess(result)
+        }
+        return jsonError(Response.Status.BAD_REQUEST, result.optString("error", "Unknown error"))
+    }
+
+    private fun handleKeyboardCombo(session: IHTTPSession): Response {
+        checkControlAllowed()?.let { return it }
+        val map = session.parms?.get("map")
+        if (map.isNullOrEmpty()) {
+            return jsonError(Response.Status.BAD_REQUEST, "Query parameter 'map' is required, e.g. /api/remote/keyboard?map=ctrl+c")
+        }
+        val result = commandHandler("keyboardCombo", JSONObject().put("map", map))
+        if (result.optBoolean("executed", false)) {
+            return jsonSuccess(result)
+        }
+        return jsonError(Response.Status.BAD_REQUEST, result.optString("error", "Unknown error"))
+    }
+
+    private fun handleKeyboardText(session: IHTTPSession): Response {
+        checkControlAllowed()?.let { return it }
+        val body = parseBody(session)
+        val text = body?.optString("text", "")
+        if (text.isNullOrEmpty()) {
+            return jsonError(Response.Status.BAD_REQUEST, "JSON body with 'text' field is required, e.g. {\"text\": \"hello world\"}")
+        }
+        val result = commandHandler("keyboardText", JSONObject().put("text", text))
+        return jsonSuccess(result)
+    }
+
+    // ==================== Location Handler ====================
+
+    private fun handleGetLocation(): Response {
+        val result = commandHandler("getLocation", null)
         return jsonSuccess(result)
     }
 

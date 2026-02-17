@@ -71,12 +71,30 @@ class UpdateModule(reactContext: ReactApplicationContext) : ReactContextBaseJava
                     val releaseNotes = jsonObject.optString("body", "")
                     val publishedAt = jsonObject.optString("published_at", "")
                     
-                    // Construire l'URL de téléchargement directement à partir du tag
-                    // Pattern: https://github.com/rushb-fr/freekiosk/releases/download/v{VERSION}/freeKiosk-v{VERSION}.apk
-                    val apkUrl = "https://github.com/rushb-fr/freekiosk/releases/download/v${tagName}/freeKiosk-v${tagName}.apk"
+                    // Get the actual APK download URL from release assets
+                    var apkUrl = ""
+                    val assetsArray = jsonObject.optJSONArray("assets")
+                    if (assetsArray != null && assetsArray.length() > 0) {
+                        for (i in 0 until assetsArray.length()) {
+                            val asset = assetsArray.getJSONObject(i)
+                            val assetName = asset.getString("name")
+                            if (assetName.endsWith(".apk", ignoreCase = true)) {
+                                apkUrl = asset.getString("browser_download_url")
+                                android.util.Log.d("UpdateModule", "Found APK asset: $assetName")
+                                break
+                            }
+                        }
+                    }
+                    
+                    // Fallback to constructed URL if no asset found (should not happen)
+                    if (apkUrl.isEmpty()) {
+                        apkUrl = "https://github.com/rushb-fr/freekiosk/releases/download/v${tagName}/FreeKiosk-v${tagName}.apk"
+                        android.util.Log.w("UpdateModule", "No APK asset found, using fallback URL")
+                    }
+                    
                     android.util.Log.d("UpdateModule", "Tag from GitHub: ${jsonObject.getString("tag_name")}")
                     android.util.Log.d("UpdateModule", "Version after removePrefix: $tagName")
-                    android.util.Log.d("UpdateModule", "Constructed APK URL: $apkUrl")
+                    android.util.Log.d("UpdateModule", "APK Download URL: $apkUrl")
                     
                     val result = Arguments.createMap().apply {
                         putString("version", tagName)

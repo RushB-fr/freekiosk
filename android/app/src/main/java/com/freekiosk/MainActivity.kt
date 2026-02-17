@@ -54,6 +54,11 @@ class MainActivity : ReactActivity() {
   // Volume change receiver (also handles 5-tap gesture detection)
   private var volumeChangeReceiver: VolumeChangeReceiver? = null
 
+  // Debounce handler for hideSystemUI to avoid dismissing the power menu (GlobalActions)
+  // on devices where onWindowFocusChanged fires rapidly (e.g. TECNO/HiOS on Android 14)
+  private val hideSystemUIHandler = Handler(Looper.getMainLooper())
+  private var lastFocusLostTime = 0L
+
   override fun getMainComponentName(): String = "FreeKiosk"
 
   override fun createReactActivityDelegate(): ReactActivityDelegate =
@@ -217,10 +222,17 @@ class MainActivity : ReactActivity() {
       val allowPowerButton = allowPowerButtonValue == "true"
       val allowNotificationsValue = getAsyncStorageValue("@kiosk_allow_notifications", "false")
       val allowNotifications = allowNotificationsValue == "true"
+      val allowSystemInfoValue = getAsyncStorageValue("@kiosk_allow_system_info", "false")
+      val allowSystemInfo = allowSystemInfoValue == "true"
       
       // Configurer les features Lock Task based on settings
       if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
         var lockTaskFeatures = DevicePolicyManager.LOCK_TASK_FEATURE_NONE
+        // SYSTEM_INFO: shows non-interactive status bar info (time, battery)
+        // Fixes Samsung/OneUI devices muting audio in lock task mode
+        if (allowSystemInfo) {
+          lockTaskFeatures = lockTaskFeatures or DevicePolicyManager.LOCK_TASK_FEATURE_SYSTEM_INFO
+        }
         if (allowPowerButton) {
           lockTaskFeatures = lockTaskFeatures or DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS
         }
@@ -230,7 +242,7 @@ class MainActivity : ReactActivity() {
           lockTaskFeatures = lockTaskFeatures or DevicePolicyManager.LOCK_TASK_FEATURE_HOME
         }
         devicePolicyManager.setLockTaskFeatures(adminComponent, lockTaskFeatures)
-        DebugLog.d("MainActivity", "Lock task features set: powerButton=$allowPowerButton, notifications=$allowNotifications (flags=$lockTaskFeatures)")
+        DebugLog.d("MainActivity", "Lock task features set: powerButton=$allowPowerButton, notifications=$allowNotifications, systemInfo=$allowSystemInfo (flags=$lockTaskFeatures)")
       }
 
       val samsungUpdateApps = arrayOf(
@@ -338,9 +350,26 @@ class MainActivity : ReactActivity() {
     // Relancer Lock Task si nécessaire (WebView ET External App)
     if (kioskEnabled && devicePolicyManager.isDeviceOwnerApp(packageName)) {
       if (!isTaskLocked()) {
-        enableKioskRestrictions()
-        startLockTask()
-        DebugLog.d("MainActivity", "Re-started lock task on resume (with kiosk restrictions)")
+        // Check if power button (GlobalActions) is allowed — if so, the brief focus
+        // loss may be from the power menu. Delay the re-lock to avoid dismissing it.
+        val allowPowerButton = getAsyncStorageValue("@kiosk_allow_power_button", "false") == "true"
+        val timeSinceFocusLost = System.currentTimeMillis() - lastFocusLostTime
+        
+        if (allowPowerButton && timeSinceFocusLost < 2000L) {
+          // Power menu was likely just shown — defer re-lock to avoid focus conflict
+          DebugLog.d("MainActivity", "Deferring re-lock: power menu may be active (${timeSinceFocusLost}ms since focus lost)")
+          Handler(Looper.getMainLooper()).postDelayed({
+            if (!isTaskLocked()) {
+              enableKioskRestrictions()
+              startLockTask()
+              DebugLog.d("MainActivity", "Deferred re-lock completed")
+            }
+          }, 2000L)
+        } else {
+          enableKioskRestrictions()
+          startLockTask()
+          DebugLog.d("MainActivity", "Re-started lock task on resume (with kiosk restrictions)")
+        }
       }
     }
   }
@@ -384,8 +413,20 @@ class MainActivity : ReactActivity() {
 
   override fun onWindowFocusChanged(hasFocus: Boolean) {
     super.onWindowFocusChanged(hasFocus)
-    if (hasFocus) {
-      hideSystemUI()
+    if (!hasFocus) {
+      // Track when we lost focus (e.g. power menu / GlobalActions appeared)
+      lastFocusLostTime = System.currentTimeMillis()
+      // Cancel any pending hideSystemUI to avoid fighting with the system window
+      hideSystemUIHandler.removeCallbacksAndMessages(null)
+    } else {
+      // Debounce hideSystemUI: wait 600ms before re-applying immersive mode.
+      // This prevents the power menu from being immediately dismissed on devices
+      // where the WindowManager focus bounces rapidly (TECNO, Infinix, itel / HiOS).
+      // The Lock Task is still fully active during this window — no security impact.
+      val timeSinceFocusLost = System.currentTimeMillis() - lastFocusLostTime
+      val delay = if (timeSinceFocusLost < 1500L) 600L else 0L
+      hideSystemUIHandler.removeCallbacksAndMessages(null)
+      hideSystemUIHandler.postDelayed({ hideSystemUI() }, delay)
     }
   }
 

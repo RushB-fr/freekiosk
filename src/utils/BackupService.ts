@@ -56,6 +56,7 @@ const BACKUP_KEYS = [
   '@kiosk_rest_api_allow_control',
   '@kiosk_allow_power_button',
   '@kiosk_allow_notifications',
+  '@kiosk_allow_system_info',
   // Return to Settings
   '@kiosk_return_tap_count',
   '@kiosk_return_tap_timeout',

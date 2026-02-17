@@ -38,6 +38,7 @@ interface WebViewComponentProps {
 export interface WebViewComponentRef {
   goBack: () => void;
   scrollToTop: () => void;
+  clearCache: () => void;
 }
 
 const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(({ 
@@ -143,7 +144,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
     blockedUrlTimerRef.current = setTimeout(() => setBlockedUrlMessage(null), 2000);
   }, [urlFilterShowFeedback]);
 
-  // Expose goBack and scrollToTop methods to parent via ref
+  // Expose goBack, scrollToTop, and clearCache methods to parent via ref
   useImperativeHandle(ref, () => ({
     goBack: () => {
       if (webViewRef.current) {
@@ -153,6 +154,12 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
     scrollToTop: () => {
       if (webViewRef.current) {
         webViewRef.current.injectJavaScript('window.scrollTo({top: 0, behavior: "smooth"}); true;');
+      }
+    },
+    clearCache: () => {
+      if (webViewRef.current) {
+        webViewRef.current.clearCache(true);
+        console.log('[WebView] Cache cleared via ref');
       }
     }
   }));
@@ -459,7 +466,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
 
             {/* Footer */}
             <Text style={styles.footerText}>
-              Version 1.2.10 • by Rushb
+              Version 1.2.11 • by Rushb
             </Text>
           </Animated.View>
         </ScrollView>

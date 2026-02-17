@@ -67,10 +67,23 @@ Returns complete device status in one call.
   "data": {
     "level": 85,
     "charging": true,
+    "plugged": "usb",
     "temperature": 25.5,
-    "health": "good"
+    "voltage": 4.2,
+    "health": "good",
+    "technology": "Li-ion"
   }
 }
+```
+
+**Fields:**
+- `level`: Battery percentage (0-100)
+- `charging`: Whether the device is charging
+- `plugged`: Power source: `usb`, `ac`, `wireless`, or `none`
+- `temperature`: Battery temperature in °C
+- `voltage`: Battery voltage in V
+- `health`: `good`, `overheat`, `dead`, `over_voltage`, `failure`, `cold`, or `unknown`
+- `technology`: Battery chemistry (e.g., `Li-ion`)
 ```
 
 #### `GET /api/brightness`
@@ -180,13 +193,18 @@ Device information.
 {
   "success": true,
   "data": {
-    "model": "SM-T510",
-    "manufacturer": "samsung",
-    "android": "11",
-    "appVersion": "1.2.2"
+    "ip": "192.168.1.50",
+    "hostname": "freekiosk",
+    "version": "1.2.11",
+    "isDeviceOwner": true,
+    "kioskMode": true
   }
 }
 ```
+
+**Field Descriptions:**
+- `isDeviceOwner`: Whether the app has Device Owner privileges (required for reboot, lock, true screen off)
+- `kioskMode`: Whether kiosk lock task mode is currently active
 
 #### `GET /api/health`
 Simple health check.
@@ -201,6 +219,17 @@ Simple health check.
 Returns a PNG image of the current screen.
 
 **Response**: `image/png` binary data
+
+**Usage examples:**
+```bash
+# Save screenshot to file
+curl http://TABLET_IP:8080/api/screenshot -o screenshot.png
+
+# Display in HTML
+<img src="http://TABLET_IP:8080/api/screenshot" />
+```
+
+> 💡 The screenshot is captured from the app's root view. It works even when the screensaver overlay is active.
 
 #### `GET /api/camera/photo`
 📷 Take a photo using the device camera. **(v1.2.5+)**
@@ -324,15 +353,25 @@ Navigate to a new URL.
 Wake from screensaver.
 
 #### `POST /api/tts`
-Text-to-speech.
+Text-to-speech. Uses Android native TextToSpeech engine (handled server-side, no JS bridge dependency).
 ```json
 { "text": "Hello World" }
 ```
+> 💡 Uses the system default TTS language. The TTS engine is initialized when the HTTP server starts.
 
 #### `POST /api/volume`
 Set media volume (0-100).
 ```json
 { "value": 50 }
+```
+
+#### `GET /api/volume`
+Get current media volume.
+```json
+{
+  "success": true,
+  "data": { "level": 80, "maxLevel": 100 }
+}
 ```
 
 #### `POST /api/toast`
@@ -348,7 +387,13 @@ Execute JavaScript in WebView.
 ```
 
 #### `GET|POST /api/clearCache`
-Clear WebView cache and reload.
+Clear WebView cache, cookies, localStorage and reload. Performs a full native cache clear including:
+- WebView cache (HTTP cache, images, scripts)
+- Cookies (all domains)
+- Web Storage (localStorage, sessionStorage)
+- Form data
+
+Then forces a full WebView remount.
 
 #### `POST /api/app/launch`
 Launch an external app.
@@ -358,6 +403,14 @@ Launch an external app.
 
 #### `GET|POST /api/reboot`
 Reboot device (requires Device Owner mode). Executed natively without JS bridge dependency.
+
+#### `GET|POST /api/lock`
+Lock device screen (requires Device Owner mode). Uses `DevicePolicyManager.lockNow()` to truly turn off the screen.
+
+> ⚠️ Without Device Owner, this endpoint returns an error. Use `/api/screen/off` as a fallback (dims to 0 brightness).
+
+#### `GET|POST /api/restart-ui`
+Restart the FreeKiosk app UI. Calls `activity.recreate()` to fully restart the React Native activity without rebooting the device. Useful for troubleshooting UI issues remotely.
 
 ---
 
@@ -385,6 +438,11 @@ Play a short beep sound.
 
 Perfect for controlling Android TV devices or navigating apps.
 
+> ⚠️ **Important**: Remote key events are injected into the **FreeKiosk app process** using `Instrumentation.sendKeyDownUpSync()`. This means:
+> - Keys work within the FreeKiosk WebView (e.g., navigating a web page)
+> - Keys do **not** propagate to external apps or the Android launcher
+> - For external app control, consider using ADB commands via a separate tool
+
 | Endpoint | Key |
 |----------|-----|
 | `GET\|POST /api/remote/up` | D-pad Up |
@@ -396,6 +454,162 @@ Perfect for controlling Android TV devices or navigating apps.
 | `GET\|POST /api/remote/home` | Home |
 | `GET\|POST /api/remote/menu` | Menu |
 | `GET\|POST /api/remote/playpause` | Play/Pause |
+
+### Keyboard Emulation (GET or POST) ⌨️
+
+Simulate keyboard input on the device. Three modes are available:
+
+#### Single Key Press: `GET|POST /api/remote/keyboard/{key}`
+
+Press a single keyboard key. The key name is in the URL path.
+
+```bash
+# Press letter 'a'
+curl http://tablet-ip:8080/api/remote/keyboard/a
+
+# Press Enter
+curl http://tablet-ip:8080/api/remote/keyboard/enter
+
+# Press F5 (refresh in most browsers)
+curl http://tablet-ip:8080/api/remote/keyboard/f5
+
+# Press Escape
+curl http://tablet-ip:8080/api/remote/keyboard/escape
+
+# Press Space
+curl http://tablet-ip:8080/api/remote/keyboard/space
+```
+
+**Supported keys:**
+
+| Category | Keys |
+|----------|------|
+| Letters | `a` through `z` |
+| Digits | `0` through `9` |
+| Function | `f1` through `f12` |
+| Navigation | `up`, `down`, `left`, `right`, `home`, `end`, `pageup`, `pagedown` |
+| Editing | `enter` / `return`, `space`, `tab`, `backspace`, `delete` / `del`, `insert`, `escape` / `esc` |
+| Toggles | `capslock`, `numlock`, `scrolllock` |
+| Modifiers | `shift`, `ctrl` / `control`, `alt`, `meta` / `win` / `cmd` |
+| Media | `playpause`, `play`, `pause`, `stop`, `next` / `nexttrack`, `previous` / `prevtrack`, `volumeup`, `volumedown`, `mute` |
+| Android | `back`, `menu`, `search`, `power`, `select` / `center`, `androidhome` |
+| Symbols | `period` / `dot`, `comma`, `minus` / `dash`, `plus`, `equals`, `semicolon`, `apostrophe` / `quote`, `slash`, `backslash`, `leftbracket`, `rightbracket`, `grave` / `backtick`, `at`, `pound` / `hash`, `star` / `asterisk` |
+| Single char | Any single character: `.`, `,`, `-`, `=`, `/`, `;`, `'`, etc. |
+
+> 💡 **Note**: In the keyboard endpoint, `home` maps to the keyboard Home key (cursor to beginning of line), NOT the Android Home button. Use `androidhome` or `/api/remote/home` for the Android Home button.
+
+#### Keyboard Shortcut: `GET|POST /api/remote/keyboard?map={combo}`
+
+Send a keyboard shortcut with modifier keys. Format: `modifier1+modifier2+key`.
+
+```bash
+# Copy (Ctrl+C)
+curl "http://tablet-ip:8080/api/remote/keyboard?map=ctrl+c"
+
+# Paste (Ctrl+V)
+curl "http://tablet-ip:8080/api/remote/keyboard?map=ctrl+v"
+
+# Select All (Ctrl+A)
+curl "http://tablet-ip:8080/api/remote/keyboard?map=ctrl+a"
+
+# Close tab (Ctrl+W)
+curl "http://tablet-ip:8080/api/remote/keyboard?map=ctrl+w"
+
+# Alt+F4
+curl "http://tablet-ip:8080/api/remote/keyboard?map=alt+f4"
+
+# Ctrl+Shift+A (uppercase A with Ctrl)
+curl "http://tablet-ip:8080/api/remote/keyboard?map=ctrl+shift+a"
+```
+
+**Supported modifiers:** `ctrl` / `control`, `alt`, `shift`, `meta` / `win` / `cmd`
+
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "executed": true,
+    "command": "keyboardCombo",
+    "map": "ctrl+c",
+    "key": "c",
+    "keyCode": 31,
+    "modifiers": ["ctrl"],
+    "metaState": 28672
+  }
+}
+```
+
+#### Type Text: `POST /api/remote/text`
+
+Type a full text string into the currently focused input field.
+
+```bash
+curl -X POST http://tablet-ip:8080/api/remote/text \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hello World!"}'
+```
+
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "executed": true,
+    "command": "keyboardText",
+    "textLength": 12
+  }
+}
+```
+
+> ⚠️ **Limitation**: Keyboard emulation uses `Instrumentation` which injects events into the FreeKiosk app process. Keys work within the FreeKiosk WebView but may not propagate to external apps.
+
+### GPS Location (GET)
+
+#### `GET /api/location`
+
+Returns the device's last known GPS coordinates. Uses GPS, Network, and Passive location providers.
+
+> ⚠️ **Requires**: Location permission granted + GPS enabled on the device.
+
+```bash
+curl http://tablet-ip:8080/api/location
+```
+
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "executed": true,
+    "command": "getLocation",
+    "available": true,
+    "latitude": 48.8566,
+    "longitude": 2.3522,
+    "accuracy": 15.0,
+    "altitude": 35.0,
+    "speed": 0.0,
+    "bearing": 0.0,
+    "provider": "gps",
+    "time": 1704672000000,
+    "providers": ["gps", "network", "passive"]
+  }
+}
+```
+
+If no location is available:
+```json
+{
+  "success": true,
+  "data": {
+    "executed": true,
+    "command": "getLocation",
+    "available": false,
+    "error": "No location available. Ensure GPS is enabled and location permission is granted.",
+    "providers": ["network", "passive"]
+  }
+}
+```
 
 ---
 
@@ -450,6 +664,30 @@ rest:
       
       - name: "Tablet Screensaver"
         value_template: "{{ value_json.data.screen.screensaverActive }}"
+
+  - resource: http://TABLET_IP:8080/api/location
+    scan_interval: 300
+    sensor:
+      - name: "Tablet GPS Latitude"
+        value_template: "{{ value_json.data.latitude | default('unavailable') }}"
+      
+      - name: "Tablet GPS Longitude"
+        value_template: "{{ value_json.data.longitude | default('unavailable') }}"
+      
+      - name: "Tablet GPS Accuracy"
+        value_template: "{{ value_json.data.accuracy | default('unavailable') }}"
+        unit_of_measurement: "m"
+
+  - resource: http://TABLET_IP:8080/api/battery
+    scan_interval: 60
+    sensor:
+      - name: "Tablet Battery Temperature"
+        value_template: "{{ value_json.data.temperature }}"
+        unit_of_measurement: "°C"
+        device_class: temperature
+      
+      - name: "Tablet Battery Health"
+        value_template: "{{ value_json.data.health }}"
 ```
 
 ### REST Commands
@@ -478,6 +716,14 @@ rest_command:
   
   tablet_reload:
     url: http://TABLET_IP:8080/api/reload
+    method: POST
+  
+  tablet_lock:
+    url: http://TABLET_IP:8080/api/lock
+    method: POST
+  
+  tablet_restart_ui:
+    url: http://TABLET_IP:8080/api/restart-ui
     method: POST
   
   tablet_tts:
@@ -509,6 +755,20 @@ rest_command:
   tablet_screensaver_off:
     url: http://TABLET_IP:8080/api/screensaver/off
     method: POST
+  
+  tablet_keyboard_key:
+    url: "http://TABLET_IP:8080/api/remote/keyboard/{{ key }}"
+    method: GET
+  
+  tablet_keyboard_combo:
+    url: "http://TABLET_IP:8080/api/remote/keyboard?map={{ combo }}"
+    method: GET
+  
+  tablet_type_text:
+    url: http://TABLET_IP:8080/api/remote/text
+    method: POST
+    content_type: "application/json"
+    payload: '{"text": "{{ text }}"}'
 ```
 
 ### Screenshot Camera
@@ -619,6 +879,19 @@ curl http://TABLET_IP:8080/api/screenshot -o screenshot.png
 # Show toast
 curl -X POST -H "Content-Type: application/json" \
   -d '{"text": "Hello!"}' http://TABLET_IP:8080/api/toast
+
+# Keyboard: press Enter
+curl http://TABLET_IP:8080/api/remote/keyboard/enter
+
+# Keyboard: Ctrl+A (select all)
+curl "http://TABLET_IP:8080/api/remote/keyboard?map=ctrl+a"
+
+# Type text into focused field
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"text": "Hello World!"}' http://TABLET_IP:8080/api/remote/text
+
+# Get GPS location
+curl http://TABLET_IP:8080/api/location
 ```
 
 ---

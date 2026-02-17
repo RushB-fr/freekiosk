@@ -15,6 +15,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ***
 
+## [1.2.11] - 2026-02-16
+
+### Added
+- ⌨️ **Keyboard Emulation API**: Full keyboard input simulation via REST API ([#keyboard](https://github.com/FreeKiosk/FreeKiosk/issues))
+  - **Single key press** (`GET|POST /api/remote/keyboard/{key}`): Send any keyboard key
+    - Supports: a-z, 0-9, F1-F12, space, tab, enter, escape, backspace, delete, arrows, symbols, media keys
+    - Over 80 named keys + single character support
+  - **Keyboard shortcuts** (`GET|POST /api/remote/keyboard?map=ctrl+c`): Send key combinations with modifiers
+    - Supports: ctrl, alt, shift, meta (Windows/Cmd key)
+    - Examples: `ctrl+c`, `ctrl+v`, `alt+f4`, `ctrl+shift+a`
+  - **Text input** (`POST /api/remote/text`): Type full text strings into focused input fields
+    - Body: `{"text": "Hello World!"}`
+    - Uses `Instrumentation.sendStringSync()` for natural text input
+  - All keyboard operations handled natively (no JS bridge — fast and reliable)
+- 📍 **GPS Location API** (`GET /api/location`): New endpoint for device GPS coordinates
+  - Returns: latitude, longitude, accuracy, altitude, speed, bearing, provider, timestamp
+  - Uses GPS, Network, and Passive location providers (best accuracy wins)
+  - Permissions already declared in manifest (`ACCESS_FINE_LOCATION` + `ACCESS_COARSE_LOCATION`)
+- 🔋 **Enriched Battery API**: `GET /api/battery` now returns additional data
+  - New fields: `temperature` (°C), `voltage` (V), `health` (good/overheat/dead/etc.), `technology` (Li-ion/etc.)
+  - Backward compatible: existing `level`, `charging`, `plugged` fields unchanged
+- 🔒 **Lock Device API** (`GET|POST /api/lock`): New endpoint to lock the device screen
+  - Uses `DevicePolicyManager.lockNow()` for a true screen lock (Device Owner required)
+  - Returns clear error message if Device Owner mode is not active
+- 🔄 **Restart UI API** (`GET|POST /api/restart-ui`): New endpoint to restart the app UI
+  - Calls `activity.recreate()` to fully restart the React Native activity
+  - Useful for remote troubleshooting without rebooting the device
+- 🗣️ **Text-to-Speech (TTS)**: Fully implemented native TTS via Android `TextToSpeech` engine
+  - TTS engine is initialized when the HTTP server starts
+  - Handled natively (no JS bridge dependency — works even if React Native is unresponsive)
+  - Auto-retries if TTS engine is not ready on first call
+- 📊 **Volume Read API** (`GET /api/volume`): New endpoint to read current volume level
+  - Returns `{ level: 0-100, maxLevel: 100 }` for easy integration with Home Assistant sensors
+
+### Fixed
+- 🐛 **Screen Sleep Scheduler - Black Screen & Navigation Lockout**: Fixed 4 critical bugs causing scheduler to malfunction
+  - **Feedback loop**: Scheduler re-entered sleep immediately after wake due to `isScheduledSleep` in useEffect dependency array
+  - **Navigation lockout**: Scheduler interval kept running while on PIN/Settings screen, calling `lockNow()` and locking user out
+  - **Wake-on-touch broken**: Touch events during sleep did nothing — never restored brightness or called `exitScheduledSleep()`
+  - **Stale closure**: `checkScreenSchedule()` used outdated state variable instead of ref
+  - **N-tap during sleep**: 5-tap for settings now properly exits scheduled sleep before navigating to PIN
+  - **Activity null after lockNow()**: `turnScreenOn()` now acquires WakeLock before checking for activity availability
+  - Fixes black screen issue on Android 8.1+ and impossible settings access during sleep windows
+- 🐛 **Power menu dismissed immediately on some devices (TECNO/HiOS)**: Fixed GlobalActions (power menu) being closed ~900ms after appearing when "Allow Power Button" is enabled in Lock Mode
+  - Root cause: `onWindowFocusChanged` aggressively re-applied immersive mode, stealing focus back from the system power menu window
+  - Additionally, `onResume` would re-trigger `startLockTask()` during the brief focus transition, compounding the issue
+  - Fix: debounced `hideSystemUI()` by 600ms on focus regain, and deferred `startLockTask()` re-lock when power button is allowed and focus was recently lost
+  - No security impact: Lock Task Mode remains fully active throughout — only the cosmetic immersive mode re-application is delayed
+  - Affects TECNO, Infinix, itel (HiOS) and potentially other OEMs with aggressive WindowManager behavior on Android 14+
+- 🐛 **Device Owner Status Hardcoded `false` in API**: Fixed `/api/info` and `/api/status` always reporting `isDeviceOwner: false`
+  - Was hardcoded to `false` in `HttpServerModule.getDeviceStatus()`
+  - Now performs a real `DevicePolicyManager.isDeviceOwnerApp()` check
+  - This caused external dashboards to incorrectly show Device Owner as inactive
+- 📺 **Screen On Not Working After lockNow()**: Fixed `GET /api/screen/on` failing when screen was off
+  - `reactContext.currentActivity` was `null` after `lockNow()` and the code silently did nothing
+  - WakeLock is now acquired **before** checking for activity (WakeLock works without activity)
+  - Added keyguard dismissal to properly wake from locked state
+  - Screen now reliably turns on whether activity is available or not
+- 🧹 **Clear Cache Now Actually Clears**: Fixed `/api/clearCache` which only reloaded the WebView
+  - Now performs a full native cache clear: WebView HTTP cache, cookies, Web Storage (localStorage/sessionStorage), form data
+  - Then forces a WebView remount on the JS side for a complete fresh start
+- 🔄 **In-App Update 404 Error**: Fixed update download failing with 404 error
+  - Now retrieves actual APK download URL from GitHub release assets instead of constructing it
+  - Eliminates filename case sensitivity issues (FreeKiosk vs freeKiosk)
+  - More robust: works regardless of APK naming convention changes
+  - Fallback to constructed URL if asset parsing fails
+- 📸 **Screenshot Race Condition**: Fixed `/api/screenshot` returning 503 intermittently
+  - Replaced `Thread.sleep(100)` with a proper `CountDownLatch` to wait for the UI thread
+  - Screenshot capture now waits up to 5 seconds for the UI thread to complete
+
+***
+
 ## [1.2.10] - 2026-02-11
 
 ### Added

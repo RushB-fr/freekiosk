@@ -85,7 +85,7 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     }
 
     @ReactMethod
-    fun startLockTask(externalAppPackage: String?, allowPowerButton: Boolean, allowNotifications: Boolean, promise: Promise) {
+    fun startLockTask(externalAppPackage: String?, allowPowerButton: Boolean, allowNotifications: Boolean, allowSystemInfo: Boolean, promise: Promise) {
         try {
             val activity = reactApplicationContext.currentActivity
             if (activity != null && activity is MainActivity) {
@@ -113,6 +113,11 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
                                 var lockTaskFeatures = DevicePolicyManager.LOCK_TASK_FEATURE_NONE
                                 
+                                // SYSTEM_INFO: shows non-interactive status bar info (time, battery)
+                                // Fixes Samsung/OneUI devices muting audio in lock task mode
+                                if (allowSystemInfo) {
+                                    lockTaskFeatures = lockTaskFeatures or DevicePolicyManager.LOCK_TASK_FEATURE_SYSTEM_INFO
+                                }
                                 if (allowPowerButton) {
                                     lockTaskFeatures = lockTaskFeatures or DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS
                                 }
@@ -122,7 +127,7 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                                     lockTaskFeatures = lockTaskFeatures or DevicePolicyManager.LOCK_TASK_FEATURE_HOME
                                 }
                                 dpm.setLockTaskFeatures(adminComponent, lockTaskFeatures)
-                                android.util.Log.d("KioskModule", "Lock task features set: powerButton=$allowPowerButton, notifications=$allowNotifications (flags=$lockTaskFeatures)")
+                                android.util.Log.d("KioskModule", "Lock task features set: powerButton=$allowPowerButton, notifications=$allowNotifications, systemInfo=$allowSystemInfo (flags=$lockTaskFeatures)")
                             }
                             
                             dpm.setLockTaskPackages(adminComponent, whitelist.toTypedArray())
@@ -375,25 +380,29 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     @ReactMethod
     fun turnScreenOn(promise: Promise) {
         try {
+            val powerManager = reactApplicationContext.getSystemService(Context.POWER_SERVICE) as PowerManager
+            
+            // IMPORTANT: Acquire WakeLock FIRST, before checking for activity
+            // After lockNow(), activity may be null, but WakeLock still works
+            
+            // Release old wakeLock if exists
+            wakeLock?.release()
+            
+            // Create WakeLock to turn on screen
+            @Suppress("DEPRECATION")
+            wakeLock = powerManager.newWakeLock(
+                PowerManager.FULL_WAKE_LOCK or 
+                PowerManager.ACQUIRE_CAUSES_WAKEUP or 
+                PowerManager.ON_AFTER_RELEASE,
+                "FreeKiosk:ScreenOn"
+            )
+            wakeLock?.acquire(10*60*1000L) // 10 minutes timeout
+            android.util.Log.d("KioskModule", "WakeLock acquired to turn screen ON")
+            
             val activity = reactApplicationContext.currentActivity
             if (activity != null) {
                 activity.runOnUiThread {
                     try {
-                        val powerManager = reactApplicationContext.getSystemService(Context.POWER_SERVICE) as PowerManager
-                        
-                        // Release old wakeLock if exists
-                        wakeLock?.release()
-                        
-                        // Create WakeLock to turn on screen
-                        @Suppress("DEPRECATION")
-                        wakeLock = powerManager.newWakeLock(
-                            PowerManager.FULL_WAKE_LOCK or 
-                            PowerManager.ACQUIRE_CAUSES_WAKEUP or 
-                            PowerManager.ON_AFTER_RELEASE,
-                            "FreeKiosk:ScreenOn"
-                        )
-                        wakeLock?.acquire(10*60*1000L) // 10 minutes timeout
-                        
                         // Show over lock screen and dismiss keyguard (in case PIN is set)
                         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
                             activity.setShowWhenLocked(true)
@@ -417,17 +426,19 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                         layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
                         activity.window.attributes = layoutParams
                         
-                        android.util.Log.d("KioskModule", "Screen turned ON via WakeLock + keyguard dismissed")
-                        promise.resolve(true)
+                        android.util.Log.d("KioskModule", "Screen turned ON via WakeLock + activity flags")
                     } catch (e: Exception) {
-                        android.util.Log.e("KioskModule", "Failed to turn screen on: ${e.message}")
-                        promise.reject("ERROR", "Failed to turn screen on: ${e.message}")
+                        android.util.Log.e("KioskModule", "Failed to set activity flags: ${e.message}")
                     }
                 }
             } else {
-                promise.reject("ERROR", "Activity not available")
+                android.util.Log.w("KioskModule", "Activity is null after lockNow() — WakeLock alone will wake screen")
             }
+            
+            // Resolve immediately - WakeLock handles the wake even if activity is null
+            promise.resolve(true)
         } catch (e: Exception) {
+            android.util.Log.e("KioskModule", "Failed to turn screen on: ${e.message}")
             promise.reject("ERROR", "Failed to turn screen on: ${e.message}")
         }
     }

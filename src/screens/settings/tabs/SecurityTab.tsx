@@ -34,6 +34,10 @@ interface SecurityTabProps {
   allowNotifications: boolean;
   onAllowNotificationsChange: (value: boolean) => void;
   
+  // System Info (audio fix for Samsung)
+  allowSystemInfo: boolean;
+  onAllowSystemInfoChange: (value: boolean) => void;
+  
   // Return to Settings
   returnMode: string; // 'tap_anywhere' | 'button'
   onReturnModeChange: (value: string) => void;
@@ -82,6 +86,8 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
   onAllowPowerButtonChange,
   allowNotifications,
   onAllowNotificationsChange,
+  allowSystemInfo,
+  onAllowSystemInfoChange,
   returnMode,
   onReturnModeChange,
   returnTapCount,
@@ -179,6 +185,13 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
               hint="Enable notification dispatch to allow NFC tag reading in external apps. ⚠️ Note: Android will show the Home button (non-functional) and make the notification panel accessible when this is enabled."
               value={allowNotifications}
               onValueChange={onAllowNotificationsChange}
+            />
+            <View style={styles.divider} />
+            <SettingsSwitch
+              label="ℹ️ Show System Info Bar"
+              hint="Displays the native Android status bar (time, battery, connectivity) in the locked app. This also fixes audio being muted on some Samsung/OneUI devices in lock mode."
+              value={allowSystemInfo}
+              onValueChange={onAllowSystemInfoChange}
             />
           </>
         )}

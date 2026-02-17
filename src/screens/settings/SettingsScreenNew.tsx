@@ -110,6 +110,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [keyboardMode, setKeyboardMode] = useState<string>('default');
   const [allowPowerButton, setAllowPowerButton] = useState<boolean>(false);
   const [allowNotifications, setAllowNotifications] = useState<boolean>(false);
+  const [allowSystemInfo, setAllowSystemInfo] = useState<boolean>(false);
   const [returnMode, setReturnMode] = useState<string>('tap_anywhere');
   const [returnTapCount, setReturnTapCount] = useState<string>('5');
   const [returnTapTimeout, setReturnTapTimeout] = useState<string>('1500');
@@ -330,6 +331,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedKeyboardMode = await StorageService.getKeyboardMode();
     const savedAllowPowerButton = await StorageService.getAllowPowerButton();
     const savedAllowNotifications = await StorageService.getAllowNotifications();
+    const savedAllowSystemInfo = await StorageService.getAllowSystemInfo();
     const savedReturnMode = await StorageService.getReturnMode();
     const savedReturnTapCount = await StorageService.getReturnTapCount();
     const savedReturnTapTimeout = await StorageService.getReturnTapTimeout();
@@ -383,6 +385,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setKeyboardMode(savedKeyboardMode);
     setAllowPowerButton(savedAllowPowerButton);
     setAllowNotifications(savedAllowNotifications);
+    setAllowSystemInfo(savedAllowSystemInfo);
     setReturnMode(savedReturnMode);
     setReturnTapCount(String(savedReturnTapCount));
     setReturnTapTimeout(String(savedReturnTapTimeout));
@@ -838,6 +841,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.saveKeyboardMode(keyboardMode);
     await StorageService.saveAllowPowerButton(allowPowerButton);
     await StorageService.saveAllowNotifications(allowNotifications);
+    await StorageService.saveAllowSystemInfo(allowSystemInfo);
     await StorageService.saveReturnMode(returnMode);
     const tapCount = parseInt(returnTapCount, 10);
     await StorageService.saveReturnTapCount(isNaN(tapCount) ? 5 : Math.max(2, Math.min(20, tapCount)));
@@ -906,7 +910,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     if (kioskEnabled) {
       try {
         const packageToWhitelist = displayMode === 'external_app' ? externalAppPackage : null;
-        await KioskModule.startLockTask(packageToWhitelist, allowPowerButton, allowNotifications);
+        await KioskModule.startLockTask(packageToWhitelist, allowPowerButton, allowNotifications, allowSystemInfo);
       } catch (error) {
         console.warn('[Settings] startLockTask error (non-blocking):', error);
       }
@@ -1273,6 +1277,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             onAllowPowerButtonChange={setAllowPowerButton}
             allowNotifications={allowNotifications}
             onAllowNotificationsChange={setAllowNotifications}
+            allowSystemInfo={allowSystemInfo}
+            onAllowSystemInfoChange={setAllowSystemInfo}
             returnMode={returnMode}
             onReturnModeChange={setReturnMode}
             returnTapCount={returnTapCount}

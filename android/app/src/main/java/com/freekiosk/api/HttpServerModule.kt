@@ -1,9 +1,12 @@
 package com.freekiosk.api
 
 import android.app.ActivityManager
+import android.app.Instrumentation
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.location.Location
+import android.location.LocationManager
 import android.graphics.Bitmap
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -21,7 +24,9 @@ import android.os.BatteryManager
 import android.os.Environment
 import android.os.PowerManager
 import android.os.StatFs
+import android.speech.tts.TextToSpeech
 import android.util.Log
+import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
@@ -95,9 +100,29 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     
     // Camera
     private var cameraPhotoModule: CameraPhotoModule? = null
+    
+    // Text-to-Speech
+    private var tts: TextToSpeech? = null
+    private var ttsReady: Boolean = false
 
     init {
         initSensors()
+        initTts()
+    }
+
+    private fun initTts() {
+        try {
+            tts = TextToSpeech(reactContext.applicationContext) { status ->
+                if (status == TextToSpeech.SUCCESS) {
+                    ttsReady = true
+                    Log.d(TAG, "TextToSpeech initialized successfully")
+                } else {
+                    Log.e(TAG, "TextToSpeech initialization failed: $status")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to initialize TTS: ${e.message}")
+        }
     }
 
     private fun initSensors() {
@@ -312,7 +337,9 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             put("ip", getLocalIpAddress())
             put("hostname", "freekiosk")
             put("version", com.freekiosk.BuildConfig.VERSION_NAME)
-            put("isDeviceOwner", false)
+            // Check real Device Owner status via DevicePolicyManager
+            val dpm = reactContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as android.app.admin.DevicePolicyManager
+            put("isDeviceOwner", dpm.isDeviceOwnerApp(reactContext.packageName))
             put("kioskMode", jsKioskMode)
         }
         status.put("device", deviceStatus)
@@ -382,10 +409,29 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             else -> "none"
         }
         
+        // Additional battery details
+        val temperature = (batteryIntent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0) / 10.0
+        val voltage = (batteryIntent?.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0) ?: 0) / 1000.0
+        val technology = batteryIntent?.getStringExtra(BatteryManager.EXTRA_TECHNOLOGY) ?: "unknown"
+        val health = batteryIntent?.getIntExtra(BatteryManager.EXTRA_HEALTH, -1) ?: -1
+        val healthStr = when (health) {
+            BatteryManager.BATTERY_HEALTH_GOOD -> "good"
+            BatteryManager.BATTERY_HEALTH_OVERHEAT -> "overheat"
+            BatteryManager.BATTERY_HEALTH_DEAD -> "dead"
+            BatteryManager.BATTERY_HEALTH_OVER_VOLTAGE -> "over_voltage"
+            BatteryManager.BATTERY_HEALTH_UNSPECIFIED_FAILURE -> "failure"
+            BatteryManager.BATTERY_HEALTH_COLD -> "cold"
+            else -> "unknown"
+        }
+        
         return JSONObject().apply {
             put("level", percentage)
             put("charging", isCharging)
             put("plugged", pluggedType)
+            put("temperature", temperature)
+            put("voltage", voltage)
+            put("health", healthStr)
+            put("technology", technology)
         }
     }
 
@@ -589,6 +635,139 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                         put("error", "Reboot failed: ${e.message}")
                     }
                 }
+            }
+            "tts" -> {
+                val text = params?.optString("text", "") ?: ""
+                if (text.isNotEmpty()) {
+                    speakText(text)
+                    return JSONObject().apply {
+                        put("executed", true)
+                        put("command", command)
+                    }
+                } else {
+                    return JSONObject().apply {
+                        put("executed", false)
+                        put("command", command)
+                        put("error", "Text is required")
+                    }
+                }
+            }
+            "clearCache" -> {
+                clearWebViewCache()
+                // Also send to JS to reload the WebView
+                sendEvent("onApiCommand", Arguments.createMap().apply {
+                    putString("command", "clearCache")
+                    putString("params", "{}")
+                })
+                return JSONObject().apply {
+                    put("executed", true)
+                    put("command", command)
+                }
+            }
+            "lockDevice" -> {
+                return try {
+                    val dpm = reactContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as android.app.admin.DevicePolicyManager
+                    if (dpm.isDeviceOwnerApp(reactContext.packageName)) {
+                        dpm.lockNow()
+                        Log.d(TAG, "Device locked via Device Owner API")
+                        JSONObject().apply {
+                            put("executed", true)
+                            put("command", command)
+                        }
+                    } else {
+                        Log.w(TAG, "Lock device failed: not Device Owner")
+                        JSONObject().apply {
+                            put("executed", false)
+                            put("command", command)
+                            put("error", "Lock device requires Device Owner mode")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Lock device failed: ${e.message}")
+                    JSONObject().apply {
+                        put("executed", false)
+                        put("command", command)
+                        put("error", "Lock device failed: ${e.message}")
+                    }
+                }
+            }
+            "restartUi" -> {
+                // Restart the React Native activity to refresh the UI
+                UiThreadUtil.runOnUiThread {
+                    try {
+                        val activity = reactContext.currentActivity
+                        if (activity != null) {
+                            activity.recreate()
+                            Log.d(TAG, "UI restarted via activity.recreate()")
+                        } else {
+                            Log.w(TAG, "Cannot restart UI: activity is null")
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to restart UI: ${e.message}")
+                    }
+                }
+                return JSONObject().apply {
+                    put("executed", true)
+                    put("command", command)
+                }
+            }
+            "keyboardKey" -> {
+                val key = params?.optString("key", "") ?: ""
+                if (key.isEmpty()) {
+                    return JSONObject().apply {
+                        put("executed", false)
+                        put("command", command)
+                        put("error", "Key name is required")
+                    }
+                }
+                val keyCode = mapKeyNameToKeyCode(key.lowercase())
+                if (keyCode == null) {
+                    return JSONObject().apply {
+                        put("executed", false)
+                        put("command", command)
+                        put("error", "Unknown key: $key. Use a-z, 0-9, f1-f12, space, tab, enter, escape, backspace, delete, etc.")
+                    }
+                }
+                Thread {
+                    try {
+                        val inst = Instrumentation()
+                        inst.sendKeyDownUpSync(keyCode)
+                        Log.d(TAG, "Keyboard key sent: $key (code: $keyCode)")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to send keyboard key: ${e.message}")
+                    }
+                }.start()
+                return JSONObject().apply {
+                    put("executed", true)
+                    put("command", command)
+                    put("key", key)
+                    put("keyCode", keyCode)
+                }
+            }
+            "keyboardCombo" -> {
+                val map = params?.optString("map", "") ?: ""
+                if (map.isEmpty()) {
+                    return JSONObject().apply {
+                        put("executed", false)
+                        put("command", command)
+                        put("error", "Key combination (map) is required, e.g. ctrl+c, alt+f4, ctrl+shift+a")
+                    }
+                }
+                return sendKeyboardCombo(map)
+            }
+            "keyboardText" -> {
+                val text = params?.optString("text", "") ?: ""
+                if (text.isEmpty()) {
+                    return JSONObject().apply {
+                        put("executed", false)
+                        put("command", command)
+                        put("error", "Text is required")
+                    }
+                }
+                return sendKeyboardText(text)
+            }
+            "getLocation" -> {
+                return getLocationInfo()
             }
         }
         
@@ -844,23 +1023,23 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     private fun turnScreenOn() {
         UiThreadUtil.runOnUiThread {
             try {
+                val powerManager = reactContext.getSystemService(Context.POWER_SERVICE) as PowerManager
+                
+                // Release old wakeLock if exists
+                wakeLock?.release()
+                
+                // Create WakeLock to turn on screen — this works even without activity
+                @Suppress("DEPRECATION")
+                wakeLock = powerManager.newWakeLock(
+                    PowerManager.FULL_WAKE_LOCK or 
+                    PowerManager.ACQUIRE_CAUSES_WAKEUP or 
+                    PowerManager.ON_AFTER_RELEASE,
+                    "FreeKiosk:HttpScreenOn"
+                )
+                wakeLock?.acquire(10*60*1000L) // 10 minutes timeout
+                
                 val activity = reactContext.currentActivity
                 if (activity != null) {
-                    val powerManager = reactContext.getSystemService(Context.POWER_SERVICE) as PowerManager
-                    
-                    // Release old wakeLock if exists
-                    wakeLock?.release()
-                    
-                    // Create WakeLock to turn on screen
-                    @Suppress("DEPRECATION")
-                    wakeLock = powerManager.newWakeLock(
-                        PowerManager.FULL_WAKE_LOCK or 
-                        PowerManager.ACQUIRE_CAUSES_WAKEUP or 
-                        PowerManager.ON_AFTER_RELEASE,
-                        "FreeKiosk:HttpScreenOn"
-                    )
-                    wakeLock?.acquire(10*60*1000L) // 10 minutes timeout
-                    
                     // Re-enable FLAG_KEEP_SCREEN_ON
                     activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                     
@@ -869,19 +1048,36 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                     layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
                     activity.window.attributes = layoutParams
                     
-                    // Release wakeLock after a short delay — FLAG_KEEP_SCREEN_ON handles persistence
-                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                        try {
-                            wakeLock?.release()
-                            wakeLock = null
-                            Log.d(TAG, "WakeLock released after screen on (FLAG_KEEP_SCREEN_ON active)")
-                        } catch (e: Exception) {
-                            // Already released
-                        }
-                    }, 5000) // 5 seconds is enough for screen to fully wake
+                    // Dismiss keyguard if locked
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
+                        activity.setShowWhenLocked(true)
+                        activity.setTurnScreenOn(true)
+                        val keyguardManager = reactContext.getSystemService(Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
+                        keyguardManager.requestDismissKeyguard(activity, null)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        activity.window.addFlags(
+                            WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
+                            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                        )
+                    }
                     
-                    Log.d(TAG, "Screen turned ON via HTTP API")
+                    Log.d(TAG, "Screen turned ON via HTTP API (activity available)")
+                } else {
+                    Log.d(TAG, "Screen turned ON via WakeLock only (activity not available)")
                 }
+                
+                // Release wakeLock after a short delay — FLAG_KEEP_SCREEN_ON handles persistence
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    try {
+                        wakeLock?.release()
+                        wakeLock = null
+                        Log.d(TAG, "WakeLock released after screen on")
+                    } catch (e: Exception) {
+                        // Already released
+                    }
+                }, 5000)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to turn screen on: ${e.message}")
             }
@@ -921,11 +1117,344 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
         }
     }
 
+    // ==================== Text-to-Speech ====================
+
+    private fun speakText(text: String) {
+        try {
+            if (tts != null && ttsReady) {
+                tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "freekiosk_tts_${System.currentTimeMillis()}")
+                Log.d(TAG, "TTS speaking: $text")
+            } else {
+                // TTS not ready, try to reinitialize
+                Log.w(TAG, "TTS not ready, reinitializing...")
+                initTts()
+                // Retry after a short delay
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    if (ttsReady) {
+                        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "freekiosk_tts_retry")
+                    }
+                }, 1000)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "TTS speak failed: ${e.message}")
+        }
+    }
+
+    // ==================== Keyboard Emulation ====================
+
+    /**
+     * Map a key name (string) to an Android KeyEvent keycode.
+     * Supports: single characters (a-z, 0-9, symbols), named keys (space, tab, enter, etc.),
+     * function keys (f1-f12), navigation, media keys, and modifiers.
+     */
+    private fun mapKeyNameToKeyCode(key: String): Int? {
+        // Single character keys
+        if (key.length == 1) {
+            val char = key[0]
+            return when {
+                char in 'a'..'z' -> KeyEvent.KEYCODE_A + (char - 'a')
+                char in '0'..'9' -> KeyEvent.KEYCODE_0 + (char - '0')
+                char == ' ' -> KeyEvent.KEYCODE_SPACE
+                char == '.' -> KeyEvent.KEYCODE_PERIOD
+                char == ',' -> KeyEvent.KEYCODE_COMMA
+                char == '-' -> KeyEvent.KEYCODE_MINUS
+                char == '=' -> KeyEvent.KEYCODE_EQUALS
+                char == '+' -> KeyEvent.KEYCODE_PLUS
+                char == '[' -> KeyEvent.KEYCODE_LEFT_BRACKET
+                char == ']' -> KeyEvent.KEYCODE_RIGHT_BRACKET
+                char == '\\' -> KeyEvent.KEYCODE_BACKSLASH
+                char == '/' -> KeyEvent.KEYCODE_SLASH
+                char == ';' -> KeyEvent.KEYCODE_SEMICOLON
+                char == '\'' -> KeyEvent.KEYCODE_APOSTROPHE
+                char == '`' -> KeyEvent.KEYCODE_GRAVE
+                char == '@' -> KeyEvent.KEYCODE_AT
+                char == '#' -> KeyEvent.KEYCODE_POUND
+                char == '*' -> KeyEvent.KEYCODE_STAR
+                char == '\t' -> KeyEvent.KEYCODE_TAB
+                char == '\n' -> KeyEvent.KEYCODE_ENTER
+                else -> null
+            }
+        }
+
+        // Named keys
+        return when (key) {
+            // Whitespace / editing
+            "space" -> KeyEvent.KEYCODE_SPACE
+            "tab" -> KeyEvent.KEYCODE_TAB
+            "enter", "return" -> KeyEvent.KEYCODE_ENTER
+            "escape", "esc" -> KeyEvent.KEYCODE_ESCAPE
+            "backspace" -> KeyEvent.KEYCODE_DEL
+            "delete", "del" -> KeyEvent.KEYCODE_FORWARD_DEL
+            "insert", "ins" -> KeyEvent.KEYCODE_INSERT
+
+            // Cursor / navigation (keyboard Home/End, not Android Home button)
+            "up" -> KeyEvent.KEYCODE_DPAD_UP
+            "down" -> KeyEvent.KEYCODE_DPAD_DOWN
+            "left" -> KeyEvent.KEYCODE_DPAD_LEFT
+            "right" -> KeyEvent.KEYCODE_DPAD_RIGHT
+            "home" -> KeyEvent.KEYCODE_MOVE_HOME
+            "end" -> KeyEvent.KEYCODE_MOVE_END
+            "pageup" -> KeyEvent.KEYCODE_PAGE_UP
+            "pagedown" -> KeyEvent.KEYCODE_PAGE_DOWN
+
+            // Function keys
+            "f1" -> KeyEvent.KEYCODE_F1
+            "f2" -> KeyEvent.KEYCODE_F2
+            "f3" -> KeyEvent.KEYCODE_F3
+            "f4" -> KeyEvent.KEYCODE_F4
+            "f5" -> KeyEvent.KEYCODE_F5
+            "f6" -> KeyEvent.KEYCODE_F6
+            "f7" -> KeyEvent.KEYCODE_F7
+            "f8" -> KeyEvent.KEYCODE_F8
+            "f9" -> KeyEvent.KEYCODE_F9
+            "f10" -> KeyEvent.KEYCODE_F10
+            "f11" -> KeyEvent.KEYCODE_F11
+            "f12" -> KeyEvent.KEYCODE_F12
+
+            // Toggle keys
+            "capslock" -> KeyEvent.KEYCODE_CAPS_LOCK
+            "numlock" -> KeyEvent.KEYCODE_NUM_LOCK
+            "scrolllock" -> KeyEvent.KEYCODE_SCROLL_LOCK
+
+            // Modifier keys (as standalone presses)
+            "shift" -> KeyEvent.KEYCODE_SHIFT_LEFT
+            "ctrl", "control" -> KeyEvent.KEYCODE_CTRL_LEFT
+            "alt" -> KeyEvent.KEYCODE_ALT_LEFT
+            "meta", "win", "cmd", "command" -> KeyEvent.KEYCODE_META_LEFT
+
+            // Media keys
+            "playpause" -> KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+            "play" -> KeyEvent.KEYCODE_MEDIA_PLAY
+            "pause" -> KeyEvent.KEYCODE_MEDIA_PAUSE
+            "stop" -> KeyEvent.KEYCODE_MEDIA_STOP
+            "next", "nexttrack" -> KeyEvent.KEYCODE_MEDIA_NEXT
+            "previous", "prevtrack" -> KeyEvent.KEYCODE_MEDIA_PREVIOUS
+            "volumeup" -> KeyEvent.KEYCODE_VOLUME_UP
+            "volumedown" -> KeyEvent.KEYCODE_VOLUME_DOWN
+            "mute" -> KeyEvent.KEYCODE_VOLUME_MUTE
+
+            // Android system keys
+            "back" -> KeyEvent.KEYCODE_BACK
+            "menu" -> KeyEvent.KEYCODE_MENU
+            "search" -> KeyEvent.KEYCODE_SEARCH
+            "power" -> KeyEvent.KEYCODE_POWER
+            "select", "center", "dpadcenter" -> KeyEvent.KEYCODE_DPAD_CENTER
+            "androidhome" -> KeyEvent.KEYCODE_HOME
+
+            // Symbol names
+            "period", "dot" -> KeyEvent.KEYCODE_PERIOD
+            "comma" -> KeyEvent.KEYCODE_COMMA
+            "minus", "dash" -> KeyEvent.KEYCODE_MINUS
+            "plus" -> KeyEvent.KEYCODE_PLUS
+            "equals" -> KeyEvent.KEYCODE_EQUALS
+            "semicolon" -> KeyEvent.KEYCODE_SEMICOLON
+            "apostrophe", "quote" -> KeyEvent.KEYCODE_APOSTROPHE
+            "slash" -> KeyEvent.KEYCODE_SLASH
+            "backslash" -> KeyEvent.KEYCODE_BACKSLASH
+            "leftbracket" -> KeyEvent.KEYCODE_LEFT_BRACKET
+            "rightbracket" -> KeyEvent.KEYCODE_RIGHT_BRACKET
+            "grave", "backtick" -> KeyEvent.KEYCODE_GRAVE
+            "at" -> KeyEvent.KEYCODE_AT
+            "pound", "hash" -> KeyEvent.KEYCODE_POUND
+            "star", "asterisk" -> KeyEvent.KEYCODE_STAR
+
+            else -> null
+        }
+    }
+
+    /**
+     * Send a keyboard shortcut combination (e.g., "ctrl+c", "alt+f4", "ctrl+shift+a").
+     * The last part is the key, preceding parts are modifiers (ctrl, alt, shift, meta).
+     */
+    private fun sendKeyboardCombo(map: String): JSONObject {
+        // NanoHTTPD decodes '+' in query params as space, so split on both '+' and ' '
+        val parts = map.lowercase().split(Regex("[+ ]")).map { it.trim() }.filter { it.isNotEmpty() }
+        if (parts.isEmpty()) {
+            return JSONObject().apply {
+                put("executed", false)
+                put("command", "keyboardCombo")
+                put("error", "Empty key combination")
+            }
+        }
+
+        // Last part is the key, everything before is a modifier
+        val keyName = parts.last()
+        val modifiers = parts.dropLast(1)
+
+        val keyCode = mapKeyNameToKeyCode(keyName)
+        if (keyCode == null) {
+            return JSONObject().apply {
+                put("executed", false)
+                put("command", "keyboardCombo")
+                put("error", "Unknown key in combination: $keyName")
+            }
+        }
+
+        // Build meta state from modifiers
+        var metaState = 0
+        for (mod in modifiers) {
+            metaState = metaState or when (mod) {
+                "ctrl", "control" -> KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON
+                "alt" -> KeyEvent.META_ALT_ON or KeyEvent.META_ALT_LEFT_ON
+                "shift" -> KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
+                "meta", "win", "cmd", "command" -> KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON
+                else -> {
+                    return JSONObject().apply {
+                        put("executed", false)
+                        put("command", "keyboardCombo")
+                        put("error", "Unknown modifier: $mod. Valid modifiers: ctrl, alt, shift, meta")
+                    }
+                }
+            }
+        }
+
+        val finalMetaState = metaState
+        Thread {
+            try {
+                val inst = Instrumentation()
+                val now = android.os.SystemClock.uptimeMillis()
+                val downEvent = KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0, finalMetaState)
+                val upEvent = KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0, finalMetaState)
+                inst.sendKeySync(downEvent)
+                inst.sendKeySync(upEvent)
+                Log.d(TAG, "Keyboard combo sent: $map (key=$keyCode, meta=$finalMetaState)")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send keyboard combo: ${e.message}")
+            }
+        }.start()
+
+        return JSONObject().apply {
+            put("executed", true)
+            put("command", "keyboardCombo")
+            put("map", map)
+            put("key", keyName)
+            put("keyCode", keyCode)
+            put("modifiers", org.json.JSONArray(modifiers))
+            put("metaState", finalMetaState)
+        }
+    }
+
+    /**
+     * Type a text string by sending individual key events for each character.
+     * Uses Instrumentation.sendStringSync() for natural text input.
+     */
+    private fun sendKeyboardText(text: String): JSONObject {
+        Thread {
+            try {
+                val inst = Instrumentation()
+                inst.sendStringSync(text)
+                Log.d(TAG, "Keyboard text sent: ${text.take(50)}${if (text.length > 50) "..." else ""}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send keyboard text: ${e.message}")
+            }
+        }.start()
+
+        return JSONObject().apply {
+            put("executed", true)
+            put("command", "keyboardText")
+            put("textLength", text.length)
+        }
+    }
+
+    // ==================== GPS Location ====================
+
+    /**
+     * Get the device's last known GPS location.
+     * Tries GPS, Network, and Passive providers, returns the most accurate.
+     * Requires ACCESS_FINE_LOCATION permission (already declared in manifest).
+     */
+    private fun getLocationInfo(): JSONObject {
+        return try {
+            val locationManager = reactContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+
+            // Try to get last known location from various providers (best accuracy wins)
+            var bestLocation: Location? = null
+            val providers = listOf(
+                LocationManager.GPS_PROVIDER,
+                LocationManager.NETWORK_PROVIDER,
+                LocationManager.PASSIVE_PROVIDER
+            )
+
+            for (provider in providers) {
+                try {
+                    if (locationManager.isProviderEnabled(provider)) {
+                        @Suppress("MissingPermission")
+                        val location = locationManager.getLastKnownLocation(provider)
+                        if (location != null) {
+                            if (bestLocation == null || location.accuracy < bestLocation!!.accuracy) {
+                                bestLocation = location
+                            }
+                        }
+                    }
+                } catch (e: SecurityException) {
+                    Log.w(TAG, "No location permission for provider: $provider")
+                }
+            }
+
+            // Check which providers are enabled
+            val enabledProviders = providers.filter {
+                try { locationManager.isProviderEnabled(it) } catch (e: Exception) { false }
+            }
+
+            JSONObject().apply {
+                put("executed", true)
+                put("command", "getLocation")
+                put("providers", org.json.JSONArray(enabledProviders))
+                if (bestLocation != null) {
+                    put("available", true)
+                    put("latitude", bestLocation!!.latitude)
+                    put("longitude", bestLocation!!.longitude)
+                    put("accuracy", bestLocation!!.accuracy.toDouble())
+                    put("altitude", bestLocation!!.altitude)
+                    put("speed", bestLocation!!.speed.toDouble())
+                    put("bearing", bestLocation!!.bearing.toDouble())
+                    put("provider", bestLocation!!.provider ?: "unknown")
+                    put("time", bestLocation!!.time)
+                } else {
+                    put("available", false)
+                    put("error", "No location available. Ensure GPS is enabled and location permission is granted.")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get location: ${e.message}")
+            JSONObject().apply {
+                put("executed", false)
+                put("command", "getLocation")
+                put("error", "Failed to get location: ${e.message}")
+            }
+        }
+    }
+
+    // ==================== WebView Cache Clearing ====================
+
+    private fun clearWebViewCache() {
+        UiThreadUtil.runOnUiThread {
+            try {
+                // Clear WebView cache and data
+                android.webkit.WebView(reactContext.applicationContext).apply {
+                    clearCache(true)
+                    clearFormData()
+                    clearHistory()
+                    destroy()
+                }
+                // Also clear cookies
+                android.webkit.CookieManager.getInstance().removeAllCookies(null)
+                android.webkit.CookieManager.getInstance().flush()
+                // Clear WebStorage
+                android.webkit.WebStorage.getInstance().deleteAllData()
+                Log.d(TAG, "WebView cache, cookies, and storage cleared")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to clear WebView cache: ${e.message}")
+            }
+        }
+    }
+
     // ==================== Screenshot Method ====================
 
     private fun captureScreenshot(): java.io.InputStream? {
         return try {
             var screenshot: ByteArrayInputStream? = null
+            val latch = java.util.concurrent.CountDownLatch(1)
             
             UiThreadUtil.runOnUiThread {
                 try {
@@ -944,11 +1473,13 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to capture screenshot on UI thread", e)
+                } finally {
+                    latch.countDown()
                 }
             }
             
-            // Wait a bit for UI thread to complete
-            Thread.sleep(100)
+            // Wait for UI thread to complete (max 5 seconds)
+            latch.await(5, java.util.concurrent.TimeUnit.SECONDS)
             screenshot
         } catch (e: Exception) {
             Log.e(TAG, "Failed to capture screenshot", e)
@@ -969,6 +1500,10 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             mediaPlayer = null
             toneGenerator?.release()
             toneGenerator = null
+            tts?.stop()
+            tts?.shutdown()
+            tts = null
+            ttsReady = false
             sensorManager?.unregisterListener(this)
             cameraPhotoModule = null
             Log.d(TAG, "HttpServerModule cleaned up")

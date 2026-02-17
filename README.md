@@ -11,7 +11,7 @@
   </p>
   
   <p>
-    <img src="https://img.shields.io/badge/Version-1.2.10-blue.svg" alt="Version 1.2.9">
+    <img src="https://img.shields.io/badge/Version-1.2.11-blue.svg" alt="Version 1.2.9">
     <a href="https://github.com/rushb-fr/freekiosk/releases"><img src="https://img.shields.io/github/downloads/rushb-fr/freekiosk/total.svg" alt="Downloads"></a>
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT">
     <img src="https://img.shields.io/badge/Android-8.0%2B-green.svg" alt="Android 8.0+">
@@ -261,7 +261,19 @@ Done! Your tablet is now in kiosk mode.
 
 ## 🗺️ Roadmap
 
-### ✅ v1.2.10 (Feb 2026) - URL Filtering, NFC Fix & Scroll to Top 🆕
+### ✅ v1.2.11 (Feb 2026) - Keyboard API, GPS, TTS & Major Fixes 🆕
+- ⌨️ **Keyboard Emulation API**: Full keyboard input, shortcuts & text typing via REST
+- 📍 **GPS Location API**: Device coordinates via `/api/location`
+- 🔋 **Enriched Battery API**: Temperature, voltage, health & technology fields
+- 🔒 **Lock Device API** & 🔄 **Restart UI API**: New remote control endpoints
+- 🗣️ **Text-to-Speech (TTS)**: Native Android TTS via REST API
+- 📊 **Volume Read API**: Current volume level via `/api/volume`
+- 🐛 **Screen Sleep Scheduler Fix**: Fixed black screen, lockout & wake-on-touch bugs
+- 🐛 **Power Menu Fix (TECNO/HiOS)**: Fixed power menu dismissed immediately
+- 🧹 **Clear Cache Fix**: Now performs full native cache clear
+- 🔄 **Update 404 Fix**: Retrieves actual APK URL from GitHub assets
+
+### ✅ v1.2.10 (Feb 2026) - URL Filtering, NFC Fix & Scroll to Top
 - ⏱️ **Inactivity Return - Scroll to Top**: Smoothly scrolls to top when already on start page
 - 🔗 **URL Filtering (Blacklist / Whitelist)**: Control allowed URLs with wildcard patterns
 - 🔗 **URL Filtering Form Fix**: Fixed form submissions blocked in whitelist mode

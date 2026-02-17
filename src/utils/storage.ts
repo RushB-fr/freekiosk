@@ -53,6 +53,8 @@ const KEYS = {
   ALLOW_POWER_BUTTON: '@kiosk_allow_power_button',
   // Notifications (NFC support)
   ALLOW_NOTIFICATIONS: '@kiosk_allow_notifications',
+  // Allow System Info (audio fix for Samsung in lock mode)
+  ALLOW_SYSTEM_INFO: '@kiosk_allow_system_info',
   // Return to Settings
   RETURN_TAP_COUNT: '@kiosk_return_tap_count',
   RETURN_TAP_TIMEOUT: '@kiosk_return_tap_timeout',
@@ -245,6 +247,8 @@ export const StorageService = {
         KEYS.ALLOW_POWER_BUTTON,
         // Notifications
         KEYS.ALLOW_NOTIFICATIONS,
+        // System Info (audio fix)
+        KEYS.ALLOW_SYSTEM_INFO,
         // Return to Settings
         KEYS.RETURN_TAP_COUNT,
         KEYS.VOLUME_UP_5TAP_ENABLED,
@@ -1099,6 +1103,25 @@ export const StorageService = {
       return value ? JSON.parse(value) : false; // Default OFF for maximum security
     } catch (error) {
       console.error('Error getting allow notifications:', error);
+      return false;
+    }
+  },
+
+  // ALLOW SYSTEM INFO (audio fix for Samsung in lock mode)
+  saveAllowSystemInfo: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.ALLOW_SYSTEM_INFO, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving allow system info:', error);
+    }
+  },
+
+  getAllowSystemInfo: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.ALLOW_SYSTEM_INFO);
+      return value ? JSON.parse(value) : false; // Default OFF
+    } catch (error) {
+      console.error('Error getting allow system info:', error);
       return false;
     }
   },
