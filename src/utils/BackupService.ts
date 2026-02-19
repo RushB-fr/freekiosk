@@ -6,7 +6,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform, PermissionsAndroid, Alert } from 'react-native';
 import RNFS from 'react-native-fs';
-import { hasSecurePin, getSecureApiKey, saveSecureApiKey } from './secureStorage';
+import { hasSecurePin, getSecureApiKey, saveSecureApiKey, getSecureMqttPassword, saveSecureMqttPassword } from './secureStorage';
 
 // All storage keys to backup
 const BACKUP_KEYS = [
@@ -93,6 +93,18 @@ const BACKUP_KEYS = [
   '@kiosk_url_filter_mode',
   '@kiosk_url_filter_list',
   '@kiosk_url_filter_show_feedback',
+  // MQTT
+  '@kiosk_mqtt_enabled',
+  '@kiosk_mqtt_broker_url',
+  '@kiosk_mqtt_port',
+  '@kiosk_mqtt_username',
+  '@kiosk_mqtt_client_id',
+  '@kiosk_mqtt_base_topic',
+  '@kiosk_mqtt_discovery_prefix',
+  '@kiosk_mqtt_status_interval',
+  '@kiosk_mqtt_allow_control',
+  '@kiosk_mqtt_motion_always_on',
+  // Note: MQTT password is handled separately via Keychain (secure storage)
   // Legacy keys
   '@screensaver_delay',
   '@motion_detection_enabled',
@@ -211,6 +223,16 @@ export async function exportBackup(): Promise<{ success: boolean; filePath?: str
       }
     } catch (e) {
       console.warn('Failed to read API key from secure storage:', e);
+    }
+
+    // Get MQTT password from secure storage (Keychain)
+    try {
+      const mqttPassword = await getSecureMqttPassword();
+      if (mqttPassword) {
+        settings['@kiosk_mqtt_password'] = mqttPassword;
+      }
+    } catch (e) {
+      console.warn('Failed to read MQTT password from secure storage:', e);
     }
 
     // Check if PIN is configured (but don't export the PIN itself for security)
@@ -334,6 +356,9 @@ export async function importBackup(filePath: string): Promise<{ success: boolean
           if (key === '@kiosk_rest_api_key') {
             await saveSecureApiKey(value);
             console.log('[BackupService] API key imported to secure storage');
+          } else if (key === '@kiosk_mqtt_password') {
+            await saveSecureMqttPassword(value);
+            console.log('[BackupService] MQTT password imported to secure storage');
           } else {
             await AsyncStorage.setItem(key, value);
           }

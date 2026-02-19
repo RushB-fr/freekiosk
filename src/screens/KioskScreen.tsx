@@ -42,6 +42,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [inactivityEnabled, setInactivityEnabled] = useState(true);
   const [inactivityDelay, setInactivityDelay] = useState(600000);
   const [motionEnabled, setMotionEnabled] = useState(false);
+  const [motionAlwaysOn, setMotionAlwaysOn] = useState(false);
   const [motionCameraPosition, setMotionCameraPosition] = useState<'front' | 'back'>('front');
   const [isPreCheckingMotion, setIsPreCheckingMotion] = useState(false); // Pré-vérification avant activation screensaver
   const preCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -320,10 +321,12 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         onScreenOn: () => {
           setIsScreensaverActive(false);
           resetTimer();
+          ApiService.updateStatus({ screenOn: true });
           console.log('[API] Screen ON');
         },
         onScreenOff: () => {
           setIsScreensaverActive(true);
+          ApiService.updateStatus({ screenOn: false });
           console.log('[API] Screen OFF');
         },
         onWake: () => {
@@ -468,18 +471,22 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       
       // Auto-start the API server if enabled
       await ApiService.autoStart();
+
+      // Auto-start MQTT client if enabled
+      await ApiService.autoStartMqtt();
     };
 
     initApiService();
 
     return () => {
+      ApiService.stopMqtt();
       ApiService.destroy();
     };
   }, []);
 
   // Listen for screen state changes from native (power button pressed)
   useEffect(() => {
-    // Check initial screen state
+    // Check initial screen state (only on mount)
     const checkInitialScreenState = async () => {
       try {
         if (KioskModule?.isScreenOn) {
@@ -491,21 +498,21 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         console.error('[KioskScreen] Error checking initial screen state:', error);
       }
     };
-    
+
     checkInitialScreenState();
-    
+
     const screenStateListener = DeviceEventEmitter.addListener(
       'onScreenStateChanged',
       (isScreenOn: boolean) => {
         console.log('[KioskScreen] Screen state changed:', isScreenOn ? 'ON' : 'OFF');
-        
+
         // Update API status with new screen state
         ApiService.updateStatus({
           screenOn: isScreenOn,
         });
-        
+
         // If screen turned on, deactivate screensaver
-        if (isScreenOn && isScreensaverActive) {
+        if (isScreenOn && isScreensaverActiveRef.current) {
           setIsScreensaverActive(false);
           resetTimer();
         }
@@ -515,7 +522,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     return () => {
       screenStateListener.remove();
     };
-  }, [isScreensaverActive]);
+  }, []);
 
   // Listen for volume changes from hardware buttons
   useEffect(() => {
@@ -1052,6 +1059,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       const savedInactivityEnabled = bool(K.SCREENSAVER_INACTIVITY_ENABLED, true);
       const savedInactivityDelay = num(K.SCREENSAVER_INACTIVITY_DELAY, 600000);
       const savedMotionEnabled = bool(K.SCREENSAVER_MOTION_ENABLED, false);
+      const savedMotionAlwaysOn = bool(K.MQTT_MOTION_ALWAYS_ON, false);
       const savedMotionCameraPosition = (str(K.MOTION_CAMERA_POSITION) ?? 'front') as 'front' | 'back';
       const savedStatusBarEnabled = bool(K.STATUS_BAR_ENABLED, false);
       const savedStatusBarOnOverlay = bool(K.STATUS_BAR_ON_OVERLAY, true);
@@ -1077,6 +1085,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       setInactivityEnabled(savedInactivityEnabled);
       setInactivityDelay(savedInactivityDelay);
       setMotionEnabled(savedMotionEnabled);
+      setMotionAlwaysOn(savedMotionAlwaysOn);
       setMotionCameraPosition(savedMotionCameraPosition);
       setStatusBarEnabled(savedStatusBarEnabled);
       setStatusBarOnOverlay(savedStatusBarOnOverlay);
@@ -1583,6 +1592,11 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   }, [resetTimer, defaultBrightness, autoBrightnessEnabled, exitScheduledSleep]);
 
   const onMotionDetected = useCallback(async () => {
+    // Report motion to API/MQTT
+    ApiService.updateStatus({ motionDetected: true });
+    // Auto-clear after 10 seconds
+    setTimeout(() => ApiService.updateStatus({ motionDetected: false }), 10000);
+
     // Don't wake on motion during scheduled sleep
     if (isScheduledSleepRef.current) {
       console.log('[KioskScreen] Motion ignored — screen is in scheduled sleep');
@@ -1800,7 +1814,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
 
       {/* Motion Detector - Active during pre-check OR when screensaver is ON (only if screen is focused) */}
       <MotionDetector
-        enabled={isFocused && motionEnabled && (isPreCheckingMotion || isScreensaverActive)}
+        enabled={isFocused && (motionAlwaysOn || (motionEnabled && (isPreCheckingMotion || isScreensaverActive)))}
         onMotionDetected={onMotionDetected}
         sensitivity="medium"
         cameraPosition={motionCameraPosition}

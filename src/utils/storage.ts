@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlockingRegion } from '../types/blockingOverlay';
 import { ScreenScheduleRule } from '../types/screenScheduler';
-import { saveSecureApiKey, getSecureApiKey, clearSecureApiKey } from './secureStorage';
+import { saveSecureApiKey, getSecureApiKey, clearSecureApiKey, clearSecureMqttPassword } from './secureStorage';
 
 const KEYS = {
   URL: '@kiosk_url',
@@ -93,6 +93,17 @@ const KEYS = {
   URL_FILTER_SHOW_FEEDBACK: '@kiosk_url_filter_show_feedback',
   // PDF Viewer
   PDF_VIEWER_ENABLED: '@kiosk_pdf_viewer_enabled',
+  // MQTT (Home Assistant integration)
+  MQTT_ENABLED: '@kiosk_mqtt_enabled',
+  MQTT_BROKER_URL: '@kiosk_mqtt_broker_url',
+  MQTT_PORT: '@kiosk_mqtt_port',
+  MQTT_USERNAME: '@kiosk_mqtt_username',
+  MQTT_CLIENT_ID: '@kiosk_mqtt_client_id',
+  MQTT_BASE_TOPIC: '@kiosk_mqtt_base_topic',
+  MQTT_DISCOVERY_PREFIX: '@kiosk_mqtt_discovery_prefix',
+  MQTT_STATUS_INTERVAL: '@kiosk_mqtt_status_interval',
+  MQTT_ALLOW_CONTROL: '@kiosk_mqtt_allow_control',
+  MQTT_MOTION_ALWAYS_ON: '@kiosk_mqtt_motion_always_on',
   // Legacy keys for backward compatibility
   SCREENSAVER_DELAY: '@screensaver_delay',
   MOTION_DETECTION_ENABLED: '@motion_detection_enabled',
@@ -288,14 +299,26 @@ export const StorageService = {
         KEYS.URL_FILTER_MODE,
         KEYS.URL_FILTER_LIST,
         KEYS.URL_FILTER_SHOW_FEEDBACK,
+        // MQTT
+        KEYS.MQTT_ENABLED,
+        KEYS.MQTT_BROKER_URL,
+        KEYS.MQTT_PORT,
+        KEYS.MQTT_USERNAME,
+        KEYS.MQTT_CLIENT_ID,
+        KEYS.MQTT_BASE_TOPIC,
+        KEYS.MQTT_DISCOVERY_PREFIX,
+        KEYS.MQTT_STATUS_INTERVAL,
+        KEYS.MQTT_ALLOW_CONTROL,
+        KEYS.MQTT_MOTION_ALWAYS_ON,
         // Legacy keys
         KEYS.SCREENSAVER_DELAY,
         KEYS.MOTION_DETECTION_ENABLED,
         KEYS.MOTION_SENSITIVITY,
         KEYS.MOTION_DELAY,
       ]);
-      // Also clear secure API key from Keychain
+      // Also clear secure API key and MQTT password from Keychain
       await clearSecureApiKey();
+      await clearSecureMqttPassword();
     } catch (error) {
       console.error('Error clearing all storage keys:', error);
     }
@@ -1644,6 +1667,190 @@ export const StorageService = {
       return value ? JSON.parse(value) : false;
     } catch (error) {
       console.error('Error getting PDF viewer enabled:', error);
+      return false;
+    }
+  },
+
+  // ============ MQTT (Home Assistant) ============
+
+  saveMqttEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving MQTT enabled:', error);
+    }
+  },
+
+  getMqttEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting MQTT enabled:', error);
+      return false;
+    }
+  },
+
+  saveMqttBrokerUrl: async (url: string): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_BROKER_URL, url);
+    } catch (error) {
+      console.error('Error saving MQTT broker URL:', error);
+    }
+  },
+
+  getMqttBrokerUrl: async (): Promise<string> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_BROKER_URL);
+      return value || '';
+    } catch (error) {
+      console.error('Error getting MQTT broker URL:', error);
+      return '';
+    }
+  },
+
+  saveMqttPort: async (port: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_PORT, port.toString());
+    } catch (error) {
+      console.error('Error saving MQTT port:', error);
+    }
+  },
+
+  getMqttPort: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_PORT);
+      const port = value ? parseInt(value, 10) : 1883;
+      return isNaN(port) ? 1883 : port;
+    } catch (error) {
+      console.error('Error getting MQTT port:', error);
+      return 1883;
+    }
+  },
+
+  saveMqttUsername: async (username: string): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_USERNAME, username);
+    } catch (error) {
+      console.error('Error saving MQTT username:', error);
+    }
+  },
+
+  getMqttUsername: async (): Promise<string> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_USERNAME);
+      return value || '';
+    } catch (error) {
+      console.error('Error getting MQTT username:', error);
+      return '';
+    }
+  },
+
+  saveMqttClientId: async (clientId: string): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_CLIENT_ID, clientId);
+    } catch (error) {
+      console.error('Error saving MQTT client ID:', error);
+    }
+  },
+
+  getMqttClientId: async (): Promise<string> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_CLIENT_ID);
+      return value || '';
+    } catch (error) {
+      console.error('Error getting MQTT client ID:', error);
+      return '';
+    }
+  },
+
+  saveMqttBaseTopic: async (topic: string): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_BASE_TOPIC, topic);
+    } catch (error) {
+      console.error('Error saving MQTT base topic:', error);
+    }
+  },
+
+  getMqttBaseTopic: async (): Promise<string> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_BASE_TOPIC);
+      return value || 'freekiosk';
+    } catch (error) {
+      console.error('Error getting MQTT base topic:', error);
+      return 'freekiosk';
+    }
+  },
+
+  saveMqttDiscoveryPrefix: async (prefix: string): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_DISCOVERY_PREFIX, prefix);
+    } catch (error) {
+      console.error('Error saving MQTT discovery prefix:', error);
+    }
+  },
+
+  getMqttDiscoveryPrefix: async (): Promise<string> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_DISCOVERY_PREFIX);
+      return value || 'homeassistant';
+    } catch (error) {
+      console.error('Error getting MQTT discovery prefix:', error);
+      return 'homeassistant';
+    }
+  },
+
+  saveMqttStatusInterval: async (seconds: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_STATUS_INTERVAL, seconds.toString());
+    } catch (error) {
+      console.error('Error saving MQTT status interval:', error);
+    }
+  },
+
+  getMqttStatusInterval: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_STATUS_INTERVAL);
+      const interval = value ? parseInt(value, 10) : 30;
+      return isNaN(interval) ? 30 : Math.max(5, interval);
+    } catch (error) {
+      console.error('Error getting MQTT status interval:', error);
+      return 30;
+    }
+  },
+
+  saveMqttAllowControl: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_ALLOW_CONTROL, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving MQTT allow control:', error);
+    }
+  },
+
+  getMqttAllowControl: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_ALLOW_CONTROL);
+      return value ? JSON.parse(value) : true;
+    } catch (error) {
+      console.error('Error getting MQTT allow control:', error);
+      return true;
+    }
+  },
+
+  saveMqttMotionAlwaysOn: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_MOTION_ALWAYS_ON, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving MQTT motion always on:', error);
+    }
+  },
+
+  getMqttMotionAlwaysOn: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_MOTION_ALWAYS_ON);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting MQTT motion always on:', error);
       return false;
     }
   },

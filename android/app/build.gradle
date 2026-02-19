@@ -165,6 +165,9 @@ dependencies {
     // NanoHTTPD for REST API server
     implementation("org.nanohttpd:nanohttpd:2.3.1")
 
+    // Eclipse Paho MQTT Client for Home Assistant integration
+    implementation("org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5")
+
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
     } else {

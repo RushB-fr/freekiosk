@@ -12,6 +12,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- 📡 **MQTT + Home Assistant Auto-Discovery**: Native MQTT client with full HA integration
+  - **27 auto-discovered entities** in Home Assistant via MQTT Discovery protocol
+  - **11 sensors**: Battery level, brightness, WiFi SSID, WiFi signal, light sensor, IP address, app version, memory used, storage free, current URL, volume
+  - **6 binary sensors**: Screen on/off, screensaver active, battery charging, kiosk mode, device owner, motion detected
+  - **2 number controls**: Brightness (0-100%), volume (0-100%) — adjustable sliders in HA
+  - **2 switches**: Screen power (ON/OFF), screensaver (ON/OFF)
+  - **5 buttons**: Reload, wake, reboot, clear cache, lock
+  - **1 text entity**: Navigate URL — send a URL to load in the WebView
+  - **20 additional commands** via MQTT: TTS, toast, audio play/stop/beep, launch app, execute JS, URL rotation start/stop, restart UI
+  - **Push-based status**: Periodic state publishing (configurable 5-3600 seconds, default 30s)
+  - **LWT (Last Will & Testament)**: Automatic availability tracking — HA shows device as unavailable on disconnect
+  - **Auto-reconnect**: Handles WiFi drops and broker restarts with automatic re-publishing of all discovery configs
+  - **Always-on Motion Detection**: Configurable option to run camera-based motion detection continuously (not just during screensaver)
+  - **Full command parity** with REST API — both interfaces dispatch through the same command handler
+  - **Concurrent operation**: MQTT and REST API can run simultaneously
+  - Eclipse Paho MQTT v3.1.1 with secure password storage (Android Keychain)
+  - Settings: Broker URL, port, username, password, client ID, base topic, discovery prefix, status interval, allow control
+  - Connection status indicator in Settings UI
+  - MQTT settings included in backup/restore
+  - **[Full MQTT Documentation](docs/MQTT.md)**
+
 
 ***
 

@@ -17,6 +17,7 @@
     <img src="https://img.shields.io/badge/Android-8.0%2B-green.svg" alt="Android 8.0+">
     <img src="https://img.shields.io/badge/Device%20Owner-Supported-brightgreen" alt="Device Owner">
     <img src="https://img.shields.io/badge/REST%20API-40%2B%20Endpoints-orange" alt="REST API">
+    <img src="https://img.shields.io/badge/MQTT-Home%20Assistant%20Discovery-41BDF5" alt="MQTT">
   </p>
   
   <p><strong>A <a href="https://rushb.fr">Rushb</a> Project</strong></p>
@@ -39,7 +40,7 @@ FreeKiosk is a **completely free and open-source** kiosk mode application for An
 - ✅ **Optional Screen Pinning** - User choice: full lock or normal mode
 - ✅ **HTTPS Support** - Works with self-signed certificates
 - ✅ **Easy Setup** - One-time ADB command
-- ✅ **Home Assistant Ready** - Perfect for dashboards
+- ✅ **Home Assistant Ready** - REST API + MQTT with auto-discovery
 
 ---
 
@@ -67,7 +68,21 @@ FreeKiosk is a **completely free and open-source** kiosk mode application for An
 - **Optional API Key** authentication
 - **[Full API Documentation](docs/REST_API.md)**
 
-### ADB / CLI Configuration 🆕
+### MQTT (Home Assistant Auto-Discovery) 🆕
+- **27 Entities** auto-discovered in Home Assistant via MQTT Discovery
+- **Sensors**: Battery, brightness, light, WiFi SSID/signal, IP, memory, storage, volume, URL, app version
+- **Binary Sensors**: Screen on/off, screensaver, charging, kiosk mode, device owner, motion
+- **Controls**: Brightness slider, volume slider, screen power switch, screensaver switch
+- **Buttons**: Reload, wake, reboot, clear cache, lock
+- **Text**: Navigate to URL
+- **Additional Commands**: TTS, toast, audio play/stop/beep, launch app, execute JS, URL rotation
+- **Push-based**: Real-time status updates (configurable interval, default 30s)
+- **LWT**: Automatic availability tracking (online/offline)
+- **Auto-reconnect**: Handles WiFi drops and broker restarts
+- **Always-on Motion Detection**: Optional camera-based motion sensor
+- **[Full MQTT Documentation](docs/MQTT.md)**
+
+### ADB / CLI Configuration
 - **Headless Provisioning** - Configure via ADB without touching the screen
 - **Mass Deployment** - Script deployment across multiple devices
 - **Full Config Support** - URL, app lock, REST API, screensaver, etc.
@@ -237,6 +252,7 @@ Done! Your tablet is now in kiosk mode.
 | **Open-source** | 🟢 MIT | 🔴 Closed |
 | **Device Owner** | ✅ | ✅ |
 | **REST API** | ✅ 40+ endpoints | ✅ |
+| **MQTT + HA Discovery** | ✅ 27 entities | ❌ |
 | **Home Assistant** | ✅ | ✅ |
 | **Sensors (light, proximity)** | ✅ | ✅ |
 | **Screenshot API** | ✅ | ✅ |
@@ -485,7 +501,7 @@ Done! Your tablet is now in kiosk mode.
 - [ ] 🏠 HACS Integration - Native Home Assistant plugin
 - [ ] 🌍 Multi-language - French, Spanish, German, Portuguese
 - [ ] 🎨 Custom Themes - Personalize UI colors and branding
-- [ ] 📡 MQTT Support - Alternative to REST for real-time events
+- [X] 📡 MQTT Support - Native MQTT with Home Assistant Auto-Discovery (27 entities)
 - [ ] 🔗 Tasker Integration - Android automation support
 - [ ] 📺 Chromecast Support - Cast content to displays
 - [ ] 🎮 **Physical Button Remapping** - Reassign device buttons (volume, camera, custom) to custom actions

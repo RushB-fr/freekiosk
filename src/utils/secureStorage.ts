@@ -8,6 +8,7 @@ const { KioskModule } = NativeModules;
 // Constants
 const PIN_SERVICE = 'freekiosk_pin';
 const API_KEY_SERVICE = 'freekiosk_api_key';
+const MQTT_PASSWORD_SERVICE = 'freekiosk_mqtt_password';
 const LEGACY_API_KEY = '@kiosk_rest_api_key'; // Legacy AsyncStorage key for migration
 const ATTEMPTS_KEY = '@kiosk_pin_attempts';
 const LOCKOUT_KEY = '@kiosk_pin_lockout';
@@ -621,5 +622,66 @@ async function clearLegacyApiKey(): Promise<void> {
     await AsyncStorage.removeItem(LEGACY_API_KEY);
   } catch (error) {
     console.error('[SecureStorage] Error clearing legacy API key:', error);
+  }
+}
+
+// ============================================
+// MQTT PASSWORD SECURE STORAGE
+// ============================================
+
+/**
+ * Save MQTT password securely in Keychain
+ */
+export async function saveSecureMqttPassword(password: string): Promise<boolean> {
+  try {
+    if (!password || password.trim() === '') {
+      await clearSecureMqttPassword();
+      return true;
+    }
+
+    await Keychain.setGenericPassword(
+      'mqtt_password',
+      password,
+      {
+        service: MQTT_PASSWORD_SERVICE,
+        accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED,
+      }
+    );
+
+    console.log('[SecureStorage] MQTT password saved to Keychain');
+    return true;
+  } catch (error) {
+    console.error('[SecureStorage] Error saving MQTT password:', error);
+    return false;
+  }
+}
+
+/**
+ * Get MQTT password from secure storage
+ */
+export async function getSecureMqttPassword(): Promise<string> {
+  try {
+    const credentials = await Keychain.getGenericPassword({ service: MQTT_PASSWORD_SERVICE });
+
+    if (credentials && credentials.password) {
+      return credentials.password;
+    }
+
+    return '';
+  } catch (error) {
+    console.error('[SecureStorage] Error getting MQTT password:', error);
+    return '';
+  }
+}
+
+/**
+ * Clear MQTT password from secure storage
+ */
+export async function clearSecureMqttPassword(): Promise<void> {
+  try {
+    await Keychain.resetGenericPassword({ service: MQTT_PASSWORD_SERVICE });
+    console.log('[SecureStorage] MQTT password cleared');
+  } catch (error) {
+    console.error('[SecureStorage] Error clearing MQTT password:', error);
   }
 }
