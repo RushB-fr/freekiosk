@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+***
+
+## [1.2.13] - 2026-02-20
+
 ### Added
 - 📡 **MQTT + Home Assistant Auto-Discovery**: Native MQTT client with full HA integration
   - **27 auto-discovered entities** in Home Assistant via MQTT Discovery protocol

@@ -300,6 +300,8 @@ export const StorageService = {
         KEYS.URL_FILTER_MODE,
         KEYS.URL_FILTER_LIST,
         KEYS.URL_FILTER_SHOW_FEEDBACK,
+        // PDF Viewer
+        KEYS.PDF_VIEWER_ENABLED,
         // MQTT
         KEYS.MQTT_ENABLED,
         KEYS.MQTT_BROKER_URL,

@@ -90,8 +90,8 @@ android {
         applicationId "com.freekiosk"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 27
-        versionName "1.2.12"
+        versionCode 28
+        versionName "1.2.13"
 
         manifestPlaceholders = [usesCleartextTraffic: "true"]
     }

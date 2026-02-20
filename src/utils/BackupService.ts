@@ -93,6 +93,8 @@ const BACKUP_KEYS = [
   '@kiosk_url_filter_mode',
   '@kiosk_url_filter_list',
   '@kiosk_url_filter_show_feedback',
+  // PDF Viewer
+  '@kiosk_pdf_viewer_enabled',
   // MQTT
   '@kiosk_mqtt_enabled',
   '@kiosk_mqtt_broker_url',

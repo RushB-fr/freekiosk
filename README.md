@@ -11,7 +11,7 @@
   </p>
   
   <p>
-    <img src="https://img.shields.io/badge/Version-1.2.12-blue.svg" alt="Version 1.2.9">
+    <img src="https://img.shields.io/badge/Version-1.2.13-blue.svg" alt="Version 1.2.9">
     <a href="https://github.com/rushb-fr/freekiosk/releases"><img src="https://img.shields.io/github/downloads/rushb-fr/freekiosk/total.svg" alt="Downloads"></a>
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT">
     <img src="https://img.shields.io/badge/Android-8.0%2B-green.svg" alt="Android 8.0+">
@@ -277,7 +277,14 @@ Done! Your tablet is now in kiosk mode.
 
 ## 🗺️ Roadmap
 
-### ✅ v1.2.12 (Feb 2026) - PDF Viewer, Accessibility & Screen Lock 🆕
+### ✅ v1.2.13 (Feb 2026) - MQTT & Home Assistant Integration 🆕
+- 📡 **MQTT + Home Assistant Auto-Discovery**: 27 auto-discovered HA entities (sensors, switches, buttons, controls)
+- 📡 **Push-based status**: Periodic state publishing, LWT availability tracking, auto-reconnect
+- 📡 **20 MQTT commands**: TTS, toast, audio, launch app, execute JS, URL rotation, restart UI, and more
+- 🔊 **Samsung Audio Fix**: Fixed audio muted in Lock Mode on Samsung/OneUI devices
+- 🔧 **Fire OS Camera/Mic Fix**: Auto-grant WebView media permissions on Echo Show / Fire tablets
+
+### ✅ v1.2.12 (Feb 2026) - PDF Viewer, Accessibility & Screen Lock
 - 📄 **Inline PDF Viewer**: PDFs open directly in-app via bundled PDF.js — no Google Docs needed
 - ♿ **AccessibilityService**: Cross-app keyboard injection for External App mode (privacy ROM compatible)
 - 🔒 **Screen Lock without Device Owner**: 4-tier fallback (Device Owner → Device Admin → Accessibility → dim)
