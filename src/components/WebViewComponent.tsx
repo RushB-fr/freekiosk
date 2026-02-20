@@ -703,6 +703,11 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
 
         mediaPlaybackRequiresUserAction={false}
         allowsInlineMediaPlayback={true}
+
+        // Kiosk mode: auto-grant camera/microphone permissions to web pages.
+        // On Android this is handled by our RNCWebChromeClient patch (auto-grant in onPermissionRequest).
+        // On iOS this prop handles it natively.
+        mediaCapturePermissionGrantType="grant"
       />
       
       {loading && !error && (
