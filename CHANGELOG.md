@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Connection status indicator in Settings UI
   - MQTT settings included in backup/restore
   - **[Full MQTT Documentation](docs/MQTT.md)**
+### Fixed
+- 🔧 **Camera/Microphone not working in WebView on Fire OS** (Echo Show, Fire tablets) (#63): auto-grant WebView media/geolocation permissions in kiosk mode — OS-level permission via `pm grant` still required
 
 
 ***

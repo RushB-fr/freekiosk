@@ -1,3 +1,101 @@
+diff --git a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebChromeClient.java b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebChromeClient.java
+index 07f73fd..275f2cd 100644
+--- a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebChromeClient.java
++++ b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebChromeClient.java
+@@ -144,72 +144,32 @@ public class RNCWebChromeClient extends WebChromeClient implements LifecycleEven
+ 
+     @Override
+     public void onPermissionRequest(final PermissionRequest request) {
+-
+-        grantedPermissions = new ArrayList<>();
+-
+-        ArrayList<String> requestedAndroidPermissions = new ArrayList<>();
+-        for (String requestedResource : request.getResources()) {
+-            String androidPermission = null;
+-
+-            if (requestedResource.equals(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) {
+-                androidPermission = Manifest.permission.RECORD_AUDIO;
+-            } else if (requestedResource.equals(PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
+-                androidPermission = Manifest.permission.CAMERA;
+-            } else if(requestedResource.equals(PermissionRequest.RESOURCE_PROTECTED_MEDIA_ID)) {
+-                if (mAllowsProtectedMedia) {
+-                  grantedPermissions.add(requestedResource);
+-                } else {
+-                  /**
+-                   * Legacy handling (Kept in case it was working under some conditions (given Android version or something))
+-                   *
+-                   * Try to ask user to grant permission using Activity.requestPermissions
+-                   *
+-                   * Find more details here: https://github.com/react-native-webview/react-native-webview/pull/2732
+-                   */
+-                  androidPermission = PermissionRequest.RESOURCE_PROTECTED_MEDIA_ID;
+-                }            }
+-            // TODO: RESOURCE_MIDI_SYSEX, RESOURCE_PROTECTED_MEDIA_ID.
+-            if (androidPermission != null) {
+-                if (ContextCompat.checkSelfPermission(this.mWebView.getThemedReactContext(), androidPermission) == PackageManager.PERMISSION_GRANTED) {
+-                    grantedPermissions.add(requestedResource);
+-                } else {
+-                    requestedAndroidPermissions.add(androidPermission);
+-                }
+-            }
+-        }
+-
+-        // If all the permissions are already granted, send the response to the WebView synchronously
+-        if (requestedAndroidPermissions.isEmpty()) {
+-            request.grant(grantedPermissions.toArray(new String[0]));
+-            grantedPermissions = null;
+-            return;
+-        }
+-
+-        // Otherwise, ask to Android System for native permissions asynchronously
+-
+-        this.permissionRequest = request;
+-
+-        requestPermissions(requestedAndroidPermissions);
++        /**
++         * FreeKiosk: Auto-grant all WebView media permission requests (camera, microphone,
++         * protected media) without going through the native Android permission dialog.
++         *
++         * Why: On Fire OS (Amazon Echo Show, Fire tablets) and other non-standard Android
++         * distributions, ContextCompat.checkSelfPermission() may return PERMISSION_DENIED
++         * even when the permission was granted via `adb shell pm grant`. The subsequent
++         * Activity.requestPermissions() dialog is then either suppressed or never shown,
++         * causing getUserMedia() to fail silently.
++         *
++         * Since FreeKiosk is a kiosk app that:
++         * - Already declares CAMERA and RECORD_AUDIO in AndroidManifest.xml
++         * - Controls which URLs are loaded (URL filtering)
++         * - Runs in a managed kiosk context where user consent is implied
++         *
++         * Auto-granting is the correct behavior. The actual hardware access is still
++         * gated by the Android-level permission (granted via pm grant or Device Owner).
++         */
++        request.grant(request.getResources());
+     }
+ 
+ 
+     @Override
+     public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
+-
+-        if (ContextCompat.checkSelfPermission(this.mWebView.getThemedReactContext(), Manifest.permission.ACCESS_FINE_LOCATION)
+-                != PackageManager.PERMISSION_GRANTED) {
+-
+-            /*
+-             * Keep the trace of callback and origin for the async permission request
+-             */
+-            geolocationPermissionCallback = callback;
+-            geolocationPermissionOrigin = origin;
+-
+-            requestPermissions(Collections.singletonList(Manifest.permission.ACCESS_FINE_LOCATION));
+-
+-        } else {
+-            callback.invoke(origin, true, false);
+-        }
++        // FreeKiosk: Auto-grant geolocation for kiosk mode (same Fire OS rationale as onPermissionRequest)
++        callback.invoke(origin, true, false);
+     }
+ 
+     private PermissionAwareActivity getPermissionAwareActivity() {
 diff --git a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
 index 0287e1c..c09506e 100644
 --- a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
