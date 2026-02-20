@@ -4,7 +4,7 @@ FreeKiosk includes a native MQTT client for real-time integration with **Home As
 
 ## Overview
 
-- **Protocol**: MQTT v3.1.1 (Eclipse Paho)
+- **Protocol**: MQTT v5 / v3.1.1 (HiveMQ Client)
 - **Default Port**: 1883
 - **Discovery**: Home Assistant MQTT Discovery (auto-creates device + entities)
 - **Push-based**: Real-time status updates (no polling needed)
@@ -21,7 +21,10 @@ FreeKiosk includes a native MQTT client for real-time integration with **Home As
 4. Enable **MQTT**
 5. Enter your broker URL (e.g. `192.168.1.100`)
 6. Configure port, username, password as needed
-7. The connection status indicator shows Connected/Disconnected
+7. Press **Connect** button
+8. The connection status indicator shows Connected/Disconnected
+
+> Settings are saved automatically as you type. Connection is only established when you press "Connect" — no auto-reconnect on every keystroke.
 
 ### Via Backup/Restore
 MQTT settings are included in FreeKiosk backup/restore. You can configure one device and export the configuration to others.
@@ -38,6 +41,7 @@ MQTT settings are included in FreeKiosk backup/restore. You can configure one de
 | **Username** | *(empty)* | MQTT username (optional) |
 | **Password** | *(empty)* | MQTT password (stored in Android Keychain, optional) |
 | **Client ID** | *(auto)* | MQTT client ID (auto-generated as `freekiosk_{deviceId}` if empty) |
+| **Device Name** | *(empty)* | Friendly name used in MQTT topics and HA device name (e.g. "lobby", "entrance"). If empty, uses Android ID. |
 | **Base Topic** | `freekiosk` | Base MQTT topic prefix for this device |
 | **Discovery Prefix** | `homeassistant` | Home Assistant MQTT discovery prefix |
 | **Status Interval** | 30 | How often to publish status (5-3600 seconds) |
@@ -48,18 +52,18 @@ MQTT settings are included in FreeKiosk backup/restore. You can configure one de
 
 ## Topic Structure
 
-For a device with `deviceId = abc123` and default base topic `freekiosk`:
+For a device with `deviceName = lobby` (or `deviceId` if no name set) and default base topic `freekiosk`:
 
 | Purpose | Topic | QoS | Retained |
 |---------|-------|-----|----------|
-| Availability (LWT) | `freekiosk/abc123/availability` | 1 | Yes |
-| State (all data) | `freekiosk/abc123/state` | 0 | Yes |
-| Commands | `freekiosk/abc123/set/{entity}` | 1 | No |
-| Discovery | `homeassistant/{component}/freekiosk_abc123/{objectId}/config` | 1 | Yes |
+| Availability (LWT) | `freekiosk/lobby/availability` | 1 | Yes |
+| State (all data) | `freekiosk/lobby/state` | 0 | Yes |
+| Commands | `freekiosk/lobby/set/{entity}` | 1 | No |
+| Discovery | `homeassistant/{component}/freekiosk_{deviceId}/{objectId}/config` | 1 | Yes |
 
-### Device ID
+### Topic ID
 
-The `deviceId` is derived from `Settings.Secure.ANDROID_ID` — a unique identifier per device, stable across reboots.
+The topic identifier is either the configured **Device Name** (sanitized: lowercased, spaces replaced with underscores) or the `ANDROID_ID` if no name is set. This makes topics human-readable when using device names (e.g. `freekiosk/lobby/state` instead of `freekiosk/9774d56d682e549c/state`).
 
 ### Availability
 
@@ -91,7 +95,8 @@ A JSON object published periodically (default: every 30 seconds) containing all 
     "ip": "192.168.1.50",
     "version": "1.2.12",
     "kioskMode": true,
-    "isDeviceOwner": true
+    "isDeviceOwner": true,
+    "motionAlwaysOn": false
   },
   "sensors": {
     "light": 150.5
@@ -130,10 +135,11 @@ All entities are grouped under one HA device:
 
 | Field | Value |
 |-------|-------|
-| Name | FreeKiosk {deviceId} |
+| Name | FreeKiosk {deviceName} *(or FreeKiosk {deviceId} if no name set)* |
 | Model | FreeKiosk |
 | Manufacturer | FreeKiosk |
 | SW Version | *(app version)* |
+| Configuration URL | `http://{localIp}:8080` |
 
 ### Entities
 
@@ -171,12 +177,13 @@ All entities are grouped under one HA device:
 | Brightness Control | `.../set/brightness` | 0 | 100 | % |
 | Volume Control | `.../set/volume` | 0 | 100 | % |
 
-#### Switches (2)
+#### Switches (3)
 
 | Entity | Command Topic | Payload |
 |--------|--------------|---------|
 | Screen Power | `.../set/screen` | ON / OFF |
 | Screensaver | `.../set/screensaver` | ON / OFF |
+| Always-on Motion Detection | `.../set/motion_always_on` | ON / OFF |
 
 #### Buttons (5)
 
@@ -188,19 +195,21 @@ All entities are grouped under one HA device:
 | Clear Cache | `.../set/clear_cache` | mdi:delete-sweep |
 | Lock | `.../set/lock` | mdi:lock |
 
-#### Text (1)
+#### Text (3)
 
 | Entity | Command Topic | Description |
 |--------|--------------|-------------|
 | Navigate URL | `.../set/url` | Navigate WebView to a URL |
+| Text to Speech | `.../set/tts` | Speak text aloud on the tablet |
+| Toast Message | `.../set/toast` | Show a toast notification on screen |
 
-**Total: 27 entities** auto-discovered in Home Assistant.
+**Total: 30 entities** auto-discovered in Home Assistant.
 
 ---
 
 ## Command Reference
 
-Commands are sent by publishing to `{baseTopic}/{deviceId}/set/{entity}`.
+Commands are sent by publishing to `{baseTopic}/{topicId}/set/{entity}`.
 
 | Topic Suffix | Command | Payload | Description |
 |-------------|---------|---------|-------------|
@@ -208,14 +217,15 @@ Commands are sent by publishing to `{baseTopic}/{deviceId}/set/{entity}`.
 | `volume` | setVolume | `0-100` (integer) | Set media volume |
 | `screen` | screenOn / screenOff | `ON` / `OFF` | Turn screen on or off |
 | `screensaver` | screensaverOn / screensaverOff | `ON` / `OFF` | Enable/disable screensaver |
+| `motion_always_on` | setMotionAlwaysOn | `ON` / `OFF` | Toggle always-on motion detection |
 | `reload` | reload | any | Reload WebView |
 | `wake` | wake | any | Wake from screensaver |
 | `reboot` | reboot | any | Reboot device (Device Owner required) |
 | `clear_cache` | clearCache | any | Clear WebView cache |
 | `lock` | lockDevice | any | Lock device screen |
 | `url` | setUrl | URL string | Navigate to URL |
-| `tts` | tts | text string | Text-to-speech |
-| `toast` | toast | text string | Show toast notification |
+| `tts` | tts | text string | Text-to-speech (handled natively) |
+| `toast` | toast | text string | Show toast notification (handled natively) |
 | `launch_app` | launchApp | package name | Launch external app |
 | `execute_js` | executeJs | JS code string | Execute JavaScript in WebView |
 | `audio_play` | audioPlay | JSON `{"url":"...","loop":false,"volume":50}` | Play audio from URL |
@@ -225,7 +235,7 @@ Commands are sent by publishing to `{baseTopic}/{deviceId}/set/{entity}`.
 | `rotation_stop` | rotationStop | any | Stop URL rotation |
 | `restart_ui` | restartUi | any | Restart app UI |
 
-> Commands have full parity with the [REST API](REST_API.md). Both interfaces dispatch through the same command handler.
+> Commands have full parity with the [REST API](REST_API.md). Both interfaces dispatch through the same command handler. TTS and Toast are handled natively on the MQTT side (no JS round-trip).
 
 ---
 
@@ -235,9 +245,9 @@ FreeKiosk can detect motion using the device camera and report it as a binary se
 
 **Default behavior**: Motion detection only runs during screensaver (to wake the screen on movement).
 
-**Always-on mode**: Enable "Always-on Motion Detection" in MQTT settings to run motion detection continuously. The `motion_detected` binary sensor will update in real-time. Note: this uses the camera continuously and increases battery usage.
+**Always-on mode**: Enable "Always-on Motion Detection" in MQTT settings or via the HA switch entity to run motion detection continuously. The `motion_detected` binary sensor will update in real-time. Note: this uses the camera continuously and increases battery usage.
 
-> Camera permission must be granted for motion detection to work.
+> Camera permission must be granted for motion detection to work. FreeKiosk requests this permission automatically on first launch.
 
 ---
 
@@ -246,7 +256,7 @@ FreeKiosk can detect motion using the device camera and report it as a binary se
 ### Auto-reconnect
 The MQTT client automatically reconnects when the connection is lost (WiFi drop, broker restart). On reconnect, it:
 1. Publishes `"online"` to the availability topic
-2. Re-publishes all 27 HA Discovery configs
+2. Re-publishes all 30 HA Discovery configs
 3. Re-subscribes to command topics
 4. Resumes periodic status publishing
 
@@ -265,40 +275,43 @@ MQTT and the REST API can run simultaneously. Both use the same internal command
 mosquitto_sub -h BROKER_IP -t "freekiosk/#" -v
 
 # Check device availability
-mosquitto_sub -h BROKER_IP -t "freekiosk/DEVICE_ID/availability"
+mosquitto_sub -h BROKER_IP -t "freekiosk/TOPIC_ID/availability"
 
 # Read device state
-mosquitto_sub -h BROKER_IP -t "freekiosk/DEVICE_ID/state"
+mosquitto_sub -h BROKER_IP -t "freekiosk/TOPIC_ID/state"
 
 # Set brightness to 50%
-mosquitto_pub -h BROKER_IP -t "freekiosk/DEVICE_ID/set/brightness" -m "50"
+mosquitto_pub -h BROKER_IP -t "freekiosk/TOPIC_ID/set/brightness" -m "50"
 
 # Turn screen off
-mosquitto_pub -h BROKER_IP -t "freekiosk/DEVICE_ID/set/screen" -m "OFF"
+mosquitto_pub -h BROKER_IP -t "freekiosk/TOPIC_ID/set/screen" -m "OFF"
 
 # Turn screen on
-mosquitto_pub -h BROKER_IP -t "freekiosk/DEVICE_ID/set/screen" -m "ON"
+mosquitto_pub -h BROKER_IP -t "freekiosk/TOPIC_ID/set/screen" -m "ON"
 
 # Navigate to URL
-mosquitto_pub -h BROKER_IP -t "freekiosk/DEVICE_ID/set/url" -m "https://example.com"
+mosquitto_pub -h BROKER_IP -t "freekiosk/TOPIC_ID/set/url" -m "https://example.com"
 
 # Reload WebView
-mosquitto_pub -h BROKER_IP -t "freekiosk/DEVICE_ID/set/reload" -m "PRESS"
+mosquitto_pub -h BROKER_IP -t "freekiosk/TOPIC_ID/set/reload" -m "PRESS"
 
 # Play audio
-mosquitto_pub -h BROKER_IP -t "freekiosk/DEVICE_ID/set/audio_play" -m '{"url":"https://example.com/sound.mp3","volume":50}'
+mosquitto_pub -h BROKER_IP -t "freekiosk/TOPIC_ID/set/audio_play" -m '{"url":"https://example.com/sound.mp3","volume":50}'
 
 # Text-to-speech
-mosquitto_pub -h BROKER_IP -t "freekiosk/DEVICE_ID/set/tts" -m "Hello from Home Assistant"
+mosquitto_pub -h BROKER_IP -t "freekiosk/TOPIC_ID/set/tts" -m "Hello from Home Assistant"
 
 # Show toast
-mosquitto_pub -h BROKER_IP -t "freekiosk/DEVICE_ID/set/toast" -m "Hello!"
+mosquitto_pub -h BROKER_IP -t "freekiosk/TOPIC_ID/set/toast" -m "Hello!"
+
+# Toggle always-on motion detection
+mosquitto_pub -h BROKER_IP -t "freekiosk/TOPIC_ID/set/motion_always_on" -m "ON"
 
 # View HA discovery configs
 mosquitto_sub -h BROKER_IP -t "homeassistant/#" -v
 ```
 
-Replace `BROKER_IP` with your MQTT broker IP and `DEVICE_ID` with the device's Android ID (visible in the MQTT state JSON under `device.ip` or in the HA device page).
+Replace `BROKER_IP` with your MQTT broker IP and `TOPIC_ID` with the device name (e.g. `lobby`) or Android ID if no name is configured.
 
 ---
 
@@ -321,7 +334,7 @@ automation:
     action:
       - service: mqtt.publish
         data:
-          topic: "freekiosk/abc123/set/wake"
+          topic: "freekiosk/lobby/set/wake"
           payload: "PRESS"
 ```
 
@@ -335,7 +348,7 @@ automation:
     action:
       - service: mqtt.publish
         data:
-          topic: "freekiosk/abc123/set/screen"
+          topic: "freekiosk/lobby/set/screen"
           payload: "OFF"
 ```
 
@@ -349,7 +362,7 @@ automation:
     action:
       - service: mqtt.publish
         data:
-          topic: "freekiosk/abc123/set/screen"
+          topic: "freekiosk/lobby/set/screen"
           payload: "ON"
 ```
 
@@ -364,15 +377,15 @@ automation:
     action:
       - service: mqtt.publish
         data:
-          topic: "freekiosk/abc123/set/audio_beep"
+          topic: "freekiosk/lobby/set/audio_beep"
           payload: "PRESS"
       - service: mqtt.publish
         data:
-          topic: "freekiosk/abc123/set/toast"
+          topic: "freekiosk/lobby/set/toast"
           payload: "Someone is at the door!"
       - service: mqtt.publish
         data:
-          topic: "freekiosk/abc123/set/url"
+          topic: "freekiosk/lobby/set/url"
           payload: "http://homeassistant:8123/lovelace/cameras"
 ```
 
@@ -386,9 +399,23 @@ automation:
     action:
       - service: mqtt.publish
         data:
-          topic: "freekiosk/abc123/set/brightness"
+          topic: "freekiosk/lobby/set/brightness"
           payload: >-
             {{ (states('sensor.living_room_light_level') | float / 10) | int | min(100) }}
+```
+
+#### TTS announcement
+```yaml
+automation:
+  - alias: "Announce Weather on Tablet"
+    trigger:
+      - platform: time
+        at: "08:00:00"
+    action:
+      - service: mqtt.publish
+        data:
+          topic: "freekiosk/lobby/set/tts"
+          payload: "Good morning! Today's forecast is {{ states('weather.home') }}."
 ```
 
 ### Dashboard Card (Lovelace)
@@ -404,7 +431,10 @@ entities:
   - entity: number.freekiosk_abc123_volume_control
   - entity: switch.freekiosk_abc123_screen_power
   - entity: switch.freekiosk_abc123_screensaver
+  - entity: switch.freekiosk_abc123_motion_always_on
   - entity: binary_sensor.freekiosk_abc123_motion_detected
+  - entity: text.freekiosk_abc123_tts
+  - entity: text.freekiosk_abc123_toast
   - entity: sensor.freekiosk_abc123_wifi_ssid
   - entity: sensor.freekiosk_abc123_wifi_signal
   - entity: button.freekiosk_abc123_reload
@@ -424,8 +454,9 @@ entities:
 
 ### Entities showing "Unknown"
 - Wait for the first status publish (up to 30 seconds by default)
-- Check the state topic: `mosquitto_sub -h BROKER_IP -t "freekiosk/DEVICE_ID/state"`
+- Check the state topic: `mosquitto_sub -h BROKER_IP -t "freekiosk/TOPIC_ID/state"`
 - For binary sensors, ensure the state JSON contains the expected boolean fields
+- TTS and Toast entities always show empty — this is by design (fire-and-forget commands)
 
 ### Connection keeps dropping
 - Check WiFi stability on the tablet
@@ -438,25 +469,30 @@ entities:
 - The tablet immediately publishes updated state after executing screen on/off commands
 
 ### Motion detection not working
-- Grant camera permission to the app: Settings > Apps > FreeKiosk > Permissions > Camera
+- Grant camera permission to the app (requested automatically on first launch)
 - By default, motion only activates during screensaver. Enable "Always-on Motion Detection" for continuous detection
 - Check logs: `adb logcat | grep MotionDetection`
 
 ### WiFi SSID showing "WiFi" instead of real name
-- Grant location permissions: Settings > Apps > FreeKiosk > Permissions > Location
+- Grant location permissions (requested automatically on first launch)
 - Android requires location permissions to read WiFi SSID (Android 8.0+)
+
+### TTS not speaking
+- Ensure the device has a TTS engine installed (most Android devices include Google TTS)
+- Check device volume is not muted
+- TTS is handled natively by the MQTT module — no need for the REST API to be running
 
 ---
 
 ## Technical Details
 
-- **MQTT Library**: Eclipse Paho MQTT v3.1.1 (`org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5`)
-- **Connection**: `MqttAsyncClient` with automatic reconnect
+- **MQTT Library**: HiveMQ MQTT Client (`com.hivemq:hivemq-mqtt-client:1.3.12`)
+- **Connection**: Automatic reconnect with exponential backoff
 - **Clean Session**: Yes (no persistent subscriptions)
 - **Keep Alive**: 30 seconds
-- **Max In-flight**: 100 messages (supports publishing all 27 discovery configs at once)
 - **Thread Safety**: MQTT callbacks are dispatched to the main thread via `Handler(Looper.getMainLooper())`
 - **Password Storage**: Encrypted in Android Keychain (same as REST API key)
+- **TTS & Toast**: Handled natively in the MQTT module (no JS round-trip)
 
 ---
 
