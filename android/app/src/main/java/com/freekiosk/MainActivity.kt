@@ -693,9 +693,10 @@ class MainActivity : ReactActivity() {
     val url = intent.getStringExtra("url")
     val pin = intent.getStringExtra("pin")
     val configJson = intent.getStringExtra("config") // Full JSON config
-    
+    val mqttBroker = intent.getStringExtra("mqtt_broker_url")
+
     // Skip if no config parameters
-    if (lockPackage == null && url == null && configJson == null) return false
+    if (lockPackage == null && url == null && configJson == null && mqttBroker == null) return false
     
     android.util.Log.i("FreeKiosk-ADB", "ADB config received: lock_package=$lockPackage, url=$url, config=${configJson != null}")
     
@@ -844,6 +845,43 @@ class MainActivity : ReactActivity() {
       if (it == "numeric" || it == "alphanumeric") {
         editor.putString("@kiosk_pin_mode", it)
       }
+    }
+
+    // MQTT configuration
+    intent.getStringExtra("mqtt_enabled")?.let {
+      editor.putString("@kiosk_mqtt_enabled", it)
+    }
+    intent.getStringExtra("mqtt_broker_url")?.let {
+      editor.putString("@kiosk_mqtt_broker_url", it)
+    }
+    intent.getStringExtra("mqtt_port")?.let {
+      editor.putString("@kiosk_mqtt_port", it)
+    }
+    intent.getStringExtra("mqtt_username")?.let {
+      editor.putString("@kiosk_mqtt_username", it)
+    }
+    intent.getStringExtra("mqtt_password")?.let {
+      // MQTT password goes to secure Keychain, not AsyncStorage
+      // Use a special pending key that KioskScreen will handle
+      editor.putString("@mqtt_password_pending", it)
+    }
+    intent.getStringExtra("mqtt_client_id")?.let {
+      editor.putString("@kiosk_mqtt_client_id", it)
+    }
+    intent.getStringExtra("mqtt_base_topic")?.let {
+      editor.putString("@kiosk_mqtt_base_topic", it)
+    }
+    intent.getStringExtra("mqtt_discovery_prefix")?.let {
+      editor.putString("@kiosk_mqtt_discovery_prefix", it)
+    }
+    intent.getStringExtra("mqtt_status_interval")?.let {
+      editor.putString("@kiosk_mqtt_status_interval", it)
+    }
+    intent.getStringExtra("mqtt_allow_control")?.let {
+      editor.putString("@kiosk_mqtt_allow_control", it)
+    }
+    intent.getStringExtra("mqtt_device_name")?.let {
+      editor.putString("@kiosk_mqtt_device_name", it)
     }
     
     // Mark that there is pending config
@@ -1008,7 +1046,18 @@ class MainActivity : ReactActivity() {
       "allow_power_button" to "@kiosk_allow_power_button",
       "back_button_mode" to "@kiosk_back_button_mode",
       "default_brightness" to "@default_brightness",
-      "pin_mode" to "@kiosk_pin_mode"
+      "pin_mode" to "@kiosk_pin_mode",
+      // MQTT
+      "mqtt_enabled" to "@kiosk_mqtt_enabled",
+      "mqtt_broker_url" to "@kiosk_mqtt_broker_url",
+      "mqtt_port" to "@kiosk_mqtt_port",
+      "mqtt_username" to "@kiosk_mqtt_username",
+      "mqtt_client_id" to "@kiosk_mqtt_client_id",
+      "mqtt_base_topic" to "@kiosk_mqtt_base_topic",
+      "mqtt_discovery_prefix" to "@kiosk_mqtt_discovery_prefix",
+      "mqtt_status_interval" to "@kiosk_mqtt_status_interval",
+      "mqtt_allow_control" to "@kiosk_mqtt_allow_control",
+      "mqtt_device_name" to "@kiosk_mqtt_device_name"
     )
     
     for ((jsonKey, storageKey) in keyMapping) {
@@ -1021,6 +1070,11 @@ class MainActivity : ReactActivity() {
     // Handle lock_package -> also set display_mode
     if (config.has("lock_package") && !config.has("display_mode")) {
       editor.putString("@kiosk_display_mode", "external_app")
+    }
+
+    // MQTT password requires special handling (goes to secure Keychain, not AsyncStorage)
+    if (config.has("mqtt_password")) {
+      editor.putString("@mqtt_password_pending", config.getString("mqtt_password"))
     }
   }
   
