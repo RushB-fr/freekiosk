@@ -482,7 +482,12 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       await ApiService.autoStart();
 
       // Auto-start MQTT client if enabled
-      await ApiService.autoStartMqtt();
+      try {
+        await ApiService.autoStartMqtt();
+      } catch (e) {
+        // Expected when MQTT is disabled or not configured
+        console.log('ApiService: MQTT auto-start skipped:', (e as Error).message);
+      }
     };
 
     initApiService();

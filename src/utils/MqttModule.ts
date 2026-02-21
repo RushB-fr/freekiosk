@@ -18,6 +18,7 @@ export interface MqttConfig {
   statusInterval: number;
   allowControl: boolean;
   deviceName?: string;
+  useTls?: boolean;
 }
 
 class MqttClientService {
@@ -96,6 +97,27 @@ class MqttClientService {
     return () => {
       subscription.remove();
       this.connectionListener = null;
+    };
+  }
+
+  /**
+   * Subscribe to MQTT connection error events
+   * @param callback Function called when a connection error occurs
+   */
+  onConnectionError(callback: (message: string) => void): () => void {
+    if (!this.eventEmitter) {
+      return () => {};
+    }
+
+    const subscription = this.eventEmitter.addListener(
+      'onMqttConnectionError',
+      (event: { message: string }) => {
+        callback(event.message);
+      }
+    );
+
+    return () => {
+      subscription.remove();
     };
   }
 }

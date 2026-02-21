@@ -24,7 +24,8 @@ data class MqttConfig(
     val discoveryPrefix: String = "homeassistant",
     val statusInterval: Long = 30000, // 30 seconds
     val allowControl: Boolean = true,
-    val deviceName: String? = null
+    val deviceName: String? = null,
+    val useTls: Boolean = false
 )
 
 /**
@@ -84,6 +85,9 @@ class KioskMqttClient(
     /** Lambda invoked when the connection state changes. */
     var onConnectionChanged: ((Boolean) -> Unit)? = null
 
+    /** Lambda invoked when a connection error occurs, with error message. */
+    var onConnectionError: ((String) -> Unit)? = null
+
     /** Lambda that provides the current local IP address for HA Discovery configuration_url. */
     var ipProvider: (() -> String)? = null
 
@@ -124,14 +128,26 @@ class KioskMqttClient(
         disconnectRequested = false
 
         try {
-            Log.i(TAG, "Connecting to tcp://${config.brokerUrl}:${config.port} as $effectiveClientId (device=$deviceId, topic=$topicId)")
+            val protocol = if (config.useTls) "ssl" else "tcp"
+            val maskedPass = config.password?.let { p ->
+                if (p.length <= 4) "****"
+                else "${p.take(3)}${"*".repeat(p.length - 6).take(10)}${p.takeLast(3)}"
+            } ?: "(none)"
+            Log.i(TAG, "Connecting to $protocol://${config.brokerUrl}:${config.port} as $effectiveClientId (device=$deviceId, topic=$topicId, tls=${config.useTls}, user=${config.username ?: "(none)"}, pass=$maskedPass)")
 
             // Build the MQTT 3.1.1 async client
-            val client = MqttClient.builder()
+            val clientBuilder = MqttClient.builder()
                 .useMqttVersion3()
                 .identifier(effectiveClientId)
                 .serverHost(config.brokerUrl)
                 .serverPort(config.port)
+
+            // Add TLS if enabled (e.g., port 8883)
+            if (config.useTls) {
+                clientBuilder.sslWithDefaultConfig()
+            }
+
+            val client = clientBuilder
                 .automaticReconnect()
                     .initialDelay(1, TimeUnit.SECONDS)
                     .maxDelay(30, TimeUnit.SECONDS)
@@ -142,7 +158,11 @@ class KioskMqttClient(
                 }
                 .addDisconnectedListener { ctx ->
                     if (!disconnectRequested) {
-                        Log.w(TAG, "Connection lost: ${ctx.cause.message}")
+                        val errorMsg = ctx.cause.message ?: ctx.cause.javaClass.simpleName
+                        Log.w(TAG, "Connection lost: $errorMsg")
+                        mainHandler.post {
+                            onConnectionError?.invoke(errorMsg)
+                        }
                     }
                     _isConnected = false
                     stopStatusPublishing()
@@ -180,9 +200,10 @@ class KioskMqttClient(
             connectBuilder.send().whenComplete { _, throwable ->
                 if (throwable != null) {
                     Log.e(TAG, "Connection failed: ${throwable.message}", throwable)
-                    // ConnectedListener won't fire, so notify manually
                     _isConnected = false
+                    val errorMsg = throwable.message ?: throwable.javaClass.simpleName
                     mainHandler.post {
+                        onConnectionError?.invoke(errorMsg)
                         onConnectionChanged?.invoke(false)
                     }
                 }
