@@ -8,7 +8,7 @@ import StatusBar from '../components/StatusBar';
 import MotionDetector from '../components/MotionDetector';
 import ExternalAppOverlay from '../components/ExternalAppOverlay';
 import { StorageService } from '../utils/storage';
-import { saveSecurePin } from '../utils/secureStorage';
+import { saveSecurePin, saveSecureMqttPassword } from '../utils/secureStorage';
 import KioskModule from '../utils/KioskModule';
 import AppLauncherModule from '../utils/AppLauncherModule';
 import OverlayServiceModule from '../utils/OverlayServiceModule';
@@ -482,7 +482,12 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       await ApiService.autoStart();
 
       // Auto-start MQTT client if enabled
-      await ApiService.autoStartMqtt();
+      try {
+        await ApiService.autoStartMqtt();
+      } catch (e) {
+        // Expected when MQTT is disabled or not configured
+        console.log('ApiService: MQTT auto-start skipped:', (e as Error).message);
+      }
     };
 
     initApiService();
@@ -1020,6 +1025,10 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
                 // PIN must be saved to Keystore (not just AsyncStorage)
                 await saveSecurePin(value);
                 console.log('[KioskScreen] PIN saved to secure Keystore via pending ADB config');
+              } else if (key === '@mqtt_password_pending') {
+                // MQTT password must be saved to Keychain (not AsyncStorage)
+                await saveSecureMqttPassword(value);
+                console.log('[KioskScreen] MQTT password saved to secure Keychain via pending ADB config');
               } else {
                 entries.push([key, value]);
               }

@@ -207,7 +207,8 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
                 discoveryPrefix = if (configMap.hasKey("discoveryPrefix")) configMap.getString("discoveryPrefix") ?: "homeassistant" else "homeassistant",
                 statusInterval = if (configMap.hasKey("statusInterval")) configMap.getInt("statusInterval").toLong() else 30000L,
                 allowControl = if (configMap.hasKey("allowControl")) configMap.getBoolean("allowControl") else true,
-                deviceName = if (configMap.hasKey("deviceName")) configMap.getString("deviceName") else null
+                deviceName = if (configMap.hasKey("deviceName")) configMap.getString("deviceName") else null,
+                useTls = if (configMap.hasKey("useTls")) configMap.getBoolean("useTls") else false
             )
 
             val client = KioskMqttClient(reactContext.applicationContext, config)
@@ -232,6 +233,10 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
 
             client.onConnectionChanged = { connected ->
                 emitConnectionChanged(connected)
+            }
+
+            client.onConnectionError = { errorMessage ->
+                emitConnectionError(errorMessage)
             }
 
             client.ipProvider = { getLocalIpAddress() }
@@ -262,9 +267,15 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
                 putString("deviceId", deviceId)
             }
             promise.resolve(result)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Failed to start MQTT client", e)
-            promise.reject("START_ERROR", e.message)
+            // Log the root cause for ExceptionInInitializerError
+            var cause = e.cause
+            while (cause != null) {
+                Log.e(TAG, "Caused by: ${cause.javaClass.name}: ${cause.message}")
+                cause = cause.cause
+            }
+            promise.reject("START_ERROR", "${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
@@ -637,6 +648,15 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
     private fun emitConnectionChanged(connected: Boolean) {
         sendEvent("onMqttConnectionChanged", Arguments.createMap().apply {
             putBoolean("connected", connected)
+        })
+    }
+
+    /**
+     * Emit an `onMqttConnectionError` event to JS with the error message.
+     */
+    private fun emitConnectionError(message: String) {
+        sendEvent("onMqttConnectionError", Arguments.createMap().apply {
+            putString("message", message)
         })
     }
 

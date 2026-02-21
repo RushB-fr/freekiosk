@@ -76,9 +76,10 @@ const SettingsInput: React.FC<SettingsInputProps> = ({
     let newRealValue: string;
 
     if (newDisplayLength > currentRealLength) {
-      // User typed a new character - get the last char from display
-      const newChar = text.slice(-1);
-      newRealValue = value + newChar;
+      // Handle both single character typing and multi-character paste
+      const charsAdded = newDisplayLength - currentRealLength;
+      const newChars = text.slice(-charsAdded);
+      newRealValue = value + newChars;
     } else if (newDisplayLength < currentRealLength) {
       // User deleted characters
       newRealValue = value.slice(0, newDisplayLength);

@@ -105,6 +105,22 @@ adb shell am start -n com.freekiosk/.MainActivity [OPTIONS]
 | `--es rest_api_port "8080"` | String | API server port |
 | `--es rest_api_key "secret"` | String | API authentication key |
 
+### MQTT Options
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `--es mqtt_enabled "true"` | String | Enable MQTT client |
+| `--es mqtt_broker_url "host"` | String | MQTT broker hostname or IP |
+| `--es mqtt_port "1883"` | String | MQTT broker port |
+| `--es mqtt_username "user"` | String | MQTT authentication username |
+| `--es mqtt_password "pass"` | String | MQTT authentication password (stored securely in Keychain) |
+| `--es mqtt_client_id "id"` | String | MQTT client ID (auto-generated if empty) |
+| `--es mqtt_base_topic "freekiosk"` | String | Base MQTT topic prefix |
+| `--es mqtt_discovery_prefix "homeassistant"` | String | Home Assistant MQTT discovery prefix |
+| `--es mqtt_status_interval "30"` | String | Status publish interval in seconds |
+| `--es mqtt_allow_control "true"` | String | Allow remote control via MQTT |
+| `--es mqtt_device_name "name"` | String | Friendly device name for HA discovery |
+
 ### Screensaver Options
 
 | Parameter | Type | Description |
@@ -311,7 +327,18 @@ When using `--es config '{...}'`, the following keys are supported:
   "allow_power_button": "false",
   "back_button_mode": "immediate",
   "test_mode": "false",
-  "default_brightness": "75"
+  "default_brightness": "75",
+  "mqtt_enabled": "true",
+  "mqtt_broker_url": "broker.local",
+  "mqtt_port": "1883",
+  "mqtt_username": "user",
+  "mqtt_password": "password",
+  "mqtt_client_id": "tablet1",
+  "mqtt_base_topic": "freekiosk",
+  "mqtt_discovery_prefix": "homeassistant",
+  "mqtt_status_interval": "30",
+  "mqtt_allow_control": "true",
+  "mqtt_device_name": "Kitchen Tablet"
 }
 ```
 

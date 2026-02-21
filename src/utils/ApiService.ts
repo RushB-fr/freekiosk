@@ -126,46 +126,41 @@ class ApiServiceClass {
    * Start the MQTT client if enabled in settings
    */
   async autoStartMqtt(): Promise<void> {
-    try {
-      const enabled = await StorageService.getMqttEnabled();
-      if (!enabled) {
-        console.log('ApiService: MQTT disabled in settings');
-        return;
-      }
-
-      const brokerUrl = await StorageService.getMqttBrokerUrl();
-      if (!brokerUrl) {
-        console.log('ApiService: MQTT broker URL not configured');
-        return;
-      }
-
-      const port = await StorageService.getMqttPort();
-      const username = await StorageService.getMqttUsername();
-      const password = await getSecureMqttPassword();
-      const clientId = await StorageService.getMqttClientId();
-      const baseTopic = await StorageService.getMqttBaseTopic();
-      const discoveryPrefix = await StorageService.getMqttDiscoveryPrefix();
-      const statusInterval = await StorageService.getMqttStatusInterval();
-      const allowControl = await StorageService.getMqttAllowControl();
-      const deviceName = await StorageService.getMqttDeviceName();
-
-      await mqttClient.start({
-        brokerUrl,
-        port,
-        username: username || undefined,
-        password: password || undefined,
-        clientId: clientId || undefined,
-        baseTopic,
-        discoveryPrefix,
-        statusInterval: statusInterval * 1000, // Convert seconds to ms
-        allowControl,
-        deviceName: deviceName || undefined,
-      });
-
-      console.log(`ApiService: MQTT client started for ${brokerUrl}:${port}`);
-    } catch (error) {
-      console.error('ApiService: Failed to auto-start MQTT', error);
+    const enabled = await StorageService.getMqttEnabled();
+    if (!enabled) {
+      throw new Error('MQTT is not enabled');
     }
+
+    const brokerUrl = await StorageService.getMqttBrokerUrl();
+    if (!brokerUrl) {
+      throw new Error('Broker URL not configured');
+    }
+
+    const port = await StorageService.getMqttPort();
+    const username = await StorageService.getMqttUsername();
+    const password = await getSecureMqttPassword();
+    const clientId = await StorageService.getMqttClientId();
+    const baseTopic = await StorageService.getMqttBaseTopic();
+    const discoveryPrefix = await StorageService.getMqttDiscoveryPrefix();
+    const statusInterval = await StorageService.getMqttStatusInterval();
+    const allowControl = await StorageService.getMqttAllowControl();
+    const deviceName = await StorageService.getMqttDeviceName();
+
+    await mqttClient.start({
+      brokerUrl,
+      port,
+      username: username || undefined,
+      password: password || undefined,
+      clientId: clientId || undefined,
+      baseTopic,
+      discoveryPrefix,
+      statusInterval: statusInterval * 1000, // Convert seconds to ms
+      allowControl,
+      deviceName: deviceName || undefined,
+      useTls: port === 8883,
+    });
+
+    console.log(`ApiService: MQTT client started for ${brokerUrl}:${port}`);
   }
 
   /**
