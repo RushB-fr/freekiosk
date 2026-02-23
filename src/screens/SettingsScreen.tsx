@@ -82,6 +82,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [updateInfo, setUpdateInfo] = useState<any>(null);
   const [downloading, setDownloading] = useState<boolean>(false);
   const [currentVersion, setCurrentVersion] = useState<string>('');
+  const [betaUpdatesEnabled, setBetaUpdatesEnabled] = useState<boolean>(false);
 
   useEffect(() => {
     loadSettings();
@@ -95,6 +96,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
     try {
       const versionInfo = await UpdateModule.getCurrentVersion();
       setCurrentVersion(versionInfo.versionName);
+      const savedBetaUpdates = await StorageService.getBetaUpdatesEnabled();
+      setBetaUpdatesEnabled(savedBetaUpdates);
     } catch (error) {
       console.error('Failed to load current version:', error);
     }
@@ -381,8 +384,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
       const currentVersionInfo = await UpdateModule.getCurrentVersion();
       console.log('Current version:', currentVersionInfo);
       
-      console.log('Checking for updates...');
-      const latestUpdate = await UpdateModule.checkForUpdates();
+      console.log(`Checking for updates (beta=${betaUpdatesEnabled})...`);
+      const latestUpdate = await UpdateModule.checkForUpdatesWithChannel(betaUpdatesEnabled);
       
       console.log('Update check result:', JSON.stringify(latestUpdate, null, 2));
       console.log('Download URL:', latestUpdate.downloadUrl);
@@ -397,9 +400,10 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
         setUpdateAvailable(true);
         setUpdateInfo(latestUpdate);
         console.log('Update available, updateInfo set:', latestUpdate);
+        const betaTag = latestUpdate.isPrerelease ? ' 🧪 Beta' : '';
         Alert.alert(
-          '🎉 Update Available',
-          `New version ${latestVer} is available!\n\nCurrent: ${currentVer}\n\nWould you like to download and install it?`,
+          `🎉 Update Available${betaTag}`,
+          `New version ${latestVer} is available!${latestUpdate.isPrerelease ? ' (pre-release)' : ''}\n\nCurrent: ${currentVer}\n\nWould you like to download and install it?`,
           [
             { text: 'Not Now', style: 'cancel' },
             { text: 'Update', onPress: () => handleDownloadUpdate(latestUpdate) }
@@ -884,9 +888,9 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
             
             {updateAvailable && updateInfo && (
               <View style={[styles.infoBox, { backgroundColor: '#e8f5e9', marginTop: 10 }]}>
-                <Text style={[styles.infoTitle, { color: '#2e7d32' }]}>🎉 Update Available</Text>
+                <Text style={[styles.infoTitle, { color: '#2e7d32' }]}>🎉 {updateInfo.isPrerelease ? '🧪 Beta ' : ''}Update Available</Text>
                 <Text style={styles.infoText}>
-                  Version {updateInfo.version} is available!
+                  Version {updateInfo.version} is available!{updateInfo.isPrerelease ? ' (pre-release)' : ''}
                 </Text>
                 {updateInfo.notes && (
                   <Text style={[styles.infoText, { marginTop: 5, fontSize: 12 }]}>
@@ -895,6 +899,20 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
                 )}
               </View>
             )}
+            
+            <View style={styles.switchRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>🧪 Beta Updates</Text>
+                <Text style={styles.hint}>Receive pre-release versions before stable releases</Text>
+              </View>
+              <Switch
+                value={betaUpdatesEnabled}
+                onValueChange={async (value) => {
+                  setBetaUpdatesEnabled(value);
+                  await StorageService.saveBetaUpdatesEnabled(value);
+                }}
+              />
+            </View>
             
             <TouchableOpacity
               style={[styles.saveButton, checkingUpdate || downloading ? styles.saveButtonDisabled : null]}

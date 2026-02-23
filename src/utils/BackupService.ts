@@ -107,6 +107,8 @@ const BACKUP_KEYS = [
   '@kiosk_mqtt_allow_control',
   '@kiosk_mqtt_device_name',
   '@kiosk_mqtt_motion_always_on',
+  // Beta Updates
+  '@kiosk_beta_updates_enabled',
   // Note: MQTT password is handled separately via Keychain (secure storage)
   // Legacy keys
   '@screensaver_delay',

@@ -15,6 +15,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ***
 
+## [1.2.14] - 2026-02-23
+
+### Added
+- 🔌 **MQTT Configuration via ADB intents**: Configure all MQTT settings headlessly for automated tablet provisioning
+  - 11 parameters supported: `mqtt_enabled`, `mqtt_broker_url`, `mqtt_port`, `mqtt_username`, `mqtt_password`, `mqtt_client_id`, `mqtt_base_topic`, `mqtt_discovery_prefix`, `mqtt_status_interval`, `mqtt_allow_control`, `mqtt_device_name`
+  - MQTT password stored securely in Android Keychain, same pattern as PIN
+  - Example usage:
+    ```bash
+    adb shell am start -n com.freekiosk/.MainActivity \
+        --es mqtt_enabled "true" \
+        --es mqtt_broker_url "broker.local" \
+        --es mqtt_port "1883" \
+        --es mqtt_username "user" \
+        --es mqtt_password "pass"
+    ```
+- 🔒 **TLS/SSL MQTT support**: New `useTls` config option — auto-enabled when port is 8883
+- 🔔 **MQTT connection errors surfaced to UI**: Broker errors (e.g. `NOT_AUTHORIZED`) now propagate from native Kotlin → JS → Settings UI — no more silent failures
+- 💾 **Password saved hint**: Shows "Password is saved" when a password is already configured, preventing accidental overwrites
+
+### Fixed
+- 🔄 **MQTT reconnect losing credentials**: HiveMQ's `automaticReconnect()` was sending `null` username/password on reconnection, causing the broker to reject with `NOT_AUTHORIZED`. Replaced with manual reconnect that always sends full credentials, with exponential backoff (1s → 30s)
+- 🏗️ **Release build crash (R8/ProGuard)**: R8 obfuscation was renaming Netty/JCTools fields used via `Unsafe.objectFieldOffset()` reflection, causing `ExceptionInInitializerError` on startup in release builds. Added official HiveMQ ProGuard rules (`-keepclassmembernames`)
+- 📋 **Password paste truncated to one character**: MQTT password field was incorrectly capturing only the last character on paste (`slice(-1)` → `slice(-charsAdded)`)
+- ⌨️ **Broker URL keyboard adding spaces after dots**: Fixed by setting `keyboardType="url"` on the broker URL input
+- 🔁 **Connect button ALREADY_RUNNING error**: `handleConnect` now stops the existing MQTT client before starting a new one
+- 🔄 **External App Mode: child activities no longer killed by auto-relaunch** (#69): barcode scanners, file pickers, camera intents, and other child activities launched by the locked app are now properly detected and allowed
+  - Uses `ActivityManager.runningAppProcesses` to check if the locked app's process is still alive (not crashed) — if alive and foreground is not a launcher, it's a child activity
+  - Launchers (Home screen) are dynamically detected via `PackageManager.queryIntentActivities(ACTION_MAIN, CATEGORY_HOME)` — works on all OEMs without hardcoding
+  - Safe in Lock Task mode: user cannot open other apps, only the locked app can launch child activities
+  - Logic: launcher detected → relaunch FreeKiosk; locked app process alive → allow child activity; process dead → relaunch FreeKiosk
+  - Fixes use cases: MLKit barcode scanner, camera intents, file pickers, permission dialogs, any native modal launched by the locked app
+- 🚀 **External App Mode boot: REST API now starts automatically**: When FreeKiosk is set as default launcher in External App Mode, `HomeActivity` now also starts `MainActivity` in background
+  - Ensures REST API server, MQTT, and other services are running even when an external app is in foreground
+  - `MainActivity` automatically moves to background (`moveTaskToBack`) when started from `HomeActivity`
+  - Fixes issue where the external app would start but FreeKiosk's API server wouldn't be accessible
+
+***
+
 ## [1.2.13] - 2026-02-20
 
 ### Added
@@ -75,11 +113,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - All patches saved in `patches/react-native-webview+13.16.0.patch` via `patch-package`
 
 - ♿ **AccessibilityService for cross-app key injection**: New `FreeKioskAccessibilityService` enables keyboard emulation in External App mode
-  - Uses `performGlobalAction()` for Back/Home/Recents navigation (all Android versions)
+  - Uses `performGlobalAction()` for Back/Home/Recents/PlayPause navigation (all Android versions)
   - Uses `InputMethod.sendKeyEvent()` / `commitText()` for keys and text on Android 13+ (API 33+)
+  - **DPAD navigation fallback** (all Android versions): spatial focus traversal via accessibility tree,
+    `ACTION_CLICK` for select, `ACTION_SCROLL_FORWARD/BACKWARD` for scrolling
+  - **Play/Pause** mapped to `GLOBAL_ACTION_KEYCODE_HEADSETHOOK` (Android 12+)
   - Fallback for Android 5–12: `ACTION_SET_TEXT` injects printable characters, text, Backspace, and Shift+letter
   - `KeyCharacterMap` converts keyCodes to printable characters for the ACTION_SET_TEXT fallback
-  - Automatic fallback chain: AccessibilityService → Activity `dispatchKeyEvent()` → `input keyevent` (last resort)
+  - 5-tier fallback chain: globalAction → InputMethod → a11y navigation → ACTION_SET_TEXT → `input keyevent`
   - **Settings UI**: New "Accessibility Service" section in Advanced Settings with:
     - Status indicator (Active / Enabled / Disabled)
     - "Open Accessibility Settings" button to launch Android's settings

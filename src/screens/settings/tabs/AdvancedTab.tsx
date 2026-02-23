@@ -27,6 +27,8 @@ interface AdvancedTabProps {
   downloading: boolean;
   updateAvailable: boolean;
   updateInfo: any;
+  betaUpdatesEnabled: boolean;
+  onBetaUpdatesChange: (value: boolean) => void;
   onCheckForUpdates: () => void;
   onDownloadUpdate: () => void;
   
@@ -52,6 +54,8 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
   downloading,
   updateAvailable,
   updateInfo,
+  betaUpdatesEnabled,
+  onBetaUpdatesChange,
   onCheckForUpdates,
   onDownloadUpdate,
   certificates,
@@ -115,13 +119,28 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
         </View>
         
         {updateAvailable && updateInfo && (
-          <SettingsInfoBox variant="success" title="🎉 Update Available">
+          <SettingsInfoBox variant="success" title={`🎉 ${updateInfo.isPrerelease ? '🧪 Beta ' : ''}Update Available`}>
             <Text style={styles.infoText}>
-              Version {updateInfo.version} is available!
+              Version {updateInfo.version} is available!{updateInfo.isPrerelease ? ' (pre-release)' : ''}
               {updateInfo.notes && `\n\n${updateInfo.notes.substring(0, 150)}...`}
             </Text>
           </SettingsInfoBox>
         )}
+        
+        <View style={styles.betaRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.betaLabel}>🧪 Beta Updates</Text>
+            <Text style={styles.betaHint}>Receive pre-release versions before stable</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.betaToggle, betaUpdatesEnabled && styles.betaToggleActive]}
+            onPress={() => onBetaUpdatesChange(!betaUpdatesEnabled)}
+          >
+            <Text style={[styles.betaToggleText, betaUpdatesEnabled && styles.betaToggleTextActive]}>
+              {betaUpdatesEnabled ? 'ON' : 'OFF'}
+            </Text>
+          </TouchableOpacity>
+        </View>
         
         <SettingsButton
           title={checkingUpdate ? 'Checking...' : downloading ? 'Downloading...' : 'Check for Updates'}
@@ -396,6 +415,42 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: Spacing.xl,
     marginBottom: Spacing.xxl,
+  },
+  betaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  betaLabel: {
+    ...Typography.label,
+    fontSize: 14,
+  },
+  betaHint: {
+    ...Typography.hint,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  betaToggle: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: Colors.surfaceVariant,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  betaToggleActive: {
+    backgroundColor: '#E8F5E9',
+    borderColor: '#4CAF50',
+  },
+  betaToggleText: {
+    ...Typography.label,
+    fontSize: 12,
+    color: Colors.textHint,
+  },
+  betaToggleTextActive: {
+    color: '#2E7D32',
   },
 });
 

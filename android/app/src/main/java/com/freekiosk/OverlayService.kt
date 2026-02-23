@@ -1,5 +1,6 @@
 package com.freekiosk
 
+import android.app.ActivityManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -140,6 +141,7 @@ class OverlayService : Service() {
     private var nfcEnabled = false // Whether NFC is enabled (to filter NFC system package from monitoring)
     private val foregroundMonitorHandler = Handler(Looper.getMainLooper())
     private val FOREGROUND_CHECK_INTERVAL = 5000L // Check every 5 seconds (was 2s, reduced for low-end device performance)
+    private var cachedLauncherPackages: Set<String>? = null // Cached list of launcher packages for Home detection
     // BroadcastReceiver pour détecter quand l'écran s'allume
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -1130,22 +1132,84 @@ class OverlayService : Service() {
             }
             foregroundNullCount = 0
             
+            // Correct app in foreground - nothing to do
+            if (topPackage == lockedPackage || topPackage == packageName) {
+                return
+            }
+            
             // When NFC is enabled, ignore transient NFC system package to prevent false relaunch
             if (nfcEnabled && topPackage.contains(".nfc")) {
                 android.util.Log.d("OverlayService", "NFC package detected ($topPackage) - ignoring (NFC mode active)")
                 return
             }
             
-            // If locked app is not in foreground and FreeKiosk is not in foreground
-            if (topPackage != lockedPackage && topPackage != packageName) {
-                android.util.Log.i("OverlayService", "Locked app ($lockedPackage) not in foreground (current: $topPackage) - bringing FreeKiosk back")
-                
-                // Bring FreeKiosk back to foreground
+            // Check if it's a launcher (user pressed Home button) - always relaunch
+            if (isLauncherPackage(topPackage)) {
+                android.util.Log.i("OverlayService", "Launcher detected ($topPackage) - user pressed Home, bringing FreeKiosk back")
                 bringFreeKioskToFront()
+                return
             }
+            
+            // Check if the locked app still has a visible/foreground process
+            // This indicates a child activity (barcode scanner, file picker, camera, etc.)
+            // was launched BY the locked app itself - allow it
+            // Safe in Lock Task mode: user can't open other apps, only the locked app can launch activities
+            if (isLockedAppProcessAlive()) {
+                android.util.Log.d("OverlayService", "Child activity detected ($topPackage) - locked app ($lockedPackage) process still alive, allowing")
+                return
+            }
+            
+            // Locked app process is dead (crashed/killed) and foreground is not a child activity
+            android.util.Log.i("OverlayService", "Locked app ($lockedPackage) process dead (current: $topPackage) - bringing FreeKiosk back")
+            bringFreeKioskToFront()
         } catch (e: Exception) {
             android.util.Log.e("OverlayService", "Error checking foreground app: ${e.message}")
         }
+    }
+    
+    /**
+     * Check if the locked app's process is still alive (not crashed).
+     * 
+     * In Lock Task mode, the user cannot open other apps — only the locked app itself
+     * can launch child activities (barcode scanner, file picker, camera intent, etc.).
+     * So if the locked app's process is still alive AND the foreground is not a launcher,
+     * it must be a child activity launched by the locked app.
+     * 
+     * When the app crashes, its process is killed and disappears from runningAppProcesses.
+     * When the user presses Home, the launcher is detected first (isLauncherPackage check).
+     * 
+     * Note: We check for process existence, not IMPORTANCE_VISIBLE, because full-screen
+     * child activities (like MLKit barcode scanner) cause the parent to receive onStop(),
+     * dropping its importance to CACHED — but the process is still alive.
+     */
+    private fun isLockedAppProcessAlive(): Boolean {
+        val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return false
+        val processes = am.runningAppProcesses ?: return false
+        
+        for (proc in processes) {
+            if (proc.processName == lockedPackage || proc.processName?.startsWith("$lockedPackage:") == true) {
+                android.util.Log.d("OverlayService", "Locked app process ($lockedPackage) alive - importance=${proc.importance}")
+                return true
+            }
+        }
+        // Process not found = app crashed/killed
+        android.util.Log.d("OverlayService", "Locked app process ($lockedPackage) NOT found in running processes")
+        return false
+    }
+    
+    /**
+     * Check if a package is a launcher (Home screen app).
+     * Uses PackageManager to dynamically detect all registered launchers on the device.
+     * Results are cached since launchers don't change at runtime.
+     */
+    private fun isLauncherPackage(pkg: String): Boolean {
+        if (cachedLauncherPackages == null) {
+            val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+            val resolveInfos = packageManager.queryIntentActivities(intent, 0)
+            cachedLauncherPackages = resolveInfos.map { it.activityInfo.packageName }.toSet()
+            android.util.Log.d("OverlayService", "Cached launcher packages: $cachedLauncherPackages")
+        }
+        return cachedLauncherPackages?.contains(pkg) == true
     }
 
     /**

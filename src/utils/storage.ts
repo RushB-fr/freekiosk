@@ -105,6 +105,8 @@ const KEYS = {
   MQTT_ALLOW_CONTROL: '@kiosk_mqtt_allow_control',
   MQTT_DEVICE_NAME: '@kiosk_mqtt_device_name',
   MQTT_MOTION_ALWAYS_ON: '@kiosk_mqtt_motion_always_on',
+  // Beta Updates
+  BETA_UPDATES_ENABLED: '@kiosk_beta_updates_enabled',
   // Legacy keys for backward compatibility
   SCREENSAVER_DELAY: '@screensaver_delay',
   MOTION_DETECTION_ENABLED: '@motion_detection_enabled',
@@ -1873,6 +1875,25 @@ export const StorageService = {
       return value ? JSON.parse(value) : false;
     } catch (error) {
       console.error('Error getting MQTT motion always on:', error);
+      return false;
+    }
+  },
+
+  // BETA UPDATES
+  saveBetaUpdatesEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.BETA_UPDATES_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving beta updates enabled:', error);
+    }
+  },
+
+  getBetaUpdatesEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.BETA_UPDATES_ENABLED);
+      return value ? JSON.parse(value) : false; // Default OFF
+    } catch (error) {
+      console.error('Error getting beta updates enabled:', error);
       return false;
     }
   },

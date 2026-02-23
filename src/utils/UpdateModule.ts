@@ -13,6 +13,7 @@ interface UpdateInfo {
   notes: string;
   publishedAt: string;
   downloadUrl: string;
+  isPrerelease?: boolean;
 }
 
 export default {
@@ -24,10 +25,18 @@ export default {
   },
 
   /**
-   * Check for available updates on GitHub
+   * Check for available updates on GitHub (stable channel only)
    */
   checkForUpdates(): Promise<UpdateInfo> {
     return UpdateModule.checkForUpdates();
+  },
+
+  /**
+   * Check for updates with optional beta/pre-release channel support.
+   * @param includeBeta - If true, includes pre-release versions
+   */
+  checkForUpdatesWithChannel(includeBeta: boolean): Promise<UpdateInfo> {
+    return UpdateModule.checkForUpdatesWithChannel(includeBeta);
   },
 
   /**

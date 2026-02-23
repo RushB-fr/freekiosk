@@ -98,6 +98,13 @@ class MainActivity : ReactActivity() {
     hideSystemUI()
     checkAndStartLockTask()
 
+    // If started from HomeActivity (External App Mode at boot),
+    // move to background so the external app stays in foreground
+    if (intent?.getBooleanExtra("from_home_activity", false) == true) {
+      DebugLog.d("MainActivity", "Started from HomeActivity, moving to background")
+      Handler(Looper.getMainLooper()).postDelayed({ moveTaskToBack(true) }, 500)
+    }
+
     // Check if we need to navigate to PIN
     handleNavigationIntent(intent)
   }

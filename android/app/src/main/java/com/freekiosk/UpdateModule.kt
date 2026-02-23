@@ -51,11 +51,32 @@ class UpdateModule(reactContext: ReactApplicationContext) : ReactContextBaseJava
         }
     }
 
+    /**
+     * Check for updates - stable channel only (backward compatible)
+     */
     @ReactMethod
     fun checkForUpdates(promise: Promise) {
+        checkForUpdatesWithChannel(false, promise)
+    }
+
+    /**
+     * Check for updates with optional beta/pre-release channel support.
+     * When includeBeta is false, uses /releases/latest (stable only).
+     * When includeBeta is true, uses /releases and picks the first release (beta or stable).
+     */
+    @ReactMethod
+    fun checkForUpdatesWithChannel(includeBeta: Boolean, promise: Promise) {
         Thread {
             try {
-                val url = URL("https://api.github.com/repos/rushb-fr/freekiosk/releases/latest")
+                val apiUrl = if (includeBeta) {
+                    "https://api.github.com/repos/rushb-fr/freekiosk/releases?per_page=10"
+                } else {
+                    "https://api.github.com/repos/rushb-fr/freekiosk/releases/latest"
+                }
+                
+                android.util.Log.d("UpdateModule", "Checking updates: includeBeta=$includeBeta, url=$apiUrl")
+                
+                val url = URL(apiUrl)
                 val connection = url.openConnection() as HttpURLConnection
                 connection.requestMethod = "GET"
                 connection.connectTimeout = 10000
@@ -64,12 +85,27 @@ class UpdateModule(reactContext: ReactApplicationContext) : ReactContextBaseJava
                 val responseCode = connection.responseCode
                 if (responseCode == HttpURLConnection.HTTP_OK) {
                     val response = connection.inputStream.bufferedReader().use { it.readText() }
-                    val jsonObject = JSONObject(response)
+                    
+                    // Parse the release object
+                    val jsonObject = if (includeBeta) {
+                        // /releases returns an array — pick the first one (most recent, beta or stable)
+                        val releasesArray = org.json.JSONArray(response)
+                        if (releasesArray.length() == 0) {
+                            promise.reject("ERROR", "No releases found")
+                            connection.disconnect()
+                            return@Thread
+                        }
+                        releasesArray.getJSONObject(0)
+                    } else {
+                        // /releases/latest returns a single object
+                        JSONObject(response)
+                    }
                     
                     val tagName = jsonObject.getString("tag_name").removePrefix("v")
                     val releaseName = jsonObject.optString("name", "")
                     val releaseNotes = jsonObject.optString("body", "")
                     val publishedAt = jsonObject.optString("published_at", "")
+                    val isPrerelease = jsonObject.optBoolean("prerelease", false)
                     
                     // Get the actual APK download URL from release assets
                     var apkUrl = ""
@@ -95,6 +131,7 @@ class UpdateModule(reactContext: ReactApplicationContext) : ReactContextBaseJava
                     android.util.Log.d("UpdateModule", "Tag from GitHub: ${jsonObject.getString("tag_name")}")
                     android.util.Log.d("UpdateModule", "Version after removePrefix: $tagName")
                     android.util.Log.d("UpdateModule", "APK Download URL: $apkUrl")
+                    android.util.Log.d("UpdateModule", "Is pre-release: $isPrerelease")
                     
                     val result = Arguments.createMap().apply {
                         putString("version", tagName)
@@ -102,9 +139,10 @@ class UpdateModule(reactContext: ReactApplicationContext) : ReactContextBaseJava
                         putString("notes", releaseNotes)
                         putString("publishedAt", publishedAt)
                         putString("downloadUrl", apkUrl)
+                        putBoolean("isPrerelease", isPrerelease)
                     }
                     
-                    android.util.Log.d("UpdateModule", "Update available: $tagName at $apkUrl")
+                    android.util.Log.d("UpdateModule", "Update available: $tagName at $apkUrl (prerelease=$isPrerelease)")
                     promise.resolve(result)
                 } else {
                     promise.reject("ERROR", "GitHub API returned code: $responseCode")

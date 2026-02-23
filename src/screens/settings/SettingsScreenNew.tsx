@@ -170,6 +170,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [updateInfo, setUpdateInfo] = useState<any>(null);
   const [downloading, setDownloading] = useState<boolean>(false);
   const [currentVersion, setCurrentVersion] = useState<string>('');
+  const [betaUpdatesEnabled, setBetaUpdatesEnabled] = useState<boolean>(false);
 
   useEffect(() => {
     loadSettings();
@@ -203,6 +204,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     try {
       const versionInfo = await UpdateModule.getCurrentVersion();
       setCurrentVersion(versionInfo.versionName);
+      const savedBetaUpdates = await StorageService.getBetaUpdatesEnabled();
+      setBetaUpdatesEnabled(savedBetaUpdates);
     } catch (error) {
       console.error('Failed to load current version:', error);
     }
@@ -628,11 +631,11 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     
     try {
       const currentVersionInfo = await UpdateModule.getCurrentVersion();
-      const latestUpdate = await UpdateModule.checkForUpdates();
+      const latestUpdate = await UpdateModule.checkForUpdatesWithChannel(betaUpdatesEnabled);
       const currentVer = currentVersionInfo.versionName;
       const latestVer = latestUpdate.version;
       
-      console.log(`Version comparison: current=${currentVer}, latest=${latestVer}`);
+      console.log(`Version comparison: current=${currentVer}, latest=${latestVer}, beta=${betaUpdatesEnabled}`);
       
       // Use semantic version comparison instead of simple string equality
       const versionComparison = compareVersions(latestVer, currentVer);
@@ -641,9 +644,10 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
         // Latest version is newer than current
         setUpdateAvailable(true);
         setUpdateInfo(latestUpdate);
+        const betaTag = latestUpdate.isPrerelease ? ' 🧪 Beta' : '';
         Alert.alert(
-          '🎉 Update Available',
-          `New version ${latestVer} available!\n\nCurrent: ${currentVer}\n\nDo you want to download and install it?`,
+          `🎉 Update Available${betaTag}`,
+          `New version ${latestVer} available!${latestUpdate.isPrerelease ? ' (pre-release)' : ''}\n\nCurrent: ${currentVer}\n\nDo you want to download and install it?`,
           [
             { text: 'Later', style: 'cancel' },
             { text: 'Update', onPress: () => handleDownloadUpdate(latestUpdate) }
@@ -1333,6 +1337,11 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             downloading={downloading}
             updateAvailable={updateAvailable}
             updateInfo={updateInfo}
+            betaUpdatesEnabled={betaUpdatesEnabled}
+            onBetaUpdatesChange={async (value: boolean) => {
+              setBetaUpdatesEnabled(value);
+              await StorageService.saveBetaUpdatesEnabled(value);
+            }}
             onCheckForUpdates={handleCheckForUpdates}
             onDownloadUpdate={() => handleDownloadUpdate()}
             certificates={certificates}

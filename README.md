@@ -11,7 +11,7 @@
   </p>
   
   <p>
-    <img src="https://img.shields.io/badge/Version-1.2.13-blue.svg" alt="Version 1.2.9">
+    <img src="https://img.shields.io/badge/Version-1.2.14-blue.svg" alt="Version 1.2.9">
     <a href="https://github.com/rushb-fr/freekiosk/releases"><img src="https://img.shields.io/github/downloads/rushb-fr/freekiosk/total.svg" alt="Downloads"></a>
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT">
     <img src="https://img.shields.io/badge/Android-8.0%2B-green.svg" alt="Android 8.0+">
@@ -277,7 +277,16 @@ Done! Your tablet is now in kiosk mode.
 
 ## 🗺️ Roadmap
 
-### ✅ v1.2.13 (Feb 2026) - MQTT & Home Assistant Integration 🆕
+### ✅ v1.2.14 (Feb 2026) - MQTT Improvements & External App Fixes 🆕
+- 🔌 **MQTT ADB provisioning**: Configure all MQTT settings headlessly via ADB intents
+- 🔒 **TLS/SSL MQTT support**: Auto-enabled on port 8883
+- 🔔 **MQTT error surfacing**: Broker errors now visible in Settings UI
+- 🔄 **MQTT reconnect fix**: Full credentials always sent on reconnect (no more NOT_AUTHORIZED)
+- 🏗️ **Release build crash fix**: R8/ProGuard obfuscation crash fixed for HiveMQ/Netty
+- 🔁 **External App child activities**: Barcode scanners, file pickers & camera intents no longer killed
+- 🚀 **External App boot fix**: REST API + MQTT now start automatically when external app is foreground
+
+### ✅ v1.2.13 (Feb 2026) - MQTT & Home Assistant Integration
 - 📡 **MQTT + Home Assistant Auto-Discovery**: 27 auto-discovered HA entities (sensors, switches, buttons, controls)
 - 📡 **Push-based status**: Periodic state publishing, LWT availability tracking, auto-reconnect
 - 📡 **20 MQTT commands**: TTS, toast, audio, launch app, execute JS, URL rotation, restart UI, and more
