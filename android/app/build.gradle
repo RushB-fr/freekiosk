@@ -91,7 +91,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 28
-        versionName "1.2.13"
+        versionName "1.2.14"
 
         manifestPlaceholders = [usesCleartextTraffic: "true"]
     }

@@ -3,7 +3,7 @@
  * Settings section for MQTT / Home Assistant integration
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -43,6 +43,8 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
   const [motionAlwaysOn, setMotionAlwaysOn] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const connectionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load settings on mount
   useEffect(() => {
@@ -66,8 +68,29 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
     const unsubscribe = mqttClient.onConnectionChanged((connected) => {
       setIsConnected(connected);
       setIsLoading(false);
+      if (connected) {
+        setConnectionError(null);
+      }
+      // Clear connection timeout
+      if (connectionTimeoutRef.current) {
+        clearTimeout(connectionTimeoutRef.current);
+        connectionTimeoutRef.current = null;
+      }
     });
 
+    return () => {
+      unsubscribe();
+      if (connectionTimeoutRef.current) {
+        clearTimeout(connectionTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Listen for connection errors from native
+  useEffect(() => {
+    const unsubscribe = mqttClient.onConnectionError((message) => {
+      setConnectionError(message);
+    });
     return unsubscribe;
   }, []);
 
@@ -116,11 +139,25 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
 
   const handleConnect = async () => {
     setIsLoading(true);
+    setConnectionError(null);
     try {
+      // Stop existing client first to avoid ALREADY_RUNNING error
+      await ApiService.stopMqtt();
       await ApiService.autoStartMqtt();
+
+      // Set a timeout — if no connection event within 15s, stop loading
+      connectionTimeoutRef.current = setTimeout(() => {
+        setIsLoading((current) => {
+          if (current) {
+            setConnectionError('Connection timed out after 15 seconds. Check broker URL, port, and network connectivity.');
+            return false;
+          }
+          return current;
+        });
+      }, 15000);
     } catch (error: any) {
       console.error('[MqttSettings] Failed to connect MQTT:', error);
-      Alert.alert('Error', `Failed to connect MQTT: ${error.message}`);
+      setConnectionError(error.message || 'Unknown error');
       setIsLoading(false);
     }
   };
@@ -265,6 +302,10 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
               {isLoading && <ActivityIndicator size="small" color="#007AFF" style={styles.loader} />}
             </View>
 
+            {connectionError && (
+              <Text style={styles.errorText}>{connectionError}</Text>
+            )}
+
             {/* Connect / Disconnect button */}
             {!isLoading && (
               <View style={styles.connectButtonRow}>
@@ -297,6 +338,7 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
             value={brokerUrl}
             onChangeText={handleBrokerUrlChange}
             placeholder="e.g. 192.168.1.100"
+            keyboardType="url"
             icon="server-network"
             hint="MQTT broker hostname or IP address (required)"
           />
@@ -329,6 +371,7 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
             placeholder="Leave empty if not required"
             secureTextEntry
             icon="lock"
+            hint={password.length > 0 ? "Password is saved. Leave untouched to keep current password." : undefined}
           />
 
           {/* Client ID */}
@@ -462,6 +505,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#999',
     fontStyle: 'italic',
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#F44336',
+    marginTop: 8,
   },
   hintContainer: {
     flexDirection: 'row',

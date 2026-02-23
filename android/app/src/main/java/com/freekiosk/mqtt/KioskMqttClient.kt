@@ -9,7 +9,7 @@ import com.hivemq.client.mqtt.MqttClient
 import com.hivemq.client.mqtt.datatypes.MqttQos
 import com.hivemq.client.mqtt.mqtt3.Mqtt3AsyncClient
 import org.json.JSONObject
-import java.util.concurrent.TimeUnit
+
 
 /**
  * MQTT configuration data class.
@@ -24,7 +24,8 @@ data class MqttConfig(
     val discoveryPrefix: String = "homeassistant",
     val statusInterval: Long = 30000, // 30 seconds
     val allowControl: Boolean = true,
-    val deviceName: String? = null
+    val deviceName: String? = null,
+    val useTls: Boolean = false
 )
 
 /**
@@ -73,6 +74,10 @@ class KioskMqttClient(
     @Volatile
     private var disconnectRequested = false
 
+    /** Current reconnect delay in milliseconds (exponential backoff). */
+    private var reconnectDelay = 1000L
+    private val maxReconnectDelay = 30000L
+
     // ==================== Callbacks ====================
 
     /** Lambda invoked when a command is received via MQTT. */
@@ -83,6 +88,9 @@ class KioskMqttClient(
 
     /** Lambda invoked when the connection state changes. */
     var onConnectionChanged: ((Boolean) -> Unit)? = null
+
+    /** Lambda invoked when a connection error occurs, with error message. */
+    var onConnectionError: ((String) -> Unit)? = null
 
     /** Lambda that provides the current local IP address for HA Discovery configuration_url. */
     var ipProvider: (() -> String)? = null
@@ -124,69 +132,56 @@ class KioskMqttClient(
         disconnectRequested = false
 
         try {
-            Log.i(TAG, "Connecting to tcp://${config.brokerUrl}:${config.port} as $effectiveClientId (device=$deviceId, topic=$topicId)")
+            val protocol = if (config.useTls) "ssl" else "tcp"
+            val maskedPass = config.password?.let { p ->
+                if (p.length <= 4) "****"
+                else "${p.take(3)}${"*".repeat(p.length - 6).take(10)}${p.takeLast(3)}"
+            } ?: "(none)"
+            Log.i(TAG, "Connecting to $protocol://${config.brokerUrl}:${config.port} as $effectiveClientId (device=$deviceId, topic=$topicId, tls=${config.useTls}, user=${config.username ?: "(none)"}, pass=$maskedPass)")
 
             // Build the MQTT 3.1.1 async client
-            val client = MqttClient.builder()
+            val clientBuilder = MqttClient.builder()
                 .useMqttVersion3()
                 .identifier(effectiveClientId)
                 .serverHost(config.brokerUrl)
                 .serverPort(config.port)
-                .automaticReconnect()
-                    .initialDelay(1, TimeUnit.SECONDS)
-                    .maxDelay(30, TimeUnit.SECONDS)
-                    .applyAutomaticReconnect()
+
+            // Add TLS if enabled (e.g., port 8883)
+            if (config.useTls) {
+                clientBuilder.sslWithDefaultConfig()
+            }
+
+            val client = clientBuilder
                 .addConnectedListener {
                     Log.i(TAG, "Connected to broker")
+                    reconnectDelay = 1000L // reset backoff on successful connect
                     onConnectSuccess()
                 }
                 .addDisconnectedListener { ctx ->
                     if (!disconnectRequested) {
-                        Log.w(TAG, "Connection lost: ${ctx.cause.message}")
+                        val errorMsg = ctx.cause.message ?: ctx.cause.javaClass.simpleName
+                        Log.w(TAG, "Connection lost: $errorMsg")
+                        mainHandler.post {
+                            onConnectionError?.invoke(errorMsg)
+                        }
                     }
                     _isConnected = false
                     stopStatusPublishing()
                     mainHandler.post {
                         onConnectionChanged?.invoke(false)
                     }
+                    // Manual reconnect with exponential backoff (preserves credentials)
+                    if (!disconnectRequested) {
+                        val delay = reconnectDelay
+                        reconnectDelay = (reconnectDelay * 2).coerceAtMost(maxReconnectDelay)
+                        Log.i(TAG, "Scheduling reconnect in ${delay}ms")
+                        mainHandler.postDelayed({ sendConnect() }, delay)
+                    }
                 }
                 .buildAsync()
 
             mqttClient = client
-
-            // Build connect options
-            val connectBuilder = client.connectWith()
-                .cleanSession(true)
-                .keepAlive(30)
-
-            // LWT: publish "offline" to availability topic if connection is lost unexpectedly
-            connectBuilder.willPublish()
-                .topic(availabilityTopic)
-                .payload("offline".toByteArray())
-                .qos(MqttQos.AT_LEAST_ONCE)
-                .retain(true)
-                .applyWillPublish()
-
-            // Credentials
-            if (!config.username.isNullOrBlank()) {
-                val authBuilder = connectBuilder.simpleAuth()
-                    .username(config.username)
-                if (!config.password.isNullOrEmpty()) {
-                    authBuilder.password(config.password.toByteArray())
-                }
-                authBuilder.applySimpleAuth()
-            }
-
-            connectBuilder.send().whenComplete { _, throwable ->
-                if (throwable != null) {
-                    Log.e(TAG, "Connection failed: ${throwable.message}", throwable)
-                    // ConnectedListener won't fire, so notify manually
-                    _isConnected = false
-                    mainHandler.post {
-                        onConnectionChanged?.invoke(false)
-                    }
-                }
-            }
+            sendConnect()
         } catch (e: Exception) {
             Log.e(TAG, "Failed to create MQTT client: ${e.message}", e)
             _isConnected = false
@@ -257,6 +252,54 @@ class KioskMqttClient(
             }
         } else {
             mainHandler.postDelayed({ connect() }, 500)
+        }
+    }
+
+    /**
+     * Send CONNECT packet with credentials, LWT, and session settings.
+     * Used for both initial connect and manual reconnect.
+     */
+    private fun sendConnect() {
+        val client = mqttClient ?: return
+
+        if (disconnectRequested) return
+
+        try {
+            val connectBuilder = client.connectWith()
+                .cleanSession(true)
+                .keepAlive(30)
+
+            // LWT: publish "offline" to availability topic if connection is lost unexpectedly
+            connectBuilder.willPublish()
+                .topic(availabilityTopic)
+                .payload("offline".toByteArray())
+                .qos(MqttQos.AT_LEAST_ONCE)
+                .retain(true)
+                .applyWillPublish()
+
+            // Credentials
+            if (!config.username.isNullOrBlank()) {
+                val authBuilder = connectBuilder.simpleAuth()
+                    .username(config.username)
+                if (!config.password.isNullOrEmpty()) {
+                    authBuilder.password(config.password.toByteArray())
+                }
+                authBuilder.applySimpleAuth()
+            }
+
+            connectBuilder.send().whenComplete { _, throwable ->
+                if (throwable != null) {
+                    Log.e(TAG, "Connection failed: ${throwable.message}", throwable)
+                    _isConnected = false
+                    val errorMsg = throwable.message ?: throwable.javaClass.simpleName
+                    mainHandler.post {
+                        onConnectionError?.invoke(errorMsg)
+                        onConnectionChanged?.invoke(false)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error sending CONNECT: ${e.message}", e)
         }
     }
 
