@@ -3,7 +3,7 @@
  * A text input with label and validation
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import { View, Text, TextInput, StyleSheet, ViewStyle, KeyboardTypeOptions } from 'react-native';
 import { Colors, Spacing, Typography } from '../../theme';
 import Icon, { IconName } from '../Icon';
@@ -27,6 +27,11 @@ interface SettingsInputProps {
   onBlur?: () => void;
 }
 
+// Uses native secureTextEntry for password masking - no manual bullet management.
+// Custom bullet masking (•) caused extra characters on certain Android keyboards
+// (Samsung, Gboard predictive text, autocorrect, paste) because it reconstructed
+// the real value from display text lengths, which breaks with composing input.
+// This is the same fix applied to PinInput in v1.2.5.
 const SettingsInput: React.FC<SettingsInputProps> = ({
   label,
   hint,
@@ -45,66 +50,6 @@ const SettingsInput: React.FC<SettingsInputProps> = ({
   multiline = false,
   onBlur,
 }) => {
-  // For secure text entry, we manage our own display value with last char visible
-  const [displayValue, setDisplayValue] = useState<string>('');
-  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Sync display value when value changes externally (e.g., reset to empty)
-  useEffect(() => {
-    if (secureTextEntry) {
-      if (value.length === 0) {
-        setDisplayValue('');
-      }
-    }
-    return () => {
-      if (hideTimeoutRef.current) {
-        clearTimeout(hideTimeoutRef.current);
-      }
-    };
-  }, [value, secureTextEntry]);
-
-  const handleSecureTextChange = (text: string): void => {
-    // Clear any pending timeout
-    if (hideTimeoutRef.current) {
-      clearTimeout(hideTimeoutRef.current);
-    }
-
-    // Detect if user is typing or deleting
-    const currentRealLength = value.length;
-    const newDisplayLength = text.length;
-
-    let newRealValue: string;
-
-    if (newDisplayLength > currentRealLength) {
-      // Handle both single character typing and multi-character paste
-      const charsAdded = newDisplayLength - currentRealLength;
-      const newChars = text.slice(-charsAdded);
-      newRealValue = value + newChars;
-    } else if (newDisplayLength < currentRealLength) {
-      // User deleted characters
-      newRealValue = value.slice(0, newDisplayLength);
-    } else {
-      // Same length - could be a replacement, use existing value
-      newRealValue = value;
-    }
-
-    onChangeText(newRealValue);
-
-    if (newRealValue.length === 0) {
-      setDisplayValue('');
-      return;
-    }
-
-    // Show masked value with last character visible
-    const masked = '•'.repeat(Math.max(0, newRealValue.length - 1)) + newRealValue.slice(-1);
-    setDisplayValue(masked);
-
-    // After 500ms, mask the last character too
-    hideTimeoutRef.current = setTimeout(() => {
-      setDisplayValue('•'.repeat(newRealValue.length));
-    }, 500);
-  };
-
   return (
     <View style={[styles.container, style]}>
       <View style={styles.labelRow}>
@@ -120,11 +65,12 @@ const SettingsInput: React.FC<SettingsInputProps> = ({
           multiline && styles.inputMultiline,
           inputStyle,
         ]}
-        value={secureTextEntry ? displayValue : value}
-        onChangeText={secureTextEntry ? handleSecureTextChange : onChangeText}
+        value={value}
+        onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={Colors.textHint}
         keyboardType={keyboardType}
+        secureTextEntry={secureTextEntry}
         autoCapitalize={autoCapitalize}
         maxLength={maxLength}
         editable={!disabled}

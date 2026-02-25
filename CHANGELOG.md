@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- 🔐 **MQTT password field adding extra characters**: Removed custom bullet-masking logic in `SettingsInput` and replaced with native `secureTextEntry` — same fix as PinInput (v1.2.5). Custom masking reconstructed the real value from display text lengths, which broke with Samsung/Gboard predictive text, autocorrect, and paste, silently injecting extra characters. Affects MQTT password, API key, and all other password fields using `SettingsInput`.
 
 ***
 
