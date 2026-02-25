@@ -3,7 +3,7 @@
  * Material Design tabs with organized sections
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -172,6 +172,25 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [currentVersion, setCurrentVersion] = useState<string>('');
   const [betaUpdatesEnabled, setBetaUpdatesEnabled] = useState<boolean>(false);
 
+  // Detect available cameras — extracted so it can be called by both loadSettings and the
+  // CameraDevicesChanged listener (race condition fix for slow SoCs like Rockchip RK3576S:
+  // ProcessCameraProvider initializes asynchronously, so getAvailableCameraDevices() may
+  // return [] on the first call if the provider hasn't resolved yet).
+  const detectCameras = useCallback(() => {
+    try {
+      const devices = Camera.getAvailableCameraDevices();
+      const cameras = devices
+        .filter((d: any) => d.position === 'front' || d.position === 'back')
+        .map((d: any) => ({ position: d.position as 'front' | 'back', id: d.id }));
+      if (cameras.length > 0) {
+        setAvailableCameras(cameras);
+        console.log('[Settings] Available cameras:', cameras);
+      }
+    } catch (error) {
+      console.error('[Settings] Error detecting cameras:', error);
+    }
+  }, []);
+
   useEffect(() => {
     loadSettings();
     loadCertificates();
@@ -180,6 +199,20 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     checkDeviceOwner();
     loadCurrentVersion();
     checkLightSensor();
+  }, []);
+
+  // Subscribe to camera device changes — handles the race condition where
+  // ProcessCameraProvider hasn't resolved yet when the settings screen first loads.
+  // On unusual SoCs (Rockchip, Amlogic, etc.) this async init can take several seconds.
+  useEffect(() => {
+    const subscription = Camera.addCameraDevicesChangedListener((devices) => {
+      const cameras = devices
+        .filter((d: any) => d.position === 'front' || d.position === 'back')
+        .map((d: any) => ({ position: d.position as 'front' | 'back', id: d.id }));
+      console.log('[Settings] CameraDevicesChanged event — cameras:', cameras);
+      setAvailableCameras(cameras);
+    });
+    return () => subscription.remove();
   }, []);
 
   // ============ LOAD FUNCTIONS ============
@@ -299,18 +332,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setMotionCameraPosition(savedMotionCameraPosition ?? 'front');
     setScreensaverBrightness(savedScreensaverBrightness ?? 0);
 
-    // Detect available cameras
-    try {
-      const devices = await Camera.getAvailableCameraDevices();
-      const cameras = devices
-        .filter(d => d.position === 'front' || d.position === 'back')
-        .map(d => ({ position: d.position as 'front' | 'back', id: d.id }));
-      setAvailableCameras(cameras);
-      console.log('[Settings] Available cameras:', cameras);
-    } catch (error) {
-      console.error('[Settings] Error detecting cameras:', error);
-      setAvailableCameras([]);
-    }
+    // Detect available cameras (first attempt — may return [] on slow SoCs before
+    // ProcessCameraProvider resolves; the CameraDevicesChanged listener handles the retry)
+    detectCameras();
 
     if (savedInactivityDelay && !isNaN(savedInactivityDelay)) {
       setInactivityDelay(String(Math.floor(savedInactivityDelay / 60000)));

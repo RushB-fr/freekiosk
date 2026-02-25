@@ -69,17 +69,20 @@ export const ApiSettingsSection: React.FC<ApiSettingsSectionProps> = ({
     setApiKey(key);
     setAllowControl(control);
 
-    // Check if server is already running (started by KioskScreen)
+    // Always sync server state with stored settings.
+    // If the server is already running (started by KioskScreen) but with a stale config
+    // (e.g. a previously-set API key that was later cleared), restart it so that the
+    // running server always reflects what is shown in the settings UI.
     const isRunning = await httpServer.isRunning();
-    if (isRunning) {
-      setServerRunning(true);
-      const info = await httpServer.getServerInfo();
-      if (info.ip) {
-        setLocalIp(info.ip);
+    if (enabled) {
+      if (isRunning) {
+        // Stop the potentially-stale instance, then start fresh with current settings.
+        try { await httpServer.stopServer(); } catch (_) { /* ignore */ }
       }
-    } else if (enabled) {
-      // Only start if enabled and not already running
       startServer(port, key, control);
+    } else if (isRunning) {
+      // API was disabled while server was left running – stop it.
+      await stopServer();
     }
   };
 
@@ -129,8 +132,9 @@ export const ApiSettingsSection: React.FC<ApiSettingsSectionProps> = ({
     if (!isNaN(port) && port >= 1024 && port <= 65535) {
       await StorageService.saveRestApiPort(port);
       
-      // Restart server if running
-      if (serverRunning) {
+      // Restart server if it is actually running (avoid stale React state)
+      const isCurrentlyRunning = await httpServer.isRunning();
+      if (isCurrentlyRunning) {
         await stopServer();
         await startServer(port, apiKey, allowControl);
       }
@@ -143,8 +147,9 @@ export const ApiSettingsSection: React.FC<ApiSettingsSectionProps> = ({
     setApiKey(value);
     await StorageService.saveRestApiKey(value);
     
-    // Restart server if running
-    if (serverRunning) {
+    // Restart server if it is actually running (avoid stale React state)
+    const isCurrentlyRunning = await httpServer.isRunning();
+    if (isCurrentlyRunning) {
       const port = parseInt(apiPort, 10) || 8080;
       await stopServer();
       await startServer(port, value, allowControl);
@@ -157,8 +162,9 @@ export const ApiSettingsSection: React.FC<ApiSettingsSectionProps> = ({
     setAllowControl(value);
     await StorageService.saveRestApiAllowControl(value);
     
-    // Restart server if running
-    if (serverRunning) {
+    // Restart server if it is actually running (avoid stale React state)
+    const isCurrentlyRunning = await httpServer.isRunning();
+    if (isCurrentlyRunning) {
       const port = parseInt(apiPort, 10) || 8080;
       await stopServer();
       await startServer(port, apiKey, value);

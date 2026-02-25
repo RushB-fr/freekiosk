@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - 🔐 **MQTT password field adding extra characters**: Removed custom bullet-masking logic in `SettingsInput` and replaced with native `secureTextEntry` — same fix as PinInput (v1.2.5). Custom masking reconstructed the real value from display text lengths, which broke with Samsung/Gboard predictive text, autocorrect, and paste, silently injecting extra characters. Affects MQTT password, API key, and all other password fields using `SettingsInput`.
+- **REST API camera photo endpoint returns "Invalid or missing API key" after settings change**: `ApiSettingsSection` now always restarts the HTTP server with the current stored settings when the REST API settings page is opened. Previously, if the server was started by `KioskScreen` with an API key that was later cleared in settings, the running server kept its stale config (the JS settings page found it "already running" and skipped re-applying the new config). Also fixed a related race condition in the port/key/control change handlers where they checked a potentially-stale React `serverRunning` state instead of querying the native module.
+- 🔧 **Motion detection shows "No cameras available" on non-standard SoCs** (Rockchip, Amlogic, etc.): react-native-vision-camera's ProcessCameraProvider initializes asynchronously — on slow hardware it resolves after the settings screen already read the empty camera list; fixed by subscribing to `CameraDevicesChanged` so the UI updates as soon as cameras become available
 
 ***
 
