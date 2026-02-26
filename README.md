@@ -11,7 +11,7 @@
   </p>
   
   <p>
-    <img src="https://img.shields.io/badge/Version-1.2.14-blue.svg" alt="Version 1.2.9">
+    <img src="https://img.shields.io/badge/Version-1.2.15-blue.svg" alt="Version 1.2.9">
     <a href="https://github.com/rushb-fr/freekiosk/releases"><img src="https://img.shields.io/github/downloads/rushb-fr/freekiosk/total.svg" alt="Downloads"></a>
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT">
     <img src="https://img.shields.io/badge/Android-8.0%2B-green.svg" alt="Android 8.0+">
@@ -277,7 +277,14 @@ Done! Your tablet is now in kiosk mode.
 
 ## 🗺️ Roadmap
 
-### ✅ v1.2.14 (Feb 2026) - MQTT Improvements & External App Fixes 🆕
+### ✅ v1.2.15 (Feb 2026) - Beta Channel, Brightness Control & Fixes 🆕
+- 💡 **App Brightness Control toggle**: Disable FreeKiosk brightness management to let Tasker/system handle it
+- 🧪 **Beta update channel**: Opt-in toggle for pre-release versions with semver-aware comparison
+- 🔐 **MQTT password field fix**: Replaced custom masking with native `secureTextEntry` — fixes Samsung/Gboard paste issues
+- 🔧 **Motion detection fix**: Fixed "No cameras available" on Rockchip/Amlogic SoCs
+- 🔧 **REST API camera key fix**: Server now restarts with current config when API settings page opens
+
+### ✅ v1.2.14 (Feb 2026) - MQTT Improvements & External App Fixes
 - 🔌 **MQTT ADB provisioning**: Configure all MQTT settings headlessly via ADB intents
 - 🔒 **TLS/SSL MQTT support**: Auto-enabled on port 8883
 - 🔔 **MQTT error surfacing**: Broker errors now visible in Settings UI

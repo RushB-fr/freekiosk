@@ -141,6 +141,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [currentLightLevel, setCurrentLightLevel] = useState<number>(0);
   const [hasLightSensor, setHasLightSensor] = useState<boolean>(true);
   
+  // Brightness Management (allow system to manage)
+  const [brightnessManagementEnabled, setBrightnessManagementEnabled] = useState<boolean>(true);
+  
   // Screen Sleep Scheduler states
   const [screenSchedulerEnabled, setScreenSchedulerEnabled] = useState<boolean>(false);
   const [screenSchedulerRules, setScreenSchedulerRules] = useState<ScreenScheduleRule[]>([]);
@@ -387,6 +390,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedAutoBrightnessMin = await StorageService.getAutoBrightnessMin();
     const savedAutoBrightnessMax = await StorageService.getAutoBrightnessMax();
 
+    // Brightness Management
+    const savedBrightnessManagementEnabled = await StorageService.getBrightnessManagementEnabled();
+
     // Screen Sleep Scheduler settings
     const savedScreenSchedulerEnabled = await StorageService.getScreenSchedulerEnabled();
     const savedScreenSchedulerRules = await StorageService.getScreenSchedulerRules();
@@ -432,6 +438,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setAutoBrightnessEnabled(savedAutoBrightnessEnabled);
     setAutoBrightnessMin(savedAutoBrightnessMin);
     setAutoBrightnessMax(savedAutoBrightnessMax);
+    setBrightnessManagementEnabled(savedBrightnessManagementEnabled);
     setScreenSchedulerEnabled(savedScreenSchedulerEnabled);
     setScreenSchedulerRules(savedScreenSchedulerRules);
     setScreenSchedulerWakeOnTouch(savedScreenSchedulerWakeOnTouch);
@@ -627,16 +634,45 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     }
   };
 
+  // Handle brightness management toggle (app control vs system control)
+  const handleBrightnessManagementToggle = async (enabled: boolean) => {
+    setBrightnessManagementEnabled(enabled);
+    if (!enabled) {
+      // Disable auto-brightness if active
+      if (autoBrightnessEnabled) {
+        setAutoBrightnessEnabled(false);
+      }
+      // Reset window brightness to system default (BRIGHTNESS_OVERRIDE_NONE)
+      try {
+        await AutoBrightnessModule.stopAutoBrightness();
+        await AutoBrightnessModule.resetToSystemBrightness();
+        console.log('[Settings] Brightness management disabled, reset to system brightness');
+      } catch (error) {
+        console.error('[Settings] Error resetting to system brightness:', error);
+      }
+    }
+  };
+
   // ============ UPDATE FUNCTIONS ============
 
   /**
    * Compare semantic versions (e.g., "1.1.4" vs "1.2.2")
    * Returns: 1 if v1 > v2, -1 if v1 < v2, 0 if equal
    */
+  /**
+   * Semver-aware version comparison supporting pre-release suffixes.
+   * Examples: 1.2.15-beta.1 < 1.2.15-beta.2 < 1.2.15 (stable)
+   * Returns: 1 if v1 > v2, -1 if v1 < v2, 0 if equal
+   */
   const compareVersions = (v1: string, v2: string): number => {
-    const parts1 = v1.split('.').map(Number);
-    const parts2 = v2.split('.').map(Number);
+    // Split version and pre-release: "1.2.15-beta.1" → ["1.2.15", "beta.1"]
+    const [core1, pre1] = v1.split('-', 2);
+    const [core2, pre2] = v2.split('-', 2);
     
+    const parts1 = core1.split('.').map(Number);
+    const parts2 = core2.split('.').map(Number);
+    
+    // Compare numeric core first
     for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
       const num1 = parts1[i] || 0;
       const num2 = parts2[i] || 0;
@@ -644,6 +680,19 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       if (num1 > num2) return 1;
       if (num1 < num2) return -1;
     }
+    
+    // Same core version — compare pre-release
+    // No pre-release (stable) > any pre-release (beta)
+    if (!pre1 && pre2) return 1;   // v1 is stable, v2 is beta → v1 wins
+    if (pre1 && !pre2) return -1;  // v1 is beta, v2 is stable → v2 wins
+    if (!pre1 && !pre2) return 0;  // both stable, same version
+    
+    // Both have pre-release: compare beta numbers ("beta.1" vs "beta.2")
+    const betaNum1 = parseInt(pre1!.replace(/[^0-9]/g, '') || '0', 10);
+    const betaNum2 = parseInt(pre2!.replace(/[^0-9]/g, '') || '0', 10);
+    
+    if (betaNum1 > betaNum2) return 1;
+    if (betaNum1 < betaNum2) return -1;
     
     return 0;
   };
@@ -820,6 +869,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
 
     await StorageService.savePinMaxAttempts(pinMaxAttemptsNumber);
     await StorageService.savePinMode(pinMode);
+
+    // Save brightness management setting (applies to ALL modes)
+    await StorageService.saveBrightnessManagementEnabled(brightnessManagementEnabled);
 
     if (displayMode === 'webview') {
       await StorageService.saveAutoReload(autoReload);
@@ -1030,6 +1082,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
               setAutoBrightnessEnabled(false);
               setAutoBrightnessMin(0.1);
               setAutoBrightnessMax(1.0);
+              setBrightnessManagementEnabled(true);
               
               // Reset screen scheduler state
               setScreenSchedulerEnabled(false);
@@ -1249,6 +1302,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
         return (
           <DisplayTab
             displayMode={displayMode}
+            brightnessManagementEnabled={brightnessManagementEnabled}
+            onBrightnessManagementEnabledChange={handleBrightnessManagementToggle}
             defaultBrightness={defaultBrightness}
             onDefaultBrightnessChange={setDefaultBrightness}
             autoBrightnessEnabled={autoBrightnessEnabled}

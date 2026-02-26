@@ -149,6 +149,21 @@ const AutoBrightnessModule = {
       return false;
     }
   },
+
+  /**
+   * Reset screen brightness to system default (BRIGHTNESS_OVERRIDE_NONE).
+   * After calling this, Android uses the system brightness setting
+   * and external tools (Tasker, adaptive brightness, etc.) have full control.
+   */
+  resetToSystemBrightness: async (): Promise<AutoBrightnessResult> => {
+    try {
+      const result = await NativeAutoBrightnessModule.resetToSystemBrightness();
+      return result;
+    } catch (error) {
+      console.error('[AutoBrightness] Failed to reset to system brightness:', error);
+      throw error;
+    }
+  },
 };
 
 export default AutoBrightnessModule;

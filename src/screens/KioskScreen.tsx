@@ -98,6 +98,11 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [autoBrightnessMin, setAutoBrightnessMin] = useState<number>(0.1);
   const [autoBrightnessMax, setAutoBrightnessMax] = useState<number>(1.0);
   const [autoBrightnessInterval, setAutoBrightnessInterval] = useState<number>(1000);
+  
+  // Brightness management (allow system to manage)
+  const [brightnessManagementEnabled, setBrightnessManagementEnabled] = useState<boolean>(true);
+  const brightnessManagementRef = useRef<boolean>(true);
+  
   const [urlRotationInterval, setUrlRotationInterval] = useState<number>(30000);
   const [currentUrlIndex, setCurrentUrlIndex] = useState<number>(0);
   const urlRotationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -213,6 +218,8 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   // Auto-brightness: pause when screensaver activates, resume when it deactivates
   useEffect(() => {
     const handleAutoBrightnessForScreensaver = async () => {
+      // Skip if brightness management is disabled
+      if (!brightnessManagementRef.current) return;
       // Skip if scheduled sleep is active (handled separately)
       if (isScheduledSleep) return;
       if (!autoBrightnessEnabled) return;
@@ -262,21 +269,23 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       }
       clearTimer();
       // Restaurer la luminosité normale (or restart auto-brightness)
-      (async () => {
-        try {
-          if (autoBrightnessEnabled) {
-            await AutoBrightnessModule.startAutoBrightness(
-              autoBrightnessMin,
-              autoBrightnessMax,
-              autoBrightnessInterval
-            );
-          } else {
-            await RNBrightness.setBrightnessLevel(defaultBrightness);
+      if (brightnessManagementRef.current) {
+        (async () => {
+          try {
+            if (autoBrightnessEnabled) {
+              await AutoBrightnessModule.startAutoBrightness(
+                autoBrightnessMin,
+                autoBrightnessMax,
+                autoBrightnessInterval
+              );
+            } else {
+              await RNBrightness.setBrightnessLevel(defaultBrightness);
+            }
+          } catch (error) {
+            console.error('[KioskScreen] Error restoring brightness:', error);
           }
-        } catch (error) {
-          console.error('[KioskScreen] Error restoring brightness:', error);
-        }
-      })();
+        })();
+      }
     }
   }, [isFocused, isScreensaverActive, isPreCheckingMotion, defaultBrightness, autoBrightnessEnabled, autoBrightnessMin, autoBrightnessMax, autoBrightnessInterval]);
 
@@ -286,6 +295,11 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       await ApiService.initialize({
         onSetBrightness: async (value: number) => {
           try {
+            // Skip if brightness management is disabled
+            if (!brightnessManagementRef.current) {
+              console.log('[API] Brightness management disabled, ignoring setBrightness');
+              return;
+            }
             // If auto-brightness is enabled, disable it first
             if (autoBrightnessEnabled) {
               await AutoBrightnessModule.stopAutoBrightness();
@@ -421,6 +435,11 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         },
         onAutoBrightnessEnable: async (min: number, max: number) => {
           try {
+            // Skip if brightness management is disabled
+            if (!brightnessManagementRef.current) {
+              console.log('[API] Brightness management disabled, ignoring autoBrightnessEnable');
+              return;
+            }
             // Convert from API 0-100 to internal 0-1
             const minNormalized = min / 100;
             const maxNormalized = max / 100;
@@ -451,6 +470,11 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         },
         onAutoBrightnessDisable: async () => {
           try {
+            // Skip if brightness management is disabled
+            if (!brightnessManagementRef.current) {
+              console.log('[API] Brightness management disabled, ignoring autoBrightnessDisable');
+              return;
+            }
             await AutoBrightnessModule.stopAutoBrightness();
             setAutoBrightnessEnabled(false);
 
@@ -685,6 +709,8 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   useEffect(() => {
     // Don't apply manual brightness when auto-brightness is active
     if (autoBrightnessEnabled) return;
+    // Don't apply if brightness management is disabled
+    if (!brightnessManagementEnabled) return;
     
     if (!isScreensaverActive) {
       (async () => {
@@ -842,7 +868,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
 
     try {
       // Stop auto-brightness if active
-      if (autoBrightnessEnabled) {
+      if (brightnessManagementRef.current && autoBrightnessEnabled) {
         await AutoBrightnessModule.stopAutoBrightness();
       }
       // Schedule native alarm for wake-up BEFORE turning screen off
@@ -852,10 +878,12 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       console.log('[ScreenScheduler] Screen turned OFF via native module');
     } catch (error) {
       console.warn('[ScreenScheduler] Native screen off failed, using brightness fallback:', error);
-      try {
-        await RNBrightness.setBrightnessLevel(0);
-      } catch (e) {
-        console.error('[ScreenScheduler] Brightness fallback also failed:', e);
+      if (brightnessManagementRef.current) {
+        try {
+          await RNBrightness.setBrightnessLevel(0);
+        } catch (e) {
+          console.error('[ScreenScheduler] Brightness fallback also failed:', e);
+        }
       }
     }
   }, [autoBrightnessEnabled, scheduleNativeWakeAlarm]);
@@ -873,18 +901,22 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       // Turn screen on via native (WakeLock + FLAG_KEEP_SCREEN_ON)
       await KioskModule.turnScreenOn();
       console.log('[ScreenScheduler] Screen turned ON via native module');
-      // Restore brightness
-      if (autoBrightnessEnabled) {
-        await AutoBrightnessModule.startAutoBrightness(autoBrightnessMin, autoBrightnessMax, autoBrightnessInterval);
-      } else {
-        await RNBrightness.setBrightnessLevel(defaultBrightness);
+      // Restore brightness (only if app manages brightness)
+      if (brightnessManagementRef.current) {
+        if (autoBrightnessEnabled) {
+          await AutoBrightnessModule.startAutoBrightness(autoBrightnessMin, autoBrightnessMax, autoBrightnessInterval);
+        } else {
+          await RNBrightness.setBrightnessLevel(defaultBrightness);
+        }
       }
     } catch (error) {
       console.error('[ScreenScheduler] Error waking screen:', error);
-      try {
-        await RNBrightness.setBrightnessLevel(defaultBrightness);
-      } catch (e) {
-        console.error('[ScreenScheduler] Brightness restore also failed:', e);
+      if (brightnessManagementRef.current) {
+        try {
+          await RNBrightness.setBrightnessLevel(defaultBrightness);
+        } catch (e) {
+          console.error('[ScreenScheduler] Brightness restore also failed:', e);
+        }
       }
     }
 
@@ -1184,6 +1216,11 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       setAutoBrightnessMax(savedAutoBrightnessMax);
       setAutoBrightnessInterval(savedAutoBrightnessInterval);
       
+      // Load Brightness Management setting
+      const savedBrightnessManagementEnabled = bool(K.BRIGHTNESS_MANAGEMENT_ENABLED, true);
+      setBrightnessManagementEnabled(savedBrightnessManagementEnabled);
+      brightnessManagementRef.current = savedBrightnessManagementEnabled;
+      
       // Load Screen Sleep Scheduler settings
       const savedScreenSchedulerEnabled = bool(K.SCREEN_SCHEDULER_ENABLED, false);
       const savedScreenSchedulerRules = jsonParse(K.SCREEN_SCHEDULER_RULES, []) as ScreenScheduleRule[];
@@ -1218,8 +1255,8 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       const savedPdfViewerEnabled = bool(K.PDF_VIEWER_ENABLED, false);
       setPdfViewerEnabled(savedPdfViewerEnabled);
       
-      // Start auto-brightness if enabled (only in webview mode)
-      if (savedAutoBrightnessEnabled && savedDisplayMode === 'webview') {
+      // Start auto-brightness if enabled (only in webview mode and when app manages brightness)
+      if (savedBrightnessManagementEnabled && savedAutoBrightnessEnabled && savedDisplayMode === 'webview') {
         try {
           await AutoBrightnessModule.startAutoBrightness(
             savedAutoBrightnessMin,
@@ -1229,6 +1266,16 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           console.log('[KioskScreen] Auto-brightness started');
         } catch (error) {
           console.error('[KioskScreen] Failed to start auto-brightness:', error);
+        }
+      }
+      
+      // If brightness management is disabled, reset to system brightness
+      if (!savedBrightnessManagementEnabled) {
+        try {
+          await AutoBrightnessModule.resetToSystemBrightness();
+          console.log('[KioskScreen] Brightness management disabled, reset to system brightness');
+        } catch (error) {
+          console.error('[KioskScreen] Failed to reset to system brightness:', error);
         }
       }
       
@@ -1495,7 +1542,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     if (isScreensaverActiveRef.current) {
       setIsScreensaverActive(false);
       // Restaurer immédiatement la luminosité (sauf si auto-brightness car le useEffect s'en charge)
-      if (!autoBrightnessEnabled) {
+      if (brightnessManagementRef.current && !autoBrightnessEnabled) {
         try {
           await RNBrightness.setBrightnessLevel(defaultBrightness);
         } catch (error) {
@@ -1601,7 +1648,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     setIsScreensaverActive(false);
     resetTimer();
     // Restaurer immédiatement la luminosité (sauf si auto-brightness car le useEffect s'en charge)
-    if (!autoBrightnessEnabled) {
+    if (brightnessManagementRef.current && !autoBrightnessEnabled) {
       try {
         await RNBrightness.setBrightnessLevel(defaultBrightness);
       } catch (error) {
@@ -1642,7 +1689,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       console.log('[KioskScreen] Mouvement détecté, réveil du screensaver');
       setIsScreensaverActive(false);
       // Restaurer immédiatement la luminosité (sauf si auto-brightness car le useEffect s'en charge)
-      if (!autoBrightnessEnabled) {
+      if (brightnessManagementRef.current && !autoBrightnessEnabled) {
         try {
           await RNBrightness.setBrightnessLevel(defaultBrightness);
         } catch (error) {
@@ -1655,6 +1702,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   }, [defaultBrightness, resetTimer, autoBrightnessEnabled]);
 
   const enableScreensaverEffects = async () => {
+    if (!brightnessManagementRef.current) return;
     try {
       await RNBrightness.setBrightnessLevel(screensaverBrightness);
     } catch (error) {
@@ -1877,12 +1925,12 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         </View>
       )}
 
-      {/* Screensaver overlay - black when brightness=0%, transparent when dimming */}
+      {/* Screensaver overlay - black when brightness=0% or brightness management disabled, transparent when dimming */}
       {isScreensaverActive && screensaverEnabled && (
         <TouchableOpacity
           style={[
             styles.screensaverOverlay,
-            screensaverBrightness === 0 
+            (screensaverBrightness === 0 || !brightnessManagementEnabled)
               ? styles.screensaverBlack 
               : styles.screensaverTransparent
           ]}

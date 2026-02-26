@@ -274,12 +274,17 @@ List available cameras on the device. **(v1.2.5+)**
 
 #### `POST /api/brightness`
 Set screen brightness (disables auto-brightness if enabled).
+
+> ⚠️ When **App Brightness Control** is disabled in settings, this endpoint is ignored (brightness is managed by the system/Tasker).
+
 ```json
 { "value": 75 }
 ```
 
 #### `POST /api/autoBrightness/enable`
 Enable automatic brightness adjustment based on ambient light sensor.
+
+> ⚠️ When **App Brightness Control** is disabled in settings, this endpoint is ignored.
 ```json
 { "min": 10, "max": 100 }
 ```
@@ -585,14 +590,17 @@ Response:
 > | Feature | Android 13+ (API 33+) | Android 5–12 (API 21–32) |
 > |---|---|---|
 > | **Back / Home / Recents** | ✅ `performGlobalAction()` | ✅ `performGlobalAction()` |
+> | **DPAD navigation** (up, down, left, right) | ✅ `InputMethod.sendKeyEvent()` | ✅ Accessibility tree traversal + scroll |
+> | **Select / Enter** (on UI elements) | ✅ `InputMethod.sendKeyEvent()` | ✅ `ACTION_CLICK` on focused element |
+> | **Play/Pause** | ✅ `InputMethod.sendKeyEvent()` | ✅ `GLOBAL_ACTION_HEADSETHOOK` (API 31+) |
 > | **Printable keys** (a-z, 0-9, symbols) | ✅ `InputMethod.sendKeyEvent()` | ✅ `ACTION_SET_TEXT` (appends char) |
 > | **Backspace** | ✅ `InputMethod.sendKeyEvent()` | ✅ `ACTION_SET_TEXT` (removes last char) |
 > | **Text input** | ✅ `InputMethod.commitText()` | ✅ `ACTION_SET_TEXT` (appends text) |
 > | **Shift + letter** (e.g. Shift+A → 'A') | ✅ `InputMethod.sendKeyEvent()` | ✅ `ACTION_SET_TEXT` (shifted char) |
-> | **Non-printable keys** (arrows, Tab, Escape, F1-F12) | ✅ `InputMethod.sendKeyEvent()` | ⚠️ Limited (`input keyevent` — requires root) |
+> | **Non-printable keys** (Tab, Escape, F1-F12) | ✅ `InputMethod.sendKeyEvent()` | ⚠️ Limited (`input keyevent` — requires root) |
 > | **Ctrl/Alt combos** (Ctrl+C, Alt+F4) | ✅ `InputMethod.sendKeyEvent()` | ⚠️ Limited (meta state lost) |
 >
-> **Summary**: On Android 13+, everything works via InputMethod APIs. On Android 5–12, most common operations (typing text, printable keys, backspace, Shift+letter, navigation) work via `ACTION_SET_TEXT`. Only non-printable keys and Ctrl/Alt shortcuts are limited on older devices.
+> **Summary**: On Android 13+, everything works via InputMethod APIs. On Android 5–12, most remote control operations work: DPAD navigation via accessibility tree traversal, Select via `ACTION_CLICK`, Play/Pause via global action (API 31+), text/printable keys via `ACTION_SET_TEXT`. Only Tab, F-keys, and Ctrl/Alt shortcuts are limited.
 
 ### GPS Location (GET)
 

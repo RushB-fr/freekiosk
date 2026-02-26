@@ -197,6 +197,36 @@ class AutoBrightnessModule(private val reactContext: ReactApplicationContext) :
         promise.resolve(sensor != null)
     }
 
+    /**
+     * Reset screen brightness to system default (BRIGHTNESS_OVERRIDE_NONE)
+     * This tells Android to use the system brightness setting instead of an app-override.
+     */
+    @ReactMethod
+    fun resetToSystemBrightness(promise: Promise) {
+        try {
+            val activity = reactContext.currentActivity
+            if (activity == null) {
+                promise.resolve(createResultMap(false, "No activity"))
+                return
+            }
+            activity.runOnUiThread {
+                try {
+                    val window = activity.window
+                    val layoutParams = window.attributes
+                    layoutParams.screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                    window.attributes = layoutParams
+                    promise.resolve(createResultMap(true, "Reset to system brightness"))
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to reset brightness", e)
+                    promise.resolve(createResultMap(false, e.message ?: "Unknown error"))
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to reset brightness", e)
+            promise.resolve(createResultMap(false, e.message ?: "Unknown error"))
+        }
+    }
+
     // SensorEventListener implementation
     override fun onSensorChanged(event: SensorEvent) {
         if (!isActive || event.sensor.type != Sensor.TYPE_LIGHT) return

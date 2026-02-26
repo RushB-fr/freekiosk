@@ -328,6 +328,7 @@ When using `--es config '{...}'`, the following keys are supported:
   "back_button_mode": "immediate",
   "test_mode": "false",
   "default_brightness": "75",
+  "brightness_management_enabled": "true",
   "mqtt_enabled": "true",
   "mqtt_broker_url": "broker.local",
   "mqtt_port": "1883",

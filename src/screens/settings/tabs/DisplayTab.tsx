@@ -20,6 +20,10 @@ import { ScreenScheduleRule } from '../../../types/screenScheduler';
 interface DisplayTabProps {
   displayMode: 'webview' | 'external_app';
   
+  // Brightness management (allow system to manage)
+  brightnessManagementEnabled: boolean;
+  onBrightnessManagementEnabledChange: (value: boolean) => void;
+  
   // Default brightness
   defaultBrightness: number;
   onDefaultBrightnessChange: (value: number) => void;
@@ -86,6 +90,8 @@ interface DisplayTabProps {
 
 const DisplayTab: React.FC<DisplayTabProps> = ({
   displayMode,
+  brightnessManagementEnabled,
+  onBrightnessManagementEnabledChange,
   defaultBrightness,
   onDefaultBrightnessChange,
   autoBrightnessEnabled,
@@ -152,8 +158,29 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
 
   return (
     <View>
-      {/* Default Brightness - Only in WebView mode */}
+      {/* App Brightness Control toggle - WebView mode only (external app mode doesn't manage brightness) */}
       {displayMode === 'webview' && (
+        <SettingsSection title="Brightness Control" icon="brightness-6">
+          <SettingsSwitch
+            label="App Brightness Control"
+            hint={brightnessManagementEnabled
+              ? "FreeKiosk manages screen brightness"
+              : "System manages brightness (Tasker, Android settings, etc.)"}
+            value={brightnessManagementEnabled}
+            onValueChange={onBrightnessManagementEnabledChange}
+          />
+          {!brightnessManagementEnabled && (
+            <SettingsInfoBox variant="info">
+              <Text style={styles.infoText}>
+                💡 Brightness is managed by the system. External tools like Tasker can control brightness without interference from FreeKiosk.
+              </Text>
+            </SettingsInfoBox>
+          )}
+        </SettingsSection>
+      )}
+
+      {/* Default Brightness - Only in WebView mode and when app manages brightness */}
+      {displayMode === 'webview' && brightnessManagementEnabled && (
         <SettingsSection title="Manual Brightness" icon="brightness-6">
           <SettingsSlider
             label=""
@@ -177,8 +204,8 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
         </SettingsSection>
       )}
       
-      {/* Auto-Brightness - WebView only */}
-      {displayMode === 'webview' && (
+      {/* Auto-Brightness - WebView only, and only when app manages brightness */}
+      {displayMode === 'webview' && brightnessManagementEnabled && (
         <SettingsSection title="Auto-Brightness" icon="brightness-auto">
           <SettingsSwitch
             label="Enable Auto-Brightness"
@@ -250,24 +277,26 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
           
           {screensaverEnabled && (
             <>
-              {/* Screensaver Brightness */}
-              <View style={styles.subSection}>
-                <Text style={styles.subSectionTitle}>Screensaver Brightness</Text>
-                <SettingsSlider
-                  label=""
-                  hint="Screen brightness when screensaver is active"
-                  value={screensaverBrightness}
-                  onValueChange={onScreensaverBrightnessChange}
-                  minimumValue={0}
-                  maximumValue={1}
-                  step={0.01}
-                  presets={[
-                    { label: 'Black Screen', value: 0 },
-                    { label: 'Very Dim (5%)', value: 0.05 },
-                    { label: 'Dim (10%)', value: 0.1 },
-                  ]}
-                />
-              </View>
+              {/* Screensaver Brightness - only when app manages brightness */}
+              {brightnessManagementEnabled && (
+                <View style={styles.subSection}>
+                  <Text style={styles.subSectionTitle}>Screensaver Brightness</Text>
+                  <SettingsSlider
+                    label=""
+                    hint="Screen brightness when screensaver is active"
+                    value={screensaverBrightness}
+                    onValueChange={onScreensaverBrightnessChange}
+                    minimumValue={0}
+                    maximumValue={1}
+                    step={0.01}
+                    presets={[
+                      { label: 'Black Screen', value: 0 },
+                      { label: 'Very Dim (5%)', value: 0.05 },
+                      { label: 'Dim (10%)', value: 0.1 },
+                    ]}
+                  />
+                </View>
+              )}
               
               {/* Inactivity Delay */}
               <View style={styles.subSection}>

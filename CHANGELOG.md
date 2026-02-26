@@ -12,6 +12,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+***
+
+## [1.2.15] - 2026-02-26
+
+### Added
+- 💡 **Allow system brightness management** (#65): New toggle "App Brightness Control" in Display settings. When disabled, FreeKiosk never touches screen brightness — system tools like Tasker, Android adaptive brightness, or other automation apps retain full control. Applies to both WebView and External App modes. All brightness-related UI (manual slider, auto-brightness, screensaver brightness) is hidden when disabled. REST API brightness commands are also ignored when disabled.
+- 🧪 **Beta update channel**: Opt-in toggle to receive pre-release versions before stable releases
+  - New "🧪 Beta Updates" toggle in the Updates section (Settings → Advanced)
+  - When enabled, the in-app updater checks GitHub pre-releases (tagged `v1.2.15-beta.1`, etc.)
+  - When disabled (default), behavior is unchanged — only stable releases are shown
+  - Update alert shows a 🧪 badge and "(pre-release)" label for beta versions
+  - Semver-aware version comparison: `1.2.15-beta.1 < 1.2.15-beta.2 < 1.2.15` (stable always wins)
+  - No downgrade: switching beta OFF won't propose installing an older stable over a newer beta
+
 ### Fixed
 - 🔐 **MQTT password field adding extra characters**: Removed custom bullet-masking logic in `SettingsInput` and replaced with native `secureTextEntry` — same fix as PinInput (v1.2.5). Custom masking reconstructed the real value from display text lengths, which broke with Samsung/Gboard predictive text, autocorrect, and paste, silently injecting extra characters. Affects MQTT password, API key, and all other password fields using `SettingsInput`.
 - **REST API camera photo endpoint returns "Invalid or missing API key" after settings change**: `ApiSettingsSection` now always restarts the HTTP server with the current stored settings when the REST API settings page is opened. Previously, if the server was started by `KioskScreen` with an API key that was later cleared in settings, the running server kept its stale config (the JS settings page found it "already running" and skipped re-applying the new config). Also fixed a related race condition in the port/key/control change handlers where they checked a potentially-stale React `serverRunning` state instead of querying the native module.

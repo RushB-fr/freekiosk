@@ -76,6 +76,8 @@ const KEYS = {
   AUTO_BRIGHTNESS_MAX: '@kiosk_auto_brightness_max',
   AUTO_BRIGHTNESS_UPDATE_INTERVAL: '@kiosk_auto_brightness_update_interval',
   AUTO_BRIGHTNESS_SAVED_MANUAL: '@kiosk_auto_brightness_saved_manual',
+  // Brightness Management (allow system to manage)
+  BRIGHTNESS_MANAGEMENT_ENABLED: '@brightness_management_enabled',
   // Screen Sleep Scheduler
   SCREEN_SCHEDULER_ENABLED: '@kiosk_screen_scheduler_enabled',
   SCREEN_SCHEDULER_RULES: '@kiosk_screen_scheduler_rules',
@@ -287,6 +289,8 @@ export const StorageService = {
         KEYS.AUTO_BRIGHTNESS_MAX,
         KEYS.AUTO_BRIGHTNESS_UPDATE_INTERVAL,
         KEYS.AUTO_BRIGHTNESS_SAVED_MANUAL,
+        // Brightness Management
+        KEYS.BRIGHTNESS_MANAGEMENT_ENABLED,
         // Screen Sleep Scheduler
         KEYS.SCREEN_SCHEDULER_ENABLED,
         KEYS.SCREEN_SCHEDULER_RULES,
@@ -1432,6 +1436,26 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting auto brightness saved manual:', error);
       return null;
+    }
+  },
+
+  // ============ BRIGHTNESS MANAGEMENT ============
+
+  saveBrightnessManagementEnabled: async (enabled: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.BRIGHTNESS_MANAGEMENT_ENABLED, JSON.stringify(enabled));
+    } catch (error) {
+      console.error('Error saving brightness management enabled:', error);
+    }
+  },
+
+  getBrightnessManagementEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.BRIGHTNESS_MANAGEMENT_ENABLED);
+      return value ? JSON.parse(value) : true; // Default: true (app manages brightness) for backward compat
+    } catch (error) {
+      console.error('Error getting brightness management enabled:', error);
+      return true;
     }
   },
 

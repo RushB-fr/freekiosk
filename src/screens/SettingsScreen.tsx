@@ -374,6 +374,41 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setShowTime(value);
   };
 
+  /**
+   * Semver-aware version comparison supporting pre-release suffixes.
+   * Examples: 1.2.15-beta.1 < 1.2.15-beta.2 < 1.2.15 (stable)
+   * Returns: 1 if v1 > v2, -1 if v1 < v2, 0 if equal
+   */
+  const compareVersionsSemver = (v1: string, v2: string): number => {
+    const [core1, pre1] = v1.split('-', 2);
+    const [core2, pre2] = v2.split('-', 2);
+    
+    const parts1 = core1.split('.').map(Number);
+    const parts2 = core2.split('.').map(Number);
+    
+    for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+      const num1 = parts1[i] || 0;
+      const num2 = parts2[i] || 0;
+      
+      if (num1 > num2) return 1;
+      if (num1 < num2) return -1;
+    }
+    
+    // Same core — stable > beta
+    if (!pre1 && pre2) return 1;
+    if (pre1 && !pre2) return -1;
+    if (!pre1 && !pre2) return 0;
+    
+    // Both beta — compare beta number
+    const betaNum1 = parseInt(pre1!.replace(/[^0-9]/g, '') || '0', 10);
+    const betaNum2 = parseInt(pre2!.replace(/[^0-9]/g, '') || '0', 10);
+    
+    if (betaNum1 > betaNum2) return 1;
+    if (betaNum1 < betaNum2) return -1;
+    
+    return 0;
+  };
+
   const handleCheckForUpdates = async () => {
     setCheckingUpdate(true);
     setUpdateAvailable(false);
@@ -390,13 +425,13 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
       console.log('Update check result:', JSON.stringify(latestUpdate, null, 2));
       console.log('Download URL:', latestUpdate.downloadUrl);
       
-      // Compare versions
+      // Compare versions (semver-aware, handles -beta.N)
       const currentVer = currentVersionInfo.versionName;
       const latestVer = latestUpdate.version;
       
       console.log(`Comparing versions: current=${currentVer}, latest=${latestVer}`);
       
-      if (latestVer !== currentVer) {
+      if (compareVersionsSemver(latestVer, currentVer) > 0) {
         setUpdateAvailable(true);
         setUpdateInfo(latestUpdate);
         console.log('Update available, updateInfo set:', latestUpdate);

@@ -78,6 +78,8 @@ const BACKUP_KEYS = [
   '@kiosk_auto_brightness_max',
   '@kiosk_auto_brightness_update_interval',
   '@kiosk_auto_brightness_saved_manual',
+  // Brightness Management
+  '@brightness_management_enabled',
   // Screen Sleep Scheduler
   '@kiosk_screen_scheduler_enabled',
   '@kiosk_screen_scheduler_rules',
