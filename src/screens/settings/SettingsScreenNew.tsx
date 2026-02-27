@@ -26,6 +26,7 @@ import OverlayPermissionModule from '../../utils/OverlayPermissionModule';
 import LauncherModule from '../../utils/LauncherModule';
 import UpdateModule from '../../utils/UpdateModule';
 import AutoBrightnessModule from '../../utils/AutoBrightnessModule';
+import { httpServer } from '../../utils/HttpServerModule';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/AppNavigator';
 
@@ -175,6 +176,28 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [currentVersion, setCurrentVersion] = useState<string>('');
   const [betaUpdatesEnabled, setBetaUpdatesEnabled] = useState<boolean>(false);
 
+  // Camera2 fallback — uses Camera2 API directly via HttpServerModule to enumerate cameras.
+  // This is needed for devices where CameraX/ProcessCameraProvider fails entirely
+  // (e.g. MediaTek LEGACY front-only cameras where CameraValidator rejects the device).
+  const fetchCamera2Fallback = useCallback(async () => {
+    try {
+      const camera2Devices = await httpServer.getCamera2Devices();
+      if (camera2Devices && camera2Devices.length > 0) {
+        const cameras = camera2Devices
+          .filter((d: any) => d.position === 'front' || d.position === 'back')
+          .map((d: any) => ({ position: d.position as 'front' | 'back', id: d.id }));
+        if (cameras.length > 0) {
+          console.log('[Settings] Camera2 fallback found cameras:', cameras);
+          setAvailableCameras(cameras);
+          return true;
+        }
+      }
+    } catch (error) {
+      console.error('[Settings] Camera2 fallback error:', error);
+    }
+    return false;
+  }, []);
+
   // Detect available cameras — extracted so it can be called by both loadSettings and the
   // CameraDevicesChanged listener (race condition fix for slow SoCs like Rockchip RK3576S:
   // ProcessCameraProvider initializes asynchronously, so getAvailableCameraDevices() may
@@ -187,12 +210,20 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
         .map((d: any) => ({ position: d.position as 'front' | 'back', id: d.id }));
       if (cameras.length > 0) {
         setAvailableCameras(cameras);
-        console.log('[Settings] Available cameras:', cameras);
+        console.log('[Settings] Available cameras (vision-camera):', cameras);
+      } else {
+        // CameraX/ProcessCameraProvider returned no cameras — try Camera2 API fallback.
+        // This happens on MediaTek LEGACY front-only devices where CameraValidator
+        // fails LENS_FACING_BACK verification and reports "No available camera can be found".
+        console.log('[Settings] vision-camera returned 0 cameras, trying Camera2 fallback...');
+        fetchCamera2Fallback();
       }
     } catch (error) {
       console.error('[Settings] Error detecting cameras:', error);
+      // Also try Camera2 fallback on error
+      fetchCamera2Fallback();
     }
-  }, []);
+  }, [fetchCamera2Fallback]);
 
   useEffect(() => {
     loadSettings();
@@ -207,16 +238,24 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   // Subscribe to camera device changes — handles the race condition where
   // ProcessCameraProvider hasn't resolved yet when the settings screen first loads.
   // On unusual SoCs (Rockchip, Amlogic, etc.) this async init can take several seconds.
+  // If the event fires with 0 cameras (MediaTek LEGACY front-only devices where CameraX
+  // validation permanently fails), fall back to Camera2 API enumeration.
   useEffect(() => {
     const subscription = Camera.addCameraDevicesChangedListener((devices) => {
       const cameras = devices
         .filter((d: any) => d.position === 'front' || d.position === 'back')
         .map((d: any) => ({ position: d.position as 'front' | 'back', id: d.id }));
       console.log('[Settings] CameraDevicesChanged event — cameras:', cameras);
-      setAvailableCameras(cameras);
+      if (cameras.length > 0) {
+        setAvailableCameras(cameras);
+      } else {
+        // CameraX resolved but found 0 cameras — try Camera2 fallback
+        console.log('[Settings] CameraDevicesChanged returned 0 cameras, trying Camera2 fallback...');
+        fetchCamera2Fallback();
+      }
     });
     return () => subscription.remove();
-  }, []);
+  }, [fetchCamera2Fallback]);
 
   // ============ LOAD FUNCTIONS ============
   

@@ -542,18 +542,22 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     const screenStateListener = DeviceEventEmitter.addListener(
       'onScreenStateChanged',
       (isScreenOn: boolean) => {
-        console.log('[KioskScreen] Screen state changed:', isScreenOn ? 'ON' : 'OFF');
+        // Defer to next tick to avoid CalledFromWrongThreadException
+        // when react-native-screens manipulates views during commit on native thread
+        setTimeout(() => {
+          console.log('[KioskScreen] Screen state changed:', isScreenOn ? 'ON' : 'OFF');
 
-        // Update API status with new screen state
-        ApiService.updateStatus({
-          screenOn: isScreenOn,
-        });
+          // Update API status with new screen state
+          ApiService.updateStatus({
+            screenOn: isScreenOn,
+          });
 
-        // If screen turned on, deactivate screensaver
-        if (isScreenOn && isScreensaverActiveRef.current) {
-          setIsScreensaverActive(false);
-          resetTimer();
-        }
+          // If screen turned on, deactivate screensaver
+          if (isScreenOn && isScreensaverActiveRef.current) {
+            setIsScreensaverActive(false);
+            resetTimer();
+          }
+        }, 0);
       }
     );
 
@@ -931,20 +935,28 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     if (!screenSchedulerEnabled) return;
 
     const wakeSubscription = DeviceEventEmitter.addListener('onScheduledWake', () => {
-      console.log('[ScreenScheduler] 📢 Native WAKE alarm received');
-      if (isScheduledSleepRef.current) {
-        exitScheduledSleep();
-      }
+      // Defer to next tick to avoid CalledFromWrongThreadException
+      // when react-native-screens manipulates views during commit on native thread
+      setTimeout(() => {
+        console.log('[ScreenScheduler] 📢 Native WAKE alarm received');
+        if (isScheduledSleepRef.current) {
+          exitScheduledSleep();
+        }
+      }, 0);
     });
 
     const sleepSubscription = DeviceEventEmitter.addListener('onScheduledSleep', () => {
-      console.log('[ScreenScheduler] 📢 Native SLEEP alarm received');
-      if (!isScheduledSleepRef.current) {
-        const activeRule = getActiveSleepRule(screenSchedulerRules, new Date());
-        if (activeRule) {
-          enterScheduledSleep(activeRule);
+      // Defer to next tick to avoid CalledFromWrongThreadException
+      // when react-native-screens manipulates views during commit on native thread
+      setTimeout(() => {
+        console.log('[ScreenScheduler] 📢 Native SLEEP alarm received');
+        if (!isScheduledSleepRef.current) {
+          const activeRule = getActiveSleepRule(screenSchedulerRules, new Date());
+          if (activeRule) {
+            enterScheduledSleep(activeRule);
+          }
         }
-      }
+      }, 0);
     });
 
     return () => {
@@ -1021,15 +1033,23 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     // Listen for app return events (émis depuis MainActivity.onResume)
     const appReturnedListener = eventEmitter.addListener(
       'onAppReturned',
-      handleAppReturned
+      (event: any) => {
+        // Defer to next tick to avoid CalledFromWrongThreadException
+        // when react-native-screens manipulates views during commit on native thread
+        setTimeout(() => handleAppReturned(event), 0);
+      }
     );
 
     // Listen for navigateToPin event (5-tap depuis overlay ou Volume Up)
     const navigateToPinListener = eventEmitter.addListener(
       'navigateToPin',
       () => {
-        // Le flag natif est déjà mis par OverlayService.returnToFreeKiosk()
-        navigation.navigate('Pin');
+        // Defer to next tick to avoid CalledFromWrongThreadException
+        // when react-native-screens manipulates views during commit on native thread
+        setTimeout(() => {
+          // Le flag natif est déjà mis par OverlayService.returnToFreeKiosk()
+          navigation.navigate('Pin');
+        }, 0);
       }
     );
 

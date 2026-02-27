@@ -89,9 +89,13 @@ class ApiServiceClass {
       this.eventEmitter = new NativeEventEmitter(HttpServerModule);
       
       // Listen for API commands from native module
+      // Defer to next tick to avoid CalledFromWrongThreadException
+      // when react-native-screens manipulates views during commit on native thread
       this.commandSubscription = this.eventEmitter.addListener(
         'onApiCommand',
-        this.handleCommand.bind(this)
+        (event: { command: string; params: string }) => {
+          setTimeout(() => this.handleCommand(event), 0);
+        }
       );
 
       console.log('ApiService: Initialized and listening for commands');

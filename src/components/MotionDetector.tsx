@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import MotionDetectionModule from '../utils/MotionDetectionModule';
+import { httpServer } from '../utils/HttpServerModule';
 
 export type MotionStatus = 'idle' | 'active' | 'error' | 'no-camera';
 
@@ -16,6 +17,7 @@ interface MotionDetectorProps {
 const THROTTLE_INTERVAL = 2000; // Minimum 2s entre détections
 const CAPTURE_INTERVAL = 1000; // Capturer une photo par seconde
 const CAMERA_READY_DELAY = 1500; // Delay before starting detection to let camera initialize and auto-expose
+const CAMERA2_CAPTURE_INTERVAL = 2000; // Camera2 fallback is slower (opens/closes camera each time), use 2s interval
 const WARMUP_FRAMES = 3; // Skip first N frames to let camera auto-exposure adjust
 
 // Seuils de sensibilité : ratio de pixels qui doivent changer
@@ -44,6 +46,11 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
 
+  // Camera2 fallback state — for devices where CameraX/vision-camera fails
+  // (e.g. MediaTek LEGACY front-only cameras where CameraValidator rejects the device)
+  const [useCamera2Fallback, setUseCamera2Fallback] = useState(false);
+  const camera2CheckDone = useRef<boolean>(false);
+
   // Track mounted state
   useEffect(() => {
     isMounted.current = true;
@@ -53,6 +60,49 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
       console.log('[MotionDetection] Component unmounted');
     };
   }, [cameraPosition]);
+
+  // Camera2 fallback check — when vision-camera can't find a device, check Camera2 API directly
+  useEffect(() => {
+    if (!enabled || device || !hasPermission || camera2CheckDone.current) {
+      return;
+    }
+
+    // vision-camera returned no device — try Camera2 API fallback
+    let cancelled = false;
+    camera2CheckDone.current = true;
+
+    (async () => {
+      try {
+        console.log('[MotionDetection] vision-camera has no device, checking Camera2 fallback...');
+        const camera2Devices = await httpServer.getCamera2Devices();
+        if (cancelled || !isMounted.current) return;
+
+        const hasTargetCamera = camera2Devices.some(
+          (d) => d.position === cameraPosition
+        );
+        const hasAnyCamera = camera2Devices.length > 0;
+
+        if (hasTargetCamera || hasAnyCamera) {
+          console.log(`[MotionDetection] Camera2 fallback: found ${camera2Devices.length} cameras, enabling fallback mode`);
+          setUseCamera2Fallback(true);
+        } else {
+          console.warn('[MotionDetection] Camera2 fallback: no cameras found either');
+        }
+      } catch (error) {
+        console.error('[MotionDetection] Camera2 fallback check failed:', error);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [enabled, device, hasPermission, cameraPosition]);
+
+  // Reset Camera2 check when device becomes available (e.g. CameraX finally resolves)
+  useEffect(() => {
+    if (device) {
+      camera2CheckDone.current = false;
+      setUseCamera2Fallback(false);
+    }
+  }, [device]);
 
   const stopDetection = useCallback(() => {
     if (detectionInterval.current) {
@@ -65,6 +115,65 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
     // Reset native module
     MotionDetectionModule?.reset().catch(() => {});
   }, []);
+
+  // Camera2 fallback capture — uses Camera2 API via HttpServerModule
+  const captureAndCompareCamera2 = useCallback(async () => {
+    if (!isMounted.current || !enabled || isCapturing.current) {
+      return;
+    }
+
+    isCapturing.current = true;
+
+    try {
+      const photoPath = await httpServer.captureCamera2Photo(cameraPosition, 50);
+
+      if (!isMounted.current || !enabled) return;
+
+      if (!photoPath) {
+        console.warn('[MotionDetection] Camera2 fallback: capture returned null');
+        return;
+      }
+
+      captureCount.current += 1;
+
+      // Skip warmup frames
+      if (warmupFrames.current < WARMUP_FRAMES) {
+        warmupFrames.current += 1;
+        console.log(`[MotionDetection] Camera2 warmup frame ${warmupFrames.current}/${WARMUP_FRAMES}`);
+        await MotionDetectionModule.compareImages(
+          photoPath,
+          SENSITIVITY_THRESHOLDS[sensitivity]
+        );
+        return;
+      }
+
+      const hasMotion = await MotionDetectionModule.compareImages(
+        photoPath,
+        SENSITIVITY_THRESHOLDS[sensitivity]
+      );
+
+      if (captureCount.current % 10 === 0) {
+        console.log(`[MotionDetection] Camera2 capture #${captureCount.current}, hasMotion=${hasMotion}`);
+      }
+
+      if (!isMounted.current || !enabled) return;
+
+      if (hasMotion) {
+        console.log('[MotionDetection] Camera2 fallback: Motion detected!');
+        const now = Date.now();
+        if (now - lastMotionTime.current > THROTTLE_INTERVAL) {
+          lastMotionTime.current = now;
+          onMotionDetected();
+        }
+      }
+    } catch (error: any) {
+      if (error?.message) {
+        console.warn(`[MotionDetection] Camera2 capture error: ${error.message}`);
+      }
+    } finally {
+      isCapturing.current = false;
+    }
+  }, [enabled, sensitivity, onMotionDetected, cameraPosition]);
 
   const captureAndCompare = useCallback(async () => {
     // Guard against multiple concurrent captures and unmounted state
@@ -149,6 +258,25 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
     }
   }, [enabled, sensitivity, onMotionDetected, isCameraReady]);
 
+  // Start detection in Camera2 fallback mode
+  const startCamera2Detection = useCallback(() => {
+    stopDetection();
+
+    console.log('[MotionDetection] Starting Camera2 fallback detection');
+    onStatusChange?.('active');
+
+    // Slightly longer delay for Camera2 — first capture includes camera open time
+    setTimeout(() => {
+      if (!isMounted.current || !enabled) return;
+
+      detectionInterval.current = setInterval(() => {
+        if (isMounted.current && enabled) {
+          captureAndCompareCamera2();
+        }
+      }, CAMERA2_CAPTURE_INTERVAL);
+    }, CAMERA_READY_DELAY);
+  }, [stopDetection, captureAndCompareCamera2, enabled, onStatusChange]);
+
   const startDetection = useCallback(() => {
     stopDetection();
 
@@ -164,29 +292,48 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
     }, CAMERA_READY_DELAY);
   }, [stopDetection, captureAndCompare, enabled, isCameraReady]);
 
+  // Camera2 fallback detection lifecycle
   useEffect(() => {
-    if (enabled && hasPermission && device) {
+    if (useCamera2Fallback && enabled && hasPermission) {
+      startCamera2Detection();
+    }
+    return () => {
+      if (useCamera2Fallback) {
+        stopDetection();
+      }
+    };
+  }, [useCamera2Fallback, enabled, hasPermission, startCamera2Detection, stopDetection]);
+
+  // Vision-camera lifecycle (original)
+  useEffect(() => {
+    if (enabled && hasPermission && device && !useCamera2Fallback) {
       setIsCameraActive(true);
     } else {
       setIsCameraActive(false);
       setIsCameraReady(false);
-      stopDetection();
+      if (!useCamera2Fallback) {
+        stopDetection();
+      }
     }
 
     return () => {
-      stopDetection();
+      if (!useCamera2Fallback) {
+        stopDetection();
+      }
     };
-  }, [enabled, hasPermission, device, stopDetection]);
+  }, [enabled, hasPermission, device, useCamera2Fallback, stopDetection]);
 
-  // Start detection only when camera is ready
+  // Start detection only when camera is ready (vision-camera mode)
   useEffect(() => {
-    if (isCameraReady && enabled && hasPermission) {
+    if (isCameraReady && enabled && hasPermission && !useCamera2Fallback) {
       startDetection();
     }
     return () => {
-      stopDetection();
+      if (!useCamera2Fallback) {
+        stopDetection();
+      }
     };
-  }, [isCameraReady, enabled, hasPermission, startDetection, stopDetection]);
+  }, [isCameraReady, enabled, hasPermission, useCamera2Fallback, startDetection, stopDetection]);
 
   const handleCameraInitialized = useCallback(() => {
     if (isMounted.current) {
@@ -205,13 +352,19 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
 
   // Check if camera is available and notify status
   useEffect(() => {
-    if (!device && enabled) {
+    if (!device && enabled && !useCamera2Fallback) {
       console.warn(`[MotionDetection] No ${cameraPosition} camera available on this device`);
       onStatusChange?.('no-camera');
     } else if (!enabled) {
       onStatusChange?.('idle');
     }
-  }, [device, enabled, cameraPosition, onStatusChange]);
+  }, [device, enabled, cameraPosition, useCamera2Fallback, onStatusChange]);
+
+  // Camera2 fallback mode — no vision-camera component needed, just run detection
+  if (useCamera2Fallback && enabled && hasPermission) {
+    // Return an empty View — Camera2 captures are done via native module, no UI component needed
+    return <View style={styles.container} pointerEvents="none" />;
+  }
 
   if (!enabled || !device || !hasPermission) {
     return null;

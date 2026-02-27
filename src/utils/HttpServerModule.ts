@@ -139,6 +139,46 @@ class HttpServerService {
       this.commandListener = null;
     };
   }
+
+  /**
+   * Get available cameras via Camera2 API directly.
+   * Bypasses CameraX/ProcessCameraProvider which can fail on some devices
+   * (e.g. MediaTek LEGACY front-only cameras where CameraX validation rejects the device).
+   * Used as a fallback when react-native-vision-camera reports no cameras.
+   */
+  async getCamera2Devices(): Promise<Array<{ id: string; position: 'front' | 'back' | string; maxWidth: number; maxHeight: number }>> {
+    if (Platform.OS !== 'android' || !HttpServerModule) {
+      return [];
+    }
+
+    try {
+      return await HttpServerModule.getCamera2Devices();
+    } catch (error) {
+      console.error('[HttpServer] Failed to get Camera2 devices:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Capture a photo via Camera2 API directly and save to a temp file.
+   * Used as a fallback for motion detection on devices where vision-camera/CameraX
+   * cannot access the camera (e.g. MediaTek LEGACY front-only devices).
+   * @param cameraFacing "front" or "back"
+   * @param quality JPEG quality 0-100
+   * @returns Promise resolving to the temp file path, or null on failure
+   */
+  async captureCamera2Photo(cameraFacing: string = 'front', quality: number = 50): Promise<string | null> {
+    if (Platform.OS !== 'android' || !HttpServerModule) {
+      return null;
+    }
+
+    try {
+      return await HttpServerModule.captureCamera2Photo(cameraFacing, quality);
+    } catch (error) {
+      console.error('[HttpServer] Camera2 photo capture failed:', error);
+      return null;
+    }
+  }
 }
 
 // Export singleton instance

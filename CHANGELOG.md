@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- 📷 **Camera2 fallback for devices where CameraX fails entirely** (MediaTek LEGACY, front-only cameras): On some devices, CameraX's `CameraValidator` permanently rejects the camera (e.g. front-only devices where BACK camera verification fails), so vision-camera never reports any cameras. Added a Camera2 API fallback: the settings screen now queries `Camera2` directly via a new `getCamera2Devices()` native method when CameraX returns nothing, and the motion detector automatically switches to Camera2-based photo capture (`captureCamera2Photo()`) when vision-camera has no device — enabling motion detection on hardware that CameraX cannot handle
+- 🐛 **Fixed crash (CalledFromWrongThreadException) when entering standby/screensaver** (#82): Native events (`onScheduledSleep`, `onScheduledWake`, `navigateToPin`, `onScreenStateChanged`, API commands) were triggering React state updates synchronously on the `mqt_v_native` thread, causing `react-native-screens` to manipulate the Android view hierarchy from a non-UI thread. Wrapped all native event callbacks with `setTimeout(cb, 0)` to defer state updates to the next event loop tick, ensuring React commits go through proper UI thread dispatch
+- 🐛 **Fixed invisible PIN input on dark mode devices** (#81): The PIN `TextInput` had no explicit `color` set, so Android dark mode overrode the text/dot color to white — making input invisible against the white background. Added explicit `color: '#333333'` and `placeholderTextColor` to ensure dots and placeholder are always visible regardless of system theme
 
 ***
 

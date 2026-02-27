@@ -287,6 +287,74 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
         promise.resolve(getLocalIpAddress())
     }
 
+    /**
+     * Get available cameras via Camera2 API directly.
+     * This bypasses CameraX/ProcessCameraProvider which can fail on certain devices
+     * (e.g. MediaTek LEGACY front-only cameras where CameraValidator rejects the device).
+     * Used as a fallback when react-native-vision-camera reports no cameras.
+     */
+    @ReactMethod
+    fun getCamera2Devices(promise: Promise) {
+        try {
+            if (cameraPhotoModule == null) {
+                cameraPhotoModule = CameraPhotoModule(reactContext.applicationContext)
+            }
+            val cameras = cameraPhotoModule?.getAvailableCameras() ?: emptyList()
+            val result = Arguments.createArray()
+            cameras.forEach { cam ->
+                val cameraMap = Arguments.createMap().apply {
+                    putString("id", cam["id"].toString())
+                    putString("position", when (cam["facing"]) {
+                        "front" -> "front"
+                        "back" -> "back"
+                        else -> cam["facing"].toString()
+                    })
+                    putInt("maxWidth", (cam["maxWidth"] as? Int) ?: 0)
+                    putInt("maxHeight", (cam["maxHeight"] as? Int) ?: 0)
+                }
+                result.pushMap(cameraMap)
+            }
+            promise.resolve(result)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get Camera2 devices: ${e.message}")
+            promise.reject("CAMERA2_ERROR", "Failed to enumerate cameras: ${e.message}")
+        }
+    }
+
+    /**
+     * Capture a photo via Camera2 API directly and save to a temp file.
+     * Used as a fallback for motion detection on devices where vision-camera/CameraX
+     * cannot access the camera (e.g. MediaTek LEGACY front-only devices).
+     * @param cameraFacing "front" or "back"
+     * @param quality JPEG quality 0-100
+     * @return Promise resolving to the temp file path
+     */
+    @ReactMethod
+    fun captureCamera2Photo(cameraFacing: String, quality: Int, promise: Promise) {
+        Thread {
+            try {
+                if (cameraPhotoModule == null) {
+                    cameraPhotoModule = CameraPhotoModule(reactContext.applicationContext)
+                }
+                val inputStream = cameraPhotoModule?.capturePhoto(cameraFacing, quality)
+                if (inputStream == null) {
+                    promise.reject("CAPTURE_FAILED", "Camera2 photo capture returned null")
+                    return@Thread
+                }
+                // Write to temp file
+                val tempFile = java.io.File.createTempFile("motion_cam2_", ".jpg", reactContext.cacheDir)
+                tempFile.outputStream().use { out ->
+                    inputStream.copyTo(out)
+                }
+                inputStream.close()
+                promise.resolve(tempFile.absolutePath)
+            } catch (e: Exception) {
+                Log.e(TAG, "Camera2 photo capture failed: ${e.message}")
+                promise.reject("CAPTURE_ERROR", "Camera2 capture failed: ${e.message}")
+            }
+        }.start()
+    }
+
     // ==================== Status Provider ====================
 
     private fun getDeviceStatus(): JSONObject {

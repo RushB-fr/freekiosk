@@ -153,6 +153,7 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
             keyboardType={pinMode === 'alphanumeric' ? 'default' : 'numeric'}
             maxLength={pinMode === 'alphanumeric' ? undefined : 6}
             placeholder={pinMode === 'alphanumeric' ? 'Enter password' : '••••'}
+            placeholderTextColor="#999999"
             autoFocus
             autoCapitalize={pinMode === 'alphanumeric' ? 'none' : undefined}
             autoCorrect={false}
@@ -206,6 +207,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 20,
     fontSize: 24,
+    color: '#333333',
     backgroundColor: '#fff',
     marginBottom: 20,
     textAlign: 'center',
