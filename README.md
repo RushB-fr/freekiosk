@@ -244,7 +244,7 @@ Done! Your tablet is now in kiosk mode.
 
 ---
 
-## 🆚 vs Fully Kiosk Browser
+## FreeKiosk vs Fully Kiosk Browser
 
 | Feature | FreeKiosk | Fully Kiosk |
 |---------|-----------|-------------|
