@@ -18,6 +18,8 @@ import { ApiService } from '../utils/ApiService';
 import { mqttClient } from '../utils/MqttModule';
 import DeviceControlService from '../services/DeviceControlService';
 import { ScheduledEvent, getActiveEvent } from '../types/planner';
+import { DashboardTile } from '../types/dashboard';
+import DashboardGrid from '../components/DashboardGrid';
 import { ScreenScheduleRule, getNextWakeTime, getActiveSleepRule, getNextSleepTime } from '../types/screenScheduler';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
@@ -112,6 +114,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [urlPlannerEnabled, setUrlPlannerEnabled] = useState<boolean>(false);
   const [urlPlannerEvents, setUrlPlannerEvents] = useState<ScheduledEvent[]>([]);
   const [activeScheduledEvent, setActiveScheduledEvent] = useState<ScheduledEvent | null>(null);
+  const activeScheduledEventRef = useRef<ScheduledEvent | null>(null);
   const urlPlannerTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [baseUrl, setBaseUrl] = useState<string>(''); // Original URL before planner/rotation
   
@@ -157,6 +160,12 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [urlFilterMode, setUrlFilterMode] = useState<'blacklist' | 'whitelist'>('blacklist');
   const [urlFilterList, setUrlFilterList] = useState<string[]>([]);
   const [urlFilterShowFeedback, setUrlFilterShowFeedback] = useState<boolean>(false);
+
+  // Dashboard states
+  const [dashboardModeEnabled, setDashboardModeEnabled] = useState<boolean>(false);
+  const [dashboardTiles, setDashboardTiles] = useState<DashboardTile[]>([]);
+  const [dashboardShowGrid, setDashboardShowGrid] = useState<boolean>(true);
+  const [navState, setNavState] = useState<{ canGoBack: boolean; canGoForward: boolean; title: string }>({ canGoBack: false, canGoForward: false, title: '' });
   const [pdfViewerEnabled, setPdfViewerEnabled] = useState<boolean>(false);
 
   // AppState listener - détecte quand l'app revient au premier plan
@@ -783,6 +792,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     if (
       displayMode === 'webview' &&
       urlRotationEnabled &&
+      !dashboardModeEnabled &&
       urlRotationList.length >= 2 &&
       urlRotationInterval >= 5000 &&
       !activeScheduledEvent // Don't rotate when planner event is active
@@ -808,7 +818,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         urlRotationTimerRef.current = null;
       }
     };
-  }, [displayMode, urlRotationEnabled, urlRotationList, urlRotationInterval, activeScheduledEvent]);
+  }, [displayMode, urlRotationEnabled, dashboardModeEnabled, urlRotationList, urlRotationInterval, activeScheduledEvent]);
 
   // URL Planner effect - checks every minute for scheduled events
   useEffect(() => {
@@ -826,16 +836,25 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     // Check for active event immediately
     const checkAndUpdateActiveEvent = () => {
       const activeEvent = getActiveEvent(urlPlannerEvents);
-      
-      if (activeEvent && activeEvent.id !== activeScheduledEvent?.id) {
+      const prevEvent = activeScheduledEventRef.current;
+
+      if (activeEvent && activeEvent.id !== prevEvent?.id) {
         // New active event found
+        activeScheduledEventRef.current = activeEvent;
         setActiveScheduledEvent(activeEvent);
         setUrl(activeEvent.url);
-      } else if (!activeEvent && activeScheduledEvent) {
+        // In dashboard mode, switch from grid to webview for planner
+        if (dashboardModeEnabled) {
+          setDashboardShowGrid(false);
+        }
+      } else if (!activeEvent && prevEvent) {
         // No active event, but there was one before
+        activeScheduledEventRef.current = null;
         setActiveScheduledEvent(null);
-        // Restore base URL or let rotation take over
-        if (!urlRotationEnabled || urlRotationList.length < 2) {
+        if (dashboardModeEnabled) {
+          setDashboardShowGrid(true);
+        } else if (!urlRotationEnabled || urlRotationList.length < 2) {
+          // Restore base URL or let rotation take over
           setUrl(baseUrl);
         }
       }
@@ -853,7 +872,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         urlPlannerTimerRef.current = null;
       }
     };
-  }, [displayMode, urlPlannerEnabled, urlPlannerEvents, baseUrl, urlRotationEnabled, urlRotationList.length]);
+  }, [displayMode, urlPlannerEnabled, urlPlannerEvents, baseUrl, urlRotationEnabled, urlRotationList.length, dashboardModeEnabled]);
 
   // ==================== Screen Sleep Scheduler ====================
   // Strategy:
@@ -1243,6 +1262,15 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       setUrlPlannerEnabled(savedUrlPlannerEnabled);
       setUrlPlannerEvents(savedUrlPlannerEvents);
       
+      // Load Dashboard settings
+      const savedDashboardMode = bool(K.DASHBOARD_MODE_ENABLED, false);
+      const savedDashboardTiles = jsonParse(K.DASHBOARD_TILES, []) as DashboardTile[];
+      setDashboardModeEnabled(savedDashboardMode);
+      setDashboardTiles(savedDashboardTiles);
+      if (savedDashboardMode) {
+        setDashboardShowGrid(true);
+      }
+
       // Store base URL for when planner/rotation is not active
       if (savedUrl) setBaseUrl(savedUrl);
       
@@ -1477,9 +1505,14 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
 
     console.log(`[InactivityReturn] useEffect fired — enabled=${inactivityReturnEnabled}, displayMode=${displayMode}, baseUrl="${baseUrl}", url="${url}", screensaver=${isScreensaverActive}, rotation=${urlRotationEnabled}, delay=${inactivityReturnDelay}`);
 
-    // Guard: only active in webview mode with a valid base URL
-    if (!inactivityReturnEnabled || displayMode !== 'webview' || !baseUrl) {
-      console.log(`[InactivityReturn] BLOCKED: enabled=${inactivityReturnEnabled}, mode=${displayMode}, baseUrl="${baseUrl}"`);
+    // Guard: only active in webview mode with a valid base URL (or dashboard mode)
+    if (!inactivityReturnEnabled || displayMode !== 'webview' || (!baseUrl && !dashboardModeEnabled)) {
+      console.log(`[InactivityReturn] BLOCKED: enabled=${inactivityReturnEnabled}, mode=${displayMode}, baseUrl="${baseUrl}", dashboard=${dashboardModeEnabled}`);
+      return;
+    }
+    // In dashboard mode, only arm timer when user is viewing a tile (not on the grid)
+    if (dashboardModeEnabled && dashboardShowGrid) {
+      console.log('[InactivityReturn] BLOCKED: already on dashboard grid');
       return;
     }
     // Don't start during screensaver
@@ -1507,25 +1540,32 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       console.log(`[InactivityReturn] tick — elapsed=${Math.round(elapsed/1000)}s / ${inactivityReturnDelay}s, currentWebViewUrl="${currentWebViewUrlRef.current}"`);
       if (elapsed >= delayMs) {
         // Time's up — check if we need to return
-        const currentUrl = currentWebViewUrlRef.current || url;
-        const normalizedCurrent = currentUrl.replace(/\/+$/, '').toLowerCase();
-        const normalizedBase = baseUrl.replace(/\/+$/, '').toLowerCase();
-
-        console.log(`[InactivityReturn] TIME'S UP — currentUrl="${normalizedCurrent}" vs baseUrl="${normalizedBase}" — same=${normalizedCurrent === normalizedBase}`);
-
-        if (normalizedCurrent === normalizedBase) {
-          if (inactivityReturnScrollTop && webViewRef.current) {
-            console.log('[InactivityReturn] Already on start page — scrolling to top');
-            webViewRef.current.scrollToTop();
-          } else {
-            console.log('[InactivityReturn] Already on start page, scroll-to-top disabled');
-          }
-        } else {
-          console.log(`[InactivityReturn] 🔄 RETURNING to start page NOW`);
-          // Always force a full WebView reload — because setUrl alone won't work
-          // when the WebView navigated internally (url state hasn't changed)
-          setUrl(baseUrl);
+        if (dashboardModeEnabled && !dashboardShowGrid) {
+          // Dashboard mode: return to grid and reset webview for next tile open
+          console.log(`[InactivityReturn] 🔄 RETURNING to dashboard grid NOW`);
+          setDashboardShowGrid(true);
           setWebViewKey(prev => prev + 1);
+        } else if (baseUrl) {
+          const currentUrl = currentWebViewUrlRef.current || url;
+          const normalizedCurrent = currentUrl.replace(/\/+$/, '').toLowerCase();
+          const normalizedBase = baseUrl.replace(/\/+$/, '').toLowerCase();
+
+          console.log(`[InactivityReturn] TIME'S UP — currentUrl="${normalizedCurrent}" vs baseUrl="${normalizedBase}" — same=${normalizedCurrent === normalizedBase}`);
+
+          if (normalizedCurrent === normalizedBase) {
+            if (inactivityReturnScrollTop && webViewRef.current) {
+              console.log('[InactivityReturn] Already on start page — scrolling to top');
+              webViewRef.current.scrollToTop();
+            } else {
+              console.log('[InactivityReturn] Already on start page, scroll-to-top disabled');
+            }
+          } else {
+            console.log(`[InactivityReturn] 🔄 RETURNING to start page NOW`);
+            // Always force a full WebView reload — because setUrl alone won't work
+            // when the WebView navigated internally (url state hasn't changed)
+            setUrl(baseUrl);
+            setWebViewKey(prev => prev + 1);
+          }
         }
         // Reset timestamp and schedule next check
         lastUserInteractionRef.current = Date.now();
@@ -1540,7 +1580,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     inactivityReturnTimerRef.current = setTimeout(tick, delayMs);
 
     return () => clearInactivityReturnTimer();
-  }, [inactivityReturnEnabled, inactivityReturnDelay, inactivityReturnClearCache, inactivityReturnScrollTop, displayMode, baseUrl, url, isScreensaverActive, urlRotationEnabled, urlRotationList.length, activeScheduledEvent]);
+  }, [inactivityReturnEnabled, inactivityReturnDelay, inactivityReturnClearCache, inactivityReturnScrollTop, displayMode, baseUrl, url, isScreensaverActive, urlRotationEnabled, urlRotationList.length, activeScheduledEvent, dashboardModeEnabled, dashboardShowGrid]);
 
   // Ref for 5-tap debounce (prevent multiple events per tap)
   const lastTapTimeRef = useRef<number>(0);
@@ -1890,38 +1930,61 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     <View style={styles.container}>
       {displayMode === 'webview' ? (
         <>
-          {statusBarEnabled && (
+          {(statusBarEnabled || dashboardModeEnabled) && (
             <StatusBar
-              showBattery={showBattery}
-              showWifi={showWifi}
-              showBluetooth={showBluetooth}
-              showVolume={showVolume}
-              showTime={showTime}
+              showBattery={statusBarEnabled && showBattery}
+              showWifi={statusBarEnabled && showWifi}
+              showBluetooth={statusBarEnabled && showBluetooth}
+              showVolume={statusBarEnabled && showVolume}
+              showTime={statusBarEnabled && showTime}
+              dashboardMode={dashboardModeEnabled}
+              navCanGoBack={navState.canGoBack}
+              navCanGoForward={navState.canGoForward}
+              navTitle={dashboardShowGrid ? 'Dashboard' : navState.title}
+              showNavBar={!dashboardShowGrid}
+              onNavBack={() => webViewRef.current?.goBack()}
+              onNavForward={() => webViewRef.current?.goForward()}
+              onNavRefresh={() => webViewRef.current?.reload()}
+              onNavHome={() => setDashboardShowGrid(true)}
             />
           )}
-          <WebViewComponent 
-            ref={webViewRef}
-            key={webViewKey} 
-            url={url} 
-            autoReload={autoReload} 
-            keyboardMode={keyboardMode} 
-            onUserInteraction={onUserInteraction}
-            jsToExecute={jsToExecute}
-            onJsExecuted={() => setJsToExecute('')}
-            showBackButton={webViewBackButtonEnabled}
-            onNavigationStateChange={setCanGoBack}
-            onPageNavigated={(navUrl: string) => {
-              currentWebViewUrlRef.current = navUrl;
-              // Reset inactivity timer on page navigation if enabled
-              if (inactivityReturnResetOnNav) {
-                markUserInteraction();
-              }
-            }}
-            urlFilterMode={urlFilterEnabled ? urlFilterMode : undefined}
-            urlFilterPatterns={urlFilterEnabled ? urlFilterList : undefined}
-            urlFilterShowFeedback={urlFilterShowFeedback}
-            pdfViewerEnabled={pdfViewerEnabled}
-          />
+          {dashboardModeEnabled && dashboardShowGrid ? (
+            <DashboardGrid
+              tiles={dashboardTiles}
+              onTilePress={(tile) => {
+                setUrl(tile.url);
+                setDashboardShowGrid(false);
+              }}
+              onUserInteraction={onUserInteraction}
+            />
+          ) : (
+            <WebViewComponent
+              ref={webViewRef}
+              key={webViewKey}
+              url={url}
+              autoReload={autoReload}
+              keyboardMode={keyboardMode}
+              onUserInteraction={onUserInteraction}
+              jsToExecute={jsToExecute}
+              onJsExecuted={() => setJsToExecute('')}
+              showBackButton={webViewBackButtonEnabled}
+              onNavigationStateChange={(state) => {
+                setCanGoBack(state.canGoBack);
+                setNavState(state);
+              }}
+              onPageNavigated={(navUrl: string) => {
+                currentWebViewUrlRef.current = navUrl;
+                // Reset inactivity timer on page navigation if enabled
+                if (inactivityReturnResetOnNav) {
+                  markUserInteraction();
+                }
+              }}
+              urlFilterMode={urlFilterEnabled ? urlFilterMode : undefined}
+              urlFilterPatterns={urlFilterEnabled ? urlFilterList : undefined}
+              urlFilterShowFeedback={urlFilterShowFeedback}
+              pdfViewerEnabled={pdfViewerEnabled}
+            />
+          )}
         </>
       ) : (
         <ExternalAppOverlay

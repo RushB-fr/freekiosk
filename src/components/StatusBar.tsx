@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, NativeModules } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, NativeModules } from 'react-native';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { StorageService } from '../utils/storage';
 
 const { SystemInfoModule } = NativeModules;
@@ -27,6 +28,16 @@ interface StatusBarProps {
   showBluetooth?: boolean;
   showVolume?: boolean;
   showTime?: boolean;
+  // Dashboard nav props
+  dashboardMode?: boolean;
+  navCanGoBack?: boolean;
+  navCanGoForward?: boolean;
+  navTitle?: string;
+  showNavBar?: boolean;
+  onNavBack?: () => void;
+  onNavForward?: () => void;
+  onNavRefresh?: () => void;
+  onNavHome?: () => void;
 }
 
 const StatusBar: React.FC<StatusBarProps> = ({
@@ -35,6 +46,15 @@ const StatusBar: React.FC<StatusBarProps> = ({
   showBluetooth = true,
   showVolume = true,
   showTime = true,
+  dashboardMode = false,
+  navCanGoBack = false,
+  navCanGoForward = false,
+  navTitle = '',
+  showNavBar = false,
+  onNavBack,
+  onNavForward,
+  onNavRefresh,
+  onNavHome,
 }) => {
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [currentTime, setCurrentTime] = useState<string>('');
@@ -84,17 +104,17 @@ const StatusBar: React.FC<StatusBarProps> = ({
     };
   }, [showBattery, showWifi, showBluetooth, showVolume, showTime]);
 
-  if (!systemInfo) {
+  if (!systemInfo && !dashboardMode) {
     return null;
   }
 
-  // Safe accessors with defaults
-  const batteryLevel = systemInfo.battery?.level ?? 0;
-  const isCharging = systemInfo.battery?.isCharging ?? false;
-  const wifiConnected = systemInfo.wifi?.isConnected ?? false;
-  const bluetoothEnabled = systemInfo.bluetooth?.isEnabled ?? false;
-  const bluetoothDevices = systemInfo.bluetooth?.connectedDevices ?? 0;
-  const audioVolume = systemInfo.audio?.volume ?? 0;
+  // Safe accessors with defaults (systemInfo can be null when only dashboardMode is active)
+  const batteryLevel = systemInfo?.battery?.level ?? 0;
+  const isCharging = systemInfo?.battery?.isCharging ?? false;
+  const wifiConnected = systemInfo?.wifi?.isConnected ?? false;
+  const bluetoothEnabled = systemInfo?.bluetooth?.isEnabled ?? false;
+  const bluetoothDevices = systemInfo?.bluetooth?.connectedDevices ?? 0;
+  const audioVolume = systemInfo?.audio?.volume ?? 0;
 
   // Organize items: left side and right side to avoid center (camera)
   const leftItems = [];
@@ -160,19 +180,77 @@ const StatusBar: React.FC<StatusBarProps> = ({
   }
 
   return (
-    <View style={styles.container}>
-      {/* Left side items */}
-      <View style={styles.leftSide}>
-        {leftItems}
-      </View>
-      
-      {/* Spacer to avoid center (camera area) */}
-      <View style={styles.spacer} />
-      
-      {/* Right side items */}
-      <View style={styles.rightSide}>
-        {rightItems}
-      </View>
+    <View>
+      {/* Line 1: System info */}
+      {systemInfo && (showBattery || showWifi || showBluetooth || showVolume || showTime) && (
+        <View style={styles.container}>
+          <View style={styles.leftSide}>
+            {leftItems}
+          </View>
+          <View style={styles.spacer} />
+          <View style={styles.rightSide}>
+            {rightItems}
+          </View>
+        </View>
+      )}
+
+      {/* Line 2: Dashboard navigation */}
+      {dashboardMode && (
+        <View style={styles.navContainer}>
+          <TouchableOpacity
+            onPress={onNavBack}
+            disabled={!showNavBar || !navCanGoBack}
+            style={styles.navButton}
+          >
+            <MaterialCommunityIcons
+              name="arrow-left"
+              size={18}
+              color="#FFFFFF"
+              style={{ opacity: (!showNavBar || !navCanGoBack) ? 0.3 : 1 }}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={onNavForward}
+            disabled={!showNavBar || !navCanGoForward}
+            style={styles.navButton}
+          >
+            <MaterialCommunityIcons
+              name="arrow-right"
+              size={18}
+              color="#FFFFFF"
+              style={{ opacity: (!showNavBar || !navCanGoForward) ? 0.3 : 1 }}
+            />
+          </TouchableOpacity>
+
+          {showNavBar && (
+            <TouchableOpacity onPress={onNavRefresh} style={styles.navButton}>
+              <MaterialCommunityIcons name="refresh" size={18} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            onPress={onNavHome}
+            disabled={!showNavBar}
+            style={styles.navButton}
+          >
+            <MaterialCommunityIcons
+              name="home"
+              size={18}
+              color="#FFFFFF"
+              style={{ opacity: !showNavBar ? 0.3 : 1 }}
+            />
+          </TouchableOpacity>
+
+          <Text
+            style={styles.navTitle}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {navTitle || 'Dashboard'}
+          </Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -233,6 +311,23 @@ const styles = StyleSheet.create({
   },
   spacer: {
     flex: 1,
+  },
+  navContainer: {
+    height: 28,
+    backgroundColor: 'rgba(0, 0, 0, 0.88)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  navButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  navTitle: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    flex: 1,
+    marginLeft: 4,
   },
 });
 

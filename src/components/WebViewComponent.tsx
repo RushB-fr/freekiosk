@@ -28,7 +28,7 @@ interface WebViewComponentProps {
   jsToExecute?: string; // JavaScript code to execute from API
   onJsExecuted?: () => void; // callback when JS is executed
   showBackButton?: boolean; // Enable web navigation back button
-  onNavigationStateChange?: (canGoBack: boolean) => void; // Callback for web navigation state
+  onNavigationStateChange?: (state: { canGoBack: boolean; canGoForward: boolean; title: string }) => void; // Callback for web navigation state
   onPageNavigated?: (url: string) => void; // Callback when page URL changes (for inactivity return)
   urlFilterMode?: string; // 'whitelist' or 'blacklist'
   urlFilterPatterns?: string[]; // URL patterns to filter
@@ -38,6 +38,8 @@ interface WebViewComponentProps {
 
 export interface WebViewComponentRef {
   goBack: () => void;
+  goForward: () => void;
+  reload: () => void;
   scrollToTop: () => void;
   clearCache: () => void;
 }
@@ -151,6 +153,16 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
     goBack: () => {
       if (webViewRef.current) {
         webViewRef.current.goBack();
+      }
+    },
+    goForward: () => {
+      if (webViewRef.current) {
+        webViewRef.current.goForward();
+      }
+    },
+    reload: () => {
+      if (webViewRef.current) {
+        webViewRef.current.reload();
       }
     },
     scrollToTop: () => {
@@ -671,9 +683,13 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
         }}
 
         onNavigationStateChange={(navState) => {
-          // Track web navigation state (for back button)
-          if (showBackButton && onNavigationStateChange) {
-            onNavigationStateChange(navState.canGoBack);
+          // Track web navigation state (for back button and dashboard nav)
+          if (onNavigationStateChange) {
+            onNavigationStateChange({
+              canGoBack: navState.canGoBack,
+              canGoForward: navState.canGoForward,
+              title: navState.title || '',
+            });
           }
           // Report URL changes for inactivity return feature
           if (onPageNavigated && navState.url) {

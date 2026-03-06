@@ -52,6 +52,10 @@ interface GeneralTabProps {
   pinMode: 'numeric' | 'alphanumeric';
   onPinModeChange: (mode: 'numeric' | 'alphanumeric') => void;
   
+  // Dashboard mode (webview only)
+  dashboardModeEnabled: boolean;
+  onDashboardModeEnabledChange: (value: boolean) => void;
+
   // Auto reload (webview only)
   autoReload: boolean;
   onAutoReloadChange: (value: boolean) => void;
@@ -125,6 +129,8 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
   onPinMaxAttemptsBlur,
   pinMode,
   onPinModeChange,
+  dashboardModeEnabled,
+  onDashboardModeEnabledChange,
   autoReload,
   onAutoReloadChange,
   pdfViewerEnabled,
@@ -229,23 +235,40 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
       {/* URL Input (WebView mode) */}
       {displayMode === 'webview' && (
         <SettingsSection title="URL to Display" icon="link-variant">
-          <SettingsInput
-            label=""
-            value={url}
-            onChangeText={onUrlChange}
-            placeholder="https://example.com"
-            keyboardType="url"
-            hint="Example: https://www.freekiosk.app"
+          <SettingsSwitch
+            label="Use Dashboard Mode"
+            value={dashboardModeEnabled}
+            onValueChange={onDashboardModeEnabledChange}
+            hint="Replace single URL with a multi-URL dashboard"
           />
-          
-          {url.trim().toLowerCase().startsWith('http://') && (
-            <SettingsInfoBox variant="warning">
+
+          {dashboardModeEnabled ? (
+            <SettingsInfoBox variant="info">
               <Text style={styles.infoText}>
-                ⚠️ SECURITY: This URL uses HTTP (unencrypted).{`
-`}
-                Your data can be intercepted. Use HTTPS instead.
+                Dashboard mode is active. Configure your tiles in the Dashboard tab.
               </Text>
             </SettingsInfoBox>
+          ) : (
+            <>
+              <SettingsInput
+                label=""
+                value={url}
+                onChangeText={onUrlChange}
+                placeholder="https://example.com"
+                keyboardType="url"
+                hint="Example: https://www.freekiosk.app"
+              />
+
+              {url.trim().toLowerCase().startsWith('http://') && (
+                <SettingsInfoBox variant="warning">
+                  <Text style={styles.infoText}>
+                    ⚠️ SECURITY: This URL uses HTTP (unencrypted).{`
+`}
+                    Your data can be intercepted. Use HTTPS instead.
+                  </Text>
+                </SettingsInfoBox>
+              )}
+            </>
           )}
         </SettingsSection>
       )}
@@ -253,37 +276,48 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
       {/* URL Rotation (WebView mode only) */}
       {displayMode === 'webview' && (
         <SettingsSection title="URL Rotation" icon="sync">
-          <SettingsSwitch
-            label="Enable Rotation"
-            value={urlRotationEnabled}
-            onValueChange={onUrlRotationEnabledChange}
-            hint="Automatically cycle through multiple URLs"
-          />
-          
-          {urlRotationEnabled && (
+          {dashboardModeEnabled && (
+            <SettingsInfoBox variant="info">
+              <Text style={styles.infoText}>
+                URL Rotation is disabled in Dashboard mode.
+              </Text>
+            </SettingsInfoBox>
+          )}
+          {!dashboardModeEnabled && (
             <>
-              <View style={styles.rotationSpacer} />
-              <UrlListEditor
-                urls={urlRotationList}
-                onUrlsChange={onUrlRotationListChange}
+              <SettingsSwitch
+                label="Enable Rotation"
+                value={urlRotationEnabled}
+                onValueChange={onUrlRotationEnabledChange}
+                hint="Automatically cycle through multiple URLs"
               />
-              
-              <View style={styles.rotationSpacer} />
-              <SettingsInput
-                label="Rotation Interval (seconds)"
-                value={urlRotationInterval}
-                onChangeText={onUrlRotationIntervalChange}
-                placeholder="30"
-                keyboardType="numeric"
-                hint="Time between each URL change (minimum 5 seconds)"
-              />
-              
-              {urlRotationList.length < 2 && (
-                <SettingsInfoBox variant="warning">
-                  <Text style={styles.infoText}>
-                    ⚠️ Add at least 2 URLs to enable rotation
-                  </Text>
-                </SettingsInfoBox>
+
+              {urlRotationEnabled && (
+                <>
+                  <View style={styles.rotationSpacer} />
+                  <UrlListEditor
+                    urls={urlRotationList}
+                    onUrlsChange={onUrlRotationListChange}
+                  />
+
+                  <View style={styles.rotationSpacer} />
+                  <SettingsInput
+                    label="Rotation Interval (seconds)"
+                    value={urlRotationInterval}
+                    onChangeText={onUrlRotationIntervalChange}
+                    placeholder="30"
+                    keyboardType="numeric"
+                    hint="Time between each URL change (minimum 5 seconds)"
+                  />
+
+                  {urlRotationList.length < 2 && (
+                    <SettingsInfoBox variant="warning">
+                      <Text style={styles.infoText}>
+                        ⚠️ Add at least 2 URLs to enable rotation
+                      </Text>
+                    </SettingsInfoBox>
+                  )}
+                </>
               )}
             </>
           )}

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlockingRegion } from '../types/blockingOverlay';
 import { ScreenScheduleRule } from '../types/screenScheduler';
+import { DashboardTile } from '../types/dashboard';
 import { saveSecureApiKey, getSecureApiKey, clearSecureApiKey, clearSecureMqttPassword } from './secureStorage';
 
 const KEYS = {
@@ -115,7 +116,10 @@ const KEYS = {
   SCREENSAVER_DELAY: '@screensaver_delay',
   MOTION_DETECTION_ENABLED: '@motion_detection_enabled',
   MOTION_SENSITIVITY: '@motion_sensitivity',
-  MOTION_DELAY: '@motion_delay'
+  MOTION_DELAY: '@motion_delay',
+  // Dashboard
+  DASHBOARD_MODE_ENABLED: '@kiosk_dashboard_mode_enabled',
+  DASHBOARD_TILES: '@kiosk_dashboard_tiles',
 };
 
 export const StorageService = {
@@ -324,6 +328,9 @@ export const StorageService = {
         KEYS.MQTT_ALLOW_CONTROL,
         KEYS.MQTT_DEVICE_NAME,
         KEYS.MQTT_MOTION_ALWAYS_ON,
+        // Dashboard
+        KEYS.DASHBOARD_MODE_ENABLED,
+        KEYS.DASHBOARD_TILES,
         // Legacy keys
         KEYS.SCREENSAVER_DELAY,
         KEYS.MOTION_DETECTION_ENABLED,
@@ -1951,6 +1958,43 @@ export const StorageService = {
    * This is much faster than 50+ sequential getItem calls (single bridge crossing).
    * Returns a Map for O(1) key lookup.
    */
+  // DASHBOARD
+  saveDashboardModeEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.DASHBOARD_MODE_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving dashboard mode enabled:', error);
+    }
+  },
+
+  getDashboardModeEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.DASHBOARD_MODE_ENABLED);
+      return value === null ? false : JSON.parse(value);
+    } catch (error) {
+      console.error('Error getting dashboard mode enabled:', error);
+      return false;
+    }
+  },
+
+  saveDashboardTiles: async (tiles: DashboardTile[]): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.DASHBOARD_TILES, JSON.stringify(tiles));
+    } catch (error) {
+      console.error('Error saving dashboard tiles:', error);
+    }
+  },
+
+  getDashboardTiles: async (): Promise<DashboardTile[]> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.DASHBOARD_TILES);
+      return value === null ? [] : JSON.parse(value);
+    } catch (error) {
+      console.error('Error getting dashboard tiles:', error);
+      return [];
+    }
+  },
+
   getAllSettings: async (): Promise<Map<string, string | null>> => {
     try {
       const allKeys = Object.values(KEYS);

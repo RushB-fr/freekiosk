@@ -6,3 +6,4 @@ export { default as GeneralTab } from './GeneralTab';
 export { default as DisplayTab } from './DisplayTab';
 export { default as SecurityTab } from './SecurityTab';
 export { default as AdvancedTab } from './AdvancedTab';
+export { default as DashboardTab } from './DashboardTab';

@@ -141,6 +141,11 @@ export type IconName =
   | 'square-outline'
   | 'lightbulb-outline'
   | 'stop'
+  // Dashboard
+  | 'view-dashboard'
+  | 'arrow-right'
+  | 'arrow-up'
+  | 'arrow-down'
   // API & Network
   | 'api'
   | 'server-network'
