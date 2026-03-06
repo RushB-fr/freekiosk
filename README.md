@@ -99,6 +99,14 @@ FreeKiosk is a **completely free and open-source** kiosk mode application for An
 - **Settings Access Blocked**
 - **Status Bar Hidden**
 
+### Dashboard Mode 🆕
+- **Multi-URL Grid** - Display a configurable grid of URL tiles
+- **One-Tap Navigation** - Tap a tile to open its URL in the WebView
+- **Navigation Bar** - Back, forward, refresh, and home buttons
+- **Inactivity Return** - Automatically return to the dashboard grid after a configurable timeout
+- **Planner Integration** - Scheduled events take priority over the dashboard, then return to grid
+- **Auto-Colored Tiles** - Tiles get automatically assigned distinct colors
+
 ### External App Mode (Beta)
 - **Launch Any App** - Select from installed apps picker
 - **5-Tap Anywhere** - Tap 5 times rapidly anywhere on screen to access settings (no corner targeting needed)

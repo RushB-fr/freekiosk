@@ -135,6 +135,25 @@ text
 
 ---
 
+## Dashboard Mode
+
+### Q: What is Dashboard Mode?
+**A:** Dashboard Mode replaces the single-URL WebView with a grid of configurable URL tiles. Each tile has a name and a URL — tap it to open the page. A navigation bar lets you go back, forward, refresh, or return to the grid.
+
+### Q: How do I enable Dashboard Mode?
+**A:** Go to Settings → Dashboard tab → toggle "Dashboard Mode" on. Then add your tiles with a name and URL for each.
+
+### Q: Can I use Dashboard Mode with Inactivity Return?
+**A:** Yes! Enable "Inactivity Return" in Settings → General. After the configured timeout without touch, the app automatically returns to the dashboard grid.
+
+### Q: What happens with the URL Planner in Dashboard Mode?
+**A:** Scheduled planner events take priority — they switch from the grid to the scheduled URL. When the event ends, the app returns to the dashboard grid automatically.
+
+### Q: How many tiles can I create?
+**A:** There is no hard limit. The grid adapts to the number of tiles.
+
+---
+
 ## Features
 
 ### Q: Can I customize the PIN length?

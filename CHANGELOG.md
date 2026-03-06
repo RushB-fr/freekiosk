@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- 📊 **Dashboard Mode**: New display mode that shows a configurable grid of URL tiles instead of a single WebView. Users can create tiles with custom names and URLs, each automatically assigned a distinct color. Tapping a tile opens its URL in the WebView with a navigation bar (back/forward/refresh/home). Configurable in Settings → Dashboard tab
+
+### Fixed
+- 🔄 **Inactivity Return now works in Dashboard Mode**: Previously, enabling "Inactivity Return" with Dashboard Mode had no effect because the feature required a base URL (which is empty in dashboard mode). Now correctly returns to the dashboard grid after the configured timeout
+- 🔄 **URL Planner return to dashboard grid**: When a scheduled planner event ended while in Dashboard Mode, the app did not return to the dashboard grid due to a stale closure in the planner callback. Fixed by using a ref to track the active event
 
 ***
 
