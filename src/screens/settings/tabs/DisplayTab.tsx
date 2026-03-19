@@ -35,6 +35,8 @@ interface DisplayTabProps {
   onAutoBrightnessMinChange: (value: number) => void;
   autoBrightnessMax: number;
   onAutoBrightnessMaxChange: (value: number) => void;
+  autoBrightnessOffset: number;
+  onAutoBrightnessOffsetChange: (value: number) => void;
   currentLightLevel: number;
   hasLightSensor: boolean;
   
@@ -65,6 +67,10 @@ interface DisplayTabProps {
   // WebView Zoom Level
   zoomLevel: number;
   onZoomLevelChange: (value: number) => void;
+  
+  // Custom User Agent
+  customUserAgent: string;
+  onCustomUserAgentChange: (value: string) => void;
   
   // Screensaver
   screensaverEnabled: boolean;
@@ -108,6 +114,8 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
   onAutoBrightnessMinChange,
   autoBrightnessMax,
   onAutoBrightnessMaxChange,
+  autoBrightnessOffset,
+  onAutoBrightnessOffsetChange,
   currentLightLevel,
   hasLightSensor,
   statusBarEnabled,
@@ -130,6 +138,8 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
   onKeyboardModeChange,
   zoomLevel,
   onZoomLevelChange,
+  customUserAgent,
+  onCustomUserAgentChange,
   screensaverEnabled,
   onScreensaverEnabledChange,
   screensaverBrightness,
@@ -264,6 +274,21 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                   { label: '80%', value: 0.8 },
                   { label: '90%', value: 0.9 },
                   { label: '100%', value: 1.0 },
+                ]}
+              />
+              
+              <SettingsSlider
+                label="Brightness Offset"
+                hint="Added to calculated auto-brightness (e.g. +10% makes it always a bit brighter)"
+                value={autoBrightnessOffset}
+                onValueChange={onAutoBrightnessOffsetChange}
+                minimumValue={0}
+                maximumValue={0.5}
+                step={0.05}
+                presets={[
+                  { label: '0%', value: 0 },
+                  { label: '+10%', value: 0.1 },
+                  { label: '+20%', value: 0.2 },
                 ]}
               />
               
@@ -630,6 +655,28 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
             <SettingsInfoBox variant="info">
               <Text style={styles.infoText}>
                 🔍 Zoom is set to {zoomLevel}%. Tap the "100%" preset to reset to default.
+              </Text>
+            </SettingsInfoBox>
+          )}
+        </SettingsSection>
+      )}
+      
+      {/* Custom User Agent - Only in WebView mode */}
+      {displayMode === 'webview' && (
+        <SettingsSection title="User Agent" icon="web">
+          <SettingsInput
+            label="Custom User Agent"
+            hint={customUserAgent.trim() ? 'Custom UA active. Clear the field to use the default.' : 'Leave empty to use the default modern Chrome User Agent. Some hosting providers (e.g. SiteGround) block old or suspicious User Agents.'}
+            value={customUserAgent}
+            onChangeText={onCustomUserAgentChange}
+            placeholder="Mozilla/5.0 (Linux; Android 13; ...) Chrome/131..."
+            autoCapitalize="none"
+            multiline={true}
+          />
+          {customUserAgent.trim() !== '' && (
+            <SettingsInfoBox variant="warning">
+              <Text style={styles.infoText}>
+                ⚠️ Custom User Agent is active. Some sites may behave unexpectedly with non-standard UA strings.
               </Text>
             </SettingsInfoBox>
           )}

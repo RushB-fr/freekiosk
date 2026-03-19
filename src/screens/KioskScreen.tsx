@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, Text, NativeEventEmitter, NativeModules, AppState, DeviceEventEmitter, Dimensions, Pressable } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, Text, NativeEventEmitter, NativeModules, AppState, DeviceEventEmitter, Dimensions, Pressable, BackHandler } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RNBrightness from 'react-native-brightness-newarch';
 import { useIsFocused, useFocusEffect } from '@react-navigation/native';
@@ -26,6 +26,7 @@ import { ScreenScheduleRule, getNextWakeTime, getActiveSleepRule, getNextSleepTi
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import Icon from '../components/Icon';
+import { revokeSettingsAccess } from '../utils/authState';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const { HttpServerModule } = NativeModules;
@@ -109,6 +110,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [autoBrightnessEnabled, setAutoBrightnessEnabled] = useState<boolean>(false);
   const [autoBrightnessMin, setAutoBrightnessMin] = useState<number>(0.1);
   const [autoBrightnessMax, setAutoBrightnessMax] = useState<number>(1.0);
+  const [autoBrightnessOffset, setAutoBrightnessOffset] = useState<number>(0.0);
   const [autoBrightnessInterval, setAutoBrightnessInterval] = useState<number>(1000);
   
   // Brightness management (allow system to manage)
@@ -177,6 +179,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [navState, setNavState] = useState<{ canGoBack: boolean; canGoForward: boolean; title: string }>({ canGoBack: false, canGoForward: false, title: '' });
   const [pdfViewerEnabled, setPdfViewerEnabled] = useState<boolean>(false);
   const [zoomLevel, setZoomLevel] = useState<number>(100);
+  const [customUserAgent, setCustomUserAgent] = useState<string>('');
 
   // Media Player states
   const [mediaPlayerItems, setMediaPlayerItems] = useState<MediaItem[]>([]);
@@ -283,6 +286,18 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     };
   }, []);  // No dependencies — reads fresh values from storage every time
 
+  // Block Android back gesture on Kiosk screen & ensure settings access is revoked (#93).
+  // When the user returns to Kiosk (after save or navigation.reset), the back gesture
+  // should NOT navigate to Settings/Pin. Also revoke any lingering auth token.
+  useEffect(() => {
+    revokeSettingsAccess();
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      // Consume the back gesture — do nothing in kiosk mode
+      return true;
+    });
+    return () => backHandler.remove();
+  }, []);
+
   // Auto-brightness: pause when screensaver activates, resume when it deactivates
   useEffect(() => {
     const handleAutoBrightnessForScreensaver = async () => {
@@ -307,7 +322,8 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           await AutoBrightnessModule.startAutoBrightness(
             autoBrightnessMin,
             autoBrightnessMax,
-            autoBrightnessInterval
+            autoBrightnessInterval,
+            autoBrightnessOffset
           );
           console.log('[KioskScreen] Auto-brightness resumed after screensaver');
         } catch (error) {
@@ -317,7 +333,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     };
     
     handleAutoBrightnessForScreensaver();
-  }, [isScreensaverActive, autoBrightnessEnabled, autoBrightnessMin, autoBrightnessMax, autoBrightnessInterval, screensaverBrightness, isScheduledSleep]);
+  }, [isScreensaverActive, autoBrightnessEnabled, autoBrightnessMin, autoBrightnessMax, autoBrightnessOffset, autoBrightnessInterval, screensaverBrightness, isScheduledSleep]);
 
   // Désactiver le screensaver quand l'écran perd le focus (navigation vers Settings)
   // Only triggers cleanup on actual focus→blur transition (not when other deps change)
@@ -344,7 +360,8 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
               await AutoBrightnessModule.startAutoBrightness(
                 autoBrightnessMin,
                 autoBrightnessMax,
-                autoBrightnessInterval
+                autoBrightnessInterval,
+                autoBrightnessOffset
               );
             } else {
               await RNBrightness.setBrightnessLevel(defaultBrightness);
@@ -355,7 +372,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         })();
       }
     }
-  }, [isFocused, isScreensaverActive, isPreCheckingMotion, defaultBrightness, autoBrightnessEnabled, autoBrightnessMin, autoBrightnessMax, autoBrightnessInterval]);
+  }, [isFocused, isScreensaverActive, isPreCheckingMotion, defaultBrightness, autoBrightnessEnabled, autoBrightnessMin, autoBrightnessMax, autoBrightnessOffset, autoBrightnessInterval]);
 
   // API Service initialization - connect REST API to app controls
   useEffect(() => {
@@ -506,7 +523,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
             console.error('[API] Error sending remote key:', error);
           }
         },
-        onAutoBrightnessEnable: async (min: number, max: number) => {
+        onAutoBrightnessEnable: async (min: number, max: number, offset?: number) => {
           try {
             // Skip if brightness management is disabled
             if (!brightnessManagementRef.current) {
@@ -516,9 +533,14 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
             // Convert from API 0-100 to internal 0-1
             const minNormalized = min / 100;
             const maxNormalized = max / 100;
+            // Use API offset if provided, otherwise keep current setting
+            const offsetNormalized = offset !== undefined ? offset / 100 : autoBrightnessOffset;
             
             setAutoBrightnessMin(minNormalized);
             setAutoBrightnessMax(maxNormalized);
+            if (offset !== undefined) {
+              setAutoBrightnessOffset(offsetNormalized);
+            }
             setAutoBrightnessEnabled(true);
             
             // Save current manual brightness before enabling
@@ -528,15 +550,19 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
             await AutoBrightnessModule.startAutoBrightness(
               minNormalized,
               maxNormalized,
-              autoBrightnessInterval
+              autoBrightnessInterval,
+              offsetNormalized
             );
             
             // Save settings
             await StorageService.saveAutoBrightnessEnabled(true);
             await StorageService.saveAutoBrightnessMin(minNormalized);
             await StorageService.saveAutoBrightnessMax(maxNormalized);
+            if (offset !== undefined) {
+              await StorageService.saveAutoBrightnessOffset(offsetNormalized);
+            }
             
-            console.log('[API] Auto-brightness enabled (min:', min, '%, max:', max, '%)');
+            console.log('[API] Auto-brightness enabled (min:', min, '%, max:', max, '%, offset:', offset !== undefined ? offset : 'unchanged', '%)');
           } catch (error) {
             console.error('[API] Error enabling auto-brightness:', error);
           }
@@ -1024,7 +1050,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       // Restore brightness (only if app manages brightness)
       if (brightnessManagementRef.current) {
         if (autoBrightnessEnabled) {
-          await AutoBrightnessModule.startAutoBrightness(autoBrightnessMin, autoBrightnessMax, autoBrightnessInterval);
+          await AutoBrightnessModule.startAutoBrightness(autoBrightnessMin, autoBrightnessMax, autoBrightnessInterval, autoBrightnessOffset);
         } else {
           await RNBrightness.setBrightnessLevel(defaultBrightness);
         }
@@ -1044,7 +1070,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     if (screenSchedulerEnabled && screenSchedulerRules.length > 0) {
       await scheduleNativeSleepAlarm(screenSchedulerRules);
     }
-  }, [autoBrightnessEnabled, autoBrightnessMin, autoBrightnessMax, autoBrightnessInterval, defaultBrightness, screenSchedulerEnabled, screenSchedulerRules, scheduleNativeSleepAlarm]);
+  }, [autoBrightnessEnabled, autoBrightnessMin, autoBrightnessMax, autoBrightnessOffset, autoBrightnessInterval, defaultBrightness, screenSchedulerEnabled, screenSchedulerRules, scheduleNativeSleepAlarm]);
 
   // Listen for native alarm events (onScheduledWake / onScheduledSleep)
   useEffect(() => {
@@ -1385,10 +1411,12 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       const savedAutoBrightnessEnabled = bool(K.AUTO_BRIGHTNESS_ENABLED, false);
       const savedAutoBrightnessMin = num(K.AUTO_BRIGHTNESS_MIN, 0.1);
       const savedAutoBrightnessMax = num(K.AUTO_BRIGHTNESS_MAX, 1.0);
+      const savedAutoBrightnessOffset = num(K.AUTO_BRIGHTNESS_OFFSET, 0.0);
       const savedAutoBrightnessInterval = num(K.AUTO_BRIGHTNESS_UPDATE_INTERVAL, 1000);
       setAutoBrightnessEnabled(savedAutoBrightnessEnabled);
       setAutoBrightnessMin(savedAutoBrightnessMin);
       setAutoBrightnessMax(savedAutoBrightnessMax);
+      setAutoBrightnessOffset(savedAutoBrightnessOffset);
       setAutoBrightnessInterval(savedAutoBrightnessInterval);
       
       // Load Brightness Management setting
@@ -1446,6 +1474,10 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       const savedZoomLevel = num(K.WEBVIEW_ZOOM_LEVEL, 100);
       setZoomLevel(savedZoomLevel);
       
+      // Load Custom User Agent
+      const savedCustomUserAgent = str(K.CUSTOM_USER_AGENT) ?? '';
+      setCustomUserAgent(savedCustomUserAgent);
+      
       // Load Media Player settings
       if (savedDisplayMode === 'media_player') {
         const mpItems = jsonParse(K.MEDIA_PLAYER_ITEMS, []) as MediaItem[];
@@ -1479,7 +1511,8 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           await AutoBrightnessModule.startAutoBrightness(
             savedAutoBrightnessMin,
             savedAutoBrightnessMax,
-            savedAutoBrightnessInterval
+            savedAutoBrightnessInterval,
+            savedAutoBrightnessOffset
           );
           console.log('[KioskScreen] Auto-brightness started');
         } catch (error) {
@@ -2191,6 +2224,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
               urlFilterShowFeedback={urlFilterShowFeedback}
               pdfViewerEnabled={pdfViewerEnabled}
               zoomLevel={zoomLevel}
+              customUserAgent={customUserAgent}
             />
           )}
         </>

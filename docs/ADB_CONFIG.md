@@ -29,7 +29,7 @@ This ensures:
 ### First-Time Setup (New Device)
 
 ```bash
-# Set Device Owner (one-time, requires fresh device or factory reset)
+# Set Device Owner (one-time, requires no user accounts on the device)
 adb shell dpm set-device-owner com.freekiosk/.DeviceAdminReceiver
 
 # Configure and lock to external app
@@ -476,7 +476,7 @@ Without this permission, the broadcast will still be emitted but with `(NOT veri
 adb logcat -s "FreeKiosk-ADB"
 ```
 
-**Note**: Device Owner can only be set on a freshly reset device or during initial setup. Once set, all permissions are managed automatically.
+**Note**: Device Owner can only be set when **no user accounts** are active on the device (Settings → Accounts). Remove all accounts first, then run the command. You can sign back in afterwards. If account removal alone doesn't work, a factory reset is a reliable fallback. Once set, all permissions are managed automatically.
 
 ### Accessibility Service: "Permission denial: WRITE_SECURE_SETTINGS"
 

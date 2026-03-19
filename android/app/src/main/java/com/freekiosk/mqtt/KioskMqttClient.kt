@@ -310,10 +310,11 @@ class KioskMqttClient(
 
             mqttClient = client
             sendConnect()
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to create MQTT client: ${e.message}", e)
+        } catch (e: Throwable) {
+            Log.e(TAG, "Failed to create MQTT client: ${e.javaClass.simpleName}: ${e.message}", e)
             _isConnected = false
             mainHandler.post {
+                onConnectionError?.invoke("${e.javaClass.simpleName}: ${e.message}")
                 onConnectionChanged?.invoke(false)
             }
         }
@@ -428,8 +429,13 @@ class KioskMqttClient(
                     }
                 }
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error sending CONNECT: ${e.message}", e)
+        } catch (e: Throwable) {
+            Log.e(TAG, "Error sending CONNECT: ${e.javaClass.simpleName}: ${e.message}", e)
+            _isConnected = false
+            mainHandler.post {
+                onConnectionError?.invoke("CONNECT failed: ${e.javaClass.simpleName}: ${e.message}")
+                onConnectionChanged?.invoke(false)
+            }
         }
     }
 

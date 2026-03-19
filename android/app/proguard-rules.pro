@@ -19,6 +19,23 @@
 # of class names — unlike -keep which R8 ignores for member name preservation.
 # -----------------------------------------------------------------------
 
+# Preserve HiveMQ MQTT client classes (auth builders, codecs, Dagger IoC, etc.)
+# HiveMQ uses a staged builder pattern (Mqtt3SimpleAuthBuilder.Nested → .Complete)
+# and Dagger 2 for dependency injection with lazy InstanceHolder singletons.
+# R8 can merge/devirtualize these interface hierarchies, causing
+# AbstractMethodError or IncompatibleClassChangeError on older ART runtimes
+# (Android 11 and below) when the auth code path is taken.
+-keep class com.hivemq.client.** { *; }
+
+# Preserve Dagger 2 and javax.inject used internally by HiveMQ
+# (42 InstanceHolder lazy-init factories, DaggerSingletonComponent, etc.)
+-keep class dagger.** { *; }
+-keep class javax.inject.** { *; }
+
+# Preserve RxJava 2 used by HiveMQ for reactive streams
+-keepclassmembers class io.reactivex.** { *; }
+-dontwarn io.reactivex.**
+
 # Preserve Netty field/method names (JCTools Unsafe reflection)
 -keepclassmembernames class io.netty.** { *; }
 

@@ -31,7 +31,7 @@ export interface ApiCallbacks {
   onReboot?: () => void;
   onClearCache?: () => void;
   onRemoteKey?: (key: string) => void;
-  onAutoBrightnessEnable?: (min: number, max: number) => void;
+  onAutoBrightnessEnable?: (min: number, max: number, offset?: number) => void;
   onAutoBrightnessDisable?: () => void;
   onSetMotionAlwaysOn?: (value: boolean) => void;
 }
@@ -301,7 +301,8 @@ class ApiServiceClass {
           if (this.callbacks.onAutoBrightnessEnable) {
             const min = params.min !== undefined ? params.min : 10;
             const max = params.max !== undefined ? params.max : 100;
-            this.callbacks.onAutoBrightnessEnable(min, max);
+            const offset = params.offset !== undefined ? params.offset : undefined;
+            this.callbacks.onAutoBrightnessEnable(min, max, offset);
           }
           break;
           

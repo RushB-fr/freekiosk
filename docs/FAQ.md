@@ -27,10 +27,10 @@
 **A:** No, but **highly recommended** for production use. Without Device Owner, kiosk lockdown is partial (users may exit with back button, see notifications, etc.).
 
 ### Q: Can I activate Device Owner after installing FreeKiosk?
-**A:** No. Device Owner must be set up on a factory-reset device with no Google accounts. You must factory reset first.
+**A:** Yes! You just need to remove **all accounts** from the device first (Settings → Accounts). Once the `dpm` command succeeds, you can sign back into your accounts. A factory reset is **not** required — only the absence of active accounts matters.
 
 ### Q: Factory reset required?
-**A:** Yes, for Device Owner activation. This is an Android limitation, not FreeKiosk's.
+**A:** No! Android's actual requirement is that **no user accounts** are active on the device. Simply remove all accounts (Google, Samsung, Microsoft, SIM profiles), run the `dpm` command, then sign back in. A factory reset is only needed as a fallback if account removal alone doesn't work (some devices retain hidden accounts).
 
 ### Q: Can I remove Device Owner?
 **A:** Yes! In FreeKiosk settings, use the "⚠️ Remove Device Owner" button (NOT "Exit Kiosk Mode"). Or via ADB:

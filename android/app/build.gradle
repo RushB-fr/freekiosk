@@ -98,7 +98,7 @@ android {
         applicationId "com.freekiosk"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 32
+        versionCode 35
         versionName "1.2.17"
 
         // Expose self-update flag to both Kotlin (BuildConfig) and JS (via UpdateModule constants)
@@ -110,14 +110,14 @@ android {
         if (enableSelfUpdate) {
             manifestPlaceholders = [
                 usesCleartextTraffic: "true",
-                installPackagesPermission: "android.permission.REQUEST_INSTALL_PACKAGES",
-                updateReceiverEnabled: "true"
+                updateReceiverEnabled: "true",
+                accessibilityServiceEnabled: "true"
             ]
         } else {
             manifestPlaceholders = [
                 usesCleartextTraffic: "true",
-                installPackagesPermission: "android.permission.INTERNET",
-                updateReceiverEnabled: "false"
+                updateReceiverEnabled: "false",
+                accessibilityServiceEnabled: "false"
             ]
         }
     }
@@ -162,6 +162,17 @@ android {
             minifyEnabled enableProguardInReleaseBuilds
             shrinkResources true
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+        }
+    }
+
+    // Play Store builds: merge an overlay manifest that uses tools:node="remove"
+    // to completely strip FreeKioskAccessibilityService (and its BIND_ACCESSIBILITY_SERVICE
+    // permission) from the final merged manifest — not just disable it.
+    if (project.hasProperty('playstore')) {
+        sourceSets {
+            release {
+                manifest.srcFile 'src/playstore/AndroidManifest.xml'
+            }
         }
     }
 }

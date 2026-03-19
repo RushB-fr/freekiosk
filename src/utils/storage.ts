@@ -78,6 +78,7 @@ const KEYS = {
   AUTO_BRIGHTNESS_ENABLED: '@kiosk_auto_brightness_enabled',
   AUTO_BRIGHTNESS_MIN: '@kiosk_auto_brightness_min',
   AUTO_BRIGHTNESS_MAX: '@kiosk_auto_brightness_max',
+  AUTO_BRIGHTNESS_OFFSET: '@kiosk_auto_brightness_offset',
   AUTO_BRIGHTNESS_UPDATE_INTERVAL: '@kiosk_auto_brightness_update_interval',
   AUTO_BRIGHTNESS_SAVED_MANUAL: '@kiosk_auto_brightness_saved_manual',
   // Brightness Management (allow system to manage)
@@ -103,6 +104,8 @@ const KEYS = {
   PDF_VIEWER_ENABLED: '@kiosk_pdf_viewer_enabled',
   // WebView Zoom Level
   WEBVIEW_ZOOM_LEVEL: '@kiosk_webview_zoom_level',
+  // Custom User Agent
+  CUSTOM_USER_AGENT: '@kiosk_custom_user_agent',
   // MQTT (Home Assistant integration)
   MQTT_ENABLED: '@kiosk_mqtt_enabled',
   MQTT_BROKER_URL: '@kiosk_mqtt_broker_url',
@@ -313,6 +316,7 @@ export const StorageService = {
         KEYS.AUTO_BRIGHTNESS_ENABLED,
         KEYS.AUTO_BRIGHTNESS_MIN,
         KEYS.AUTO_BRIGHTNESS_MAX,
+        KEYS.AUTO_BRIGHTNESS_OFFSET,
         KEYS.AUTO_BRIGHTNESS_UPDATE_INTERVAL,
         KEYS.AUTO_BRIGHTNESS_SAVED_MANUAL,
         // Brightness Management
@@ -338,6 +342,8 @@ export const StorageService = {
         KEYS.PDF_VIEWER_ENABLED,
         // WebView Zoom Level
         KEYS.WEBVIEW_ZOOM_LEVEL,
+        // Custom User Agent
+        KEYS.CUSTOM_USER_AGENT,
         // MQTT
         KEYS.MQTT_ENABLED,
         KEYS.MQTT_BROKER_URL,
@@ -1529,6 +1535,24 @@ export const StorageService = {
     }
   },
 
+  saveAutoBrightnessOffset: async (value: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.AUTO_BRIGHTNESS_OFFSET, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving auto brightness offset:', error);
+    }
+  },
+
+  getAutoBrightnessOffset: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.AUTO_BRIGHTNESS_OFFSET);
+      return value ? JSON.parse(value) : 0.0; // Default: no offset
+    } catch (error) {
+      console.error('Error getting auto brightness offset:', error);
+      return 0.0;
+    }
+  },
+
   saveAutoBrightnessUpdateInterval: async (value: number): Promise<void> => {
     try {
       await AsyncStorage.setItem(KEYS.AUTO_BRIGHTNESS_UPDATE_INTERVAL, JSON.stringify(value));
@@ -1864,6 +1888,26 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting WebView zoom level:', error);
       return 100;
+    }
+  },
+
+  // ============ Custom User Agent ============
+
+  saveCustomUserAgent: async (value: string): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.CUSTOM_USER_AGENT, value);
+    } catch (error) {
+      console.error('Error saving custom user agent:', error);
+    }
+  },
+
+  getCustomUserAgent: async (): Promise<string> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.CUSTOM_USER_AGENT);
+      return value ?? '';
+    } catch (error) {
+      console.error('Error getting custom user agent:', error);
+      return '';
     }
   },
 

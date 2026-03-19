@@ -20,6 +20,7 @@ export interface AutoBrightnessStatus {
   currentBrightness: number; // 0-100
   minBrightness: number; // 0-100
   maxBrightness: number; // 0-100
+  brightnessOffset: number; // 0-100
 }
 
 export interface LightLevelResult {
@@ -34,6 +35,7 @@ export const AUTO_BRIGHTNESS_DEFAULTS = {
   enabled: false,
   minBrightness: 0.1, // 10%
   maxBrightness: 1.0, // 100%
+  brightnessOffset: 0.0, // No offset
   updateInterval: 1000, // 1 second
 };
 
@@ -44,18 +46,21 @@ const AutoBrightnessModule = {
    * @param minBrightness Minimum brightness (0.0-1.0) for dark conditions
    * @param maxBrightness Maximum brightness (0.0-1.0) for bright conditions
    * @param updateInterval Milliseconds between updates (for battery optimization)
+   * @param brightnessOffset Offset added to calculated brightness (0.0-1.0), e.g. 0.1 = +10%
    * @returns Promise resolving to result object
    */
   startAutoBrightness: async (
     minBrightness: number = AUTO_BRIGHTNESS_DEFAULTS.minBrightness,
     maxBrightness: number = AUTO_BRIGHTNESS_DEFAULTS.maxBrightness,
-    updateInterval: number = AUTO_BRIGHTNESS_DEFAULTS.updateInterval
+    updateInterval: number = AUTO_BRIGHTNESS_DEFAULTS.updateInterval,
+    brightnessOffset: number = AUTO_BRIGHTNESS_DEFAULTS.brightnessOffset
   ): Promise<AutoBrightnessResult> => {
     try {
       const result = await NativeAutoBrightnessModule.startAutoBrightness(
         minBrightness,
         maxBrightness,
-        updateInterval
+        updateInterval,
+        brightnessOffset
       );
       return result;
     } catch (error) {
@@ -115,18 +120,21 @@ const AutoBrightnessModule = {
    * @param minBrightness New minimum brightness (0.0-1.0)
    * @param maxBrightness New maximum brightness (0.0-1.0)
    * @param updateInterval New update interval in milliseconds
+   * @param brightnessOffset Offset added to calculated brightness (0.0-1.0)
    * @returns Promise resolving to result object
    */
   updateParameters: async (
     minBrightness: number,
     maxBrightness: number,
-    updateInterval: number
+    updateInterval: number,
+    brightnessOffset: number = AUTO_BRIGHTNESS_DEFAULTS.brightnessOffset
   ): Promise<AutoBrightnessResult> => {
     try {
       const result = await NativeAutoBrightnessModule.updateParameters(
         minBrightness,
         maxBrightness,
-        updateInterval
+        updateInterval,
+        brightnessOffset
       );
       return result;
     } catch (error) {

@@ -93,13 +93,18 @@ sudo dnf install android-tools
 
 ### Step 2: Prepare Tablet
 
-#### 1. Factory Reset
+#### 1. Remove All Accounts
 
-- Go to Settings → System → Reset
-- Select "Factory data reset"
-- Confirm
+Device Owner requires that **no user accounts** are active on the device. A factory reset is **not** required.
 
-⚠️ **CRITICAL**: After reset, **DO NOT add a Google account**. Device Owner cannot be activated if any accounts exist on the device.
+1. Go to **Settings → Accounts**
+2. Remove **every** account (Google, Samsung, Microsoft 365, etc.)
+3. Remove your SIM card or disable the SIM profile — Android may keep a SIM-linked account active
+4. Verify: Settings → Accounts should show **no accounts**
+
+⚠️ **IMPORTANT**: You can sign back into all your accounts **after** Device Owner is activated.
+
+> **Fallback**: If the `dpm` command still fails after removing accounts (some devices retain hidden accounts after a reboot), perform a factory reset: Settings → System → Reset → Factory data reset. After reset, do **not** add any account before activating Device Owner.
 
 #### 2. Enable USB Debugging
 
@@ -209,12 +214,13 @@ adb devices
 
 ### "Not allowed to set the device owner"
 
-**Cause**: Google account exists on device
+**Cause**: One or more user accounts exist on the device (Google, Samsung, Microsoft, SIM profile, etc.)
 
 **Solution**:
-1. Factory reset tablet
-2. **DO NOT** add Google account after reset
-3. Try Device Owner command again
+1. Go to Settings → Accounts and remove **all** accounts
+2. Remove SIM card or disable SIM profile (Android may keep a hidden SIM account)
+3. Try the Device Owner command again
+4. **Fallback**: If it still fails, factory reset the tablet and do **not** add any account before running the command
 
 ### "No devices/emulators found"
 

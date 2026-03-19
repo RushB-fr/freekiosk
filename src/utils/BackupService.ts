@@ -77,6 +77,7 @@ const BACKUP_KEYS = [
   '@kiosk_auto_brightness_enabled',
   '@kiosk_auto_brightness_min',
   '@kiosk_auto_brightness_max',
+  '@kiosk_auto_brightness_offset',
   '@kiosk_auto_brightness_update_interval',
   '@kiosk_auto_brightness_saved_manual',
   // Brightness Management

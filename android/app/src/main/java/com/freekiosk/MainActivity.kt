@@ -736,6 +736,22 @@ class MainActivity : ReactActivity() {
     }
   }
 
+  /**
+   * Stop KioskWatchdogService and cancel its notification (#96 fix).
+   * Called during intentional kiosk exit to prevent the watchdog from relaunching the app.
+   */
+  private fun stopKioskWatchdog() {
+    try {
+      val serviceIntent = Intent(this, KioskWatchdogService::class.java)
+      stopService(serviceIntent)
+      val nm = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+      nm.cancel(2002) // KioskWatchdogService.NOTIFICATION_ID
+      DebugLog.d("MainActivity", "KioskWatchdogService stopped and notification cleared")
+    } catch (e: Exception) {
+      DebugLog.d("MainActivity", "Error stopping KioskWatchdogService: ${e.message}")
+    }
+  }
+
   // ==================== ADB Configuration ====================
   
   /**
@@ -1244,6 +1260,14 @@ class MainActivity : ReactActivity() {
   override fun onDestroy() {
     super.onDestroy()
     disableKioskRestrictions()
+    
+    // Stop KioskWatchdogService if kiosk mode was intentionally disabled (#96 fix)
+    // This prevents the watchdog from relaunching the app after an intentional exit.
+    // We check the flag rather than isKioskEnabled() because onDestroy may also fire
+    // during an OOM kill — in that case we want the watchdog to keep running.
+    if (blockAutoRelaunch) {
+      stopKioskWatchdog()
+    }
     
     // Clean up blocking overlays
     try {

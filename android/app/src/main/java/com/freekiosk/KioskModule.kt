@@ -68,6 +68,13 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
         try {
             val activity = reactApplicationContext.currentActivity
             if (activity != null && activity is MainActivity) {
+                // Write @kiosk_enabled=false to AsyncStorage BEFORE finishing activity
+                // so the watchdog cannot relaunch the app during its next poll cycle
+                setKioskEnabledInAsyncStorage(false)
+
+                // Explicitly stop KioskWatchdogService (#96 fix)
+                stopKioskWatchdog()
+
                 activity.runOnUiThread {
                     try {
                         activity.disableKioskRestrictions()
@@ -83,6 +90,49 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
             }
         } catch (e: Exception) {
             promise.reject("ERROR", "Failed to exit kiosk mode: ${e.message}")
+        }
+    }
+
+    /**
+     * Stop the KioskWatchdogService and cancel its notification.
+     * Called on intentional kiosk exit to prevent the watchdog from relaunching the app.
+     */
+    private fun stopKioskWatchdog() {
+        try {
+            val serviceIntent = Intent(reactApplicationContext, KioskWatchdogService::class.java)
+            reactApplicationContext.stopService(serviceIntent)
+            // Also cancel the notification in case stopService races with onDestroy
+            val nm = reactApplicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            nm.cancel(2002) // KioskWatchdogService.NOTIFICATION_ID
+            android.util.Log.d("KioskModule", "KioskWatchdogService stopped and notification cleared")
+        } catch (e: Exception) {
+            android.util.Log.e("KioskModule", "Error stopping KioskWatchdogService: ${e.message}")
+        }
+    }
+
+    /**
+     * Write @kiosk_enabled directly to AsyncStorage's SQLite database.
+     * This ensures the value is persisted BEFORE the activity is destroyed,
+     * so the watchdog's next poll cycle (or a system-restart) reads the correct value.
+     */
+    private fun setKioskEnabledInAsyncStorage(enabled: Boolean) {
+        try {
+            val dbPath = reactApplicationContext.getDatabasePath("RKStorage").absolutePath
+            val db = android.database.sqlite.SQLiteDatabase.openDatabase(
+                dbPath, null, android.database.sqlite.SQLiteDatabase.OPEN_READWRITE
+            )
+            val cv = android.content.ContentValues().apply {
+                put("key", "@kiosk_enabled")
+                put("value", enabled.toString())
+            }
+            db.insertWithOnConflict(
+                "catalystLocalStorage", null, cv,
+                android.database.sqlite.SQLiteDatabase.CONFLICT_REPLACE
+            )
+            db.close()
+            android.util.Log.d("KioskModule", "@kiosk_enabled set to $enabled in AsyncStorage")
+        } catch (e: Exception) {
+            android.util.Log.e("KioskModule", "Failed to write @kiosk_enabled: ${e.message}")
         }
     }
 

@@ -286,12 +286,13 @@ Enable automatic brightness adjustment based on ambient light sensor.
 
 > ⚠️ When **App Brightness Control** is disabled in settings, this endpoint is ignored.
 ```json
-{ "min": 10, "max": 100 }
+{ "min": 10, "max": 100, "offset": 10 }
 ```
 - `min`: Minimum brightness percentage (0-100, default: 10)
 - `max`: Maximum brightness percentage (0-100, default: 100)
+- `offset`: *(optional)* Fixed percentage added to calculated brightness (0-100, default: keeps current setting). E.g. `10` means +10% brighter than what the sensor calculates
 
-> 💡 Uses a logarithmic curve for natural perception. Brightness is calculated based on ambient light level (10-1000 lux range).
+> 💡 Uses a logarithmic curve for natural perception. Brightness is calculated based on ambient light level (10-1000 lux range), then the offset is added (capped at 100%).
 
 #### `POST /api/autoBrightness/disable`
 Disable automatic brightness and restore previous manual brightness setting.

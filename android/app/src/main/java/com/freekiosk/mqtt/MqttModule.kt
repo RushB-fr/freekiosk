@@ -8,7 +8,11 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.media.AudioAttributes
+import android.media.AudioFormat
 import android.media.AudioManager
+import android.media.AudioTrack
+import android.media.MediaPlayer
 import android.Manifest
 import android.content.pm.PackageManager
 import android.location.LocationManager
@@ -96,6 +100,10 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
     // Motion detection
     private var jsMotionDetected: Boolean = false
     private var jsMotionAlwaysOn: Boolean = false
+
+    // ==================== Audio playback ====================
+
+    private var mediaPlayer: MediaPlayer? = null
 
     // ==================== TTS ====================
 
@@ -242,7 +250,7 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
             client.statusProvider = { getDeviceStatus() }
 
             client.commandHandler = { command, params ->
-                // Handle TTS and Toast natively (JS callback doesn't execute them)
+                // Handle TTS, Toast and Audio natively (JS callback doesn't execute them)
                 when (command) {
                     "tts" -> {
                         val text = params?.optString("text", "") ?: ""
@@ -251,6 +259,18 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
                     "toast" -> {
                         val text = params?.optString("text", "") ?: ""
                         if (text.isNotEmpty()) showToastMessage(text)
+                    }
+                    "audioPlay" -> {
+                        val url = params?.optString("url", "")
+                        val loop = params?.optBoolean("loop", false) ?: false
+                        val volume = params?.optInt("volume", 50) ?: 50
+                        playAudio(url, loop, volume)
+                    }
+                    "audioStop" -> {
+                        stopAudio()
+                    }
+                    "audioBeep" -> {
+                        playBeep()
                     }
                 }
                 emitCommand(command, params)
@@ -696,6 +716,96 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
         }
     }
 
+    // ==================== Audio Methods ====================
+
+    private fun playAudio(url: String?, loop: Boolean, volume: Int) {
+        try {
+            stopAudio()
+
+            if (url.isNullOrEmpty()) {
+                Log.w(TAG, "No URL provided for audio playback")
+                return
+            }
+
+            mediaPlayer = MediaPlayer().apply {
+                setDataSource(url)
+                isLooping = loop
+                setVolume(volume / 100f, volume / 100f)
+                prepareAsync()
+                setOnPreparedListener { start() }
+                setOnErrorListener { _, what, extra ->
+                    Log.e(TAG, "MediaPlayer error: $what, $extra")
+                    true
+                }
+            }
+            Log.d(TAG, "Playing audio: $url, loop=$loop, volume=$volume")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to play audio", e)
+        }
+    }
+
+    private fun stopAudio() {
+        try {
+            mediaPlayer?.apply {
+                if (isPlaying) stop()
+                release()
+            }
+            mediaPlayer = null
+            Log.d(TAG, "Audio stopped")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to stop audio", e)
+        }
+    }
+
+    private fun playBeep() {
+        Thread {
+            try {
+                // Generate a 440Hz beep (note A) for 200ms on MUSIC stream
+                val sampleRate = 44100
+                val durationMs = 200
+                val numSamples = sampleRate * durationMs / 1000
+                val samples = ShortArray(numSamples)
+                val freqHz = 440.0 // Note A4
+
+                // Generate sine wave
+                for (i in 0 until numSamples) {
+                    val angle = 2.0 * Math.PI * i * freqHz / sampleRate
+                    samples[i] = (Math.sin(angle) * Short.MAX_VALUE * 0.3).toInt().toShort() // 30% volume
+                }
+
+                val audioTrack = AudioTrack.Builder()
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                    .setAudioFormat(
+                        AudioFormat.Builder()
+                            .setSampleRate(sampleRate)
+                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                            .build()
+                    )
+                    .setBufferSizeInBytes(samples.size * 2)
+                    .setTransferMode(AudioTrack.MODE_STATIC)
+                    .build()
+
+                audioTrack.write(samples, 0, samples.size)
+                audioTrack.play()
+
+                // Wait for playback to finish then release
+                Thread.sleep(durationMs.toLong() + 50)
+                audioTrack.stop()
+                audioTrack.release()
+
+                Log.d(TAG, "Beep played (440Hz tone)")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to play beep", e)
+            }
+        }.start()
+    }
+
     // ==================== Event emitters ====================
 
     /**
@@ -745,6 +855,7 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
             mqttClient = null
             instance = null
             sensorManager?.unregisterListener(this)
+            stopAudio()
             tts?.stop()
             tts?.shutdown()
             tts = null

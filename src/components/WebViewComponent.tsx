@@ -35,6 +35,7 @@ interface WebViewComponentProps {
   urlFilterShowFeedback?: boolean; // Show feedback when URL is blocked
   pdfViewerEnabled?: boolean; // Enable inline PDF viewing via PDF.js
   zoomLevel?: number; // Zoom level percentage (50-200, default 100)
+  customUserAgent?: string; // Custom User-Agent string (empty = default modern Chrome UA)
 }
 
 export interface WebViewComponentRef {
@@ -59,7 +60,8 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   urlFilterPatterns,
   urlFilterShowFeedback = false,
   pdfViewerEnabled = false,
-  zoomLevel = 100
+  zoomLevel = 100,
+  customUserAgent = ''
 }, ref) => {
   const navigation = useNavigation<NavigationProp>();
   const webViewRef = useRef<WebView>(null);
@@ -550,8 +552,9 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
         source={{ uri: error ? 'about:blank' : url }}
         style={styles.webview}
         
-        // User Agent - Mimic Chrome to ensure proper storage APIs
-        userAgent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        // User Agent - Modern Chrome on Android to avoid WAF blocks (e.g. SiteGround)
+        // Custom UA takes precedence if set, otherwise use a recent Chrome stable UA
+        userAgent={customUserAgent?.trim() || "Mozilla/5.0 (Linux; Android 13; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"}
         
         originWhitelist={pdfViewerEnabled ? ['http://*', 'https://*', 'file://*'] : ['http://*', 'https://*']}
         mixedContentMode="always"
@@ -788,6 +791,9 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
             <Text style={styles.reloadText}>🔄 Reload Now</Text>
           </TouchableOpacity>
           {/* Fallback settings button inside error overlay */}
+          <Text style={styles.fallbackSettingsHint}>
+            Tap ⚙️ button 5× to return to settings
+          </Text>
           <TouchableOpacity
             style={styles.fallbackSettingsButton}
             activeOpacity={0.7}
@@ -1033,18 +1039,28 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 20,
     right: 20,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'transparent',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 9999,
     elevation: 9999,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.12)',
   },
   fallbackSettingsButtonText: {
-    fontSize: 20,
-    opacity: 0,
+    fontSize: 22,
+    opacity: 1,
+  },
+  fallbackSettingsHint: {
+    position: 'absolute',
+    bottom: 76,
+    right: 8,
+    fontSize: 11,
+    color: '#999',
+    textAlign: 'right',
   },
 });
 

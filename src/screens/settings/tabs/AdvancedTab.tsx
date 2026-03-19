@@ -233,7 +233,8 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
       {/* MQTT - Home Assistant Integration */}
       <MqttSettingsSection />
 
-      {/* Accessibility Service - Required for keyboard injection in External App mode */}
+      {/* Accessibility Service - Hidden in Play Store builds (BIND_ACCESSIBILITY_SERVICE policy) */}
+      {enableSelfUpdate && (
       <SettingsSection title="Accessibility Service" icon="keyboard-outline">
         <View style={styles.accessibilityStatusRow}>
           <Text style={styles.accessibilityStatusLabel}>Status</Text>
@@ -296,6 +297,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
           </SettingsInfoBox>
         )}
       </SettingsSection>
+      )}
 
       {/* Backup & Restore */}
       <BackupRestoreSection onRestoreComplete={onRestoreComplete} />

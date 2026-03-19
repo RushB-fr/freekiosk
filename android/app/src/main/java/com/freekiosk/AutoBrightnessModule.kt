@@ -45,6 +45,7 @@ class AutoBrightnessModule(private val reactContext: ReactApplicationContext) :
     private var isActive = false
     private var minBrightness = 0.1f  // 10%
     private var maxBrightness = 1.0f  // 100%
+    private var brightnessOffset = 0.0f // Offset added to calculated brightness
     private var updateInterval = 1000 // ms
     
     private var lastBrightnessValue = -1f
@@ -61,13 +62,15 @@ class AutoBrightnessModule(private val reactContext: ReactApplicationContext) :
      * @param minBrightness Minimum brightness (0.0-1.0) for dark conditions
      * @param maxBrightness Maximum brightness (0.0-1.0) for bright conditions
      * @param updateInterval Milliseconds between updates (for battery optimization)
+     * @param brightnessOffset Offset added to calculated brightness (0.0-1.0), e.g. 0.1 = +10%
      */
     @ReactMethod
-    fun startAutoBrightness(minBrightness: Double, maxBrightness: Double, updateInterval: Int, promise: Promise) {
+    fun startAutoBrightness(minBrightness: Double, maxBrightness: Double, updateInterval: Int, brightnessOffset: Double, promise: Promise) {
         try {
             // Update parameters (even if already active)
             this.minBrightness = minBrightness.toFloat().coerceIn(0f, 1f)
             this.maxBrightness = maxBrightness.toFloat().coerceIn(0f, 1f)
+            this.brightnessOffset = brightnessOffset.toFloat().coerceIn(0f, 1f)
             this.updateInterval = updateInterval.coerceIn(100, 10000)
             
             // Ensure min <= max
@@ -79,7 +82,7 @@ class AutoBrightnessModule(private val reactContext: ReactApplicationContext) :
             
             // If already active, just update parameters and return
             if (isActive) {
-                Log.d(TAG, "Auto-brightness parameters updated: min=${this.minBrightness}, max=${this.maxBrightness}")
+                Log.d(TAG, "Auto-brightness parameters updated: min=${this.minBrightness}, max=${this.maxBrightness}, offset=${this.brightnessOffset}")
                 promise.resolve(createResultMap(true, "Auto-brightness parameters updated"))
                 return
             }
@@ -105,7 +108,7 @@ class AutoBrightnessModule(private val reactContext: ReactApplicationContext) :
             smoothedBrightness = -1f
             lastUpdateTime = System.currentTimeMillis()
 
-            Log.i(TAG, "Auto-brightness started: min=$minBrightness, max=$maxBrightness, interval=$updateInterval")
+            Log.i(TAG, "Auto-brightness started: min=$minBrightness, max=$maxBrightness, offset=$brightnessOffset, interval=$updateInterval")
             
             promise.resolve(createResultMap(true, "Auto-brightness started"))
         } catch (e: Exception) {
@@ -147,6 +150,7 @@ class AutoBrightnessModule(private val reactContext: ReactApplicationContext) :
             putDouble("currentBrightness", (lastBrightnessValue * 100).toDouble())
             putDouble("minBrightness", (minBrightness * 100).toDouble())
             putDouble("maxBrightness", (maxBrightness * 100).toDouble())
+            putDouble("brightnessOffset", (brightnessOffset * 100).toDouble())
         }
         promise.resolve(result)
     }
@@ -167,10 +171,11 @@ class AutoBrightnessModule(private val reactContext: ReactApplicationContext) :
      * Update auto-brightness parameters without stopping
      */
     @ReactMethod
-    fun updateParameters(minBrightness: Double, maxBrightness: Double, updateInterval: Int, promise: Promise) {
+    fun updateParameters(minBrightness: Double, maxBrightness: Double, updateInterval: Int, brightnessOffset: Double, promise: Promise) {
         try {
             this.minBrightness = minBrightness.toFloat().coerceIn(0f, 1f)
             this.maxBrightness = maxBrightness.toFloat().coerceIn(0f, 1f)
+            this.brightnessOffset = brightnessOffset.toFloat().coerceIn(0f, 1f)
             this.updateInterval = updateInterval.coerceIn(100, 10000)
             
             // Ensure min <= max
@@ -180,7 +185,7 @@ class AutoBrightnessModule(private val reactContext: ReactApplicationContext) :
                 this.maxBrightness = temp
             }
 
-            Log.i(TAG, "Parameters updated: min=$minBrightness, max=$maxBrightness, interval=$updateInterval")
+            Log.i(TAG, "Parameters updated: min=$minBrightness, max=$maxBrightness, offset=$brightnessOffset, interval=$updateInterval")
             promise.resolve(createResultMap(true, "Parameters updated"))
         } catch (e: Exception) {
             promise.reject("UPDATE_FAILED", "Failed to update parameters: ${e.message}")
@@ -240,8 +245,8 @@ class AutoBrightnessModule(private val reactContext: ReactApplicationContext) :
         }
         lastUpdateTime = currentTime
 
-        // Calculate target brightness using logarithmic curve
-        val targetBrightness = calculateBrightness(currentLightLevel)
+        // Calculate target brightness using logarithmic curve, then apply offset
+        val targetBrightness = (calculateBrightness(currentLightLevel) + brightnessOffset).coerceIn(0.01f, 1f)
         
         // Apply smoothing for gradual transitions
         val newBrightness = if (smoothedBrightness < 0) {

@@ -164,9 +164,14 @@ For **complete lockdown** with full security, follow these steps:
 
 #### Steps
 
-**1. Factory Reset your tablet**
-- Settings → System → Reset → Factory reset
-- ⚠️ **IMPORTANT**: DO NOT add Google account after reset
+**1. Remove all accounts from your tablet**
+- Settings → Accounts → Remove **all** accounts (Google, Samsung, Microsoft, etc.)
+- Also remove any SIM card or SIM profile, as Android may keep a SIM-linked account active
+- ⚠️ **IMPORTANT**: Device Owner requires **no user accounts** on the device at the time of activation
+- 💡 You can sign back into all your accounts after Device Owner is set
+
+> **Tip**: If removing accounts doesn't work (some devices retain hidden accounts), a factory reset is a reliable fallback:
+> Settings → System → Reset → Factory reset — then do NOT add any account before step 4.
 
 **2. Enable USB Debugging**
 - Settings → About tablet → Tap "Build number" 7 times

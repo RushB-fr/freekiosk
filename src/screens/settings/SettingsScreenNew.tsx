@@ -28,6 +28,7 @@ import LauncherModule from '../../utils/LauncherModule';
 import UpdateModule, { ENABLE_SELF_UPDATE } from '../../utils/UpdateModule';
 import AutoBrightnessModule from '../../utils/AutoBrightnessModule';
 import { httpServer } from '../../utils/HttpServerModule';
+import { hasSettingsAccess, revokeSettingsAccess } from '../../utils/authState';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/AppNavigator';
 
@@ -150,6 +151,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [autoBrightnessEnabled, setAutoBrightnessEnabled] = useState<boolean>(false);
   const [autoBrightnessMin, setAutoBrightnessMin] = useState<number>(0.1);
   const [autoBrightnessMax, setAutoBrightnessMax] = useState<number>(1.0);
+  const [autoBrightnessOffset, setAutoBrightnessOffset] = useState<number>(0.0);
   const [currentLightLevel, setCurrentLightLevel] = useState<number>(0);
   const [hasLightSensor, setHasLightSensor] = useState<boolean>(true);
   
@@ -182,6 +184,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   
   // WebView Zoom Level
   const [zoomLevel, setZoomLevel] = useState<number>(100);
+  
+  // Custom User Agent
+  const [customUserAgent, setCustomUserAgent] = useState<string>('');
   
   // Media Player states
   const [mediaPlayerItems, setMediaPlayerItems] = useState<MediaItem[]>([]);
@@ -272,6 +277,16 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     });
     return () => backHandler.remove();
   }, []);
+
+  // AUTH GATE: Verify that PIN was actually entered before allowing access (#93).
+  // If Settings is mounted/re-created by Android's native back-stack or gesture
+  // navigation without going through PinScreen, redirect to Kiosk immediately.
+  useEffect(() => {
+    if (!hasSettingsAccess()) {
+      console.warn('[Settings] Access denied — no valid PIN verification. Redirecting to Kiosk.');
+      navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] });
+    }
+  }, [navigation]);
 
   // Subscribe to camera device changes — handles the race condition where
   // ProcessCameraProvider hasn't resolved yet when the settings screen first loads.
@@ -468,6 +483,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedAutoBrightnessEnabled = await StorageService.getAutoBrightnessEnabled();
     const savedAutoBrightnessMin = await StorageService.getAutoBrightnessMin();
     const savedAutoBrightnessMax = await StorageService.getAutoBrightnessMax();
+    const savedAutoBrightnessOffset = await StorageService.getAutoBrightnessOffset();
 
     // Brightness Management
     const savedBrightnessManagementEnabled = await StorageService.getBrightnessManagementEnabled();
@@ -527,6 +543,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setAutoBrightnessEnabled(savedAutoBrightnessEnabled);
     setAutoBrightnessMin(savedAutoBrightnessMin);
     setAutoBrightnessMax(savedAutoBrightnessMax);
+    setAutoBrightnessOffset(savedAutoBrightnessOffset);
     setBrightnessManagementEnabled(savedBrightnessManagementEnabled);
     setScreenSchedulerEnabled(savedScreenSchedulerEnabled);
     setScreenSchedulerRules(savedScreenSchedulerRules);
@@ -565,6 +582,10 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     // WebView Zoom Level
     const savedZoomLevel = await StorageService.getWebViewZoomLevel();
     setZoomLevel(savedZoomLevel);
+
+    // Custom User Agent
+    const savedCustomUserAgent = await StorageService.getCustomUserAgent();
+    setCustomUserAgent(savedCustomUserAgent);
 
     // Media Player settings
     const savedMediaItems = await StorageService.getMediaPlayerItems();
@@ -1101,6 +1122,11 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     // Save brightness management setting (applies to ALL modes)
     await StorageService.saveBrightnessManagementEnabled(brightnessManagementEnabled);
 
+    // Screen Sleep Scheduler settings (applies to ALL modes)
+    await StorageService.saveScreenSchedulerEnabled(screenSchedulerEnabled);
+    await StorageService.saveScreenSchedulerRules(screenSchedulerRules);
+    await StorageService.saveScreenSchedulerWakeOnTouch(screenSchedulerWakeOnTouch);
+
     if (displayMode === 'webview' || displayMode === 'media_player') {
       await StorageService.saveAutoReload(displayMode === 'webview' ? autoReload : false);
       await StorageService.saveKioskEnabled(kioskEnabled);
@@ -1115,11 +1141,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       await StorageService.saveAutoBrightnessEnabled(autoBrightnessEnabled);
       await StorageService.saveAutoBrightnessMin(autoBrightnessMin);
       await StorageService.saveAutoBrightnessMax(autoBrightnessMax);
-      
-      // Screen Sleep Scheduler settings
-      await StorageService.saveScreenSchedulerEnabled(screenSchedulerEnabled);
-      await StorageService.saveScreenSchedulerRules(screenSchedulerRules);
-      await StorageService.saveScreenSchedulerWakeOnTouch(screenSchedulerWakeOnTouch);
+      await StorageService.saveAutoBrightnessOffset(autoBrightnessOffset);
 
       // Inactivity Return to Home settings (webview only)
       if (displayMode === 'webview') {
@@ -1137,7 +1159,6 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       await StorageService.saveKioskEnabled(kioskEnabled);
       await StorageService.saveScreensaverEnabled(false);
       await StorageService.saveAutoBrightnessEnabled(false);
-      await StorageService.saveScreenSchedulerEnabled(false);
       await StorageService.saveInactivityReturnEnabled(false);
     }
 
@@ -1162,6 +1183,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.saveBackButtonTimerDelay(isNaN(timerDelay) ? 10 : Math.max(1, Math.min(3600, timerDelay)));
     await StorageService.saveKeyboardMode(keyboardMode);
     await StorageService.saveWebViewZoomLevel(zoomLevel);
+    await StorageService.saveCustomUserAgent(customUserAgent);
     await StorageService.saveAllowPowerButton(allowPowerButton);
     await StorageService.saveAllowNotifications(allowNotifications);
     await StorageService.saveAllowSystemInfo(allowSystemInfo);
@@ -1280,7 +1302,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
         ? 'Configuration saved\nMedia player locked'
         : 'Configuration saved\nScreen pinning enabled';
       Alert.alert('Success', message, [
-        { text: 'OK', onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] }) },
+        { text: 'OK', onPress: () => { revokeSettingsAccess(); navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] }); } },
       ]);
     } else {
       try {
@@ -1294,7 +1316,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
         ? 'Configuration saved\nMedia player will start'
         : 'Configuration saved\nScreen pinning disabled';
       Alert.alert('Success', message, [
-        { text: 'OK', onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] }) },
+        { text: 'OK', onPress: () => { revokeSettingsAccess(); navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] }); } },
       ]);
     }
   };
@@ -1357,6 +1379,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
               setAutoBrightnessEnabled(false);
               setAutoBrightnessMin(0.1);
               setAutoBrightnessMax(1.0);
+              setAutoBrightnessOffset(0.0);
               setBrightnessManagementEnabled(true);
               
               // Reset screen scheduler state
@@ -1390,7 +1413,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
               } catch {}
 
               Alert.alert('Success', 'Settings reset!\nPlease reconfigure the app.', [
-                { text: 'OK', onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] }) },
+                { text: 'OK', onPress: () => { revokeSettingsAccess(); navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] }); } },
               ]);
             } catch (error) {
               Alert.alert('Error', `Reset failed: ${error}`);
@@ -1457,7 +1480,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
               Alert.alert(
                 'Success',
                 'Device Owner removed!\n\nYou can now uninstall FreeKiosk normally.',
-                [{ text: 'OK', onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] }) }]
+                [{ text: 'OK', onPress: () => { revokeSettingsAccess(); navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] }); } }]
               );
             } catch (error: any) {
               Alert.alert('Error', `Failed: ${error.message || error}`);
@@ -1614,7 +1637,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             onMediaPlayerMuteChange={setMediaPlayerMute}
             onPickMediaFromDevice={handlePickMediaFromDevice}
             pickingMedia={pickingMedia}
-            onBackToKiosk={() => navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] })}
+            onBackToKiosk={() => { revokeSettingsAccess(); navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] }); }}
           />
         );
       
@@ -1639,6 +1662,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             onAutoBrightnessMinChange={setAutoBrightnessMin}
             autoBrightnessMax={autoBrightnessMax}
             onAutoBrightnessMaxChange={setAutoBrightnessMax}
+            autoBrightnessOffset={autoBrightnessOffset}
+            onAutoBrightnessOffsetChange={setAutoBrightnessOffset}
             currentLightLevel={currentLightLevel}
             hasLightSensor={hasLightSensor}
             statusBarEnabled={statusBarEnabled}
@@ -1661,6 +1686,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             onKeyboardModeChange={setKeyboardMode}
             zoomLevel={zoomLevel}
             onZoomLevelChange={setZoomLevel}
+            customUserAgent={customUserAgent}
+            onCustomUserAgentChange={setCustomUserAgent}
             screensaverEnabled={screensaverEnabled}
             onScreensaverEnabledChange={setScreensaverEnabled}
             screensaverBrightness={screensaverBrightness}
