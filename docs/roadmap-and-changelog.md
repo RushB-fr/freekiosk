@@ -1,4 +1,4 @@
-<div align="center">
+
 
 # 🗺️ FreeKiosk Roadmap and Changelog
 
@@ -10,7 +10,7 @@
   <a href="development.md">👨‍💻 Development</a>
 </p>
 
-</div>
+
 
 > [!IMPORTANT]
 > Roadmap priorities can evolve; use issues and discussions for the latest planning signal.
@@ -19,7 +19,7 @@
 
 ### v1.2.17 (Mar 2026)
 
-<div align="center">
+
 
 | ✅ Feature | 📋 Description |
 |---|---|
@@ -29,11 +29,11 @@
 | **🛡️ Kiosk Watchdog** | Enhanced reliability and auto-recovery |
 | **📡 MQTT Persistence** | Hardened connection handling |
 
-</div>
+
 
 ### v1.2.16 (Mar 2026)
 
-<div align="center">
+
 
 | ✅ Feature | 📋 Description |
 |---|---|
@@ -42,11 +42,11 @@
 | **📷 Camera2 Fallback** | Improved camera reliability |
 | **📊 Device Info** | Enriched API/MQTT data |
 
-</div>
+
 
 ### v1.2.15 (Feb 2026)
 
-<div align="center">
+
 
 | ✅ Feature | 📋 Description |
 |---|---|
@@ -55,7 +55,7 @@
 | **🔐 MQTT Password** | UX improvements and fixes |
 | **👁️ Motion Detection** | Camera key reliability fixes |
 
-</div>
+
 
 > [!NOTE]
 > For complete release history and detailed notes, refer to GitHub releases:
@@ -66,7 +66,7 @@
 
 ### v1.3.x - Operational Excellence
 
-<div align="center">
+
 
 | 🎯 Focus Area | 📋 Planned Features |
 |---|---|
@@ -76,11 +76,11 @@
 | **📊 Monitoring** | Advanced device health and performance metrics |
 | **🔧 Configuration** | Simplified setup and management interfaces |
 
-</div>
+
 
 ### v2.x - Cloud & Enterprise
 
-<div align="center">
+
 
 | 🎯 Focus Area | 📋 Planned Features |
 |---|---|
@@ -90,7 +90,7 @@
 | **📈 Analytics** | Usage insights and performance monitoring |
 | **🔐 Security** | Enhanced authentication and access control |
 
-</div>
+
 
 > [!NOTE]
 > Roadmap items evolve over time; use issues/discussions for current prioritization:
@@ -103,7 +103,7 @@
 
 ### 📊 Current Status (v1.2.x)
 
-<div align="center">
+
 
 | ✅ Feature | 📋 Status | 📝 Notes |
 |---|---|---|
@@ -137,11 +137,11 @@
 | **📊 Health Monitoring** | ✅ Complete | System health |
 | **🔧 Debug Tools** | ✅ Complete | Troubleshooting aids |
 
-</div>
+
 
 ### 🚀 Upcoming Features (v1.3.x)
 
-<div align="center">
+
 
 | 🎯 Feature | 📋 Status | 📝 Description |
 |---|---|---|
@@ -168,11 +168,11 @@
 | **📊 Usage Reports** | 📋 Planned | Analytics dashboard |
 | **🔧 Plugin System** | 📋 Planned | Extensible architecture |
 
-</div>
+
 
 ### 🌟 Future Vision (v2.x)
 
-<div align="center">
+
 
 | 🎯 Feature | 📋 Status | 📝 Description |
 |---|---|---|
@@ -198,13 +198,13 @@
 | **🎯 Business Logic** | 📋 Planned | Enterprise features |
 | **🌍 Global Deployment** | 📋 Planned | Worldwide support |
 
-</div>
+
 
 ---
 
 ## 📈 Development Progress
 
-<div align="center">
+
 
 | 📊 Metric | 📈 Current | 🎯 Target | 📋 Status |
 |---|---|---|---|
@@ -217,13 +217,13 @@
 | **📚 Documentation** | 95% | 100% | ✅ Complete |
 | **🎯 Feature Completeness** | 85% | 95% | ✅ On Track |
 
-</div>
+
 
 ---
 
 ## 🤝 How to Influence the Roadmap
 
-<div align="center">
+
 
 | 🎯 Method | 📋 How to Participate | 📝 Impact |
 |---|---|---|
@@ -235,13 +235,13 @@
 | **🔧 Contribute Code** | [Development Guide](development.md) | Direct feature implementation |
 | **📊 Provide Metrics** | Share performance and usage data | Performance improvements |
 
-</div>
+
 
 ---
 
 ## 🔗 Related Resources
 
-<div align="center">
+
 
 | 📚 Resource | 🔗 Link | 🎯 Purpose |
 |---|---|---|
@@ -252,12 +252,12 @@
 | **👨‍💻 Development** | [Development Guide](development.md) | Setup and contribution |
 | **📚 Documentation** | [Docs Home](README.md) | Complete documentation |
 
-</div>
+
 
 ---
 
-<div align="center">
+
 
 **Made with ❤️ by [FreeKiosk Team](https://freekiosk.app)**
 
-</div>
+

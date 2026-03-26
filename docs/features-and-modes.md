@@ -1,4 +1,4 @@
-<div align="center">
+
 
 # 🧭 FreeKiosk Features and Modes
 
@@ -10,14 +10,14 @@
   <a href="INTEGRATIONS.md">🔗 Integrations</a>
 </p>
 
-</div>
+
 
 > [!TIP]
 > Use this page to choose your operational mode first, then jump to setup and automation guides.
 
 ## 🎛️ Core Features
 
-<div align="center">
+
 
 | ✅ Feature | 📋 Description |
 |---|---|
@@ -27,13 +27,13 @@
 | **🔐 PIN Protection** | Secure settings access with authentication |
 | **📌 Screen Pinning** | Optional task locking policies |
 
-</div>
+
 
 ## 🖥️ Display Modes
 
 ### 🌐 WebView Mode
 
-<div align="center">
+
 
 **Perfect for dashboards, web apps, and websites**
 
@@ -44,7 +44,7 @@
 | **📱 Immersive** | Fullscreen kiosk experience |
 | **🏠 Home Assistant** | Native integration with HA dashboards |
 
-</div>
+
 
 **Best for:**
 - Home Assistant dashboards
@@ -54,7 +54,7 @@
 
 ### 📱 External App Mode
 
-<div align="center">
+
 
 **Lock device to a specific Android application**
 
@@ -65,7 +65,7 @@
 | **🧪 Test Mode** | Safe deployment with back button access |
 | **🔐 Secure Access** | 5-tap gesture + PIN for settings |
 
-</div>
+
 
 **Best for:**
 - Cloud gaming (Steam Link, Xbox Cloud Gaming)
@@ -75,7 +75,7 @@
 
 ### 📊 Dashboard Mode
 
-<div align="center">
+
 
 **Multi-URL tile grid for quick navigation**
 
@@ -86,7 +86,7 @@
 | **⏰ Inactivity Return** | Auto-return to dashboard after timeout |
 | **🎨 Customizable** | Custom names and URLs for each tile |
 
-</div>
+
 
 **Best for:**
 - Multi-dashboard environments
@@ -96,7 +96,7 @@
 
 ### 🎬 Media / Multi-App Enhancements
 
-<div align="center">
+
 
 **Advanced features for media and multi-app deployments**
 
@@ -107,14 +107,14 @@ Recent versions include significant improvements for:
 - **🎯 Advanced Scheduling** - Time-based content switching
 - **📊 Performance Monitoring** - Resource usage tracking
 
-</div>
+
 
 > [!NOTE]
 > For detailed release information, see [Roadmap and Changelog](Roadmap-and-Changelog).
 
 ## 🔐 Security and Control
 
-<div align="center">
+
 
 | 🛡️ Security Feature | 📋 Protection Level |
 |---|---|
@@ -123,11 +123,11 @@ Recent versions include significant improvements for:
 | **📱 Overlay Prevention** | Block system dialogs and notifications |
 | **🐕 Watchdog Service** | Automatic kiosk recovery and monitoring |
 
-</div>
+
 
 ### 🔒 Lockdown Levels
 
-<div align="center">
+
 
 | 🔒 Level | 📋 Description | 🎯 Use Case |
 |---|---|---|
@@ -135,11 +135,11 @@ Recent versions include significant improvements for:
 | **Standard** | External app with navigation blocking | Single-app deployments |
 | **Enterprise** | Device Owner full lockdown | Corporate/public kiosks |
 
-</div>
+
 
 ## ⚙️ Provisioning and Operations
 
-<div align="center">
+
 
 | 🚀 Operational Feature | 📋 Capability |
 |---|---|
@@ -149,11 +149,11 @@ Recent versions include significant improvements for:
 | **🔄 Keep-alive** | Continuous monitoring and recovery |
 | **📡 Remote Control** | REST API and MQTT automation |
 
-</div>
+
 
 ### 🎯 Deployment Methods
 
-<div align="center">
+
 
 | 📋 Method | 🛠️ Tools | 📏 Scale |
 |---|---|---|
@@ -161,13 +161,13 @@ Recent versions include significant improvements for:
 | **ADB Script** | Command line | Small batches |
 | **MDM Integration** | Enterprise tools | Large fleets |
 
-</div>
+
 
 ---
 
 ## 🎯 Choosing Your Mode
 
-<div align="center">
+
 
 | 🎭 Use Case | 🎯 Recommended Mode | 🔧 Setup Guide |
 |---|---|---|
@@ -177,12 +177,12 @@ Recent versions include significant improvements for:
 | **📊 Multi-Dashboard** | Dashboard Mode | [Installation](Installation) |
 | **🎬 Media Display** | Media Mode | [Roadmap](Roadmap-and-Changelog) |
 
-</div>
+
 
 ---
 
-<div align="center">
+
 
 **Made with ❤️ by [FreeKiosk Team](https://freekiosk.app)**
 
-</div>
+

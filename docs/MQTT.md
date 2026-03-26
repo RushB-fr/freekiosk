@@ -1,4 +1,4 @@
-<div align="center">
+
 
 # 📡 FreeKiosk MQTT Documentation
 
@@ -10,13 +10,13 @@
   <a href="rest-api.md">🌐 REST API</a>
 </p>
 
-</div>
+
 
 FreeKiosk includes a native MQTT client for real-time integration with **Home Assistant** and other MQTT-based platforms.
 
 ## 📋 Overview
 
-<div align="center">
+
 
 | ⚙️ Feature | 📋 Details |
 |---|---|
@@ -26,7 +26,7 @@ FreeKiosk includes a native MQTT client for real-time integration with **Home As
 | **📡 Push-based** | Real-time status updates (no polling needed) |
 | **📱 LWT** | Availability tracking via Last Will and Testament |
 
-</div>
+
 
 > [!TIP]
 > **MQTT vs REST API**: MQTT is push-based — the tablet publishes status updates automatically every N seconds. The REST API requires polling. MQTT is the preferred integration for Home Assistant. Both can run simultaneously.
@@ -35,7 +35,7 @@ FreeKiosk includes a native MQTT client for real-time integration with **Home As
 
 ### 📱 Via UI
 
-<div align="center">
+
 
 | 📋 Step | 🎯 Action |
 |---|---|
@@ -48,7 +48,7 @@ FreeKiosk includes a native MQTT client for real-time integration with **Home As
 | **7️⃣ Connect** | Press **Connect** button |
 | **8️⃣ Verify Status** | Check connection indicator shows Connected |
 
-</div>
+
 
 > [!NOTE]
 > Settings are saved automatically as you type. Connection is only established when you press "Connect" — no auto-reconnect on every keystroke.
@@ -61,7 +61,7 @@ MQTT settings are included in FreeKiosk backup/restore. You can configure one de
 
 ## ⚙️ Configuration Options
 
-<div align="center">
+
 
 | 📋 Setting | 🔧 Default | 📝 Description |
 |---|---|---|
@@ -78,7 +78,7 @@ MQTT settings are included in FreeKiosk backup/restore. You can configure one de
 | **🎮 Allow Remote Control** | On | Enable commands via MQTT (brightness, reload, etc.) |
 | **👁️ Always-on Motion Detection** | Off | Run camera-based motion detection continuously (higher battery usage) |
 
-</div>
+
 
 ---
 
@@ -86,7 +86,7 @@ MQTT settings are included in FreeKiosk backup/restore. You can configure one de
 
 For a device with `deviceName = lobby` (or `deviceId` if no name set) and default base topic `freekiosk`:
 
-<div align="center">
+
 
 | 🎯 Purpose | 📂 Topic | 📊 QoS | 💾 Retained |
 |---|---|---|---|
@@ -95,7 +95,7 @@ For a device with `deviceName = lobby` (or `deviceId` if no name set) and defaul
 | **🎮 Commands** | `freekiosk/lobby/set/{entity}` | 1 | No |
 | **🏠 Discovery** | `homeassistant/{component}/freekiosk_{deviceId}/{objectId}/config` | 1 | Yes |
 
-</div>
+
 
 ### 🆔 Topic ID
 
@@ -103,7 +103,7 @@ The topic identifier is either the configured **Device Name** (sanitized: lowerc
 
 ### 📱 Availability
 
-<div align="center">
+
 
 | 📋 Status | 📡 Action | 💾 Retained |
 |---|---|---|
@@ -111,13 +111,13 @@ The topic identifier is either the configured **Device Name** (sanitized: lowerc
 | **🔴 Offline** | Published via LWT on unexpected disconnect | `"offline"` |
 | **👋 Graceful disconnect** | Publishes before disconnecting | `"offline"` |
 
-</div>
+
 
 ### 📊 State
 
 A JSON object published periodically (default: every 30 seconds) containing all device data:
 
-<div align="center">
+
 
 ```json
 {
@@ -161,7 +161,7 @@ A JSON object published periodically (default: every 30 seconds) containing all 
 }
 ```
 
-</div>
+
 
 ---
 
@@ -171,7 +171,7 @@ FreeKiosk automatically publishes [MQTT Discovery](https://www.home-assistant.io
 
 ### 📋 Prerequisites
 
-<div align="center">
+
 
 | ✅ Requirement | 📋 Details |
 |---|---|
@@ -179,13 +179,13 @@ FreeKiosk automatically publishes [MQTT Discovery](https://www.home-assistant.io
 | **📡 MQTT Broker** | Accessible by both HA and the tablet (e.g. Mosquitto) |
 | **🔍 Discovery** | MQTT Discovery enabled in HA (enabled by default) |
 
-</div>
+
 
 ### 📱 Device
 
 All entities are grouped under one HA device:
 
-<div align="center">
+
 
 | 📋 Field | 📋 Value |
 |---|---|
@@ -195,13 +195,13 @@ All entities are grouped under one HA device:
 | **🔢 SW Version** | *(app version)* |
 | **🔗 Configuration URL** | `http://{localIp}:8080` |
 
-</div>
+
 
 ### 🎛️ Entities
 
 #### 📊 Sensors (11)
 
-<div align="center">
+
 
 | 🎛️ Entity | 📋 Value Template | 📱 Device Class | 📏 Unit |
 |---|---|---|---|
@@ -217,11 +217,11 @@ All entities are grouped under one HA device:
 | **🌐 Current URL** | `webview.currentUrl` | — | — |
 | **🔊 Volume** | `audio.volume` | — | % |
 
-</div>
+
 
 #### 🔘 Binary Sensors (6)
 
-<div align="center">
+
 
 | 🎛️ Entity | 📋 Value Template | 📱 Device Class |
 |---|---|---|
@@ -232,22 +232,22 @@ All entities are grouped under one HA device:
 | **🏢 Device Owner** | `device.isDeviceOwner` | — |
 | **👁️ Motion** | `webview.motionDetected` | motion |
 
-</div>
+
 
 #### 🔢 Number Controls (2)
 
-<div align="center">
+
 
 | 🎛️ Entity | 📋 Command Topic | 🔢 Min | 🔢 Max | 📏 Unit |
 |---|---|---|---|---|
 | **💡 Brightness Control** | `.../set/brightness` | 0 | 100 | % |
 | **🔊 Volume Control** | `.../set/volume` | 0 | 100 | % |
 
-</div>
+
 
 #### 🔘 Switches (3)
 
-<div align="center">
+
 
 | 🎛️ Entity | 📋 Command Topic | 📋 Payload |
 |---|---|---|
@@ -255,11 +255,11 @@ All entities are grouped under one HA device:
 | **💤 Screensaver** | `.../set/screensaver` | ON / OFF |
 | **👁️ Always-on Motion Detection** | `.../set/motion_always_on` | ON / OFF |
 
-</div>
+
 
 #### 🔘 Buttons (14)
 
-<div align="center">
+
 
 | 🎛️ Entity | 📋 Command Topic | 🎨 Icon |
 |---|---|---|
@@ -278,11 +278,11 @@ All entities are grouped under one HA device:
 | **📋 Remote Menu** | `.../set/remote_menu` | mdi:menu |
 | **⏯️ Remote Play/Pause** | `.../set/remote_playpause` | mdi:play-pause |
 
-</div>
+
 
 #### 📝 Text (6)
 
-<div align="center">
+
 
 | 🎛️ Entity | 📋 Command Topic | 📝 Description |
 |---|---|---|
@@ -293,7 +293,7 @@ All entities are grouped under one HA device:
 | **⌨️ Keyboard Combo** | `.../set/keyboard_combo` | Press a key combination (e.g. `ctrl+c`, `alt+f4`) |
 | **⌨️ Keyboard Text** | `.../set/keyboard_text` | Type a text string into focused field |
 
-</div>
+
 
 **📊 Total: 42 entities** auto-discovered in Home Assistant.
 
@@ -303,7 +303,7 @@ All entities are grouped under one HA device:
 
 Commands are sent by publishing to `{baseTopic}/{topicId}/set/{entity}`.
 
-<div align="center">
+
 
 | 📂 Topic Suffix | 🎮 Command | 📋 Payload | 📝 Description |
 |---|---|---|---|
@@ -341,7 +341,7 @@ Commands are sent by publishing to `{baseTopic}/{topicId}/set/{entity}`.
 | **⌨️ keyboard_combo** | keyboardCombo | combo string (e.g. `ctrl+c`) | Press a key combination |
 | **⌨️ keyboard_text** | keyboardText | text string | Type text into focused field |
 
-</div>
+
 
 > [!NOTE]
 > Commands have full parity with the [REST API](REST-API). Both interfaces dispatch through the same native command handler. Remote control and keyboard commands are handled natively via the AccessibilityService (cross-app) or Activity key dispatch (in-app). TTS and Toast are also handled natively (no JS round-trip).
@@ -352,14 +352,14 @@ Commands are sent by publishing to `{baseTopic}/{topicId}/set/{entity}`.
 
 FreeKiosk can detect motion using the device camera and report it as a binary sensor in Home Assistant.
 
-<div align="center">
+
 
 | 🎯 Mode | 📋 Behavior | 🔋 Battery Impact |
 |---|---|---|
 | **💤 Default** | Motion detection only runs during screensaver (to wake the screen on movement) | Minimal |
 | **👁️ Always-on** | Continuous motion detection via HA switch or MQTT setting | Higher |
 
-</div>
+
 
 **🔧 Always-on mode**: Enable "Always-on Motion Detection" in MQTT settings or via the HA switch entity to run motion detection continuously. The `motion_detected` binary sensor will update in real-time. Note: this uses the camera continuously and increases battery usage.
 
@@ -373,7 +373,7 @@ FreeKiosk can detect motion using the device camera and report it as a binary se
 ### 🔄 Auto-reconnect
 
 The MQTT client automatically reconnects when the connection is lost (WiFi drop, broker restart). On reconnect, it:
-<div align="center">
+
 
 | 📋 Step | 🎯 Action |
 |---|---|
@@ -382,7 +382,7 @@ The MQTT client automatically reconnects when the connection is lost (WiFi drop,
 | **3️⃣ Subscribe** | Re-subscribes to command topics |
 | **4️⃣ Resume Publishing** | Resumes periodic status publishing |
 
-</div>
+
 
 ### 📱 LWT (Last Will and Testament)
 
@@ -396,7 +396,7 @@ MQTT and the REST API can run simultaneously. Both use the same internal command
 
 ## 🧪 Testing with MQTT CLI
 
-<div align="center">
+
 
 ```bash
 # Subscribe to all FreeKiosk topics
@@ -439,7 +439,7 @@ mosquitto_pub -h BROKER_IP -t "freekiosk/TOPIC_ID/set/motion_always_on" -m "ON"
 mosquitto_sub -h BROKER_IP -t "homeassistant/#" -v
 ```
 
-</div>
+
 
 Replace `BROKER_IP` with your MQTT broker IP and `TOPIC_ID` with the device name (e.g. `lobby`) or Android ID if no name is configured.
 
@@ -451,7 +451,7 @@ Replace `BROKER_IP` with your MQTT broker IP and `TOPIC_ID` with the device name
 
 #### 🏃 Wake tablet on room motion
 
-<div align="center">
+
 
 ```yaml
 automation:
@@ -471,11 +471,11 @@ automation:
           payload: "PRESS"
 ```
 
-</div>
+
 
 #### 🌙 Turn off tablet screen at night
 
-<div align="center">
+
 
 ```yaml
 automation:
@@ -490,11 +490,11 @@ automation:
           payload: "OFF"
 ```
 
-</div>
+
 
 #### 🌅 Turn on tablet screen in the morning
 
-<div align="center">
+
 
 ```yaml
 automation:
@@ -509,11 +509,11 @@ automation:
           payload: "ON"
 ```
 
-</div>
+
 
 #### 🔔 Doorbell alert on tablet
 
-<div align="center">
+
 
 ```yaml
 automation:
@@ -537,11 +537,11 @@ automation:
           payload: "http://homeassistant:8123/lovelace/cameras"
 ```
 
-</div>
+
 
 #### 💡 Adjust brightness based on room light
 
-<div align="center">
+
 
 ```yaml
 automation:
@@ -557,11 +557,11 @@ automation:
             {{ (states('sensor.living_room_light_level') | float / 10) | int | min(100) }}
 ```
 
-</div>
+
 
 #### 🗣️ TTS announcement
 
-<div align="center">
+
 
 ```yaml
 automation:
@@ -576,11 +576,11 @@ automation:
           payload: "Good morning! Today's forecast is {{ states('weather.home') }}."
 ```
 
-</div>
+
 
 ### 📊 Dashboard Card (Lovelace)
 
-<div align="center">
+
 
 ```yaml
 type: entities
@@ -604,7 +604,7 @@ entities:
   - entity: button.freekiosk_abc123_reboot
 ```
 
-</div>
+
 
 ---
 
@@ -612,7 +612,7 @@ entities:
 
 ### 📱 Device not appearing in Home Assistant
 
-<div align="center">
+
 
 | 🔍 Check | ✅ Solution |
 |---|---|
@@ -621,11 +621,11 @@ entities:
 | **Discovery Enabled** | Check MQTT Discovery is enabled in HA (Settings > Integrations > MQTT > Configure) |
 | **Discovery Messages** | Use `mosquitto_sub -h BROKER_IP -t "homeassistant/#" -v` to verify discovery messages |
 
-</div>
+
 
 ### ❓ Entities showing "Unknown"
 
-<div align="center">
+
 
 | 🔍 Issue | ✅ Solution |
 |---|---|
@@ -634,11 +634,11 @@ entities:
 | **Binary Sensors** | Ensure state JSON contains expected boolean fields |
 | **TTS/Toast** | These always show empty — this is by design (fire-and-forget commands) |
 
-</div>
+
 
 ### 🔄 Connection keeps dropping
 
-<div align="center">
+
 
 | 🔍 Cause | ✅ Solution |
 |---|---|
@@ -647,22 +647,22 @@ entities:
 | **Duplicate Client** | Check if another client is using the same client ID |
 | **Normal Behavior** | The client auto-reconnects automatically — brief disconnections are normal |
 
-</div>
+
 
 ### 📱 Screen Power switch flips back to ON
 
-<div align="center">
+
 
 | 🔍 Issue | ✅ Solution |
 |---|---|
 | **Version Bug** | This is resolved in the latest version. Ensure you're running v1.2.12+ |
 | **State Update** | The tablet immediately publishes updated state after executing screen on/off commands |
 
-</div>
+
 
 ### 👁️ Motion detection not working
 
-<div align="center">
+
 
 | 🔍 Issue | ✅ Solution |
 |---|---|
@@ -671,22 +671,22 @@ entities:
 | **Always-on Mode** | Enable "Always-on Motion Detection" for continuous detection |
 | **Debug Logs** | Check logs: `adb logcat | grep MotionDetection` |
 
-</div>
+
 
 ### 📶 WiFi SSID showing "WiFi" instead of real name
 
-<div align="center">
+
 
 | 🔍 Issue | ✅ Solution |
 |---|---|
 | **Location Permission** | Grant location permissions (requested automatically on first launch) |
 | **Android Requirement** | Android requires location permissions to read WiFi SSID (Android 8.0+) |
 
-</div>
+
 
 ### 🗣️ TTS not speaking
 
-<div align="center">
+
 
 | 🔍 Issue | ✅ Solution |
 |---|---|
@@ -694,13 +694,13 @@ entities:
 | **Volume** | Check device volume is not muted |
 | **Native Handling** | TTS is handled natively by the MQTT module — no need for the REST API to be running |
 
-</div>
+
 
 ---
 
 ## 🔧 Technical Details
 
-<div align="center">
+
 
 | ⚙️ Component | 📋 Details |
 |---|---|
@@ -712,13 +712,13 @@ entities:
 | **🔐 Password Storage** | Encrypted in Android Keychain (same as REST API key) |
 | **🗣️ TTS & Toast** | Handled natively in the MQTT module (no JS round-trip) |
 
-</div>
+
 
 ---
 
 ## 🔗 See Also
 
-<div align="center">
+
 
 | 📚 Document | 🎯 Focus |
 |---|---|
@@ -727,12 +727,12 @@ entities:
 | **🔧 Installation Guide** | Device setup |
 | **🔌 Integrations Overview** | Comparison of integration methods |
 
-</div>
+
 
 ---
 
-<div align="center">
+
 
 **Made with ❤️ by [FreeKiosk Team](https://freekiosk.app)**
 
-</div>
+

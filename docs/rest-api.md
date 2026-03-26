@@ -1,4 +1,4 @@
-<div align="center">
+
 
 # 🌐 FreeKiosk REST API Documentation
 
@@ -10,13 +10,13 @@
   <a href="MQTT.md">📡 MQTT</a>
 </p>
 
-</div>
+
 
 FreeKiosk includes a built-in REST API server for integration with **Home Assistant** and other smart home platforms.
 
 ## 📋 Overview
 
-<div align="center">
+
 
 | ⚙️ Feature | 📋 Details |
 |---|---|
@@ -25,7 +25,7 @@ FreeKiosk includes a built-in REST API server for integration with **Home Assist
 | **🔐 Authentication** | Optional API Key (X-Api-Key header) |
 | **📄 Format** | JSON responses |
 
-</div>
+
 
 > [!NOTE]
 > Some API features require **Device Owner mode** for full functionality (true screen off, reboot). The HTTP server remains accessible even when the screen is off (v1.2.4+). See [Installation Guide](installation.md#advanced-install-device-owner-mode) for Device Owner setup instructions.
@@ -34,7 +34,7 @@ FreeKiosk includes a built-in REST API server for integration with **Home Assist
 
 ### 📱 Via UI
 
-<div align="center">
+
 
 | 📋 Step | 🎯 Action |
 |---|---|
@@ -44,11 +44,11 @@ FreeKiosk includes a built-in REST API server for integration with **Home Assist
 | **4️⃣ Configure** | Set port and optional API key |
 | **5️⃣ Save** | Save settings |
 
-</div>
+
 
 ### ⌨️ Via ADB (Headless)
 
-<div align="center">
+
 
 ```bash
 adb shell am start -n com.freekiosk/.MainActivity \
@@ -58,7 +58,7 @@ adb shell am start -n com.freekiosk/.MainActivity \
     --es rest_api_key "your_secret_key"
 ```
 
-</div>
+
 
 > [!NOTE]
 > See [ADB Configuration Guide](ADB-Configuration) for full headless provisioning.
@@ -73,7 +73,7 @@ adb shell am start -n com.freekiosk/.MainActivity \
 
 Returns complete device status in one call.
 
-<div align="center">
+
 
 ```json
 {
@@ -95,11 +95,11 @@ Returns complete device status in one call.
 }
 ```
 
-</div>
+
 
 #### `GET /api/battery`
 
-<div align="center">
+
 
 ```json
 {
@@ -116,10 +116,10 @@ Returns complete device status in one call.
 }
 ```
 
-</div>
+
 
 **📋 Fields:**
-<div align="center">
+
 
 | 📋 Field | 📏 Range/Type | 📝 Description |
 |---|---|---|
@@ -131,12 +131,12 @@ Returns complete device status in one call.
 | **💚 health** | string | `good`, `overheat`, `dead`, `over_voltage`, `failure`, `cold`, or `unknown` |
 | **🧪 technology** | string | Battery chemistry (e.g., `Li-ion`) |
 
-</div>
+
 ```
 
 #### `GET /api/brightness`
 
-<div align="center">
+
 
 ```json
 {
@@ -145,13 +145,13 @@ Returns complete device status in one call.
 }
 ```
 
-</div>
+
 
 #### `GET /api/screen`
 
 Returns screen status with separated physical and overlay states.
 
-<div align="center">
+
 
 ```json
 {
@@ -164,10 +164,10 @@ Returns screen status with separated physical and overlay states.
 }
 ```
 
-</div>
+
 
 **📝 Field Descriptions:**
-<div align="center">
+
 
 | 📋 Field | 📋 Value | 📝 Description |
 |---|---|---|
@@ -175,7 +175,7 @@ Returns screen status with separated physical and overlay states.
 | **💡 brightness** | 0-100 | Current brightness percentage |
 | **💤 screensaverActive** | `true`/`false` | Whether the screensaver overlay is showing |
 
-</div>
+
 
 **📱 Physical Screen State (`on`):**
 - `true` = screen is physically on (consuming power)
@@ -187,7 +187,7 @@ Returns screen status with separated physical and overlay states.
 - `false` = normal content is visible
 
 **🔄 Interpreting Combined States:**
-<div align="center">
+
 
 ```javascript
 // Screen physically on + content visible
@@ -200,7 +200,7 @@ Returns screen status with separated physical and overlay states.
 { "on": false, "screensaverActive": false }
 ```
 
-</div>
+
 
 **🎯 Use Cases:**
 - To check if screen is consuming power: `on === true`
@@ -211,7 +211,7 @@ Returns screen status with separated physical and overlay states.
 
 Returns light, proximity, and accelerometer data.
 
-<div align="center">
+
 
 ```json
 {
@@ -224,11 +224,11 @@ Returns light, proximity, and accelerometer data.
 }
 ```
 
-</div>
+
 
 #### `GET /api/storage`
 
-<div align="center">
+
 
 ```json
 {
@@ -242,11 +242,11 @@ Returns light, proximity, and accelerometer data.
 }
 ```
 
-</div>
+
 
 #### `GET /api/memory`
 
-<div align="center">
+
 
 ```json
 {
@@ -261,11 +261,11 @@ Returns light, proximity, and accelerometer data.
 }
 ```
 
-</div>
+
 
 #### `GET /api/wifi`
 
-<div align="center">
+
 
 ```json
 {
@@ -279,13 +279,13 @@ Returns light, proximity, and accelerometer data.
 }
 ```
 
-</div>
+
 
 #### `GET /api/info`
 
 Device information.
 
-<div align="center">
+
 
 ```json
 {
@@ -300,23 +300,23 @@ Device information.
 }
 ```
 
-</div>
+
 
 **📝 Field Descriptions:**
-<div align="center">
+
 
 | 📋 Field | 📋 Type | 📝 Description |
 |---|---|---|
 | **🏢 isDeviceOwner** | boolean | Whether the app has Device Owner privileges (required for reboot, lock, true screen off) |
 | **🔒 kioskMode** | boolean | Whether kiosk lock task mode is currently active |
 
-</div>
+
 
 #### `GET /api/health`
 
 Simple health check.
 
-<div align="center">
+
 
 ```json
 {
@@ -325,7 +325,7 @@ Simple health check.
 }
 ```
 
-</div>
+
 
 #### `GET /api/screenshot`
 
@@ -334,7 +334,7 @@ Returns a PNG image of the current screen.
 **📄 Response**: `image/png` binary data
 
 **🎯 Usage examples:**
-<div align="center">
+
 
 ```bash
 # Save screenshot to file
@@ -344,7 +344,7 @@ curl http://TABLET_IP:8080/api/screenshot -o screenshot.png
 <img src="http://TABLET_IP:8080/api/screenshot" />
 ```
 
-</div>
+
 
 > 💡 The screenshot is captured from the app's root view. It works even when the screensaver overlay is active.
 
@@ -353,24 +353,24 @@ curl http://TABLET_IP:8080/api/screenshot -o screenshot.png
 📷 Take a photo using the device camera. **(v1.2.5+)**
 
 **📋 Query Parameters:**
-<div align="center">
+
 
 | 📋 Parameter | 🔧 Default | 📝 Description |
 |---|---|---|
 | **📷 camera** | `back` | Camera to use: `front` or `back` |
 | **🎨 quality** | `80` | JPEG compression quality (1-100) |
 
-</div>
+
 
 **📝 Examples:**
-<div align="center">
+
 
 ```
 GET /api/camera/photo?camera=back&quality=80
 GET /api/camera/photo?camera=front&quality=60
 ```
 
-</div>
+
 
 **📄 Response**: `image/jpeg` binary data
 
@@ -384,7 +384,7 @@ GET /api/camera/photo?camera=front&quality=60
 
 List available cameras on the device. **(v1.2.5+)**
 
-<div align="center">
+
 
 ```json
 {
@@ -398,7 +398,7 @@ List available cameras on the device. **(v1.2.5+)**
 }
 ```
 
-</div>
+
 
 ---
 

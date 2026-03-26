@@ -1,4 +1,4 @@
-<div align="center">
+
 
 # ❓ FreeKiosk FAQ
 
@@ -10,7 +10,7 @@
   <a href="features-and-modes.md">⚡ Features</a>
 </p>
 
-</div>
+
 
 > [!TIP]
 > Start from [`installation.md`](Installation) for first deployment, then use this page for edge cases.
@@ -87,7 +87,7 @@ adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver
 
 ### 📱 Q: Which tablets are supported?
 **A:** Any Android 8.0+ tablet. Tested on:
-<div align="center">
+
 
 | 🏭 Brand | 📱 Models |
 |---|---|
@@ -96,7 +96,7 @@ adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver
 | **Xiaomi** | Redmi Pad SE |
 | **Generic** | Most Android tablets |
 
-</div>
+
 
 ### 🌟 Q: Does it work on Samsung tablets?
 **A:** Yes! Device Owner mode specifically blocks Samsung update popups and bloatware.
@@ -197,7 +197,7 @@ adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver
 ## ⚖️ Comparison
 
 ### 🆚 Q: FreeKiosk vs Fully Kiosk Browser?
-<div align="center">
+
 
 | Feature | 🟢 FreeKiosk | 🔴 Fully Kiosk |
 |---------|-----------|-------------|
@@ -208,7 +208,7 @@ adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver
 | **Advanced features** | Roadmap | Yes |
 | **Support** | Community | Commercial |
 
-</div>
+
 
 ### 💰 Q: Why is Fully Kiosk more expensive?
 **A:** Fully Kiosk is a mature commercial product with many advanced features. FreeKiosk is new and community-driven. We're catching up! 🚀
@@ -237,7 +237,7 @@ adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver
 ## 🗺️ Roadmap
 
 ### 🚀 Q: What's coming in v1.1?
-<div align="center">
+
 
 | ✨ Feature | 📋 Description |
 |---|---|
@@ -246,10 +246,10 @@ adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver
 | **🎥 Motion Detection** | Activity-based triggers |
 | **☀️ Auto-brightness** | Scheduled brightness |
 
-</div>
+
 
 ### 🌟 Q: What about v2.0?
-<div align="center">
+
 
 | 🚀 Feature | 📋 Description |
 |---|---|
@@ -258,7 +258,7 @@ adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver
 | **📱 Multi-device** | Fleet management |
 | **📊 Analytics** | Usage insights |
 
-</div>
+
 
 See full [Roadmap](../README.md#-roadmap).
 
@@ -267,7 +267,7 @@ See full [Roadmap](../README.md#-roadmap).
 ## 💬 Support
 
 ### 🆘 Q: Where can I get help?
-<div align="center">
+
 
 | � Resource | 🔗 Link |
 |---|---|
@@ -276,10 +276,10 @@ See full [Roadmap](../README.md#-roadmap).
 | **🐛 Report Bug** | [Issues](https://github.com/rushb-fr/freekiosk/issues) |
 | **📧 Email Support** | support@freekiosk.app |
 
-</div>
+
 
 ### ❤️ Q: How can I support FreeKiosk?
-<div align="center">
+
 
 | ⭐ Action | 📋 How to |
 |---|---|
@@ -289,20 +289,19 @@ See full [Roadmap](../README.md#-roadmap).
 | **🔧 Contribute code** | [Contributing Guide](../CONTRIBUTING.md) |
 | **☕ Buy us coffee** | [Ko-fi](https://ko-fi.com/rushb) (coming soon) |
 
-</div>
+
 
 ---
 
-<div align="center">
+
 
 **❓ Didn't find your answer? Ask in [Discussions](https://github.com/rushb-fr/freekiosk/discussions)!**
 
-</div>
+
 
 ---
 
-<div align="center">
+
 
 **Made with ❤️ by [FreeKiosk Team](https://freekiosk.app)**
 
-</div>

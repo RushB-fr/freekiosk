@@ -1,4 +1,4 @@
-<div align="center">
+
 
 # 🔌 FreeKiosk Integrations
 
@@ -10,7 +10,7 @@
   <a href="MQTT.md">📡 MQTT</a>
 </p>
 
-</div>
+
 
 > [!IMPORTANT]
 > REST and MQTT can run simultaneously on the same device.
@@ -19,18 +19,18 @@
 
 FreeKiosk supports two main integration channels for seamless automation:
 
-<div align="center">
+
 
 | 🔌 Channel | 🎯 Best When | 📖 Reference |
 |---|---|---|
 | **🌐 REST API** | Request/response control on demand | [REST API Documentation](REST-API) |
 | **📡 MQTT** | Push telemetry + Home Assistant discovery | [MQTT Documentation](MQTT) |
 
-</div>
+
 
 ### 🔄 Integration Overview
 
-<div align="center">
+
 
 | ⚡ Feature | 🌐 REST API | 📡 MQTT |
 |---|---|---|
@@ -40,13 +40,13 @@ FreeKiosk supports two main integration channels for seamless automation:
 | **📱 Availability** | HTTP status | LWT (Last Will) |
 | **🔐 Security** | API key auth | Username/password |
 
-</div>
+
 
 ## 🌐 REST API
 
 Perfect for on-demand control and monitoring through HTTP requests.
 
-<div align="center">
+
 
 ### ✨ Key Features
 
@@ -58,11 +58,11 @@ Perfect for on-demand control and monitoring through HTTP requests.
 | **📸 Media Capture** | Screenshot & camera access |
 | **🔐 API Security** | Optional API key authentication |
 
-</div>
+
 
 ### 🎯 Use Cases
 
-<div align="center">
+
 
 | 🎭 Scenario | 🌐 REST API Advantage |
 |---|---|
@@ -71,7 +71,7 @@ Perfect for on-demand control and monitoring through HTTP requests.
 | **🔧 Scripts** | Simple curl/wget commands |
 | **🌐 Web Dashboards** | JavaScript fetch() calls |
 
-</div>
+
 
 ### 📖 Quick Start
 
@@ -96,7 +96,7 @@ curl -H "X-Api-Key: your-key" http://tablet-ip:8080/api/screenshot
 
 Ideal for real-time automation and Home Assistant auto-discovery.
 
-<div align="center">
+
 
 ### ✨ Key Features
 
@@ -108,11 +108,11 @@ Ideal for real-time automation and Home Assistant auto-discovery.
 | **📊 Telemetry** | Real-time sensor publishing |
 | **🎮 Remote Control** | Command subscription topics |
 
-</div>
+
 
 ### 🎯 Use Cases
 
-<div align="center">
+
 
 | 🎭 Scenario | 📡 MQTT Advantage |
 |---|---|
@@ -121,7 +121,7 @@ Ideal for real-time automation and Home Assistant auto-discovery.
 | **🔔 Notifications** | Event-based automation |
 | **🌐 Multi-device** | Central broker management |
 
-</div>
+
 
 ### 📖 Quick Start
 
@@ -150,7 +150,7 @@ freekiosk/tablet1/command/reload      # Page reload
 
 Configure integrations without UI using ADB intent parameters for mass deployment.
 
-<div align="center">
+
 
 ### 🛠️ ADB Configuration Options
 
@@ -166,11 +166,11 @@ Configure integrations without UI using ADB intent parameters for mass deploymen
 | **`mqtt_password`** | - | `"password"` |
 | **`mqtt_discovery_prefix`** | - | `"homeassistant"` |
 
-</div>
+
 
 ### 🎯 Example Commands
 
-<div align="center">
+
 
 **REST API Only:**
 ```bash
@@ -204,7 +204,7 @@ adb shell am start -n com.freekiosk/.MainActivity \
     --es pin "1234"
 ```
 
-</div>
+
 
 > [!NOTE]
 > For complete ADB provisioning guide, see [ADB Configuration Guide](ADB-Configuration).
@@ -213,7 +213,7 @@ adb shell am start -n com.freekiosk/.MainActivity \
 
 ## 🎯 Choosing Your Integration
 
-<div align="center">
+
 
 | 🎭 Use Case | 🔌 Recommended Integration | 🎯 Why |
 |---|---|---|
@@ -226,24 +226,24 @@ adb shell am start -n com.freekiosk/.MainActivity \
 | **🔧 Simple Scripts** | **REST API** | Easy curl commands |
 | **🔄 Real-time Control** | **Both** | MQTT for events, REST for commands |
 
-</div>
+
 
 ### 🔄 Hybrid Approach
 
-<div align="center">
+
 
 **Best of both worlds:**
 - **📡 MQTT** for continuous telemetry and Home Assistant discovery
 - **🌐 REST API** for on-demand commands and media capture
 - **⚙️ ADB** for initial provisioning and bulk configuration
 
-</div>
+
 
 ---
 
 ## 🔗 Related Documentation
 
-<div align="center">
+
 
 | 📚 Document | 🎯 Focus |
 |---|---|
@@ -253,12 +253,12 @@ adb shell am start -n com.freekiosk/.MainActivity \
 | **🔧 Installation** | [Device setup instructions](Installation) |
 | **❓ FAQ** | [Common integration questions](FAQ) |
 
-</div>
+
 
 ---
 
-<div align="center">
+
 
 **Made with ❤️ by [FreeKiosk Team](https://freekiosk.app)**
 
-</div>
+

@@ -1,4 +1,4 @@
-<div align="center">
+
 
 # ⌨️ FreeKiosk ADB Configuration Guide
 
@@ -11,7 +11,7 @@
   <a href="MQTT.md">📡 MQTT</a>
 </p>
 
-</div>
+
 
 > [!IMPORTANT]
 > For production-grade app locking, pair ADB provisioning with **Device Owner mode**.
@@ -20,8 +20,6 @@
 
 FreeKiosk supports configuration via Android Debug Bridge (ADB) intent extras, enabling:
 
-<div align="center">
-
 | ✅ Capability | 📋 Description |
 |---|---|
 | **🤖 Automated Device Provisioning** | Configure without UI interaction |
@@ -29,28 +27,26 @@ FreeKiosk supports configuration via Android Debug Bridge (ADB) intent extras, e
 | **⚡ Dynamic Configuration** | Change settings via scripts |
 | **🔄 CI/CD Integration** | Automated testing workflows |
 
-</div>
-
 ## 🔐 Security Model
 
-<div align="center">
+
 
 | Device State | 📋 Requirements |
 |--------------|-------------|
 | **🔓 Virgin setup** (no PIN configured) | PIN **must be provided** in the command |
 | **🔒 Already configured** | Existing PIN **required** to modify |
 
-</div>
+
 
 This security model ensures:
 
-<div align="center">
+
 
 ✅ **First-time setup is scriptable** with PIN protection  
 ✅ **Configured devices cannot be hijacked** via ADB  
 ✅ **Factory reset re-enables** ADB provisioning  
 
-</div>
+
 
 ---
 
@@ -58,7 +54,7 @@ This security model ensures:
 
 ### 📱 First-Time Setup (New Device)
 
-<div align="center">
+
 
 ```bash
 # Set Device Owner (one-time, requires no user accounts on the device)
@@ -70,14 +66,14 @@ adb shell am start -n com.freekiosk/.MainActivity \
     --es pin "1234"
 ```
 
-</div>
+
 
 > [!NOTE]
 > Setting Device Owner is **highly recommended** for external app locking as it allows FreeKiosk to automatically manage all required permissions including "Display over other apps". Without Device Owner, this permission must be granted manually through Settings.
 
 ### 🌐 Configure WebView Kiosk
 
-<div align="center">
+
 
 ```bash
 adb shell am start -n com.freekiosk/.MainActivity \
@@ -85,7 +81,7 @@ adb shell am start -n com.freekiosk/.MainActivity \
     --es pin "1234"
 ```
 
-</div>
+
 
 > [!NOTE]
 > WebView mode doesn't require Device Owner as it doesn't need overlay permissions.
@@ -96,13 +92,13 @@ adb shell am start -n com.freekiosk/.MainActivity \
 
 ### 🔧 Basic Syntax
 
-<div align="center">
+
 
 ```bash
 adb shell am start -n com.freekiosk/.MainActivity [OPTIONS]
 ```
 
-</div>
+
 
 ### 🔑 Required Parameters
 
@@ -179,7 +175,7 @@ The ADB command returns immediately, but FreeKiosk needs time to save settings a
 
 ### 🟨 TypeScript/JavaScript Example
 
-<div align="center">
+
 
 ```typescript
 private async setupKioskModeUsingFreeKiosk(packageName: string): Promise<void> {
@@ -208,11 +204,11 @@ private async setupKioskModeUsingFreeKiosk(packageName: string): Promise<void> {
 }
 ```
 
-</div>
+
 
 ### 🔧 Bash Script Example
 
-<div align="center">
+
 
 ```bash
 #!/bin/bash
@@ -236,7 +232,7 @@ timeout 30 wait $LOGCAT_PID
 echo "Configuration complete!"
 ```
 
-</div>
+
 
 ### 📡 Broadcast Events
 
@@ -254,7 +250,7 @@ FreeKiosk emits these broadcasts during ADB configuration:
 
 ### ⏱️ Waiting for External App Launch
 
-<div align="center">
+
 
 ```bash
 #!/bin/bash
@@ -279,7 +275,7 @@ echo "✅ $PACKAGE is now running and ready!"
 # Start sending video/content here
 ```
 
-</div>
+
 
 ---
 
@@ -289,7 +285,7 @@ echo "✅ $PACKAGE is now running and ready!"
 
 Lock device to a game streaming app with auto-relaunch (production mode):
 
-<div align="center">
+
 
 ```bash
 adb shell am start -n com.freekiosk/.MainActivity \
@@ -300,7 +296,7 @@ adb shell am start -n com.freekiosk/.MainActivity \
     --ez auto_start true
 ```
 
-</div>
+
 
 > [!NOTE]
 > `test_mode "false"` sets `back_button_mode` to `immediate`, meaning the Android back button will instantly relaunch the app. Omit it or set to `"true"` during testing to allow the back button to return to FreeKiosk without auto-relaunch.
@@ -309,7 +305,7 @@ adb shell am start -n com.freekiosk/.MainActivity \
 
 Display hotel dashboard with REST API for Home Assistant:
 
-<div align="center">
+
 
 ```bash
 adb shell am start -n com.freekiosk/.MainActivity \
@@ -321,13 +317,13 @@ adb shell am start -n com.freekiosk/.MainActivity \
     --es screensaver_enabled "true"
 ```
 
-</div>
+
 
 ### 🍽️ 3. Restaurant Menu Display
 
 Simple URL kiosk:
 
-<div align="center">
+
 
 ```bash
 adb shell am start -n com.freekiosk/.MainActivity \
@@ -336,13 +332,13 @@ adb shell am start -n com.freekiosk/.MainActivity \
     --es status_bar "false"
 ```
 
-</div>
+
 
 ### 📄 4. Full JSON Configuration
 
 For complex setups, use a JSON config. Note that shell escaping can be tricky - using individual parameters is often easier:
 
-<div align="center">
+
 
 ```bash
 # Linux/Mac - use single quotes for JSON
@@ -360,13 +356,13 @@ adb shell am start -n com.freekiosk/.MainActivity \
     --es pin "1234"
 ```
 
-</div>
+
 
 ### 🔄 5. Modify Existing Configuration
 
 Change the locked app on an already-configured device:
 
-<div align="center">
+
 
 ```bash
 # Must use the existing PIN
@@ -375,7 +371,7 @@ adb shell am start -n com.freekiosk/.MainActivity \
     --es pin "1234"
 ```
 
-</div>
+
 
 ---
 
@@ -383,7 +379,7 @@ adb shell am start -n com.freekiosk/.MainActivity \
 
 When using `--es config '{...}'`, the following keys are supported:
 
-<div align="center">
+
 
 ```json
 {
@@ -422,7 +418,7 @@ When using `--es config '{...}'`, the following keys are supported:
 }
 ```
 
-</div>
+
 
 ---
 
@@ -430,7 +426,7 @@ When using `--es config '{...}'`, the following keys are supported:
 
 Here's a complete bash script for provisioning a new device:
 
-<div align="center">
+
 
 ```bash
 #!/bin/bash
@@ -468,13 +464,13 @@ echo "   Locked to: $PACKAGE"
 echo "   REST API: http://<device-ip>:8080"
 ```
 
-</div>
+
 
 ---
 
 ## 💻 PowerShell Script (Windows)
 
-<div align="center">
+
 
 ```powershell
 # provision_kiosk.ps1 - Provision a FreeKiosk device (Windows)
@@ -509,7 +505,7 @@ adb shell am start -n com.freekiosk/.MainActivity `
 Write-Host "✅ Device provisioned!"
 ```
 
-</div>
+
 
 ---
 
@@ -604,7 +600,7 @@ adb shell pm clear com.freekiosk
 
 ## 🔒 Security Considerations
 
-<div align="center">
+
 
 | ⚠️ Risk | 🛡️ Mitigation |
 |---|---|
@@ -613,7 +609,7 @@ adb shell pm clear com.freekiosk
 | **Network ADB** | If using `adb tcpip`, ensure proper network security as anyone on the network could potentially access ADB. |
 | **Configuration Storage** | ADB configuration is first saved to SharedPreferences as a "pending config", then applied to AsyncStorage by React Native on the next startup. This two-step bridge ensures reliable persistence across process restarts (~500ms). |
 
-</div>
+
 
 ### 📋 Recommendations:
 - 🔐 Use strong PINs (6+ digits)
@@ -625,18 +621,18 @@ adb shell pm clear com.freekiosk
 
 ## 🔗 See Also
 
-<div align="center">
+
 
 - [🌐 REST API Documentation](REST-API) - Remote control via HTTP
 - [🏢 MDM Specification](MDM-SPEC) - Enterprise deployment
 - [🔧 Installation Guide](Installation) - Manual setup instructions
 
-</div>
+
 
 ---
 
-<div align="center">
+
 
 **Made with ❤️ by [FreeKiosk Team](https://freekiosk.app)**
 
-</div>
+

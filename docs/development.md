@@ -1,4 +1,4 @@
-<div align="center">
+
 
 # 🧪 FreeKiosk Development Guide
 
@@ -10,14 +10,14 @@
   <a href="roadmap-and-changelog.md">🗺️ Roadmap</a>
 </p>
 
-</div>
+
 
 > [!NOTE]
 > This page focuses on **contributor setup**. Operational deployment is documented in [`installation.md`](Installation).
 
 ## 📋 Prerequisites
 
-<div align="center">
+
 
 | ⚙️ Tool | 📏 Version | 📋 Purpose |
 |---|---|---|
@@ -27,7 +27,7 @@
 | **JDK** | 17+ | Java development for Android |
 | **Git** | Latest | Version control |
 
-</div>
+
 
 ### 🔧 Additional Requirements
 
@@ -37,7 +37,7 @@
 
 ## 🚀 Local Setup
 
-<div align="center">
+
 
 ```bash
 # Clone the repository
@@ -51,14 +51,14 @@ npm install
 cd ios && pod install && cd ..
 ```
 
-</div>
+
 
 > [!TIP]
 > Make sure to run `pod install` after any changes to native dependencies.
 
 ## 📱 Run on Android
 
-<div align="center">
+
 
 ```bash
 # Start Metro bundler
@@ -71,7 +71,7 @@ npx react-native run-android
 npx react-native run-android --device <device_id>
 ```
 
-</div>
+
 
 ### 🔍 Common Issues
 
@@ -83,7 +83,7 @@ npx react-native run-android --device <device_id>
 
 ## 📦 Build Release APK
 
-<div align="center">
+
 
 ```bash
 # Navigate to Android directory
@@ -96,25 +96,25 @@ cd android
 ./gradlew assembleBundle
 ```
 
-</div>
+
 
 ### 📂 Output Locations
 
-<div align="center">
+
 
 | 📄 Format | 📍 Path |
 |---|---|
 | **APK** | `android/app/build/outputs/apk/release/app-release.apk` |
 | **AAB** | `android/app/build/outputs/bundle/release/app-release.aab` |
 
-</div>
+
 
 > [!IMPORTANT]
 > For production builds, make sure to configure your signing keys in `android/app/build.gradle`.
 
 ## 🤝 Contributing
 
-<div align="center">
+
 
 | 📋 Resource | 🔗 Link |
 |---|---|
@@ -123,7 +123,7 @@ cd android
 | **💬 Discussions** | [GitHub Discussions](https://github.com/rushb-fr/freekiosk/discussions) |
 | **❓ FAQ** | [FAQ](FAQ) |
 
-</div>
+
 
 ### 🎯 How to Contribute
 
@@ -135,7 +135,7 @@ cd android
 
 ## 🔗 Related Technical Docs
 
-<div align="center">
+
 
 | 📚 Documentation | 🎯 Focus |
 |---|---|
@@ -145,13 +145,13 @@ cd android
 | **📡 MQTT** | [MQTT](MQTT) - Home Assistant integration |
 | **🗺️ Roadmap** | [Roadmap-and-Changelog](Roadmap-and-Changelog) - Release planning |
 
-</div>
+
 
 ---
 
 ## 🏗️ Project Structure
 
-<div align="center">
+
 
 ```
 freekiosk/
@@ -169,12 +169,12 @@ freekiosk/
 └── __tests__/           # Unit tests
 ```
 
-</div>
+
 
 ---
 
-<div align="center">
+
 
 **Made with ❤️ by [FreeKiosk Team](https://freekiosk.app)**
 
-</div>
+
