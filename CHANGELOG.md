@@ -173,7 +173,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Settings: Broker URL, port, username, password, client ID, base topic, discovery prefix, status interval, allow control
   - Connection status indicator in Settings UI
   - MQTT settings included in backup/restore
-  - **[Full MQTT Documentation](docs/MQTT.md)**
+  - **[Full MQTT Documentation](docs/mqtt.md)**
 ### Fixed
 - 🔊 **No audio in Lock Mode on Samsung/OneUI devices**: audio streams were muted by Samsung when `LOCK_TASK_FEATURE_NONE` was set, which is more restrictive than Android's own default behavior
   - `LOCK_TASK_FEATURE_GLOBAL_ACTIONS` is now included by default (matches Android's own default when `setLockTaskFeatures()` is never called), preventing Samsung/OneUI from muting audio in `LOCK_TASK_MODE_LOCKED`
@@ -532,7 +532,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Set locked app, URL, and all kiosk settings via ADB
   - Auto-restart and launch external app after configuration
   - Support for full JSON configuration or individual parameters
-  - [Full ADB Documentation](docs/ADB_CONFIG.md) with examples and scripts
+  - [Full ADB Documentation](docs/adb-configuration.md) with examples and scripts
 - � **Backup & Restore**: Export and import complete FreeKiosk configuration
   - Export all settings to JSON file
   - Import configuration from JSON file
@@ -629,7 +629,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - JSON responses with timestamps
 
 ### Documentation
-- 📖 New `docs/REST_API.md` with complete endpoint reference
+- 📖 New `docs/rest-api.md` with complete endpoint reference
 - 🏠 Home Assistant configuration examples
 - 🔧 cURL testing examples
 
