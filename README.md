@@ -27,21 +27,14 @@ For production deployments with complete lockdown, use Device Owner setup:
 
 ## Documentation Hub
 
-Detailed documentation has been moved into an organized wiki structure in `wiki/`.
+All documentation is now centralized in `docs/`.
 
-- [Wiki Home](wiki/Home.md)
-- [Installation](wiki/Installation.md)
-- [Features & Modes](wiki/Features-and-Modes.md)
-- [Integrations](wiki/Integrations.md)
-- [Roadmap & Changelog](wiki/Roadmap-and-Changelog.md)
-- [Development](wiki/Development.md)
-
-## Technical Reference
-
-- [Install Guide](docs/INSTALL.md)
-- [ADB Configuration](docs/ADB_CONFIG.md)
-- [REST API](docs/REST_API.md)
-- [MQTT](docs/MQTT.md)
+- [Documentation Home](docs/README.md)
+- [Installation](docs/INSTALL.md)
+- [Features and Modes](docs/FEATURES_AND_MODES.md)
+- [Integrations](docs/INTEGRATIONS.md)
+- [Roadmap and Changelog](docs/ROADMAP_AND_CHANGELOG.md)
+- [Development](docs/DEVELOPMENT.md)
 - [FAQ](docs/FAQ.md)
 
 ## Contributing
