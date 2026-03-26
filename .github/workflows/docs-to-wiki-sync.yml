@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - development
+      - wiki-implementation
     paths:
       - 'docs/**'
       - '.github/workflows/docs-to-wiki-sync.yml'
