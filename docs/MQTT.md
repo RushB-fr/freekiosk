@@ -1,4 +1,16 @@
-# FreeKiosk MQTT Documentation
+<div align="center">
+
+# 📡 FreeKiosk MQTT Documentation
+
+_Real-time telemetry, command topics, and Home Assistant auto-discovery._
+
+<p>
+  <a href="README.md">Docs Home</a> •
+  <a href="INTEGRATIONS.md">Integrations</a> •
+  <a href="rest-api.md">REST API</a>
+</p>
+
+</div>
 
 FreeKiosk includes a native MQTT client for real-time integration with **Home Assistant** and other MQTT-based platforms.
 
@@ -10,6 +22,7 @@ FreeKiosk includes a native MQTT client for real-time integration with **Home As
 - **Push-based**: Real-time status updates (no polling needed)
 - **LWT**: Availability tracking via Last Will and Testament
 
+> [!TIP]
 > **MQTT vs REST API**: MQTT is push-based — the tablet publishes status updates automatically every N seconds. The REST API requires polling. MQTT is the preferred integration for Home Assistant. Both can run simultaneously.
 
 ## Enabling MQTT
@@ -259,7 +272,7 @@ Commands are sent by publishing to `{baseTopic}/{topicId}/set/{entity}`.
 | `keyboard_combo` | keyboardCombo | combo string (e.g. `ctrl+c`) | Press a key combination |
 | `keyboard_text` | keyboardText | text string | Type text into focused field |
 
-> Commands have full parity with the [REST API](REST_API.md). Both interfaces dispatch through the same native command handler. Remote control and keyboard commands are handled natively via the AccessibilityService (cross-app) or Activity key dispatch (in-app). TTS and Toast are also handled natively (no JS round-trip).
+> Commands have full parity with the [REST API](rest-api.md). Both interfaces dispatch through the same native command handler. Remote control and keyboard commands are handled natively via the AccessibilityService (cross-app) or Activity key dispatch (in-app). TTS and Toast are also handled natively (no JS round-trip).
 
 ---
 
@@ -522,6 +535,6 @@ entities:
 
 ## See Also
 
-- [REST API Documentation](REST_API.md) — HTTP-based integration (polling)
-- [ADB Configuration Guide](ADB_CONFIG.md) — Headless provisioning via ADB
-- [Installation Guide](INSTALL.md) — Device setup
+- [REST API Documentation](rest-api.md) — HTTP-based integration (polling)
+- [ADB Configuration Guide](adb-configuration.md) — Headless provisioning via ADB
+- [Installation Guide](installation.md) — Device setup

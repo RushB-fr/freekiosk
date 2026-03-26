@@ -97,4 +97,7 @@ Once the script completes successfully:
 
 ## Support
 
-For issues or questions, please refer to the main [FreeKiosk documentation](../README.md).
+For issues or questions, refer to:
+
+- [Documentation Hub](../docs/README.md)
+- [Installation Guide](../docs/installation.md)

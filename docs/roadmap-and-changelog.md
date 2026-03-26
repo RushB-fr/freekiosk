@@ -1,4 +1,19 @@
-# Roadmap and Changelog
+<div align="center">
+
+# 🗺️ Roadmap and Changelog
+
+_Recent release highlights plus medium-term product direction._
+
+<p>
+  <a href="README.md">Docs Home</a> •
+  <a href="features-and-modes.md">Features</a> •
+  <a href="development.md">Development</a>
+</p>
+
+</div>
+
+> [!IMPORTANT]
+> Roadmap priorities can evolve; use issues and discussions for the latest planning signal.
 
 ## Latest Stable Releases
 

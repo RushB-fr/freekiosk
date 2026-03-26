@@ -1,4 +1,19 @@
-# Development
+<div align="center">
+
+# 🧪 Development
+
+_Build, run, and ship FreeKiosk locally._
+
+<p>
+  <a href="README.md">Docs Home</a> •
+  <a href="installation.md">Installation</a> •
+  <a href="roadmap-and-changelog.md">Roadmap</a>
+</p>
+
+</div>
+
+> [!NOTE]
+> This page focuses on contributor setup. Operational deployment is documented in `installation.md`.
 
 ## Prerequisites
 
@@ -35,11 +50,11 @@ Output APK:
 
 - [Contributing Guide](../CONTRIBUTING.md)
 - [Issue Tracker](https://github.com/rushb-fr/freekiosk/issues)
-- [FAQ](../docs/FAQ.md)
+- [FAQ](faq.md)
 
 ## Related Technical Docs
 
-- [Install Guide](../docs/INSTALL.md)
-- [ADB Configuration](../docs/ADB_CONFIG.md)
-- [REST API](../docs/REST_API.md)
-- [MQTT](../docs/MQTT.md)
+- [Install Guide](installation.md)
+- [ADB Configuration](adb-configuration.md)
+- [REST API](rest-api.md)
+- [MQTT](MQTT.md)

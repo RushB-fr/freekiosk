@@ -1,6 +1,20 @@
-# FreeKiosk ADB Configuration Guide
+<div align="center">
 
-Configure FreeKiosk via ADB commands for automated deployment and headless provisioning.
+# ⌨️ FreeKiosk ADB Configuration Guide
+
+_Headless provisioning and scripted deployments with secure PIN-based control._
+
+<p>
+  <a href="README.md">Docs Home</a> •
+  <a href="installation.md">Installation</a> •
+  <a href="rest-api.md">REST API</a> •
+  <a href="MQTT.md">MQTT</a>
+</p>
+
+</div>
+
+> [!IMPORTANT]
+> For production-grade app locking, pair ADB provisioning with Device Owner mode.
 
 ## Overview
 
@@ -532,6 +546,6 @@ adb shell pm clear com.freekiosk
 
 ## See Also
 
-- [REST API Documentation](REST_API.md) - Remote control via HTTP
+- [REST API Documentation](rest-api.md) - Remote control via HTTP
 - [MDM Specification](MDM_SPEC.md) - Enterprise deployment
-- [Installation Guide](INSTALL.md) - Manual setup instructions
+- [Installation Guide](installation.md) - Manual setup instructions

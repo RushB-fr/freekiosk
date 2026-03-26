@@ -1,4 +1,19 @@
-# FreeKiosk - Frequently Asked Questions
+<div align="center">
+
+# ❓ FreeKiosk FAQ
+
+_Common questions about setup, lockdown, compatibility, and operations._
+
+<p>
+  <a href="README.md">Docs Home</a> •
+  <a href="installation.md">Installation</a> •
+  <a href="features-and-modes.md">Features</a>
+</p>
+
+</div>
+
+> [!TIP]
+> Start from `installation.md` for first deployment, then use this page for edge cases.
 
 ---
 
@@ -8,7 +23,7 @@
 **A:** No! FreeKiosk uses Android's official Device Owner API. No root required.
 
 ### Q: Do I need Android Studio?
-**A:** No! Just ADB tool (15 MB download). See [Installation Guide](INSTALL.md).
+**A:** No! Just ADB tool (15 MB download). See [Installation Guide](installation.md).
 
 ### Q: Can I install from Play Store?
 **A:** Yes! Search "FreeKiosk" on Google Play Store, or download APK from [Releases](https://github.com/rushb-fr/freekiosk/releases).
@@ -35,8 +50,6 @@
 ### Q: Can I remove Device Owner?
 **A:** Yes! In FreeKiosk settings, use the "⚠️ Remove Device Owner" button (NOT "Exit Kiosk Mode"). Or via ADB:
 adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver
-
-text
 
 ### Q: Does Device Owner void warranty?
 **A:** No. Device Owner is an official Android feature with no system modifications.
@@ -94,7 +107,7 @@ text
 ## Troubleshooting
 
 ### Q: Kiosk mode doesn't lock completely
-**A:** Make sure Device Owner is activated. Without Device Owner, lockdown is partial. See [Installation Guide](INSTALL.md#advanced-install-device-owner-mode).
+**A:** Make sure Device Owner is activated. Without Device Owner, lockdown is partial. See [Installation Guide](installation.md#advanced-install-device-owner-mode).
 
 ### Q: System notifications still appear
 **A:** Device Owner mode blocks all notifications. If they still appear:
@@ -199,7 +212,7 @@ text
 **A:** Absolutely! See [Contributing Guide](../CONTRIBUTING.md).
 
 ### Q: Is FreeKiosk really open-source?
-**A:** Yes! MIT licensed. View source on [GitHub](https://github.com/rushb/freekiosk).
+**A:** Yes! MIT licensed. View source on [GitHub](https://github.com/rushb-fr/freekiosk).
 
 ### Q: Who develops FreeKiosk?
 **A:** FreeKiosk is developed by [Rushb](https://rushb.io), a French tech company passionate about open-source.
@@ -230,13 +243,13 @@ See full [Roadmap](../README.md#-roadmap).
 ## Support
 
 ### Q: Where can I get help?
-- 📖 Read [Installation Guide](INSTALL.md)
-- 💬 [GitHub Discussions](https://github.com/rushb/freekiosk/discussions)
-- 🐛 [Report Bug](https://github.com/rushb/freekiosk/issues)
+- 📖 Read [Installation Guide](installation.md)
+- 💬 [GitHub Discussions](https://github.com/rushb-fr/freekiosk/discussions)
+- 🐛 [Report Bug](https://github.com/rushb-fr/freekiosk/issues)
 - 📧 Email: support@freekiosk.app
 
 ### Q: How can I support FreeKiosk?
-- ⭐ Star on [GitHub](https://github.com/rushb/freekiosk)
+- ⭐ Star on [GitHub](https://github.com/rushb-fr/freekiosk)
 - 💬 Spread the word
 - 🐛 Report bugs
 - 🔧 Contribute code
@@ -244,7 +257,7 @@ See full [Roadmap](../README.md#-roadmap).
 
 ---
 
-**Didn't find your answer? Ask in [Discussions](https://github.com/rushb/freekiosk/discussions)!**
+**Didn't find your answer? Ask in [Discussions](https://github.com/rushb-fr/freekiosk/discussions)!**
 
 ---
 
