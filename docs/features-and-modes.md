@@ -174,8 +174,3 @@ adb shell am start -n com.freekiosk/.MainActivity \
 - **Integrations:** [REST API and MQTT](Integrations)
 - **ADB Provisioning:** [Headless deployment](ADB-Configuration)
 - **FAQ:** [Common questions](FAQ)
-
-
-**Made with ❤️ by [Rushb](https://rushb.fr)**
-
-

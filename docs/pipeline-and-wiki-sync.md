@@ -102,8 +102,3 @@ cd wiki && git add . && git commit -m "Sync docs" && git push
 - **Workflow:** [`.github/workflows/docs-to-wiki-sync.yml`](https://github.com/rushb-fr/freekiosk/blob/main/.github/workflows/docs-to-wiki-sync.yml)
 - **GitHub Wiki Docs:** [docs.github.com/en/wikis](https://docs.github.com/en/wikis)
 - **GitHub Actions:** [docs.github.com/en/actions](https://docs.github.com/en/actions)
-
-
-**Made with ❤️ by [Rushb](https://rushb.fr)**
-
-

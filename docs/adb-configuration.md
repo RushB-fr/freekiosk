@@ -635,6 +635,5 @@ adb shell pm clear com.freekiosk
 
 
 
-**Made with ❤️ by [FreeKiosk Team](https://freekiosk.app)**
 
 

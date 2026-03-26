@@ -206,6 +206,3 @@ Use both for maximum flexibility:
 - **ADB Configuration:** [Headless provisioning](ADB-Configuration)
 - **Installation:** [Device setup guide](Installation)
 - **FAQ:** [Common questions](FAQ)
-
-
-**Made with ❤️ by [Rushb](https://rushb.fr)**

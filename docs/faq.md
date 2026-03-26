@@ -300,5 +300,4 @@ See full [Roadmap](../README.md#roadmap).
 
 
 
-**Made with ❤️ by [FreeKiosk Team](https://freekiosk.app)**
 

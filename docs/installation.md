@@ -327,6 +327,3 @@ Should work, but not officially tested.
 - **Community:** [GitHub Discussions](https://github.com/rushb-fr/freekiosk/discussions)
 - **Bug Reports:** [GitHub Issues](https://github.com/rushb-fr/freekiosk/issues)
 - **Email:** support@freekiosk.app
-
-
-**Made with ❤️ by [Rushb](https://rushb.fr)**
