@@ -48,7 +48,6 @@ This security model ensures:
 
 
 
----
 
 ## 🚀 Quick Start
 
@@ -86,7 +85,6 @@ adb shell am start -n com.freekiosk/.MainActivity \
 > [!NOTE]
 > WebView mode doesn't require Device Owner as it doesn't need overlay permissions.
 
----
 
 ## 📖 Command Reference
 
@@ -167,7 +165,6 @@ adb shell am start -n com.freekiosk/.MainActivity [OPTIONS]
 |-----------|------|-------------|
 | `--es screensaver_enabled "true"` | String | Enable screensaver on inactivity |
 
----
 
 ## ⏳ Waiting for Configuration Completion
 
@@ -277,7 +274,6 @@ echo "✅ $PACKAGE is now running and ready!"
 
 
 
----
 
 ## 🎨 Examples
 
@@ -373,7 +369,6 @@ adb shell am start -n com.freekiosk/.MainActivity \
 
 
 
----
 
 ## 📋 JSON Configuration Format
 
@@ -420,7 +415,6 @@ When using `--es config '{...}'`, the following keys are supported:
 
 
 
----
 
 ## 🔧 Complete Provisioning Script
 
@@ -466,7 +460,6 @@ echo "   REST API: http://<device-ip>:8080"
 
 
 
----
 
 ## 💻 PowerShell Script (Windows)
 
@@ -507,7 +500,6 @@ Write-Host "✅ Device provisioned!"
 
 
 
----
 
 ## 🚨 Troubleshooting
 
@@ -596,7 +588,6 @@ adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver
 adb shell pm clear com.freekiosk
 ```
 
----
 
 ## 🔒 Security Considerations
 
@@ -617,7 +608,6 @@ adb shell pm clear com.freekiosk
 - 🏢 Use Device Owner mode for full kiosk lockdown
 - 🔌 Consider physical security of USB port
 
----
 
 ## 🔗 See Also
 
@@ -629,7 +619,6 @@ adb shell pm clear com.freekiosk
 
 
 
----
 
 
 

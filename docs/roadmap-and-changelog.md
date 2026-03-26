@@ -97,7 +97,6 @@
 > - [Issues](https://github.com/rushb-fr/freekiosk/issues)
 > - [Discussions](https://github.com/rushb-fr/freekiosk/discussions)
 
----
 
 ## 🎯 Detailed Feature Progress
 
@@ -200,7 +199,6 @@
 
 
 
----
 
 ## 📈 Development Progress
 
@@ -219,7 +217,6 @@
 
 
 
----
 
 ## 🤝 How to Influence the Roadmap
 
@@ -237,7 +234,6 @@
 
 
 
----
 
 ## 🔗 Related Resources
 
@@ -254,7 +250,6 @@
 
 
 
----
 
 
 

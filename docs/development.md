@@ -147,7 +147,6 @@ cd android
 
 
 
----
 
 ## 🏗️ Project Structure
 
@@ -171,7 +170,6 @@ freekiosk/
 
 
 
----
 
 
 

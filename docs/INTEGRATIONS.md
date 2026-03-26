@@ -209,7 +209,6 @@ adb shell am start -n com.freekiosk/.MainActivity \
 > [!NOTE]
 > For complete ADB provisioning guide, see [ADB Configuration Guide](ADB-Configuration).
 
----
 
 ## 🎯 Choosing Your Integration
 
@@ -239,7 +238,6 @@ adb shell am start -n com.freekiosk/.MainActivity \
 
 
 
----
 
 ## 🔗 Related Documentation
 
@@ -255,7 +253,6 @@ adb shell am start -n com.freekiosk/.MainActivity \
 
 
 
----
 
 
 

@@ -57,7 +57,6 @@ FreeKiosk includes a native MQTT client for real-time integration with **Home As
 
 MQTT settings are included in FreeKiosk backup/restore. You can configure one device and export the configuration to others.
 
----
 
 ## ⚙️ Configuration Options
 
@@ -80,7 +79,6 @@ MQTT settings are included in FreeKiosk backup/restore. You can configure one de
 
 
 
----
 
 ## 📂 Topic Structure
 
@@ -163,7 +161,6 @@ A JSON object published periodically (default: every 30 seconds) containing all 
 
 
 
----
 
 ## 🏠 Home Assistant MQTT Discovery
 
@@ -297,7 +294,6 @@ All entities are grouped under one HA device:
 
 **📊 Total: 42 entities** auto-discovered in Home Assistant.
 
----
 
 ## 🎮 Command Reference
 
@@ -346,7 +342,6 @@ Commands are sent by publishing to `{baseTopic}/{topicId}/set/{entity}`.
 > [!NOTE]
 > Commands have full parity with the [REST API](REST-API). Both interfaces dispatch through the same native command handler. Remote control and keyboard commands are handled natively via the AccessibilityService (cross-app) or Activity key dispatch (in-app). TTS and Toast are also handled natively (no JS round-trip).
 
----
 
 ## 👁️ Motion Detection
 
@@ -366,7 +361,6 @@ FreeKiosk can detect motion using the device camera and report it as a binary se
 > [!NOTE]
 > Camera permission must be granted for motion detection to work. FreeKiosk requests this permission automatically on first launch.
 
----
 
 ## 🔄 Connection Behavior
 
@@ -392,7 +386,6 @@ If the connection is lost unexpectedly, the broker publishes `"offline"` to the 
 
 MQTT and the REST API can run simultaneously. Both use the same internal command handler and status data. Enabling MQTT does not disable the REST API.
 
----
 
 ## 🧪 Testing with MQTT CLI
 
@@ -443,7 +436,6 @@ mosquitto_sub -h BROKER_IP -t "homeassistant/#" -v
 
 Replace `BROKER_IP` with your MQTT broker IP and `TOPIC_ID` with the device name (e.g. `lobby`) or Android ID if no name is configured.
 
----
 
 ## 🏠 Home Assistant Examples
 
@@ -606,7 +598,6 @@ entities:
 
 
 
----
 
 ## 🚨 Troubleshooting
 
@@ -696,7 +687,6 @@ entities:
 
 
 
----
 
 ## 🔧 Technical Details
 
@@ -714,7 +704,6 @@ entities:
 
 
 
----
 
 ## 🔗 See Also
 
@@ -729,7 +718,6 @@ entities:
 
 
 
----
 
 
 

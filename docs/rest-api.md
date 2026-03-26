@@ -63,7 +63,6 @@ adb shell am start -n com.freekiosk/.MainActivity \
 > [!NOTE]
 > See [ADB Configuration Guide](ADB-Configuration) for full headless provisioning.
 
----
 
 ## 🔗 Endpoints Reference
 
@@ -400,7 +399,6 @@ List available cameras on the device. **(v1.2.5+)**
 
 
 
----
 
 ### Control Commands (POST)
 
@@ -552,7 +550,6 @@ Lock device screen. Uses `DevicePolicyManager.lockNow()` (Device Owner) or `GLOB
 #### `GET|POST /api/restart-ui`
 Restart the FreeKiosk app UI. Calls `activity.recreate()` to fully restart the React Native activity without rebooting the device. Useful for troubleshooting UI issues remotely.
 
----
 
 ### Audio Control (POST)
 
@@ -572,7 +569,6 @@ Stop currently playing audio.
 #### `GET|POST /api/audio/beep`
 Play a short beep sound.
 
----
 
 ### Remote Control - Android TV (GET or POST)
 
@@ -784,7 +780,6 @@ If no location is available:
 }
 ```
 
----
 
 ## Authentication
 
@@ -794,7 +789,6 @@ If an API key is configured, include it in requests:
 curl -H "X-Api-Key: your-api-key" http://tablet-ip:8080/api/status
 ```
 
----
 
 ## Home Assistant Integration
 
@@ -1031,7 +1025,6 @@ automation:
           url: "http://homeassistant:8123/lovelace/cameras"
 ```
 
----
 
 ## Testing with cURL
 
@@ -1067,7 +1060,6 @@ curl -X POST -H "Content-Type: application/json" \
 curl http://TABLET_IP:8080/api/location
 ```
 
----
 
 ## Error Responses
 
@@ -1085,7 +1077,6 @@ Common errors:
 - `404 Not Found` - Unknown endpoint
 - `500 Internal Error` - Server error
 
----
 
 ## See Also
 
@@ -1093,7 +1084,6 @@ Common errors:
 - [MDM Specification](MDM-SPEC) - Enterprise deployment
 - [Installation Guide](Installation) - Manual setup
 
----
 
 ## Changelog
 

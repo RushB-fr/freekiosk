@@ -15,7 +15,6 @@
 > [!TIP]
 > Start from [`installation.md`](Installation) for first deployment, then use this page for edge cases.
 
----
 
 ## 🚀 Installation
 
@@ -31,7 +30,6 @@
 ### 🤖 Q: Which Android versions are supported?
 **A:** Android 8.0+ (API 26 and above).
 
----
 
 ## 🏢 Device Owner
 
@@ -56,7 +54,6 @@ adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver
 ### 🛡️ Q: Does Device Owner void warranty?
 **A:** No. Device Owner is an official Android feature with no system modifications.
 
----
 
 ## 📱 Usage
 
@@ -81,7 +78,6 @@ adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver
 ### 🔄 Q: Can I rotate between multiple URLs?
 **A:** Not yet, but planned for v1.1! You can use a single URL pointing to a page that rotates content.
 
----
 
 ## 🔧 Compatibility
 
@@ -110,7 +106,6 @@ adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver
 ### 💻 Q: Does it work on Chromebooks?
 **A:** No. FreeKiosk is Android-only.
 
----
 
 ## 🚨 Troubleshooting
 
@@ -154,7 +149,6 @@ adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver
 ### 💾 Q: Are my settings preserved after updating FreeKiosk?
 **A:** **Yes!** All your settings (URL, PIN, display mode, etc.) are stored locally on your device and are preserved when updating FreeKiosk. You don't need to reconfigure anything after an update.
 
----
 
 ## 📊 Dashboard Mode
 
@@ -173,7 +167,6 @@ adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver
 ### 🔢 Q: How many tiles can I create?
 **A:** There is no hard limit. The grid adapts to the number of tiles.
 
----
 
 ## ⚡ Features
 
@@ -192,7 +185,6 @@ adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver
 ### 📡 Q: Can I use FreeKiosk offline?
 **A:** Yes! Once configured, FreeKiosk works offline (your URL must be accessible offline too).
 
----
 
 ## ⚖️ Comparison
 
@@ -216,7 +208,6 @@ adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver
 ### 🎁 Q: Will FreeKiosk always be free?
 **A:** Yes! The app will always be 100% free and open-source. We may offer optional paid cloud services (FreeKiosk Cloud) in the future, but the core app stays free forever.
 
----
 
 ## 👨‍💻 Development
 
@@ -232,7 +223,6 @@ adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver
 ### 🏠 Q: Can I self-host FreeKiosk?
 **A:** The app is self-contained (no server needed). Future cloud features will offer self-hosting options.
 
----
 
 ## 🗺️ Roadmap
 
@@ -262,7 +252,6 @@ adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver
 
 See full [Roadmap](../README.md#-roadmap).
 
----
 
 ## 💬 Support
 
@@ -291,7 +280,6 @@ See full [Roadmap](../README.md#-roadmap).
 
 
 
----
 
 
 
@@ -299,7 +287,6 @@ See full [Roadmap](../README.md#-roadmap).
 
 
 
----
 
 
 

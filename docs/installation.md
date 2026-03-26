@@ -15,7 +15,6 @@
 > [!TIP]
 > If you are deploying public-facing tablets, skip directly to Device Owner mode.
 
----
 
 ## 📋 Table of Contents
 
@@ -30,7 +29,6 @@
 
 
 
----
 
 ## 🚀 Quick Install (Basic Mode)
 
@@ -87,7 +85,6 @@ Perfect for testing, personal use, or when you don't have a PC available.
 > [!WARNING]
 > Basic mode allows some system interactions (notifications, back button access in some cases). For complete lockdown, use Device Owner mode.
 
----
 
 ## 🏢 Advanced Install (Device Owner Mode)
 
@@ -269,7 +266,6 @@ adb reboot
 
 
 
----
 
 ## ⚖️ What's the Difference?
 
@@ -290,7 +286,6 @@ adb reboot
 
 
 
----
 
 ## 🚨 Troubleshooting
 
@@ -376,7 +371,6 @@ sudo udevadm control --reload-rules
 
 
 
----
 
 ## 🔧 Remove Device Owner
 
@@ -406,7 +400,6 @@ adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver
 ```
 
 
----
 
 ## 🗑️ Uninstall
 
@@ -429,7 +422,6 @@ Settings → Apps → FreeKiosk → Uninstall
 
 
 
----
 
 ## ❓ FAQ
 
@@ -446,7 +438,6 @@ Settings → Apps → FreeKiosk → Uninstall
 
 
 
----
 
 ## 🎥 Video Tutorial
 
@@ -456,7 +447,6 @@ Settings → Apps → FreeKiosk → Uninstall
 
 
 
----
 
 ## 🆘 Need Help?
 
@@ -471,7 +461,6 @@ Settings → Apps → FreeKiosk → Uninstall
 
 
 
----
 
 
 

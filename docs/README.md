@@ -86,7 +86,6 @@ FreeKiosk is an open-source kiosk platform for Android tablets, built for teams 
 - **Issues**: [GitHub Issues](https://github.com/rushb-fr/freekiosk/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/rushb-fr/freekiosk/discussions)
 
----
 
 **Made with ❤️ in France by [Rushb](https://rushb.fr)**
 
