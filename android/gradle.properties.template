@@ -1,0 +1,7 @@
+org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m
+org.gradle.daemon=true
+org.gradle.parallel=true
+org.gradle.configureondemand=true
+android.useAndroidX=true
+android.enableJetifier=true
+newArchEnabled=false
