@@ -20,6 +20,8 @@ jobs:
       FREEKIOSK_UPLOAD_STORE_PASSWORD: ${{ secrets.FREEKIOSK_UPLOAD_STORE_PASSWORD }}
       FREEKIOSK_UPLOAD_KEY_ALIAS: ${{ secrets.FREEKIOSK_UPLOAD_KEY_ALIAS }}
       FREEKIOSK_UPLOAD_KEY_PASSWORD: ${{ secrets.FREEKIOSK_UPLOAD_KEY_PASSWORD }}
+      GRADLE_OPTS: '-Xmx4096m -XX:MaxMetaspaceSize=1024m'
+      JAVA_OPTS: '-Xmx4096m -XX:MaxMetaspaceSize=1024m'
 
     steps:
       - name: Checkout repository
@@ -39,6 +41,8 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-home-cache-cleanup: true
 
       - name: Install dependencies
         run: npm ci
