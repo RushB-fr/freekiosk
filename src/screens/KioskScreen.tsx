@@ -60,6 +60,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [showBluetooth, setShowBluetooth] = useState(true);
   const [showVolume, setShowVolume] = useState(true);
   const [showTime, setShowTime] = useState(true);
+  const [statusBarTheme, setStatusBarTheme] = useState<'dark' | 'light'>('dark');
   const timerRef = useRef<any>(null);
 
   // External app states
@@ -1301,6 +1302,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       const savedShowBluetooth = bool(K.STATUS_BAR_SHOW_BLUETOOTH, true);
       const savedShowVolume = bool(K.STATUS_BAR_SHOW_VOLUME, true);
       const savedShowTime = bool(K.STATUS_BAR_SHOW_TIME, true);
+      const savedStatusBarTheme = (str(K.STATUS_BAR_THEME) === 'light' ? 'light' : 'dark') as 'dark' | 'light';
 
       if (savedUrl) setUrl(savedUrl);
       setAutoReload(savedAutoReload);
@@ -1327,6 +1329,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       setShowBluetooth(savedShowBluetooth);
       setShowVolume(savedShowVolume);
       setShowTime(savedShowTime);
+      setStatusBarTheme(savedStatusBarTheme);
 
       // Load external app settings
       const savedDisplayMode = (str(K.DISPLAY_MODE) ?? 'webview') as 'webview' | 'external_app' | 'media_player';
@@ -2177,6 +2180,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
               showBluetooth={statusBarEnabled && showBluetooth}
               showVolume={statusBarEnabled && showVolume}
               showTime={statusBarEnabled && showTime}
+              theme={statusBarTheme}
               dashboardMode={dashboardModeEnabled}
               navCanGoBack={navState.canGoBack}
               navCanGoForward={navState.canGoForward}
@@ -2237,6 +2241,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
               showBluetooth={showBluetooth}
               showVolume={showVolume}
               showTime={showTime}
+              theme={statusBarTheme}
             />
           )}
           <MediaPlayerComponent
@@ -2272,6 +2277,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           showBluetooth={showBluetooth}
           showVolume={showVolume}
           showTime={showTime}
+          statusBarTheme={statusBarTheme}
           onReturnToApp={handleReturnToExternalApp}
           onGoToSettings={handleGoToSettings}
           onLaunchApp={(pkg) => launchExternalApp(pkg)}

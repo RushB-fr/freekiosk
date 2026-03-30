@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, NativeModules } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import { StorageService } from '../utils/storage';
 
 const { SystemInfoModule } = NativeModules;
 
@@ -28,6 +27,7 @@ interface StatusBarProps {
   showBluetooth?: boolean;
   showVolume?: boolean;
   showTime?: boolean;
+  theme?: 'dark' | 'light';
   // Dashboard nav props
   dashboardMode?: boolean;
   navCanGoBack?: boolean;
@@ -46,6 +46,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
   showBluetooth = true,
   showVolume = true,
   showTime = true,
+  theme = 'dark',
   dashboardMode = false,
   navCanGoBack = false,
   navCanGoForward = false,
@@ -77,7 +78,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
         }
 
         // Log battery level to debug update issues
-        console.log('[StatusBar] Battery updated:', info.battery.level, '%', info.battery.isCharging ? '⚡' : '');
+        console.log('[StatusBar] Battery updated:', info.battery.level, '%', info.battery.isCharging ? 'charging' : '');
 
         setSystemInfo(info);
 
@@ -115,6 +116,55 @@ const StatusBar: React.FC<StatusBarProps> = ({
   const bluetoothEnabled = systemInfo?.bluetooth?.isEnabled ?? false;
   const bluetoothDevices = systemInfo?.bluetooth?.connectedDevices ?? 0;
   const audioVolume = systemInfo?.audio?.volume ?? 0;
+  const isLightTheme = theme === 'light';
+
+  const colors = {
+    barBackground: isLightTheme ? 'rgba(255, 255, 255, 0.92)' : 'rgba(0, 0, 0, 0.88)',
+    text: isLightTheme ? '#1F2937' : '#FFFFFF',
+    icon: isLightTheme ? '#1F2937' : '#FFFFFF',
+    connected: '#22C55E',
+    disconnected: '#EF4444',
+  };
+
+  const getBatteryIconName = (level: number, charging: boolean) => {
+    if (charging) {
+      return 'battery-charging';
+    }
+
+    if (level <= 10) {
+      return 'battery-alert';
+    }
+
+    if (level <= 25) {
+      return 'battery-20';
+    }
+
+    if (level <= 50) {
+      return 'battery-50';
+    }
+
+    if (level <= 75) {
+      return 'battery-80';
+    }
+
+    return 'battery';
+  };
+
+  const getVolumeIconName = (volume: number) => {
+    if (volume === 0) {
+      return 'volume-off';
+    }
+
+    if (volume <= 33) {
+      return 'volume-low';
+    }
+
+    if (volume <= 66) {
+      return 'volume-medium';
+    }
+
+    return 'volume-high';
+  };
 
   // Organize items: left side and right side to avoid center (camera)
   const leftItems = [];
@@ -124,9 +174,13 @@ const StatusBar: React.FC<StatusBarProps> = ({
   if (showBattery) {
     leftItems.push(
       <View key="battery" style={styles.item}>
-        {isCharging && <Text style={styles.chargingLeft}>⚡</Text>}
-        <Text style={styles.icon}>🔋</Text>
-        <Text style={styles.text}>{batteryLevel}%</Text>
+        <MaterialCommunityIcons
+          name={getBatteryIconName(batteryLevel, isCharging)}
+          size={14}
+          color={colors.icon}
+          style={styles.iconMaterial}
+        />
+        <Text style={[styles.text, { color: colors.text }]}>{batteryLevel}%</Text>
       </View>
     );
   }
@@ -135,10 +189,17 @@ const StatusBar: React.FC<StatusBarProps> = ({
   if (showWifi) {
     leftItems.push(
       <View key="wifi" style={styles.item}>
-        <Text style={styles.icon}>📶</Text>
-        <Text style={wifiConnected ? styles.statusConnected : styles.statusDisconnected}>
-          {wifiConnected ? '✓' : '✗'}
-        </Text>
+        <MaterialCommunityIcons
+          name={wifiConnected ? 'wifi' : 'wifi-off'}
+          size={14}
+          color={colors.icon}
+          style={styles.iconMaterial}
+        />
+        <MaterialCommunityIcons
+          name={wifiConnected ? 'check-circle' : 'close-circle'}
+          size={13}
+          color={wifiConnected ? colors.connected : colors.disconnected}
+        />
       </View>
     );
   }
@@ -147,10 +208,17 @@ const StatusBar: React.FC<StatusBarProps> = ({
   if (showBluetooth) {
     leftItems.push(
       <View key="bluetooth" style={styles.item}>
-        <Text style={styles.icon}>🔵</Text>
-        <Text style={(bluetoothEnabled && bluetoothDevices > 0) ? styles.statusConnected : styles.statusDisconnected}>
-          {(bluetoothEnabled && bluetoothDevices > 0) ? '✓' : '✗'}
-        </Text>
+        <MaterialCommunityIcons
+          name={bluetoothEnabled ? 'bluetooth' : 'bluetooth-off'}
+          size={14}
+          color={colors.icon}
+          style={styles.iconMaterial}
+        />
+        <MaterialCommunityIcons
+          name={(bluetoothEnabled && bluetoothDevices > 0) ? 'check-circle' : 'close-circle'}
+          size={13}
+          color={(bluetoothEnabled && bluetoothDevices > 0) ? colors.connected : colors.disconnected}
+        />
       </View>
     );
   }
@@ -159,12 +227,13 @@ const StatusBar: React.FC<StatusBarProps> = ({
   if (showVolume) {
     rightItems.push(
       <View key="volume" style={styles.item}>
-        <Text style={styles.icon}>
-          {audioVolume === 0 ? '🔇' :
-           audioVolume <= 33 ? '🔉' :
-           audioVolume <= 66 ? '🔊' : '📢'}
-        </Text>
-        <Text style={styles.text}>{audioVolume}%</Text>
+        <MaterialCommunityIcons
+          name={getVolumeIconName(audioVolume)}
+          size={14}
+          color={colors.icon}
+          style={styles.iconMaterial}
+        />
+        <Text style={[styles.text, { color: colors.text }]}>{audioVolume}%</Text>
       </View>
     );
   }
@@ -173,8 +242,8 @@ const StatusBar: React.FC<StatusBarProps> = ({
   if (showTime) {
     rightItems.push(
       <View key="time" style={styles.item}>
-        <Text style={styles.icon}>🕐</Text>
-        <Text style={styles.text}>{currentTime}</Text>
+        <MaterialCommunityIcons name="clock-outline" size={14} color={colors.icon} style={styles.iconMaterial} />
+        <Text style={[styles.text, { color: colors.text }]}>{currentTime}</Text>
       </View>
     );
   }
@@ -183,7 +252,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
     <View>
       {/* Line 1: System info */}
       {systemInfo && (showBattery || showWifi || showBluetooth || showVolume || showTime) && (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: colors.barBackground }]}>
           <View style={styles.leftSide}>
             {leftItems}
           </View>
@@ -196,7 +265,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
 
       {/* Line 2: Dashboard navigation */}
       {dashboardMode && (
-        <View style={styles.navContainer}>
+        <View style={[styles.navContainer, { backgroundColor: colors.barBackground }]}>
           <TouchableOpacity
             onPress={onNavBack}
             disabled={!showNavBar || !navCanGoBack}
@@ -205,7 +274,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
             <MaterialCommunityIcons
               name="arrow-left"
               size={18}
-              color="#FFFFFF"
+              color={colors.icon}
               style={{ opacity: (!showNavBar || !navCanGoBack) ? 0.3 : 1 }}
             />
           </TouchableOpacity>
@@ -218,14 +287,14 @@ const StatusBar: React.FC<StatusBarProps> = ({
             <MaterialCommunityIcons
               name="arrow-right"
               size={18}
-              color="#FFFFFF"
+              color={colors.icon}
               style={{ opacity: (!showNavBar || !navCanGoForward) ? 0.3 : 1 }}
             />
           </TouchableOpacity>
 
           {showNavBar && (
             <TouchableOpacity onPress={onNavRefresh} style={styles.navButton}>
-              <MaterialCommunityIcons name="refresh" size={18} color="#FFFFFF" />
+              <MaterialCommunityIcons name="refresh" size={18} color={colors.icon} />
             </TouchableOpacity>
           )}
 
@@ -237,13 +306,13 @@ const StatusBar: React.FC<StatusBarProps> = ({
             <MaterialCommunityIcons
               name="home"
               size={18}
-              color="#FFFFFF"
+              color={colors.icon}
               style={{ opacity: !showNavBar ? 0.3 : 1 }}
             />
           </TouchableOpacity>
 
           <Text
-            style={styles.navTitle}
+            style={[styles.navTitle, { color: colors.text }]}
             numberOfLines={1}
             ellipsizeMode="tail"
           >
@@ -283,31 +352,11 @@ const styles = StyleSheet.create({
   iconMaterial: {
     fontSize: 14,
     marginRight: 3,
-    color: '#FFFFFF',
     fontWeight: '500',
   },
   text: {
-    color: '#FFFFFF',
     fontSize: 12,
     minWidth: 30,
-  },
-  charging: {
-    fontSize: 11,
-    marginLeft: 0,
-  },
-  chargingLeft: {
-    fontSize: 11,
-    marginRight: 0,
-  },
-  statusConnected: {
-    color: '#4CAF50',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  statusDisconnected: {
-    color: '#F44336',
-    fontSize: 14,
-    fontWeight: 'bold',
   },
   spacer: {
     flex: 1,
@@ -324,7 +373,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   navTitle: {
-    color: '#FFFFFF',
     fontSize: 13,
     flex: 1,
     marginLeft: 4,

@@ -29,6 +29,7 @@ interface ExternalAppOverlayProps {
   showBluetooth?: boolean;
   showVolume?: boolean;
   showTime?: boolean;
+  statusBarTheme?: 'dark' | 'light';
   onReturnToApp: () => void;
   onGoToSettings: () => void;
   /** Called when user taps an app in the multi-app grid */
@@ -52,6 +53,7 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
   showBluetooth = true,
   showVolume = true,
   showTime = true,
+  statusBarTheme = 'dark',
   onReturnToApp,
   onGoToSettings,
   onLaunchApp,
@@ -216,6 +218,7 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
             showBluetooth={showBluetooth}
             showVolume={showVolume}
             showTime={showTime}
+            theme={statusBarTheme}
           />
         )}
         <View style={styles.multiAppHeader}>
@@ -273,6 +276,7 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
           showBluetooth={showBluetooth}
           showVolume={showVolume}
           showTime={showTime}
+          theme={statusBarTheme}
         />
       )}
       <ScrollView
