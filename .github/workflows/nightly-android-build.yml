@@ -47,6 +47,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Configure Gradle properties
+        working-directory: android
+        run: |
+          echo "android.useAndroidX=true" >> gradle.properties
+          echo "android.enableJetifier=true" >> gradle.properties
+          echo "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m" >> gradle.properties
+          echo "org.gradle.daemon=true" >> gradle.properties
+          echo "org.gradle.parallel=true" >> gradle.properties
+          echo "org.gradle.configureondemand=true" >> gradle.properties
+
       - name: Configure production signing (optional)
         if: ${{ env.FREEKIOSK_UPLOAD_STORE_FILE_B64 != '' }}
         working-directory: android
