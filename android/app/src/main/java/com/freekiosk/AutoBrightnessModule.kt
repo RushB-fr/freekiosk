@@ -167,6 +167,41 @@ class AutoBrightnessModule(private val reactContext: ReactApplicationContext) :
         promise.resolve(result)
     }
 
+    @ReactMethod
+    fun setBrightnessLevel(brightnessLevel: Double, promise: Promise) {
+        try {
+            val normalized = brightnessLevel.toFloat().coerceIn(0.0f, 1.0f)
+            applyBrightness(normalized)
+            lastBrightnessValue = normalized
+            promise.resolve(null)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to set brightness level", e)
+            promise.reject("SET_BRIGHTNESS_FAILED", "Failed to set brightness level: ${e.message}")
+        }
+    }
+
+    @ReactMethod
+    fun getBrightnessLevel(promise: Promise) {
+        try {
+            val activity = reactContext.currentActivity
+            if (activity == null) {
+                promise.resolve(lastBrightnessValue.takeIf { it >= 0f }?.toDouble() ?: 0.5)
+                return
+            }
+
+            val current = activity.window.attributes.screenBrightness
+            val value = when {
+                current >= 0f -> current
+                lastBrightnessValue >= 0f -> lastBrightnessValue
+                else -> 0.5f
+            }
+            promise.resolve(value.toDouble())
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get brightness level", e)
+            promise.reject("GET_BRIGHTNESS_FAILED", "Failed to get brightness level: ${e.message}")
+        }
+    }
+
     /**
      * Update auto-brightness parameters without stopping
      */

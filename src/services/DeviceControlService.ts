@@ -4,7 +4,7 @@
  */
 
 import { NativeModules, DeviceEventEmitter } from 'react-native';
-import RNBrightness from 'react-native-brightness-newarch';
+import RNBrightness from '../utils/BrightnessModule';
 
 const { KioskModule } = NativeModules;
 

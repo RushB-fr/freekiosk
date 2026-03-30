@@ -1,5 +1,10 @@
 module.exports = {
   dependencies: {
+    'react-native-brightness-newarch': {
+      platforms: {
+        android: null,
+      },
+    },
     'react-native-vector-icons': {
       platforms: {
         ios: null, // disable auto-linking for iOS if not needed
