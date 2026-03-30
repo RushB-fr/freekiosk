@@ -123,6 +123,6 @@ jobs:
             dist/checksums/SHA256SUMS.txt
           draft: false
           prerelease: true
-          overwrite: true
+          overwrite_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
