@@ -42,7 +42,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-cleanup: true
+          cache-cleanup: always
 
       - name: Install dependencies
         run: npm ci
