@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: nightly-android-build
@@ -104,3 +104,25 @@ jobs:
           path: dist/checksums/SHA256SUMS.txt
           retention-days: 14
           if-no-files-found: error
+
+      - name: Create or update nightly release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          name: "Nightly Build"
+          body: |
+            🚀 **Nightly Build** - Auto-generated build from latest main branch
+            
+            📅 **Build Date:** ${{ github.event.head_commit.timestamp }}
+            📝 **Commit:** [${{ github.sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+            
+            ⚠️ **Note:** This is an automated nightly build. Use at your own risk.
+          files: |
+            android/app/build/outputs/apk/release/app-release.apk
+            android/app/build/outputs/bundle/release/app-release.aab
+            dist/checksums/SHA256SUMS.txt
+          draft: false
+          prerelease: true
+          overwrite: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
