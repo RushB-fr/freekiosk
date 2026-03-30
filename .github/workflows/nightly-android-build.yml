@@ -15,6 +15,11 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      FREEKIOSK_UPLOAD_STORE_FILE_B64: ${{ secrets.FREEKIOSK_UPLOAD_STORE_FILE_B64 }}
+      FREEKIOSK_UPLOAD_STORE_PASSWORD: ${{ secrets.FREEKIOSK_UPLOAD_STORE_PASSWORD }}
+      FREEKIOSK_UPLOAD_KEY_ALIAS: ${{ secrets.FREEKIOSK_UPLOAD_KEY_ALIAS }}
+      FREEKIOSK_UPLOAD_KEY_PASSWORD: ${{ secrets.FREEKIOSK_UPLOAD_KEY_PASSWORD }}
 
     steps:
       - name: Checkout repository
@@ -39,13 +44,8 @@ jobs:
         run: npm ci
 
       - name: Configure production signing (optional)
-        if: ${{ secrets.FREEKIOSK_UPLOAD_STORE_FILE_B64 != '' }}
+        if: ${{ env.FREEKIOSK_UPLOAD_STORE_FILE_B64 != '' }}
         working-directory: android
-        env:
-          FREEKIOSK_UPLOAD_STORE_FILE_B64: ${{ secrets.FREEKIOSK_UPLOAD_STORE_FILE_B64 }}
-          FREEKIOSK_UPLOAD_STORE_PASSWORD: ${{ secrets.FREEKIOSK_UPLOAD_STORE_PASSWORD }}
-          FREEKIOSK_UPLOAD_KEY_ALIAS: ${{ secrets.FREEKIOSK_UPLOAD_KEY_ALIAS }}
-          FREEKIOSK_UPLOAD_KEY_PASSWORD: ${{ secrets.FREEKIOSK_UPLOAD_KEY_PASSWORD }}
         run: |
           echo "${FREEKIOSK_UPLOAD_STORE_FILE_B64}" | base64 -d > app/ci-upload.keystore
           {
