@@ -32,6 +32,7 @@ _Operational guides, integrations and technical reference for production kiosk d
 | ADB Configuration | Headless provisioning and scripts | [Open](adb-configuration.md) |
 | REST API | Endpoints and payloads | [Open](rest-api.md) |
 | MQTT | Topics, discovery, commands | [Open](MQTT.md) |
+| Production CI/CD | Nightly build and release promotion setup | [Open](production-pipeline-readme.md) |
 | Roadmap and Changelog | Release highlights and direction | [Open](roadmap-and-changelog.md) |
 | Development | Local setup and build flow | [Open](development.md) |
 | Pipeline and Wiki Sync | Docs publication workflow | [Open](pipeline-and-wiki-sync.md) |
