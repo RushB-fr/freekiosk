@@ -906,6 +906,8 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
         allowUniversalAccessFromFileURLs={pdfViewerEnabled}
         allowFileAccessFromFileURLs={pdfViewerEnabled}
 
+        nestedScrollEnabled={true}
+
         mediaPlaybackRequiresUserAction={false}
         allowsInlineMediaPlayback={true}
 

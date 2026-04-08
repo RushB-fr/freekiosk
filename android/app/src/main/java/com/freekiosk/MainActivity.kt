@@ -26,6 +26,8 @@ import android.content.IntentFilter
 import android.os.Build
 import android.view.WindowInsets
 import android.view.WindowInsetsController
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import android.Manifest
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -98,6 +100,16 @@ class MainActivity : ReactActivity() {
 
     // Request camera permission for motion detection
     requestCameraPermission()
+
+    // Adjust content padding when the soft keyboard appears.
+    // In immersive/kiosk mode adjustResize is ignored, so we listen for IME insets
+    // and manually add bottom padding so WebView form fields stay visible.
+    val contentView = findViewById<View>(android.R.id.content)
+    ViewCompat.setOnApplyWindowInsetsListener(contentView) { view, insets ->
+      val imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime())
+      view.setPadding(0, 0, 0, imeInsets.bottom)
+      insets
+    }
 
     readExternalAppConfig()
     ensureBootReceiverEnabled()
