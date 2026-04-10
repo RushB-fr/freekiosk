@@ -180,6 +180,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [pdfViewerEnabled, setPdfViewerEnabled] = useState<boolean>(false);
   const [printEnabled, setPrintEnabled] = useState<boolean>(false);
   const [zoomLevel, setZoomLevel] = useState<number>(100);
+  const [disableUserZoom, setDisableUserZoom] = useState<boolean>(false);
   const [customUserAgent, setCustomUserAgent] = useState<string>('');
 
   // Media Player states
@@ -1444,7 +1445,16 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       } catch (error) {
         console.error('[KioskScreen] Error setting keep screen on:', error);
       }
-      
+
+      // Load Auto Wake on Screen Off setting
+      const savedAutoWakeOnScreenOff = bool(K.AUTO_WAKE_ON_SCREEN_OFF, false);
+      try {
+        await KioskModule.setAutoWakeOnScreenOff(savedAutoWakeOnScreenOff);
+        console.log('[KioskScreen] Auto wake on screen off:', savedAutoWakeOnScreenOff);
+      } catch (error) {
+        console.error('[KioskScreen] Error setting auto wake on screen off:', error);
+      }
+
       // Load Inactivity Return to Home settings
       const savedInactivityReturnEnabled = bool(K.INACTIVITY_RETURN_ENABLED, false);
       const savedInactivityReturnDelay = num(K.INACTIVITY_RETURN_DELAY, 60000);
@@ -1478,7 +1488,11 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       // Load WebView Zoom Level
       const savedZoomLevel = num(K.WEBVIEW_ZOOM_LEVEL, 100);
       setZoomLevel(savedZoomLevel);
-      
+
+      // Load Disable User Zoom
+      const savedDisableUserZoom = bool(K.DISABLE_USER_ZOOM, false);
+      setDisableUserZoom(savedDisableUserZoom);
+
       // Load Custom User Agent
       const savedCustomUserAgent = str(K.CUSTOM_USER_AGENT) ?? '';
       setCustomUserAgent(savedCustomUserAgent);
@@ -2230,6 +2244,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
               pdfViewerEnabled={pdfViewerEnabled}
               printEnabled={printEnabled}
               zoomLevel={zoomLevel}
+              disableUserZoom={disableUserZoom}
               customUserAgent={customUserAgent}
             />
           )}

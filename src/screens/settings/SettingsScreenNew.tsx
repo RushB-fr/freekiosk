@@ -163,6 +163,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [screenSchedulerRules, setScreenSchedulerRules] = useState<ScreenScheduleRule[]>([]);
   const [screenSchedulerWakeOnTouch, setScreenSchedulerWakeOnTouch] = useState<boolean>(true);
   const [keepScreenOn, setKeepScreenOn] = useState<boolean>(true);
+  const [autoWakeOnScreenOff, setAutoWakeOnScreenOff] = useState<boolean>(false);
   const [showScheduleRuleEditor, setShowScheduleRuleEditor] = useState<boolean>(false);
   const [editingScheduleRule, setEditingScheduleRule] = useState<ScreenScheduleRule | null>(null);
   
@@ -187,7 +188,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   
   // WebView Zoom Level
   const [zoomLevel, setZoomLevel] = useState<number>(100);
-  
+  const [disableUserZoom, setDisableUserZoom] = useState<boolean>(false);
+
   // Custom User Agent
   const [customUserAgent, setCustomUserAgent] = useState<string>('');
   
@@ -553,6 +555,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setScreenSchedulerWakeOnTouch(savedScreenSchedulerWakeOnTouch);
     setKeepScreenOn(savedKeepScreenOn);
 
+    const savedAutoWakeOnScreenOff = await StorageService.getAutoWakeOnScreenOff();
+    setAutoWakeOnScreenOff(savedAutoWakeOnScreenOff);
+
     // Inactivity Return to Home settings
     const savedInactivityReturnEnabled = await StorageService.getInactivityReturnEnabled();
     const savedInactivityReturnDelay = await StorageService.getInactivityReturnDelay();
@@ -589,6 +594,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     // WebView Zoom Level
     const savedZoomLevel = await StorageService.getWebViewZoomLevel();
     setZoomLevel(savedZoomLevel);
+    const savedDisableUserZoom = await StorageService.getDisableUserZoom();
+    setDisableUserZoom(savedDisableUserZoom);
 
     // Custom User Agent
     const savedCustomUserAgent = await StorageService.getCustomUserAgent();
@@ -1177,6 +1184,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.saveManagedApps(managedApps);
     await StorageService.saveOverlayButtonVisible(overlayButtonVisible);
     await StorageService.saveKeepScreenOn(keepScreenOn);
+    await StorageService.saveAutoWakeOnScreenOff(autoWakeOnScreenOff);
     await StorageService.saveStatusBarEnabled(statusBarEnabled);
     await StorageService.saveStatusBarOnOverlay(statusBarOnOverlay);
     await StorageService.saveStatusBarOnReturn(statusBarOnReturn);
@@ -1190,6 +1198,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.saveBackButtonTimerDelay(isNaN(timerDelay) ? 10 : Math.max(1, Math.min(3600, timerDelay)));
     await StorageService.saveKeyboardMode(keyboardMode);
     await StorageService.saveWebViewZoomLevel(zoomLevel);
+    await StorageService.saveDisableUserZoom(disableUserZoom);
     await StorageService.saveCustomUserAgent(customUserAgent);
     await StorageService.saveAllowPowerButton(allowPowerButton);
     await StorageService.saveAllowNotifications(allowNotifications);
@@ -1397,7 +1406,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
               setScreenSchedulerRules([]);
               setScreenSchedulerWakeOnTouch(true);
               setKeepScreenOn(true);
-              
+              setAutoWakeOnScreenOff(false);
+
               // Reset inactivity return state
               setInactivityReturnEnabled(false);
               setInactivityReturnDelay('60');
@@ -1698,6 +1708,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             onKeyboardModeChange={setKeyboardMode}
             zoomLevel={zoomLevel}
             onZoomLevelChange={setZoomLevel}
+            disableUserZoom={disableUserZoom}
+            onDisableUserZoomChange={setDisableUserZoom}
             customUserAgent={customUserAgent}
             onCustomUserAgentChange={setCustomUserAgent}
             screensaverEnabled={screensaverEnabled}
@@ -1725,6 +1737,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
                 setScreensaverEnabled(false);
               }
             }}
+            autoWakeOnScreenOff={autoWakeOnScreenOff}
+            onAutoWakeOnScreenOffChange={setAutoWakeOnScreenOff}
             onAddScheduleRule={() => {
               setEditingScheduleRule(null);
               setShowScheduleRuleEditor(true);

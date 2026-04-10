@@ -665,6 +665,23 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     }
 
     /**
+     * Enable or disable auto-wake on screen off.
+     * When enabled, ScreenStateReceiver will immediately re-wake the screen
+     * after detecting ACTION_SCREEN_OFF (e.g. from a power button short-press).
+     */
+    @ReactMethod
+    fun setAutoWakeOnScreenOff(enabled: Boolean, promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("FreeKioskSettings", Context.MODE_PRIVATE)
+            prefs.edit().putBoolean("auto_wake_on_screen_off", enabled).apply()
+            android.util.Log.d("KioskModule", "Auto-wake on screen off: $enabled")
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERROR", "Failed to set auto-wake: ${e.message}")
+        }
+    }
+
+    /**
      * Save PIN hash for ADB verification
      * Called when PIN is set via React Native UI to keep ADB config in sync
      */
