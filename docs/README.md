@@ -82,12 +82,15 @@ adb shell dpm set-device-owner com.freekiosk/.DeviceAdminReceiver
 
 ### Integration & Automation
 
-| Guide | Description | Link |
-|-------|-------------|------|
-| **Integrations Overview** | Choose between REST API and MQTT | [Read →](Integrations) |
-| **REST API** | 40+ HTTP endpoints for device control | [Read →](REST-API) |
-| **MQTT** | Real-time telemetry and Home Assistant discovery | [Read →](MQTT) |
-| **ADB Configuration** | Headless provisioning and scripting | [Read →](ADB-Configuration) |
+| Reference | Scope | Link |
+|---|---|---|
+| ADB Configuration | Headless provisioning and scripts | [Open](adb-configuration.md) |
+| REST API | Endpoints and payloads | [Open](rest-api.md) |
+| MQTT | Topics, discovery, commands | [Open](MQTT.md) |
+| Production CI/CD | Nightly build and release promotion setup | [Open](production-pipeline-readme.md) |
+| Roadmap and Changelog | Release highlights and direction | [Open](roadmap-and-changelog.md) |
+| Development | Local setup and build flow | [Open](development.md) |
+| Pipeline and Wiki Sync | Docs publication workflow | [Open](pipeline-and-wiki-sync.md) |
 
 ### Advanced Topics
 
