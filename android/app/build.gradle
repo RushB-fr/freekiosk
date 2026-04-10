@@ -98,7 +98,7 @@ android {
         applicationId "com.freekiosk"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 37
+        versionCode 38
         versionName "1.2.19"
 
         // Expose self-update flag to both Kotlin (BuildConfig) and JS (via UpdateModule constants)
