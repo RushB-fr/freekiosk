@@ -187,7 +187,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   
   // WebView Zoom Level
   const [zoomLevel, setZoomLevel] = useState<number>(100);
-  
+  const [disableUserZoom, setDisableUserZoom] = useState<boolean>(false);
+
   // Custom User Agent
   const [customUserAgent, setCustomUserAgent] = useState<string>('');
   
@@ -589,6 +590,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     // WebView Zoom Level
     const savedZoomLevel = await StorageService.getWebViewZoomLevel();
     setZoomLevel(savedZoomLevel);
+    const savedDisableUserZoom = await StorageService.getDisableUserZoom();
+    setDisableUserZoom(savedDisableUserZoom);
 
     // Custom User Agent
     const savedCustomUserAgent = await StorageService.getCustomUserAgent();
@@ -1190,6 +1193,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.saveBackButtonTimerDelay(isNaN(timerDelay) ? 10 : Math.max(1, Math.min(3600, timerDelay)));
     await StorageService.saveKeyboardMode(keyboardMode);
     await StorageService.saveWebViewZoomLevel(zoomLevel);
+    await StorageService.saveDisableUserZoom(disableUserZoom);
     await StorageService.saveCustomUserAgent(customUserAgent);
     await StorageService.saveAllowPowerButton(allowPowerButton);
     await StorageService.saveAllowNotifications(allowNotifications);
@@ -1698,6 +1702,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             onKeyboardModeChange={setKeyboardMode}
             zoomLevel={zoomLevel}
             onZoomLevelChange={setZoomLevel}
+            disableUserZoom={disableUserZoom}
+            onDisableUserZoomChange={setDisableUserZoom}
             customUserAgent={customUserAgent}
             onCustomUserAgentChange={setCustomUserAgent}
             screensaverEnabled={screensaverEnabled}

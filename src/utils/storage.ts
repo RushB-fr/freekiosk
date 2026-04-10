@@ -106,6 +106,8 @@ const KEYS = {
   PRINT_ENABLED: '@kiosk_print_enabled',
   // WebView Zoom Level
   WEBVIEW_ZOOM_LEVEL: '@kiosk_webview_zoom_level',
+  // Disable User Zoom (pinch-to-zoom)
+  DISABLE_USER_ZOOM: '@kiosk_disable_user_zoom',
   // Custom User Agent
   CUSTOM_USER_AGENT: '@kiosk_custom_user_agent',
   // MQTT (Home Assistant integration)
@@ -1912,6 +1914,26 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting WebView zoom level:', error);
       return 100;
+    }
+  },
+
+  // ============ Disable User Zoom ============
+
+  saveDisableUserZoom: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.DISABLE_USER_ZOOM, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving disable user zoom:', error);
+    }
+  },
+
+  getDisableUserZoom: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.DISABLE_USER_ZOOM);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting disable user zoom:', error);
+      return false;
     }
   },
 
