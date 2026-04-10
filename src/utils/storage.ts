@@ -35,6 +35,7 @@ const KEYS = {
   STATUS_BAR_SHOW_BLUETOOTH: '@kiosk_status_bar_show_bluetooth',
   STATUS_BAR_SHOW_VOLUME: '@kiosk_status_bar_show_volume',
   STATUS_BAR_SHOW_TIME: '@kiosk_status_bar_show_time',
+  STATUS_BAR_THEME: '@kiosk_status_bar_theme',
   EXTERNAL_APP_TEST_MODE: '@kiosk_external_app_test_mode',
   BACK_BUTTON_MODE: '@kiosk_back_button_mode',
   BACK_BUTTON_TIMER_DELAY: '@kiosk_back_button_timer_delay',
@@ -276,6 +277,7 @@ export const StorageService = {
         KEYS.STATUS_BAR_SHOW_BLUETOOTH,
         KEYS.STATUS_BAR_SHOW_VOLUME,
         KEYS.STATUS_BAR_SHOW_TIME,
+        KEYS.STATUS_BAR_THEME,
         KEYS.EXTERNAL_APP_TEST_MODE,
         KEYS.BACK_BUTTON_MODE,
         KEYS.BACK_BUTTON_TIMER_DELAY,
@@ -991,6 +993,24 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting status bar show time:', error);
       return true;
+    }
+  },
+
+  saveStatusBarTheme: async (value: 'dark' | 'light'): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.STATUS_BAR_THEME, value);
+    } catch (error) {
+      console.error('Error saving status bar theme:', error);
+    }
+  },
+
+  getStatusBarTheme: async (): Promise<'dark' | 'light'> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.STATUS_BAR_THEME);
+      return value === 'light' ? 'light' : 'dark';
+    } catch (error) {
+      console.error('Error getting status bar theme:', error);
+      return 'dark';
     }
   },
 

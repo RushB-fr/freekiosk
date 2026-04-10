@@ -120,6 +120,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [showBluetooth, setShowBluetooth] = useState<boolean>(true);
   const [showVolume, setShowVolume] = useState<boolean>(true);
   const [showTime, setShowTime] = useState<boolean>(true);
+  const [statusBarTheme, setStatusBarTheme] = useState<'dark' | 'light'>('dark');
   const [keyboardMode, setKeyboardMode] = useState<string>('default');
   const [allowPowerButton, setAllowPowerButton] = useState<boolean>(true);
   const [allowNotifications, setAllowNotifications] = useState<boolean>(false);
@@ -456,6 +457,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedShowBluetooth = await StorageService.getStatusBarShowBluetooth();
     const savedShowVolume = await StorageService.getStatusBarShowVolume();
     const savedShowTime = await StorageService.getStatusBarShowTime();
+    const savedStatusBarTheme = await StorageService.getStatusBarTheme();
     const savedBackButtonMode = await StorageService.getBackButtonMode();
     const savedBackButtonTimerDelay = await StorageService.getBackButtonTimerDelay();
     const savedKeyboardMode = await StorageService.getKeyboardMode();
@@ -524,6 +526,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setShowBluetooth(savedShowBluetooth);
     setShowVolume(savedShowVolume);
     setShowTime(savedShowTime);
+    setStatusBarTheme(savedStatusBarTheme);
     setBackButtonMode(savedBackButtonMode);
     setBackButtonTimerDelay(String(savedBackButtonTimerDelay));
     setKeyboardMode(savedKeyboardMode);
@@ -1185,6 +1188,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.saveStatusBarShowBluetooth(showBluetooth);
     await StorageService.saveStatusBarShowVolume(showVolume);
     await StorageService.saveStatusBarShowTime(showTime);
+    await StorageService.saveStatusBarTheme(statusBarTheme);
     await StorageService.saveBackButtonMode(backButtonMode);
     const timerDelay = parseInt(backButtonTimerDelay, 10);
     await StorageService.saveBackButtonTimerDelay(isNaN(timerDelay) ? 10 : Math.max(1, Math.min(3600, timerDelay)));
@@ -1694,6 +1698,12 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             onShowVolumeChange={setShowVolume}
             showTime={showTime}
             onShowTimeChange={setShowTime}
+            statusBarTheme={statusBarTheme}
+            onStatusBarThemeChange={(value) => {
+              if (value === 'dark' || value === 'light') {
+                setStatusBarTheme(value);
+              }
+            }}
             keyboardMode={keyboardMode}
             onKeyboardModeChange={setKeyboardMode}
             zoomLevel={zoomLevel}
