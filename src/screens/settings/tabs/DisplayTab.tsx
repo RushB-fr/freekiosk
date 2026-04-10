@@ -100,6 +100,10 @@ interface DisplayTabProps {
   // Keep Screen On
   keepScreenOn: boolean;
   onKeepScreenOnChange: (value: boolean) => void;
+
+  // Auto Wake on Screen Off
+  autoWakeOnScreenOff: boolean;
+  onAutoWakeOnScreenOffChange: (value: boolean) => void;
 }
 
 const DisplayTab: React.FC<DisplayTabProps> = ({
@@ -159,6 +163,8 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
   onScreenSchedulerWakeOnTouchChange,
   keepScreenOn,
   onKeepScreenOnChange,
+  autoWakeOnScreenOff,
+  onAutoWakeOnScreenOffChange,
   onAddScheduleRule,
   onEditScheduleRule,
 }) => {
@@ -319,6 +325,21 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
               ⚠️ The device will use its Android display timeout setting to turn the screen off automatically.{`\n`}
               Configure the timeout in Android Settings → Display → Screen Timeout.{`\n`}
               Screensaver is disabled when screen management is left to the system.
+            </Text>
+          </SettingsInfoBox>
+        )}
+        <SettingsSwitch
+          label="Auto Wake on Screen Off"
+          hint={autoWakeOnScreenOff
+            ? "Screen will automatically turn back on when turned off (e.g. by power button)"
+            : "Screen stays off when turned off by power button or system"}
+          value={autoWakeOnScreenOff}
+          onValueChange={onAutoWakeOnScreenOffChange}
+        />
+        {autoWakeOnScreenOff && (
+          <SettingsInfoBox variant="info">
+            <Text style={styles.infoText}>
+              When the screen is turned off (e.g. by a short power button press), it will automatically turn back on after a brief flicker. Useful for kiosk devices where the power button cannot be physically blocked.
             </Text>
           </SettingsInfoBox>
         )}

@@ -163,6 +163,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [screenSchedulerRules, setScreenSchedulerRules] = useState<ScreenScheduleRule[]>([]);
   const [screenSchedulerWakeOnTouch, setScreenSchedulerWakeOnTouch] = useState<boolean>(true);
   const [keepScreenOn, setKeepScreenOn] = useState<boolean>(true);
+  const [autoWakeOnScreenOff, setAutoWakeOnScreenOff] = useState<boolean>(false);
   const [showScheduleRuleEditor, setShowScheduleRuleEditor] = useState<boolean>(false);
   const [editingScheduleRule, setEditingScheduleRule] = useState<ScreenScheduleRule | null>(null);
   
@@ -552,6 +553,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setScreenSchedulerRules(savedScreenSchedulerRules);
     setScreenSchedulerWakeOnTouch(savedScreenSchedulerWakeOnTouch);
     setKeepScreenOn(savedKeepScreenOn);
+
+    const savedAutoWakeOnScreenOff = await StorageService.getAutoWakeOnScreenOff();
+    setAutoWakeOnScreenOff(savedAutoWakeOnScreenOff);
 
     // Inactivity Return to Home settings
     const savedInactivityReturnEnabled = await StorageService.getInactivityReturnEnabled();
@@ -1177,6 +1181,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.saveManagedApps(managedApps);
     await StorageService.saveOverlayButtonVisible(overlayButtonVisible);
     await StorageService.saveKeepScreenOn(keepScreenOn);
+    await StorageService.saveAutoWakeOnScreenOff(autoWakeOnScreenOff);
     await StorageService.saveStatusBarEnabled(statusBarEnabled);
     await StorageService.saveStatusBarOnOverlay(statusBarOnOverlay);
     await StorageService.saveStatusBarOnReturn(statusBarOnReturn);
@@ -1397,7 +1402,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
               setScreenSchedulerRules([]);
               setScreenSchedulerWakeOnTouch(true);
               setKeepScreenOn(true);
-              
+              setAutoWakeOnScreenOff(false);
+
               // Reset inactivity return state
               setInactivityReturnEnabled(false);
               setInactivityReturnDelay('60');
@@ -1725,6 +1731,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
                 setScreensaverEnabled(false);
               }
             }}
+            autoWakeOnScreenOff={autoWakeOnScreenOff}
+            onAutoWakeOnScreenOffChange={setAutoWakeOnScreenOff}
             onAddScheduleRule={() => {
               setEditingScheduleRule(null);
               setShowScheduleRuleEditor(true);

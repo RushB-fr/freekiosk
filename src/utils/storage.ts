@@ -89,6 +89,8 @@ const KEYS = {
   SCREEN_SCHEDULER_WAKE_ON_TOUCH: '@kiosk_screen_scheduler_wake_on_touch',
   // Keep Screen On (FLAG_KEEP_SCREEN_ON)
   KEEP_SCREEN_ON: '@kiosk_keep_screen_on',
+  // Auto Wake on Screen Off
+  AUTO_WAKE_ON_SCREEN_OFF: '@kiosk_auto_wake_on_screen_off',
   // Inactivity Return to Home
   INACTIVITY_RETURN_ENABLED: '@kiosk_inactivity_return_enabled',
   INACTIVITY_RETURN_DELAY: '@kiosk_inactivity_return_delay',
@@ -329,6 +331,8 @@ export const StorageService = {
         KEYS.SCREEN_SCHEDULER_WAKE_ON_TOUCH,
         // Keep Screen On
         KEYS.KEEP_SCREEN_ON,
+        // Auto Wake on Screen Off
+        KEYS.AUTO_WAKE_ON_SCREEN_OFF,
         // Inactivity Return to Home
         KEYS.INACTIVITY_RETURN_ENABLED,
         KEYS.INACTIVITY_RETURN_DELAY,
@@ -1686,6 +1690,26 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting keep screen on:', error);
       return true;
+    }
+  },
+
+  // ============ AUTO WAKE ON SCREEN OFF ============
+
+  saveAutoWakeOnScreenOff: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.AUTO_WAKE_ON_SCREEN_OFF, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving auto wake on screen off:', error);
+    }
+  },
+
+  getAutoWakeOnScreenOff: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.AUTO_WAKE_ON_SCREEN_OFF);
+      return value !== null ? JSON.parse(value) : false; // Default: OFF
+    } catch (error) {
+      console.error('Error getting auto wake on screen off:', error);
+      return false;
     }
   },
 

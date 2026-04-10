@@ -1444,7 +1444,16 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       } catch (error) {
         console.error('[KioskScreen] Error setting keep screen on:', error);
       }
-      
+
+      // Load Auto Wake on Screen Off setting
+      const savedAutoWakeOnScreenOff = bool(K.AUTO_WAKE_ON_SCREEN_OFF, false);
+      try {
+        await KioskModule.setAutoWakeOnScreenOff(savedAutoWakeOnScreenOff);
+        console.log('[KioskScreen] Auto wake on screen off:', savedAutoWakeOnScreenOff);
+      } catch (error) {
+        console.error('[KioskScreen] Error setting auto wake on screen off:', error);
+      }
+
       // Load Inactivity Return to Home settings
       const savedInactivityReturnEnabled = bool(K.INACTIVITY_RETURN_ENABLED, false);
       const savedInactivityReturnDelay = num(K.INACTIVITY_RETURN_DELAY, 60000);
