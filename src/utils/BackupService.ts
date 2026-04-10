@@ -391,6 +391,75 @@ export async function importBackup(filePath: string): Promise<{ success: boolean
 }
 
 /**
+ * Import configuration from raw JSON content (from SAF file picker).
+ * This bypasses Scoped Storage restrictions by working with the content directly.
+ */
+export async function importBackupFromContent(jsonContent: string, fileName?: string): Promise<{ success: boolean; error?: string; warning?: string }> {
+  try {
+    // Parse and validate
+    let data: BackupData;
+    try {
+      data = JSON.parse(jsonContent) as BackupData;
+    } catch (parseError) {
+      return { success: false, error: `Invalid JSON format${fileName ? ` in ${fileName}` : ''}: ${String(parseError)}` };
+    }
+
+    // Validate backup structure
+    if (!data.version || !data.settings || typeof data.settings !== 'object') {
+      return { success: false, error: 'Invalid backup file format. Missing version or settings.' };
+    }
+
+    let warning: string | undefined;
+
+    // Check if backup had a PIN configured
+    if (data.hasPinConfigured) {
+      warning = 'Note: PIN code was not imported for security reasons. Please configure a new PIN.';
+    }
+
+    // Import settings
+    const keys = Object.keys(data.settings);
+    for (const key of keys) {
+      try {
+        const value = data.settings[key];
+        if (value !== null && value !== undefined) {
+          if (key === '@kiosk_rest_api_key') {
+            await saveSecureApiKey(value);
+            console.log('[BackupService] API key imported to secure storage');
+          } else if (key === '@kiosk_mqtt_password') {
+            await saveSecureMqttPassword(value);
+            console.log('[BackupService] MQTT password imported to secure storage');
+          } else {
+            await AsyncStorage.setItem(key, value);
+          }
+        }
+      } catch (e) {
+        console.warn(`Failed to import key ${key}:`, e);
+      }
+    }
+
+    return { success: true, warning };
+  } catch (error) {
+    console.error('Import backup from content error:', error);
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Parse and validate backup content from raw JSON string (for preview).
+ */
+export function parseBackupContent(jsonContent: string): { success: boolean; data?: BackupData; error?: string } {
+  try {
+    const data = JSON.parse(jsonContent) as BackupData;
+    if (!data.version || !data.settings || typeof data.settings !== 'object') {
+      return { success: false, error: 'Invalid backup file format' };
+    }
+    return { success: true, data };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
  * Delete a backup file
  */
 export async function deleteBackupFile(filePath: string): Promise<{ success: boolean; error?: string }> {
@@ -411,6 +480,8 @@ export async function deleteBackupFile(filePath: string): Promise<{ success: boo
 export default {
   exportBackup,
   importBackup,
+  importBackupFromContent,
+  parseBackupContent,
   listBackupFiles,
   readBackupFile,
   deleteBackupFile,

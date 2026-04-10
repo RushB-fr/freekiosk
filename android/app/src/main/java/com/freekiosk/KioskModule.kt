@@ -163,6 +163,12 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                             
                             // Add all managed apps to the lock task whitelist
                             whitelist.addAll(getManagedAppPackages())
+                            
+                            // Add print spooler packages if printing is enabled
+                            if (isPrintEnabled()) {
+                                whitelist.addAll(getPrintSpoolerPackages())
+                            }
+                            
                             val uniqueWhitelist = whitelist.distinct()
                             
                             // Configure Lock Task features based on settings
@@ -1008,6 +1014,55 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      * Read all managed app package names from AsyncStorage.
      * Used to add them to the lock task whitelist.
      */
+    /**
+     * Check if printing is enabled in settings (read from AsyncStorage)
+     */
+    private fun isPrintEnabled(): Boolean {
+        return try {
+            val dbPath = reactApplicationContext.getDatabasePath("RKStorage").absolutePath
+            val db = android.database.sqlite.SQLiteDatabase.openDatabase(dbPath, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY)
+            val cursor = db.rawQuery(
+                "SELECT value FROM catalystLocalStorage WHERE key = ?",
+                arrayOf("@kiosk_print_enabled")
+            )
+            val result = if (cursor.moveToFirst()) {
+                cursor.getString(0) == "true"
+            } else {
+                false
+            }
+            cursor.close()
+            db.close()
+            result
+        } catch (e: Exception) {
+            android.util.Log.w("KioskModule", "Could not read print enabled setting: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Dynamically discover all print spooler/service packages installed on the device.
+     * Covers com.android.printspooler, Samsung Print Service, HP Print, etc.
+     */
+    private fun getPrintSpoolerPackages(): List<String> {
+        val packages = mutableSetOf<String>()
+        packages.add("com.android.printspooler")
+        try {
+            val printServices = reactApplicationContext.packageManager.queryIntentServices(
+                Intent("android.printservice.PrintService"),
+                PackageManager.GET_META_DATA
+            )
+            for (service in printServices) {
+                service.serviceInfo?.packageName?.let { pkg ->
+                    packages.add(pkg)
+                }
+            }
+            android.util.Log.d("KioskModule", "Print spooler packages for whitelist: $packages")
+        } catch (e: Exception) {
+            android.util.Log.w("KioskModule", "Could not discover print services: ${e.message}")
+        }
+        return packages.toList()
+    }
+
     private fun getManagedAppPackages(): List<String> {
         return try {
             val dbPath = reactApplicationContext.getDatabasePath("RKStorage").absolutePath

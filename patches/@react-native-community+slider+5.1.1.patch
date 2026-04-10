@@ -1,0 +1,28 @@
+diff --git a/node_modules/@react-native-community/slider/android/src/main/java/com/reactnativecommunity/slider/ReactSliderManager.java b/node_modules/@react-native-community/slider/android/src/main/java/com/reactnativecommunity/slider/ReactSliderManager.java
+index feb5753..66821c1 100644
+--- a/node_modules/@react-native-community/slider/android/src/main/java/com/reactnativecommunity/slider/ReactSliderManager.java
++++ b/node_modules/@react-native-community/slider/android/src/main/java/com/reactnativecommunity/slider/ReactSliderManager.java
+@@ -44,12 +44,22 @@ public class ReactSliderManager extends SimpleViewManager<ReactSlider> implement
+ 
+   private static final SeekBar.OnSeekBarChangeListener ON_CHANGE_LISTENER =
+           new SeekBar.OnSeekBarChangeListener() {
++            // Guard flag to prevent infinite recursion on Android 8.x (API 26-27).
++            // On these versions, SeekBar.setProgress() inside onProgressChanged()
++            // triggers another onProgressChanged() call, causing a StackOverflowError.
++            // See: https://github.com/FreeKiosk/FreeKiosk/issues/86
++            private boolean mIsSettingProgress = false;
++
+             @Override
+             public void onProgressChanged(SeekBar seekbar, int progress, boolean fromUser) {
+-              ReactSlider slider = (ReactSlider)seekbar;
++              if (mIsSettingProgress) return;
+ 
++              ReactSlider slider = (ReactSlider)seekbar;
+               progress = slider.getValidProgressValue(progress);
++
++              mIsSettingProgress = true;
+               seekbar.setProgress(progress);
++              mIsSettingProgress = false;
+ 
+               ReactContext reactContext = (ReactContext) seekbar.getContext();
+               if (fromUser) {

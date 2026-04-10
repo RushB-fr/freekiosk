@@ -1,46 +1,104 @@
-<div align="center">
+# Wiki Sync
 
-# 🔄 Pipeline and Wiki Sync
+**How documentation is published to GitHub Wiki**
 
-_How FreeKiosk publishes repository docs to GitHub Wiki automatically._
+[Docs Home](README)
 
-<p>
-  <a href="README.md">Docs Home</a> •
-  <a href="../.github/workflows/wiki-sync.yml">Workflow File</a>
-</p>
 
-</div>
+> [!WARNING]
+> The `docs/` folder is the source of truth. Manual wiki edits will be overwritten.
 
-> [!NOTE]
-> Sync direction is one-way: repository `docs/` is the source of truth.
+## Overview
 
-## Source of Truth
+FreeKiosk uses GitHub Actions to automatically publish documentation from the repository to GitHub Wiki.
 
-- Repository documentation source: `docs/`
-- Wiki publication target: `${repo}.wiki.git`
-- Workflow file: `.github/workflows/wiki-sync.yml`
+### Components
 
-## How It Works
+| Component | Location | Purpose |
+|-----------|----------|----------|
+| **Source** | `docs/` folder | Documentation files |
+| **Target** | GitHub Wiki | Published documentation |
+| **Workflow** | `.github/workflows/docs-to-wiki-sync.yml` | Automation |
 
-1. Trigger on `push` to `main` or manual `workflow_dispatch`.
-2. Validate that `docs/` exists.
-3. Validate that GitHub Wiki is enabled for the repository.
-4. Clone the wiki repository.
-5. Sync `docs/` into the wiki repository with `rsync --delete`.
-6. Copy `README.md` to `Home.md` for GitHub Wiki landing page compatibility.
-7. Commit and push only if there are changes.
+### How It Works
 
-## Operational Notes
+1. **Trigger** - Push to `main` branch or manual workflow dispatch
+2. **Clone** - Clone the wiki repository
+3. **Sync** - Copy files from `docs/` to wiki (with `rsync --delete`)
+4. **Landing Page** - Copy `README.md` to `Home.md`
+5. **Commit** - Push changes to wiki
 
-- The sync is one-way: `docs/` -> GitHub Wiki.
-- Any manual edits done directly in GitHub Wiki will be overwritten by the next sync.
-- Keep all documentation edits in this repository under `docs/`.
+### Sync Direction
 
-## Recovery Checklist
+```
+Repository docs/  →  GitHub Wiki
+     ↑                    ↓
+  Source of Truth    Published Content
+```
 
-If the workflow fails:
+> [!WARNING]
+> This is a one-way sync. Manual wiki edits will be overwritten on next sync.
 
-- Ensure Wiki is enabled: repository Settings -> Features -> Wikis.
-- Ensure the workflow has `contents: write` permission.
-- Ensure `docs/README.md` exists.
-- Re-run the workflow manually from the Actions tab.
+
+## Best Practices
+
+- **Edit in `docs/`** - Never edit wiki directly
+- **Test locally** - Preview changes before pushing
+- **Proper formatting** - Use GitHub-flavored Markdown
+- **Update links** - Use relative links between docs
+
+## Troubleshooting
+
+### Common Issues
+
+**Wiki not enabled:**
+1. Go to repository Settings
+2. Enable Wikis under Features
+3. Re-run workflow
+
+**Permission denied:**
+1. Settings → Actions → General
+2. Set "Read and write permissions"
+3. Re-run workflow
+
+**Missing files:**
+1. Verify `docs/` folder exists
+2. Ensure `docs/README.md` is present
+3. Commit and push
+
+**Workflow stuck:**
+1. Go to Actions tab
+2. Re-run failed jobs
+
+
+## Technical Details
+
+### Workflow Configuration
+
+- **Triggers:** Push to `main` or manual dispatch
+- **Permissions:** `contents: write`
+- **Runner:** `ubuntu-latest`
+
+### Sync Process
+
+```bash
+git clone https://github.com/user/repo.wiki.git
+rsync --delete docs/ wiki/
+cp docs/README.md wiki/Home.md
+cd wiki && git add . && git commit -m "Sync docs" && git push
+```
+
+### File Mapping
+
+| Source | Target | Purpose |
+|--------|--------|----------|
+| `docs/README.md` | `Home.md` | Wiki landing page |
+| `docs/*.md` | `*.md` | Documentation pages |
+| `docs/screenshots/` | `screenshots/` | Images |
+
+
+## Resources
+
+- **Workflow:** [`.github/workflows/docs-to-wiki-sync.yml`](https://github.com/rushb-fr/freekiosk/blob/main/.github/workflows/docs-to-wiki-sync.yml)
+- **GitHub Wiki Docs:** [docs.github.com/en/wikis](https://docs.github.com/en/wikis)
+- **GitHub Actions:** [docs.github.com/en/actions](https://docs.github.com/en/actions)

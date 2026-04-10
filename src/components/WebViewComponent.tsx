@@ -8,8 +8,11 @@ import {
   Animated,
   Image,
   ScrollView,
-  Linking
+  Linking,
+  NativeModules
 } from 'react-native';
+
+const { HttpServerModule } = NativeModules;
 
 import { WebView } from 'react-native-webview';
 import type { WebViewErrorEvent, ShouldStartLoadRequest } from 'react-native-webview/lib/WebViewTypes';
@@ -34,6 +37,7 @@ interface WebViewComponentProps {
   urlFilterPatterns?: string[]; // URL patterns to filter
   urlFilterShowFeedback?: boolean; // Show feedback when URL is blocked
   pdfViewerEnabled?: boolean; // Enable inline PDF viewing via PDF.js
+  printEnabled?: boolean; // Enable window.print() interception for native printing
   zoomLevel?: number; // Zoom level percentage (50-200, default 100)
   customUserAgent?: string; // Custom User-Agent string (empty = default modern Chrome UA)
 }
@@ -60,6 +64,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   urlFilterPatterns,
   urlFilterShowFeedback = false,
   pdfViewerEnabled = false,
+  printEnabled = false,
   zoomLevel = 100,
   customUserAgent = ''
 }, ref) => {
@@ -254,13 +259,15 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
       console.error('[FreeKiosk] localStorage FAILED:', e);
     }
 
-    // Intercept window.print() to use native Android print
+    // Intercept window.print() to use native Android print (only when printing is enabled)
+    ${printEnabled ? `
     window.print = function() {
       window.ReactNativeWebView.postMessage(JSON.stringify({
         type: 'PRINT_REQUEST',
         title: document.title || ''
       }));
     };
+    ` : '// Printing disabled - window.print() not intercepted'}
 
     // Throttling pour éviter le flood de messages (critique sur Fire OS)
     let lastInteraction = 0;
@@ -298,6 +305,115 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
     // Touch events avec throttling (for screensaver only, not for tap counting)
     document.addEventListener('touchstart', sendInteraction, true);
     document.addEventListener('touchmove', sendInteraction, true);
+
+    // ==================== speechSynthesis Polyfill ====================
+    // Android WebView does not implement the Web Speech API (speechSynthesis).
+    // This polyfill bridges window.speechSynthesis.speak() to FreeKiosk's native
+    // Android TextToSpeech engine via postMessage → React Native → NativeModules.
+    // This allows web apps that use TTS to work transparently in kiosk mode.
+    (function() {
+      // Only polyfill if speechSynthesis is missing or non-functional
+      if (window.speechSynthesis && typeof window.speechSynthesis.speak === 'function') {
+        // Test if it actually works by checking for voices
+        try {
+          var voices = window.speechSynthesis.getVoices();
+          if (voices && voices.length > 0) return; // Native implementation works
+        } catch(e) {}
+        // No voices = non-functional, polyfill it
+      }
+
+      var _fkSpeaking = false;
+      var _fkEndTimer = null;
+
+      function FKSpeechSynthesisUtterance(text) {
+        this.text = text || '';
+        this.lang = '';
+        this.pitch = 1;
+        this.rate = 1;
+        this.volume = 1;
+        this.voice = null;
+        this.onstart = null;
+        this.onend = null;
+        this.onerror = null;
+        this.onpause = null;
+        this.onresume = null;
+        this.onmark = null;
+        this.onboundary = null;
+      }
+      window.SpeechSynthesisUtterance = FKSpeechSynthesisUtterance;
+
+      var _fkVoice = {
+        default: true,
+        lang: navigator.language || 'en-US',
+        localService: true,
+        name: 'FreeKiosk Native TTS',
+        voiceURI: 'freekiosk-native'
+      };
+
+      var _fkVoicesChangedCb = null;
+      var synth = {
+        speaking: false,
+        pending: false,
+        paused: false,
+        speak: function(utterance) {
+          if (!utterance || !utterance.text) return;
+          this.speaking = true;
+          _fkSpeaking = true;
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'SPEECH_SYNTH_SPEAK',
+            text: utterance.text,
+            lang: utterance.lang || '',
+            rate: utterance.rate || 1,
+            pitch: utterance.pitch || 1,
+            volume: utterance.volume || 1
+          }));
+          if (utterance.onstart) {
+            try { utterance.onstart(new Event('start')); } catch(e) {}
+          }
+          // Estimate duration and fire onend (rough: 80ms per character)
+          if (_fkEndTimer) clearTimeout(_fkEndTimer);
+          var estimatedMs = Math.max(500, utterance.text.length * 80);
+          var self = this;
+          var utt = utterance;
+          _fkEndTimer = setTimeout(function() {
+            self.speaking = false;
+            _fkSpeaking = false;
+            if (utt.onend) {
+              try { utt.onend(new Event('end')); } catch(e) {}
+            }
+          }, estimatedMs);
+        },
+        cancel: function() {
+          this.speaking = false;
+          _fkSpeaking = false;
+          if (_fkEndTimer) { clearTimeout(_fkEndTimer); _fkEndTimer = null; }
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'SPEECH_SYNTH_CANCEL' }));
+        },
+        pause: function() { this.paused = true; },
+        resume: function() { this.paused = false; },
+        getVoices: function() { return [_fkVoice]; },
+        addEventListener: function(type, fn) {
+          if (type === 'voiceschanged') _fkVoicesChangedCb = fn;
+        },
+        removeEventListener: function(type, fn) {
+          if (type === 'voiceschanged' && _fkVoicesChangedCb === fn) _fkVoicesChangedCb = null;
+        }
+      };
+      Object.defineProperty(synth, 'onvoiceschanged', {
+        get: function() { return _fkVoicesChangedCb; },
+        set: function(fn) { _fkVoicesChangedCb = fn; }
+      });
+      Object.defineProperty(window, 'speechSynthesis', {
+        get: function() { return synth; },
+        configurable: true
+      });
+      // Fire voiceschanged so apps that wait for voices discover ours
+      setTimeout(function() {
+        if (_fkVoicesChangedCb) {
+          try { _fkVoicesChangedCb(new Event('voiceschanged')); } catch(e) {}
+        }
+      }, 100);
+    })();
 
     // PDF link interception: prevent <a download href="...pdf"> from triggering
     // the native Android DownloadManager — instead force a real navigation so
@@ -406,6 +522,18 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
         const data = JSON.parse(message);
         if (data.type === 'FIVE_TAP_CLICK' && onUserInteraction) {
           onUserInteraction({ isTap: true, x: data.x, y: data.y });
+        } else if (data.type === 'SPEECH_SYNTH_SPEAK') {
+          // speechSynthesis polyfill: bridge to native Android TTS
+          if (HttpServerModule?.speak) {
+            HttpServerModule.speak(data.text || '', data.lang || '')
+              .catch((err: any) => console.error('[WebView] TTS speak failed:', err));
+          }
+        } else if (data.type === 'SPEECH_SYNTH_CANCEL') {
+          // speechSynthesis polyfill: stop native TTS
+          if (HttpServerModule?.stopSpeaking) {
+            HttpServerModule.stopSpeaking()
+              .catch((err: any) => console.error('[WebView] TTS cancel failed:', err));
+          }
         } else if (data.type === 'PRINT_REQUEST') {
           // Handle print request from window.print()
           PrintModule.printWebView(data.title || 'FreeKiosk Print')
@@ -537,7 +665,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
 
             {/* Footer */}
             <Text style={styles.footerText}>
-              Version 1.2.17 • by Rushb
+              Version 1.2.18 • by Rushb
             </Text>
           </Animated.View>
         </ScrollView>
@@ -626,9 +754,19 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
           }
           
           if (urlLower.startsWith('file://') ||
-              urlLower.startsWith('javascript:') ||
-              urlLower.startsWith('data:')) {
+              urlLower.startsWith('javascript:')) {
             console.warn('[FreeKiosk] Blocked dangerous URL scheme:', request.url);
+            return false;
+          }
+          
+          // data: URLs - allow when printing is enabled (some label/receipt sites
+          // generate print content as data:text/html popups)
+          if (urlLower.startsWith('data:')) {
+            if (printEnabled) {
+              console.log('[FreeKiosk] Allowing data: URL (printing enabled)');
+              return true;
+            }
+            console.warn('[FreeKiosk] Blocked data: URL (printing disabled):', request.url.substring(0, 100));
             return false;
           }
 
@@ -729,13 +867,32 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
         setSupportMultipleWindows={true}
         onOpenWindow={(syntheticEvent) => {
           const { nativeEvent } = syntheticEvent;
+          if (!nativeEvent.targetUrl) return;
+
+          // PDF Viewer: intercept PDF popups before URL filtering
+          // Some sites open PDFs via window.open() — handle them the same as link navigations
+          if (pdfViewerEnabled) {
+            const popupLower = nativeEvent.targetUrl.toLowerCase();
+            const popupPath = popupLower.split('?')[0].split('#')[0];
+            if (popupPath.endsWith('.pdf')) {
+              console.log('[FreeKiosk] PDF popup detected, opening in viewer:', nativeEvent.targetUrl);
+              const viewerUrl = `file:///android_asset/pdfjs/viewer.html?file=${encodeURIComponent(nativeEvent.targetUrl)}`;
+              if (webViewRef.current) {
+                webViewRef.current.injectJavaScript(
+                  `window.location.href = ${JSON.stringify(viewerUrl)}; true;`
+                );
+              }
+              return;
+            }
+          }
+
           // URL Filtering: block popups to filtered URLs
-          if (nativeEvent.targetUrl && isUrlBlocked(nativeEvent.targetUrl)) {
+          if (isUrlBlocked(nativeEvent.targetUrl)) {
             showBlockedFeedback(nativeEvent.targetUrl);
             return;
           }
           // Load the URL in the same WebView instead of opening a popup
-          if (webViewRef.current && nativeEvent.targetUrl) {
+          if (webViewRef.current) {
             webViewRef.current.injectJavaScript(
               `window.location.href = ${JSON.stringify(nativeEvent.targetUrl)};`
             );

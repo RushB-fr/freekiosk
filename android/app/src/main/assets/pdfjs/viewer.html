@@ -454,10 +454,13 @@
   function loadPdf(url) {
     var loadingTask = pdfjsLib.getDocument({
       url: url,
-      // Disable range requests for better compatibility with kiosk setups
-      disableRange: false,
-      disableStream: false,
-      // CORS: try with credentials for same-origin
+      // Single full-download request for maximum CDN/WAF compatibility
+      // (some servers like Alibaba Cloud set session cookies on first request
+      // that are needed for subsequent range requests - single request avoids this)
+      disableRange: true,
+      disableStream: true,
+      disableAutoFetch: true,
+      // CORS: credentials handled by native proxy
       withCredentials: false
     });
 
@@ -477,12 +480,17 @@
       var msg = 'Unable to load PDF.';
       if (error && error.message) {
         if (error.message.indexOf('Missing PDF') !== -1) {
-          msg = 'Invalid PDF file or URL.';
+          msg = 'Invalid PDF file or URL.\n\nThe server may be returning an HTML page instead of a PDF (WAF challenge, 403, or redirect).';
         } else if (error.message.indexOf('network') !== -1 || error.message.indexOf('fetch') !== -1) {
           msg = 'Network error. Check your connection.';
         } else {
           msg = error.message;
         }
+      }
+      // Include truncated URL for debugging
+      if (pdfUrl) {
+        var shortUrl = pdfUrl.length > 60 ? pdfUrl.substring(0, 60) + '...' : pdfUrl;
+        msg += '\n\nURL: ' + shortUrl;
       }
       showError(msg);
     });

@@ -166,7 +166,11 @@ export type IconName =
   | 'server'
   | 'remote'
   | 'numeric'
-  | 'home-assistant';
+  | 'home-assistant'
+  // Files & Folders
+  | 'folder'
+  | 'folder-open-outline'
+  | 'file-document-outline';
 
 interface IconProps {
   name: IconName;

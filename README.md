@@ -23,10 +23,6 @@
   <p><strong>A <a href="https://rushb.fr">Rushb</a> Project</strong></p>
 </div>
 
----
-
-## 🚀 What is FreeKiosk?
-
 FreeKiosk is an open-source kiosk platform for Android tablets, built for teams that want **full control without license costs**.
 
 Instead of burying everything in one long page, this README gives you the essentials and points to complete docs in `docs/`.

@@ -29,6 +29,7 @@ class VolumeChangeReceiver : BroadcastReceiver() {
         private var volumeChangeTapCount = 0
         private var volumeChangeLastTapTime = 0L
         private val volumeChangeTapTimeout = 2000L // 2 seconds timeout
+        private val volumeChangeMinInterval = 250L // Minimum ms between counted taps (filters hold/auto-repeat)
         private var lastVolume = -1
     }
     
@@ -79,10 +80,21 @@ class VolumeChangeReceiver : BroadcastReceiver() {
         // Check if volume actually changed (not just a duplicate event)
         if (lastVolume >= 0 && currentVolume != lastVolume) {
             val currentTime = System.currentTimeMillis()
+            val timeSinceLastTap = currentTime - volumeChangeLastTapTime
             
             // Reset counter if timeout exceeded
-            if (currentTime - volumeChangeLastTapTime > volumeChangeTapTimeout) {
+            if (timeSinceLastTap > volumeChangeTapTimeout) {
                 volumeChangeTapCount = 0
+            }
+            
+            // Ignore rapid volume changes from holding the button (auto-repeat).
+            // When holding, events arrive every ~50-100ms. Deliberate separate
+            // presses are at least ~250ms apart.
+            if (volumeChangeTapCount > 0 && timeSinceLastTap < volumeChangeMinInterval) {
+                val direction = if (currentVolume > lastVolume) "UP" else "DOWN"
+                Log.d(TAG, "Volume $direction ignored (too fast: ${timeSinceLastTap}ms < ${volumeChangeMinInterval}ms, likely held)")
+                lastVolume = currentVolume
+                return
             }
             
             volumeChangeTapCount++

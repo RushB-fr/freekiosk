@@ -1,8 +1,8 @@
-<div align="center">
 
-# ⌨️ FreeKiosk ADB Configuration Guide
 
-_Headless provisioning and scripted deployments with secure PIN-based control._
+# FreeKiosk ADB Configuration Guide
+
+**Headless provisioning and scripted deployments with secure PIN-based control**
 
 <p>
   <a href="README.md">Docs Home</a> •
@@ -11,36 +11,62 @@ _Headless provisioning and scripted deployments with secure PIN-based control._
   <a href="MQTT.md">MQTT</a>
 </p>
 
-</div>
+## Table of Contents
+
+- [Overview](#overview)
+- [Security Model](#security-model)
+- [Quick Start](#quick-start)
+- [Configuration Parameters](#configuration-parameters)
+- [Device States](#device-states)
+- [Common Commands](#common-commands)
+- [Command Reference](#command-reference)
+- [Advanced Scenarios](#advanced-scenarios)
+- [Troubleshooting](#troubleshooting)
+- [Related Resources](#related-resources)
+
+
 
 > [!IMPORTANT]
-> For production-grade app locking, pair ADB provisioning with Device Owner mode.
+> For production-grade app locking, pair ADB provisioning with **Device Owner mode**.
 
 ## Overview
 
 FreeKiosk supports configuration via Android Debug Bridge (ADB) intent extras, enabling:
-- **Automated device provisioning** without UI interaction
-- **Mass deployment** across multiple devices
-- **Dynamic configuration** changes via scripts
-- **CI/CD integration** for testing
+
+| Capability | Description |
+|---|---|
+| **Automated Device Provisioning** | Configure without UI interaction |
+| **Mass Deployment** | Scale across multiple devices |
+| **Dynamic Configuration** | Change settings via scripts |
+| **CI/CD Integration** | Automated testing workflows |
 
 ## Security Model
+
+
 
 | Device State | Requirements |
 |--------------|-------------|
 | **Virgin setup** (no PIN configured) | PIN **must be provided** in the command |
 | **Already configured** | Existing PIN **required** to modify |
 
-This ensures:
-- ✅ First-time setup is scriptable with PIN protection
-- ✅ Configured devices cannot be hijacked via ADB
-- ✅ Factory reset re-enables ADB provisioning
 
----
+
+This security model ensures:
+
+
+
+✅ **First-time setup is scriptable** with PIN protection  
+✅ **Configured devices cannot be hijacked** via ADB  
+✅ **Factory reset re-enables** ADB provisioning  
+
+
+
 
 ## Quick Start
 
 ### First-Time Setup (New Device)
+
+
 
 ```bash
 # Set Device Owner (one-time, requires no user accounts on the device)
@@ -52,9 +78,14 @@ adb shell am start -n com.freekiosk/.MainActivity \
     --es pin "1234"
 ```
 
-**Note**: Setting Device Owner is **highly recommended** for external app locking as it allows FreeKiosk to automatically manage all required permissions including "Display over other apps". Without Device Owner, this permission must be granted manually through Settings.
+
+
+> [!NOTE]
+> Setting Device Owner is **highly recommended** for external app locking as it allows FreeKiosk to automatically manage all required permissions including "Display over other apps". Without Device Owner, this permission must be granted manually through Settings.
 
 ### Configure WebView Kiosk
+
+
 
 ```bash
 adb shell am start -n com.freekiosk/.MainActivity \
@@ -62,17 +93,23 @@ adb shell am start -n com.freekiosk/.MainActivity \
     --es pin "1234"
 ```
 
-**Note**: WebView mode doesn't require Device Owner as it doesn't need overlay permissions.
 
----
+
+> [!NOTE]
+> WebView mode doesn't require Device Owner as it doesn't need overlay permissions.
+
 
 ## Command Reference
 
 ### Basic Syntax
 
+
+
 ```bash
 adb shell am start -n com.freekiosk/.MainActivity [OPTIONS]
 ```
+
+
 
 ### Required Parameters
 
@@ -86,6 +123,28 @@ adb shell am start -n com.freekiosk/.MainActivity [OPTIONS]
 |-----------|------|-------------|
 | `--es lock_package "com.app"` | String | Package name of app to lock device to |
 | `--ez auto_start true` | Boolean | Auto-launch the locked app after config |
+
+### Multi-App Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `--es external_app_mode "multi"` | String | App mode: `single` (default, classic) or `multi` (home screen grid) |
+| `--es managed_apps '[...]'` | String (JSON) | JSON array of managed apps (see format below) |
+
+**Managed Apps JSON Format:**
+
+Each app in the array supports these fields:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `packageName` | String | **required** | Android package name |
+| `displayName` | String | auto-resolved | Display name (auto-detected from system if omitted) |
+| `showOnHomeScreen` | Boolean | `true` | Show in the multi-app home grid |
+| `launchOnBoot` | Boolean | `false` | Auto-launch on device boot |
+| `keepAlive` | Boolean | `false` | Monitor and restart if app crashes |
+| `allowAccessibility` | Boolean | `false` | Whitelist app's accessibility services |
+
+> **Note**: Uninstalled packages in the list are silently skipped with a warning in logcat.
 
 ### WebView Parameters
 
@@ -141,13 +200,14 @@ adb shell am start -n com.freekiosk/.MainActivity [OPTIONS]
 |-----------|------|-------------|
 | `--es screensaver_enabled "true"` | String | Enable screensaver on inactivity |
 
----
 
 ## Waiting for Configuration Completion
 
 The ADB command returns immediately, but FreeKiosk needs time to save settings and restart. **Use broadcast receivers to wait for completion**:
 
 ### TypeScript/JavaScript Example
+
+
 
 ```typescript
 private async setupKioskModeUsingFreeKiosk(packageName: string): Promise<void> {
@@ -176,7 +236,11 @@ private async setupKioskModeUsingFreeKiosk(packageName: string): Promise<void> {
 }
 ```
 
+
+
 ### Bash Script Example
+
+
 
 ```bash
 #!/bin/bash
@@ -200,6 +264,8 @@ timeout 30 wait $LOGCAT_PID
 echo "Configuration complete!"
 ```
 
+
+
 ### Broadcast Events
 
 FreeKiosk emits these broadcasts during ADB configuration:
@@ -215,6 +281,8 @@ FreeKiosk emits these broadcasts during ADB configuration:
 **For External App mode with auto_start**: Wait for `EXTERNAL_APP_LAUNCHED` to know when the app is ready to receive content
 
 ### Waiting for External App Launch
+
+
 
 ```bash
 #!/bin/bash
@@ -239,13 +307,16 @@ echo "✅ $PACKAGE is now running and ready!"
 # Start sending video/content here
 ```
 
----
+
+
 
 ## Examples
 
 ### 1. Cloud Gaming Kiosk
 
 Lock device to a game streaming app with auto-relaunch (production mode):
+
+
 
 ```bash
 adb shell am start -n com.freekiosk/.MainActivity \
@@ -256,11 +327,16 @@ adb shell am start -n com.freekiosk/.MainActivity \
     --ez auto_start true
 ```
 
-> **Note**: `test_mode "false"` sets `back_button_mode` to `immediate`, meaning the Android back button will instantly relaunch the app. Omit it or set to `"true"` during testing to allow the back button to return to FreeKiosk without auto-relaunch.
 
-### 2. Hotel Room Tablet
+
+> [!NOTE]
+> `test_mode "false"` sets `back_button_mode` to `immediate`, meaning the Android back button will instantly relaunch the app. Omit it or set to `"true"` during testing to allow the back button to return to FreeKiosk without auto-relaunch.
+
+### 🏨 2. Hotel Room Tablet
 
 Display hotel dashboard with REST API for Home Assistant:
+
+
 
 ```bash
 adb shell am start -n com.freekiosk/.MainActivity \
@@ -272,9 +348,13 @@ adb shell am start -n com.freekiosk/.MainActivity \
     --es screensaver_enabled "true"
 ```
 
-### 3. Restaurant Menu Display
+
+
+### 🍽️ 3. Restaurant Menu Display
 
 Simple URL kiosk:
+
+
 
 ```bash
 adb shell am start -n com.freekiosk/.MainActivity \
@@ -283,9 +363,28 @@ adb shell am start -n com.freekiosk/.MainActivity \
     --es status_bar "false"
 ```
 
-### 4. Full JSON Configuration
+### 4. Multi-App Kiosk
+
+Configure a home screen grid with multiple apps:
+
+```bash
+adb shell am start -n com.freekiosk/.MainActivity \
+    --es external_app_mode "multi" \
+    --es managed_apps '[{"packageName":"com.spotify.music"},{"packageName":"com.netflix.mediaclient"},{"packageName":"com.youtube","launchOnBoot":true,"keepAlive":true}]' \
+    --es pin "1234" \
+    --es test_mode "false"
+```
+
+> **Tip**: Display names are auto-resolved from the system. You can override them:
+> ```bash
+> --es managed_apps '[{"packageName":"com.app","displayName":"My Custom Name"}]'
+> ```
+
+### 5. Full JSON Configuration
 
 For complex setups, use a JSON config. Note that shell escaping can be tricky - using individual parameters is often easier:
+
+
 
 ```bash
 # Linux/Mac - use single quotes for JSON
@@ -303,9 +402,11 @@ adb shell am start -n com.freekiosk/.MainActivity \
     --es pin "1234"
 ```
 
-### 5. Modify Existing Configuration
+### 6. Modify Existing Configuration
 
 Change the locked app on an already-configured device:
+
+
 
 ```bash
 # Must use the existing PIN
@@ -314,17 +415,25 @@ adb shell am start -n com.freekiosk/.MainActivity \
     --es pin "1234"
 ```
 
----
+
+
 
 ## JSON Configuration Format
 
 When using `--es config '{...}'`, the following keys are supported:
+
+
 
 ```json
 {
   "url": "https://example.com",
   "lock_package": "com.example.app",
   "display_mode": "external_app",
+  "external_app_mode": "multi",
+  "managed_apps": [
+    {"packageName": "com.app1", "showOnHomeScreen": true},
+    {"packageName": "com.app2", "launchOnBoot": true, "keepAlive": true}
+  ],
   "kiosk_enabled": "true",
   "auto_launch": "true",
   "auto_relaunch": "true",
@@ -357,11 +466,14 @@ When using `--es config '{...}'`, the following keys are supported:
 }
 ```
 
----
+
+
 
 ## Complete Provisioning Script
 
 Here's a complete bash script for provisioning a new device:
+
+
 
 ```bash
 #!/bin/bash
@@ -371,19 +483,19 @@ PACKAGE="com.cloudgaming.app"
 PIN="1234"
 API_KEY="my_secret_key"
 
-echo "🔧 Setting Device Owner..."
+echo "Setting Device Owner..."
 adb shell dpm set-device-owner com.freekiosk/.DeviceAdminReceiver
 
-echo "⏳ Waiting for device..."
+echo "Waiting for device..."
 sleep 2
 
-echo "� Granting Usage Stats permission (required for foreground monitoring)..."
+echo "Granting Usage Stats permission (required for foreground monitoring)..."
 adb shell appops set com.freekiosk android:get_usage_stats allow
 
-echo "🔑 Granting WRITE_SECURE_SETTINGS (required for auto-enabling accessibility service)..."
+echo "Granting WRITE_SECURE_SETTINGS (required for auto-enabling accessibility service)..."
 adb shell pm grant com.freekiosk android.permission.WRITE_SECURE_SETTINGS
 
-echo "�📱 Configuring FreeKiosk..."
+echo "Configuring FreeKiosk..."
 adb shell am start -n com.freekiosk/.MainActivity \
     --es lock_package "$PACKAGE" \
     --es pin "$PIN" \
@@ -399,9 +511,12 @@ echo "   Locked to: $PACKAGE"
 echo "   REST API: http://<device-ip>:8080"
 ```
 
----
 
-## PowerShell Script (Windows)
+
+
+## 💻 PowerShell Script (Windows)
+
+
 
 ```powershell
 # provision_kiosk.ps1 - Provision a FreeKiosk device (Windows)
@@ -410,18 +525,18 @@ $Package = "com.cloudgaming.app"
 $Pin = "1234"
 $ApiKey = "my_secret_key"
 
-Write-Host "🔧 Setting Device Owner..."
+Write-Host "Setting Device Owner..."
 adb shell dpm set-device-owner com.freekiosk/.DeviceAdminReceiver
 
 Start-Sleep -Seconds 2
 
-Write-Host "� Granting Usage Stats permission..."
+Write-Host "Granting Usage Stats permission..."
 adb shell appops set com.freekiosk android:get_usage_stats allow
 
-Write-Host "🔑 Granting WRITE_SECURE_SETTINGS..."
+Write-Host "Granting WRITE_SECURE_SETTINGS..."
 adb shell pm grant com.freekiosk android.permission.WRITE_SECURE_SETTINGS
 
-Write-Host "�📱 Configuring FreeKiosk..."
+Write-Host "Configuring FreeKiosk..."
 # Note: JSON escaping in PowerShell is complex, use individual parameters
 adb shell am start -n com.freekiosk/.MainActivity `
     --es lock_package $Package `
@@ -436,7 +551,8 @@ adb shell am start -n com.freekiosk/.MainActivity `
 Write-Host "✅ Device provisioned!"
 ```
 
----
+
+
 
 ## Troubleshooting
 
@@ -490,9 +606,10 @@ Without this permission, the broadcast will still be emitted but with `(NOT veri
 adb logcat -s "FreeKiosk-ADB"
 ```
 
-**Note**: Device Owner can only be set when **no user accounts** are active on the device (Settings → Accounts). Remove all accounts first, then run the command. You can sign back in afterwards. If account removal alone doesn't work, a factory reset is a reliable fallback. Once set, all permissions are managed automatically.
+> [!NOTE]
+> Device Owner can only be set when **no user accounts** are active on the device (Settings → Accounts). Remove all accounts first, then run the command. You can sign back in afterwards. If account removal alone doesn't work, a factory reset is a reliable fallback. Once set, all permissions are managed automatically.
 
-### Accessibility Service: "Permission denial: WRITE_SECURE_SETTINGS"
+### ♿ Accessibility Service: "Permission denial: WRITE_SECURE_SETTINGS"
 
 **Cause**: The `WRITE_SECURE_SETTINGS` permission is required to programmatically enable the Accessibility Service. Being a Device Owner alone does **not** grant this permission automatically.
 
@@ -504,7 +621,7 @@ After granting, tap "Enable Automatically (Device Owner)" in Settings → Advanc
 
 Alternatively, you can enable the Accessibility Service manually: Settings → Accessibility → Installed Services → FreeKiosk.
 
-### Nothing happens
+### ❓ Nothing happens
 
 **Cause**: ADB debugging might be disabled or device not authorized.
 
@@ -513,7 +630,7 @@ Alternatively, you can enable the Accessibility Service manually: Settings → A
 2. Accept the "Allow USB debugging" prompt on device
 3. Verify with `adb devices`
 
-### How to reset and re-provision
+### 🔄 How to reset and re-provision
 
 ```bash
 # Option 1: Factory reset (loses all data)
@@ -524,28 +641,39 @@ adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver
 adb shell pm clear com.freekiosk
 ```
 
----
 
 ## Security Considerations
 
-1. **ADB Access = Full Control**: Anyone with ADB access to an unlocked device can potentially reconfigure it. Disable USB debugging in production.
 
-2. **PIN Storage**: The ADB PIN is saved to Android Keystore via `react-native-keychain` with PBKDF2 hashing (same secure storage as the UI PIN). The native side also keeps a SHA-256 hash for ADB re-authentication.
 
-3. **Network ADB**: If using `adb tcpip`, ensure proper network security as anyone on the network could potentially access ADB.
+| Risk | Mitigation |
+|---|---|
+| **ADB Access = Full Control** | Anyone with ADB access to an unlocked device can potentially reconfigure it. Disable USB debugging in production. |
+| **PIN Storage** | The ADB PIN is saved to Android Keystore via `react-native-keychain` with PBKDF2 hashing (same secure storage as the UI PIN). The native side also keeps a SHA-256 hash for ADB re-authentication. |
+| **Network ADB** | If using `adb tcpip`, ensure proper network security as anyone on the network could potentially access ADB. |
+| **Configuration Storage** | ADB configuration is first saved to SharedPreferences as a "pending config", then applied to AsyncStorage by React Native on the next startup. This two-step bridge ensures reliable persistence across process restarts (~500ms). |
 
-4. **Configuration Storage**: ADB configuration is first saved to SharedPreferences as a "pending config", then applied to AsyncStorage by React Native on the next startup. This two-step bridge ensures reliable persistence across process restarts (~500ms).
 
-5. **Recommendations**:
-   - Use strong PINs (6+ digits)
-   - Disable USB debugging after setup in production
-   - Use Device Owner mode for full kiosk lockdown
-   - Consider physical security of USB port
 
----
+### Recommendations:
+- Use strong PINs (6+ digits)
+- Disable USB debugging after setup in production
+- Use Device Owner mode for full kiosk lockdown
+- Consider physical security of USB port
+
 
 ## See Also
 
-- [REST API Documentation](rest-api.md) - Remote control via HTTP
-- [MDM Specification](MDM_SPEC.md) - Enterprise deployment
-- [Installation Guide](installation.md) - Manual setup instructions
+
+
+- [REST API Documentation](REST-API) - Remote control via HTTP
+- [MDM Specification](MDM-SPEC) - Enterprise deployment
+- [Installation Guide](Installation) - Manual setup instructions
+
+
+
+
+
+
+
+

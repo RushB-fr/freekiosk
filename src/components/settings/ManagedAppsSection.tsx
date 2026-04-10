@@ -12,12 +12,13 @@ import {
   TouchableOpacity,
   FlatList,
   Modal,
+  Switch,
   StyleSheet,
   Alert,
   ActivityIndicator,
 } from 'react-native';
 import { ManagedApp, createManagedApp, isValidPackageName } from '../../types/managedApps';
-import AppLauncherModule, { AppInfo } from '../../utils/AppLauncherModule';
+import AppLauncherModule, { AppInfoAll } from '../../utils/AppLauncherModule';
 import { Colors, Spacing, Typography } from '../../theme';
 import Icon from '../Icon';
 
@@ -33,17 +34,19 @@ const ManagedAppsSection: React.FC<ManagedAppsSectionProps> = ({
   isDeviceOwner,
 }) => {
   const [showAppPicker, setShowAppPicker] = useState(false);
-  const [installedApps, setInstalledApps] = useState<AppInfo[]>([]);
+  const [allApps, setAllApps] = useState<AppInfoAll[]>([]);
+  const [showAllPackages, setShowAllPackages] = useState(false);
   const [loadingApps, setLoadingApps] = useState(false);
 
   const loadInstalledApps = useCallback(async () => {
     try {
       setLoadingApps(true);
-      const apps = await AppLauncherModule.getInstalledApps();
+      // Use getAllInstalledApps to include non-UI packages (fixes #112)
+      const apps = await AppLauncherModule.getAllInstalledApps();
       // Filter out apps already in managed list
       const existingPackages = new Set(managedApps.map(a => a.packageName));
       const filtered = apps.filter(a => !existingPackages.has(a.packageName));
-      setInstalledApps(filtered);
+      setAllApps(filtered);
       setShowAppPicker(true);
     } catch (error) {
       Alert.alert('Error', `Unable to load apps: ${error}`);
@@ -52,7 +55,12 @@ const ManagedAppsSection: React.FC<ManagedAppsSectionProps> = ({
     }
   }, [managedApps]);
 
-  const handleAddApp = useCallback((app: AppInfo) => {
+  // Derived list: filter by showAllPackages toggle
+  const installedApps = showAllPackages
+    ? allApps
+    : allApps.filter(a => a.hasLauncherActivity);
+
+  const handleAddApp = useCallback((app: AppInfoAll) => {
     const newApp = createManagedApp(app.packageName, app.appName);
     onManagedAppsChange([...managedApps, newApp]);
     setShowAppPicker(false);
@@ -204,6 +212,16 @@ const ManagedAppsSection: React.FC<ManagedAppsSectionProps> = ({
                 <Icon name="close" size={24} color={Colors.textPrimary} />
               </TouchableOpacity>
             </View>
+            <View style={styles.showAllToggle}>
+              <Icon name="package-variant" size={16} color={Colors.textSecondary} style={{ marginRight: 6 }} />
+              <Text style={styles.showAllLabel}>Show all packages (services, VPNs…)</Text>
+              <Switch
+                value={showAllPackages}
+                onValueChange={setShowAllPackages}
+                trackColor={{ false: Colors.border, true: Colors.primary + '66' }}
+                thumbColor={showAllPackages ? Colors.primary : '#ccc'}
+              />
+            </View>
             <FlatList
               data={installedApps}
               keyExtractor={item => item.packageName}
@@ -212,13 +230,28 @@ const ManagedAppsSection: React.FC<ManagedAppsSectionProps> = ({
                   style={styles.pickerItem}
                   onPress={() => handleAddApp(item)}
                 >
-                  <View style={styles.pickerIconCircle}>
-                    <Text style={styles.pickerIconText}>
-                      {item.appName.charAt(0).toUpperCase()}
+                  <View style={[
+                    styles.pickerIconCircle,
+                    !item.hasLauncherActivity && styles.pickerIconCircleService,
+                  ]}>
+                    <Text style={[
+                      styles.pickerIconText,
+                      !item.hasLauncherActivity && styles.pickerIconTextService,
+                    ]}>
+                      {item.hasLauncherActivity
+                        ? item.appName.charAt(0).toUpperCase()
+                        : '⚙'}
                     </Text>
                   </View>
                   <View style={styles.pickerInfo}>
-                    <Text style={styles.pickerAppName}>{item.appName}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={styles.pickerAppName}>{item.appName}</Text>
+                      {!item.hasLauncherActivity && (
+                        <View style={styles.serviceBadge}>
+                          <Text style={styles.serviceBadgeText}>service</Text>
+                        </View>
+                      )}
+                    </View>
                     <Text style={styles.pickerPackageName}>{item.packageName}</Text>
                   </View>
                 </TouchableOpacity>
@@ -439,6 +472,39 @@ const styles = StyleSheet.create({
   pickerPackageName: {
     ...Typography.hint,
     fontSize: 11,
+  },
+  pickerIconCircleService: {
+    backgroundColor: Colors.textDisabled + '33',
+  },
+  pickerIconTextService: {
+    color: Colors.textSecondary,
+    fontSize: 18,
+  },
+  showAllToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+    backgroundColor: Colors.cardInfo || '#EBF5FB',
+  },
+  showAllLabel: {
+    flex: 1,
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  serviceBadge: {
+    backgroundColor: Colors.textDisabled + '33',
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    marginLeft: 6,
+  },
+  serviceBadgeText: {
+    fontSize: 10,
+    color: Colors.textSecondary,
+    fontWeight: '600',
   },
 });
 

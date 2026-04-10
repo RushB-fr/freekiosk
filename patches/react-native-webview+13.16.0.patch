@@ -97,7 +97,7 @@ index 07f73fd..275f2cd 100644
  
      private PermissionAwareActivity getPermissionAwareActivity() {
 diff --git a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
-index 0287e1c..c09506e 100644
+index 0287e1c..1abee9d 100644
 --- a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
 +++ b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
 @@ -1,9 +1,11 @@
@@ -158,7 +158,7 @@ index 0287e1c..c09506e 100644
      protected @Nullable RNCBasicAuthCredential basicAuthCredential = null;
  
      public void setBasicAuthCredential(@Nullable RNCBasicAuthCredential credential) {
-@@ -86,10 +105,117 @@ public class RNCWebViewClient extends WebViewClient {
+@@ -86,10 +105,136 @@ public class RNCWebViewClient extends WebViewClient {
        super.onPageStarted(webView, url, favicon);
        mLastLoadFailed = false;
  
@@ -203,6 +203,13 @@ index 0287e1c..c09506e 100644
 +                        conn.setRequestProperty("Cookie", cookie);
 +                    }
 +
++                    // Ensure Referer header is set - file:// origins don't send Referer,
++                    // but some CDNs/WAFs (e.g. Alibaba Cloud) require it
++                    boolean hasReferer = reqHeaders != null && (reqHeaders.containsKey("Referer") || reqHeaders.containsKey("referer"));
++                    if (!hasReferer) {
++                        conn.setRequestProperty("Referer", requestUrl);
++                    }
++
 +                    conn.connect();
 +
 +                    int statusCode = conn.getResponseCode();
@@ -244,6 +251,18 @@ index 0287e1c..c09506e 100644
 +                        }
 +                    }
 +
++                    // Persist Set-Cookie from proxied response for subsequent requests
++                    // Critical for WAF/CDN session cookies (e.g. Alibaba Cloud acw_tc)
++                    if (headerFields != null) {
++                        for (Map.Entry<String, List<String>> h : headerFields.entrySet()) {
++                            if (h.getKey() != null && h.getKey().equalsIgnoreCase("Set-Cookie") && h.getValue() != null) {
++                                for (String sc : h.getValue()) {
++                                    CookieManager.getInstance().setCookie(requestUrl, sc);
++                                }
++                            }
++                        }
++                    }
++
 +                    InputStream inputStream;
 +                    if (statusCode >= 400) {
 +                        inputStream = conn.getErrorStream();
@@ -276,7 +295,7 @@ index 0287e1c..c09506e 100644
      @Override
      public boolean shouldOverrideUrlLoading(WebView view, String url) {
          final RNCWebView rncWebView = (RNCWebView) view;
-@@ -157,23 +283,15 @@ public class RNCWebViewClient extends WebViewClient {
+@@ -157,23 +302,15 @@ public class RNCWebViewClient extends WebViewClient {
  
      @Override
      public void onReceivedSslError(final WebView webView, final SslErrorHandler handler, final SslError error) {
@@ -302,7 +321,7 @@ index 0287e1c..c09506e 100644
          switch (code) {
              case SslError.SSL_DATE_INVALID:
                  description = "The date of the certificate is invalid";
-@@ -200,26 +318,228 @@ public class RNCWebViewClient extends WebViewClient {
+@@ -200,24 +337,226 @@ public class RNCWebViewClient extends WebViewClient {
  
          description = descriptionPrefix + description;
  
@@ -400,9 +419,9 @@ index 0287e1c..c09506e 100644
 +            code,
 +            description,
 +            failingUrl
-         );
-     }
- 
++        );
++    }
++
 +    // ✅ IMPROVED: Helper methods to manage certificate acceptance with SHA-256 and expiration
 +
 +    /**
@@ -474,7 +493,7 @@ index 0287e1c..c09506e 100644
 +        SharedPreferences prefs = context.getSharedPreferences(
 +            "freekiosk_ssl_certs",
 +            Context.MODE_PRIVATE
-+        );
+         );
 +
 +        // Check if certificate is accepted
 +        boolean isAccepted = prefs.getBoolean("cert_" + fingerprint, false);
@@ -538,12 +557,10 @@ index 0287e1c..c09506e 100644
 +        if (BuildConfig.DEBUG) {
 +            Log.i(TAG, "All accepted certificates cleared");
 +        }
-+    }
-+
+     }
+ 
      public void onReceivedSubResourceSslError(
-       WebView webView,
-       int errorCode,
-@@ -314,8 +634,6 @@ public class RNCWebViewClient extends WebViewClient {
+@@ -314,8 +653,6 @@ public class RNCWebViewClient extends WebViewClient {
      protected WritableMap createWebViewEvent(WebView webView, String url) {
          WritableMap event = Arguments.createMap();
          event.putDouble("target", RNCWebViewWrapper.getReactTagFromWebView(webView));

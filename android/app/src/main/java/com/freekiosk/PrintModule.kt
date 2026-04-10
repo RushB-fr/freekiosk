@@ -2,11 +2,14 @@ package com.freekiosk
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.print.PrintAttributes
 import android.print.PrintManager
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebView
+import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
@@ -23,15 +26,92 @@ import com.facebook.react.bridge.ReactMethod
  * - Supports all connected printers (WiFi, Bluetooth, USB, Cloud Print)
  * - Automatic page title detection for print job naming
  * - Works with any website that calls window.print()
+ * - Dynamic print spooler package discovery for lock task whitelisting
+ * - isPrintActive flag to suspend immersive mode during print dialog
  */
 class PrintModule(reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
 
     companion object {
         const val NAME = "PrintModule"
+
+        /**
+         * Flag to indicate a print dialog is currently active.
+         * Used by MainActivity to suspend immersive mode re-application
+         * and avoid re-entering lock task while the print UI is shown.
+         */
+        @Volatile
+        @JvmStatic
+        var isPrintActive: Boolean = false
     }
 
     override fun getName(): String = NAME
+
+    /**
+     * Check if printing is available on this device.
+     * Returns true if PrintManager service exists and at least one print service is installed.
+     */
+    @ReactMethod
+    fun isPrintAvailable(promise: Promise) {
+        try {
+            val printManager = reactApplicationContext.getSystemService(Context.PRINT_SERVICE) as? PrintManager
+            if (printManager == null) {
+                promise.resolve(false)
+                return
+            }
+            // Check if any print service is installed
+            val printServices = reactApplicationContext.packageManager.queryIntentServices(
+                Intent("android.printservice.PrintService"),
+                PackageManager.GET_META_DATA
+            )
+            promise.resolve(printServices.isNotEmpty())
+        } catch (e: Exception) {
+            DebugLog.errorProduction(NAME, "Error checking print availability: ${e.message}")
+            promise.resolve(false)
+        }
+    }
+
+    /**
+     * Get the list of print spooler/service packages installed on this device.
+     * Used by JS to inform KioskModule which packages to whitelist in lock task mode.
+     * Dynamically discovers all print services (covers com.android.printspooler,
+     * Samsung Print Service, HP Print, etc.)
+     */
+    @ReactMethod
+    fun getPrintSpoolerPackages(promise: Promise) {
+        try {
+            val packages = mutableSetOf<String>()
+            
+            // Always include the core Android print spooler
+            packages.add("com.android.printspooler")
+            
+            // Discover all installed print services dynamically
+            val printServices = reactApplicationContext.packageManager.queryIntentServices(
+                Intent("android.printservice.PrintService"),
+                PackageManager.GET_META_DATA
+            )
+            for (service in printServices) {
+                service.serviceInfo?.packageName?.let { pkg ->
+                    packages.add(pkg)
+                    DebugLog.d(NAME, "Discovered print service package: $pkg")
+                }
+            }
+            
+            val result = Arguments.createArray()
+            for (pkg in packages) {
+                result.pushString(pkg)
+            }
+            
+            DebugLog.d(NAME, "Print spooler packages: $packages")
+            promise.resolve(result)
+        } catch (e: Exception) {
+            DebugLog.errorProduction(NAME, "Error getting print spooler packages: ${e.message}")
+            // Return at least the default spooler
+            val result = Arguments.createArray()
+            result.pushString("com.android.printspooler")
+            promise.resolve(result)
+        }
+    }
 
     /**
      * Print the current WebView content
@@ -64,6 +144,10 @@ class PrintModule(reactContext: ReactApplicationContext) :
 
                     DebugLog.d(NAME, "Starting print job: $jobName for WebView at URL: ${webView.url}")
 
+                    // Set isPrintActive BEFORE opening the dialog so MainActivity knows
+                    // to suspend immersive mode re-application
+                    isPrintActive = true
+
                     // Create print document adapter from WebView
                     val printAdapter = webView.createPrintDocumentAdapter(jobName)
 
@@ -78,12 +162,25 @@ class PrintModule(reactContext: ReactApplicationContext) :
 
                     DebugLog.d(NAME, "Print dialog opened successfully")
                     promise.resolve(true)
+
+                    // Reset isPrintActive after a delay — the print dialog runs in a
+                    // separate system activity, so we can't get a direct callback when
+                    // it closes. Use onWindowFocusChanged in MainActivity as the primary
+                    // reset mechanism, but also set a safety timeout here.
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        if (isPrintActive) {
+                            DebugLog.d(NAME, "Safety timeout: resetting isPrintActive")
+                            isPrintActive = false
+                        }
+                    }, 120_000L) // 2 minute safety net
                 } catch (e: Exception) {
+                    isPrintActive = false
                     DebugLog.errorProduction(NAME, "Error during print: ${e.message}")
                     promise.reject("PRINT_ERROR", "Failed to print: ${e.message}", e)
                 }
             }
         } catch (e: Exception) {
+            isPrintActive = false
             DebugLog.errorProduction(NAME, "Error initiating print: ${e.message}")
             promise.reject("PRINT_ERROR", "Failed to initiate print: ${e.message}", e)
         }

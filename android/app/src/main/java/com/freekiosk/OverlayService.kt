@@ -1315,23 +1315,44 @@ class OverlayService : Service() {
     }
 
     /**
-     * Bring FreeKiosk to the foreground without destroying overlays
-     * This will trigger the AppState listener in KioskScreen which will relaunch the external app
+     * Relaunch the locked external app directly when it leaves the foreground.
+     * Falls back to bringing FreeKiosk to the foreground if no locked package is set.
+     *
+     * Fix #106: Previously this always brought FreeKiosk to front, which triggered
+     * onResume → startLockTask on MainActivity → visible flash. Now we relaunch
+     * the external app directly from the native layer, avoiding the JS round-trip.
      */
     private fun bringFreeKioskToFront() {
+        // If we have a locked external app, relaunch it directly
+        val targetPackage = lockedPackage
+        if (targetPackage != null) {
+            try {
+                android.util.Log.i("OverlayService", "Relaunching external app directly: $targetPackage")
+                val launchIntent = packageManager.getLaunchIntentForPackage(targetPackage)
+                if (launchIntent != null) {
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    startActivity(launchIntent)
+                    DebugLog.d("OverlayService", "External app relaunched directly: $targetPackage")
+                    return
+                } else {
+                    android.util.Log.w("OverlayService", "No launch intent for $targetPackage, falling back to FreeKiosk")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("OverlayService", "Failed to relaunch external app: ${e.message}")
+            }
+        }
+
+        // Fallback: bring FreeKiosk to front (webview/media mode, or if external app can't be launched)
         try {
             android.util.Log.i("OverlayService", "Bringing FreeKiosk to foreground for auto-relaunch")
-            
             val intent = Intent(this, MainActivity::class.java)
             intent.addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or
                 Intent.FLAG_ACTIVITY_SINGLE_TOP or
                 Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
             )
-            
-            // Don't set voluntaryReturn - we want the auto-relaunch to happen
             startActivity(intent)
-            DebugLog.d("OverlayService", "FreeKiosk brought to front - AppState listener will handle relaunch")
+            DebugLog.d("OverlayService", "FreeKiosk brought to front")
         } catch (e: Exception) {
             DebugLog.errorProduction("OverlayService", "Failed to bring FreeKiosk to front: ${e.message}")
         }

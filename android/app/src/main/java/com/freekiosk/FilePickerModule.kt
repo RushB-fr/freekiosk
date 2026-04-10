@@ -23,6 +23,7 @@ class FilePickerModule(reactContext: ReactApplicationContext) :
         const val NAME = "FilePickerModule"
         private const val TAG = "FilePickerModule"
         private const val PICK_MEDIA_REQUEST = 9001
+        private const val PICK_JSON_REQUEST = 9002
         private const val MEDIA_DIR = "media_player"
     }
 
@@ -115,6 +116,40 @@ class FilePickerModule(reactContext: ReactApplicationContext) :
     }
 
     /**
+     * Open the Android file picker for JSON file selection (for backup import).
+     * Uses SAF (Storage Access Framework) to bypass Scoped Storage restrictions.
+     * Returns a WritableMap with: { content, name, size }
+     */
+    @ReactMethod
+    fun pickJsonFile(promise: Promise) {
+        val activity = reactApplicationContext.currentActivity
+        if (activity == null) {
+            promise.reject("NO_ACTIVITY", "No activity available")
+            return
+        }
+
+        if (pickPromise != null) {
+            promise.reject("PICKER_BUSY", "A file picker is already open")
+            return
+        }
+
+        pickPromise = promise
+
+        try {
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "*/*"
+                // Accept JSON and plain text files (backup files may have generic MIME type)
+                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/json", "text/plain", "application/octet-stream"))
+            }
+            activity.startActivityForResult(intent, PICK_JSON_REQUEST)
+        } catch (e: Exception) {
+            pickPromise = null
+            promise.reject("PICKER_ERROR", "Failed to open file picker: ${e.message}")
+        }
+    }
+
+    /**
      * Delete a file that was previously copied to the media directory.
      */
     @ReactMethod
@@ -193,7 +228,7 @@ class FilePickerModule(reactContext: ReactApplicationContext) :
     // ==================== Activity Result Handling ====================
 
     override fun onActivityResult(activity: Activity, requestCode: Int, resultCode: Int, data: Intent?) {
-        if (requestCode != PICK_MEDIA_REQUEST) return
+        if (requestCode != PICK_MEDIA_REQUEST && requestCode != PICK_JSON_REQUEST) return
 
         val promise = pickPromise ?: return
         pickPromise = null
@@ -204,7 +239,23 @@ class FilePickerModule(reactContext: ReactApplicationContext) :
         }
 
         try {
-            // Check for multiple selection
+            // Handle JSON file pick - read content directly via ContentResolver
+            if (requestCode == PICK_JSON_REQUEST) {
+                val uri = data.data
+                if (uri == null) {
+                    promise.reject("NO_URI", "No file URI received")
+                    return
+                }
+                val fileInfo = readJsonFileContent(uri)
+                if (fileInfo != null) {
+                    promise.resolve(fileInfo)
+                } else {
+                    promise.reject("READ_ERROR", "Failed to read the selected JSON file")
+                }
+                return
+            }
+
+            // Handle media file pick (existing logic)
             val clipData = data.clipData
             if (clipData != null && clipData.itemCount > 1) {
                 // Multiple files selected
@@ -251,6 +302,46 @@ class FilePickerModule(reactContext: ReactApplicationContext) :
             dir.mkdirs()
         }
         return dir
+    }
+
+    /**
+     * Read a JSON file's content directly from a content:// URI.
+     * Returns a WritableMap with { content, name, size }, or null on failure.
+     * This uses ContentResolver to bypass Scoped Storage restrictions.
+     */
+    private fun readJsonFileContent(uri: Uri): WritableMap? {
+        val context = reactApplicationContext
+        val contentResolver = context.contentResolver
+
+        var fileName: String? = null
+        var fileSize: Long = 0
+
+        contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                val sizeIdx = cursor.getColumnIndex(OpenableColumns.SIZE)
+                if (nameIdx >= 0) fileName = cursor.getString(nameIdx)
+                if (sizeIdx >= 0) fileSize = cursor.getLong(sizeIdx)
+            }
+        }
+
+        if (fileName.isNullOrBlank()) {
+            fileName = "backup.json"
+        }
+
+        // Read file content as string via ContentResolver (bypasses Scoped Storage)
+        val content = contentResolver.openInputStream(uri)?.use { input ->
+            input.bufferedReader().readText()
+        } ?: return null
+
+        val result = Arguments.createMap().apply {
+            putString("content", content)
+            putString("name", fileName)
+            putDouble("size", fileSize.toDouble())
+        }
+
+        Log.d(TAG, "Read JSON file: $fileName ($fileSize bytes)")
+        return result
     }
 
     /**

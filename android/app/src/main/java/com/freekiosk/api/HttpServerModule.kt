@@ -47,6 +47,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.net.Inet4Address
 import java.net.NetworkInterface
+import java.util.Locale
 
 /**
  * React Native Module for HTTP Server management
@@ -748,8 +749,9 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             }
             "tts" -> {
                 val text = params?.optString("text", "") ?: ""
+                val language = params?.optString("language", "") ?: ""
                 if (text.isNotEmpty()) {
-                    speakText(text)
+                    speakText(text, language.ifEmpty { null })
                     return JSONObject().apply {
                         put("executed", true)
                         put("command", command)
@@ -1037,6 +1039,38 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
         }
     }
 
+    /**
+     * Speak text using the native Android TTS engine.
+     * Exposed as a @ReactMethod so the WebView speechSynthesis polyfill can call it
+     * via NativeModules.HttpServerModule.speak() from React Native.
+     */
+    @ReactMethod
+    fun speak(text: String, language: String, promise: Promise) {
+        try {
+            val lang = if (language.isNotEmpty()) language else null
+            speakText(text, lang)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to speak text", e)
+            promise.reject("TTS_ERROR", e.message)
+        }
+    }
+
+    /**
+     * Stop any ongoing TTS playback.
+     * Used by the WebView speechSynthesis polyfill for cancel().
+     */
+    @ReactMethod
+    fun stopSpeaking(promise: Promise) {
+        try {
+            tts?.stop()
+            promise.resolve(true)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to stop speaking", e)
+            promise.reject("TTS_ERROR", e.message)
+        }
+    }
+
     private fun getStorageInfo(): JSONObject {
         return try {
             val stat = StatFs(Environment.getDataDirectory().path)
@@ -1305,11 +1339,109 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
 
     // ==================== Text-to-Speech ====================
 
-    private fun speakText(text: String) {
+    /**
+     * Detect the best locale for the given text based on Unicode script analysis.
+     * Checks the dominant script in the text and returns the appropriate Locale.
+     */
+    private fun detectLocaleForText(text: String): Locale {
+        var cjkCount = 0
+        var koreanCount = 0
+        var japaneseCount = 0
+        var arabicCount = 0
+        var thaiCount = 0
+        var devanagariCount = 0
+        var cyrillicCount = 0
+        var latinCount = 0
+        var totalLetters = 0
+
+        for (char in text) {
+            if (!Character.isLetterOrDigit(char)) continue
+            totalLetters++
+            when {
+                // Korean Hangul
+                char in '\uAC00'..'\uD7AF' || char in '\u1100'..'\u11FF' || char in '\u3130'..'\u318F' -> koreanCount++
+                // Japanese Hiragana + Katakana
+                char in '\u3040'..'\u309F' || char in '\u30A0'..'\u30FF' -> japaneseCount++
+                // CJK Unified Ideographs (Chinese/Japanese Kanji)
+                char in '\u4E00'..'\u9FFF' || char in '\u3400'..'\u4DBF' || char in '\uF900'..'\uFAFF' -> cjkCount++
+                // Arabic
+                char in '\u0600'..'\u06FF' || char in '\u0750'..'\u077F' -> arabicCount++
+                // Thai
+                char in '\u0E00'..'\u0E7F' -> thaiCount++
+                // Devanagari (Hindi)
+                char in '\u0900'..'\u097F' -> devanagariCount++
+                // Cyrillic
+                char in '\u0400'..'\u04FF' -> cyrillicCount++
+                // Latin
+                char in 'A'..'Z' || char in 'a'..'z' || char in '\u00C0'..'\u024F' -> latinCount++
+            }
+        }
+
+        if (totalLetters == 0) return Locale.getDefault()
+
+        // Find the dominant non-Latin script
+        val scriptCounts = mapOf(
+            "korean" to koreanCount,
+            "japanese" to japaneseCount,
+            "cjk" to cjkCount,
+            "arabic" to arabicCount,
+            "thai" to thaiCount,
+            "devanagari" to devanagariCount,
+            "cyrillic" to cyrillicCount
+        )
+        val dominant = scriptCounts.maxByOrNull { it.value }
+
+        // If any non-Latin script is present, use that language
+        if (dominant != null && dominant.value > 0) {
+            return when (dominant.key) {
+                "korean" -> Locale.KOREAN
+                "japanese" -> Locale.JAPANESE
+                "cjk" -> Locale.SIMPLIFIED_CHINESE
+                "arabic" -> Locale("ar")
+                "thai" -> Locale("th")
+                "devanagari" -> Locale("hi")
+                "cyrillic" -> Locale("ru")
+                else -> Locale.getDefault()
+            }
+        }
+
+        // All Latin — use device default locale
+        return Locale.getDefault()
+    }
+
+    /**
+     * Parse a language string (e.g. "zh-CN", "en", "fr-FR") into a Locale.
+     */
+    private fun parseLocale(language: String): Locale {
+        val parts = language.replace("_", "-").split("-")
+        return when (parts.size) {
+            1 -> Locale(parts[0])
+            2 -> Locale(parts[0], parts[1])
+            else -> Locale(parts[0], parts[1], parts[2])
+        }
+    }
+
+    private fun speakText(text: String, language: String? = null) {
         try {
             if (tts != null && ttsReady) {
+                // Determine the target locale
+                val targetLocale = if (!language.isNullOrEmpty()) {
+                    parseLocale(language)
+                } else {
+                    detectLocaleForText(text)
+                }
+
+                // Set the language on the TTS engine
+                val result = tts?.setLanguage(targetLocale)
+                if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    Log.w(TAG, "TTS language not supported: $targetLocale, falling back to default")
+                    tts?.setLanguage(Locale.getDefault())
+                } else {
+                    Log.d(TAG, "TTS language set to: $targetLocale")
+                }
+
                 tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "freekiosk_tts_${System.currentTimeMillis()}")
-                Log.d(TAG, "TTS speaking: $text")
+                Log.d(TAG, "TTS speaking: $text (locale: $targetLocale)")
             } else {
                 // TTS not ready, try to reinitialize
                 Log.w(TAG, "TTS not ready, reinitializing...")
@@ -1317,7 +1449,7 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 // Retry after a short delay
                 android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                     if (ttsReady) {
-                        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "freekiosk_tts_retry")
+                        speakText(text, language)
                     }
                 }, 1000)
             }

@@ -102,6 +102,8 @@ const KEYS = {
   URL_FILTER_SHOW_FEEDBACK: '@kiosk_url_filter_show_feedback',
   // PDF Viewer
   PDF_VIEWER_ENABLED: '@kiosk_pdf_viewer_enabled',
+  // Printing
+  PRINT_ENABLED: '@kiosk_print_enabled',
   // WebView Zoom Level
   WEBVIEW_ZOOM_LEVEL: '@kiosk_webview_zoom_level',
   // Custom User Agent
@@ -340,6 +342,8 @@ export const StorageService = {
         KEYS.URL_FILTER_SHOW_FEEDBACK,
         // PDF Viewer
         KEYS.PDF_VIEWER_ENABLED,
+        // Printing
+        KEYS.PRINT_ENABLED,
         // WebView Zoom Level
         KEYS.WEBVIEW_ZOOM_LEVEL,
         // Custom User Agent
@@ -1867,6 +1871,26 @@ export const StorageService = {
       return value ? JSON.parse(value) : false;
     } catch (error) {
       console.error('Error getting PDF viewer enabled:', error);
+      return false;
+    }
+  },
+
+  // ============ PRINTING ============
+
+  savePrintEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.PRINT_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving print enabled:', error);
+    }
+  },
+
+  getPrintEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.PRINT_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting print enabled:', error);
       return false;
     }
   },

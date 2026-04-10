@@ -182,6 +182,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   // PDF Viewer state
   const [pdfViewerEnabled, setPdfViewerEnabled] = useState<boolean>(false);
   
+  // Printing state
+  const [printEnabled, setPrintEnabled] = useState<boolean>(false);
+  
   // WebView Zoom Level
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   
@@ -575,6 +578,10 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     // PDF Viewer setting
     const savedPdfViewerEnabled = await StorageService.getPdfViewerEnabled();
     setPdfViewerEnabled(savedPdfViewerEnabled);
+
+    // Printing setting
+    const savedPrintEnabled = await StorageService.getPrintEnabled();
+    setPrintEnabled(savedPrintEnabled);
 
     // Dashboard settings
     const savedDashboardModeEnabled = await StorageService.getDashboardModeEnabled();
@@ -1230,6 +1237,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     // Save PDF Viewer setting
     await StorageService.savePdfViewerEnabled(pdfViewerEnabled);
 
+    // Save Printing setting
+    await StorageService.savePrintEnabled(printEnabled);
+
     // Save Media Player settings
     if (displayMode === 'media_player') {
       await StorageService.saveMediaPlayerItems(mediaPlayerItems);
@@ -1566,6 +1576,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             onAutoReloadChange={setAutoReload}
             pdfViewerEnabled={pdfViewerEnabled}
             onPdfViewerEnabledChange={setPdfViewerEnabled}
+            printEnabled={printEnabled}
+            onPrintEnabledChange={setPrintEnabled}
             urlRotationEnabled={urlRotationEnabled}
             onUrlRotationEnabledChange={setUrlRotationEnabled}
             urlRotationList={urlRotationList}

@@ -330,7 +330,12 @@ class KioskHttpServer(
             return jsonError(Response.Status.BAD_REQUEST, "Text is required")
         }
 
-        val result = commandHandler("tts", JSONObject().put("text", text))
+        val params = JSONObject().put("text", text)
+        val language = body?.optString("language", "") ?: ""
+        if (language.isNotEmpty()) {
+            params.put("language", language)
+        }
+        val result = commandHandler("tts", params)
         return jsonSuccess(result)
     }
 

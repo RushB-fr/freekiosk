@@ -178,6 +178,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [dashboardShowGrid, setDashboardShowGrid] = useState<boolean>(true);
   const [navState, setNavState] = useState<{ canGoBack: boolean; canGoForward: boolean; title: string }>({ canGoBack: false, canGoForward: false, title: '' });
   const [pdfViewerEnabled, setPdfViewerEnabled] = useState<boolean>(false);
+  const [printEnabled, setPrintEnabled] = useState<boolean>(false);
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [customUserAgent, setCustomUserAgent] = useState<string>('');
 
@@ -1470,6 +1471,10 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       const savedPdfViewerEnabled = bool(K.PDF_VIEWER_ENABLED, false);
       setPdfViewerEnabled(savedPdfViewerEnabled);
       
+      // Load Printing setting
+      const savedPrintEnabled = bool(K.PRINT_ENABLED, false);
+      setPrintEnabled(savedPrintEnabled);
+      
       // Load WebView Zoom Level
       const savedZoomLevel = num(K.WEBVIEW_ZOOM_LEVEL, 100);
       setZoomLevel(savedZoomLevel);
@@ -2223,6 +2228,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
               urlFilterPatterns={urlFilterEnabled ? urlFilterList : undefined}
               urlFilterShowFeedback={urlFilterShowFeedback}
               pdfViewerEnabled={pdfViewerEnabled}
+              printEnabled={printEnabled}
               zoomLevel={zoomLevel}
               customUserAgent={customUserAgent}
             />

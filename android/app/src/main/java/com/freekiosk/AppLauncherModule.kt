@@ -170,6 +170,51 @@ class AppLauncherModule(reactContext: ReactApplicationContext) : ReactContextBas
         }
     }
 
+    /**
+     * Returns all installed apps including non-UI packages (services, VPNs, etc.).
+     * User-installed apps without a launcher activity are included so they can be
+     * whitelisted in lock task mode (fixes #112 - e.g. gnirehtet VPN).
+     * Each entry includes a hasLauncherActivity flag for UI differentiation.
+     */
+    @ReactMethod
+    fun getAllInstalledApps(promise: Promise) {
+        executor.execute {
+            try {
+                val pm = reactApplicationContext.packageManager
+                val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+
+                val appList = mutableListOf<WritableMap>()
+                for (packageInfo in packages) {
+                    val hasLauncher = pm.getLaunchIntentForPackage(packageInfo.packageName) != null
+                    val isSystemApp = (packageInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
+
+                    // Include apps that have a launcher activity OR are user-installed (non-system)
+                    if (hasLauncher || !isSystemApp) {
+                        val appName = pm.getApplicationLabel(packageInfo).toString()
+                        val appData = Arguments.createMap()
+                        appData.putString("packageName", packageInfo.packageName)
+                        appData.putString("appName", appName)
+                        appData.putBoolean("hasLauncherActivity", hasLauncher)
+                        appList.add(appData)
+                    }
+                }
+
+                // Sort by app name
+                val sortedList = appList.sortedBy { it.getString("appName") }
+
+                val resultArray = Arguments.createArray()
+                for (app in sortedList) {
+                    resultArray.pushMap(app)
+                }
+
+                promise.resolve(resultArray)
+            } catch (e: Exception) {
+                DebugLog.errorProduction("AppLauncherModule", "Failed to get all installed apps: ${e.message}")
+                promise.reject("ERROR_GET_ALL_APPS", "Failed to get all installed apps: ${e.message}")
+            }
+        }
+    }
+
     @ReactMethod
     fun getPackageLabel(packageName: String, promise: Promise) {
         try {

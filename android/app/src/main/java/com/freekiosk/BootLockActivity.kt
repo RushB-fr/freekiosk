@@ -65,8 +65,12 @@ class BootLockActivity : Activity() {
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
 
-        hideSystemUI()
+        // #109 fix: setContentView MUST come before hideSystemUI().
+        // On Android R+, window.insetsController accesses the DecorView which
+        // is only created by setContentView(). Calling hideSystemUI() first
+        // caused a NullPointerException crash on boot.
         setContentView(R.layout.activity_boot_lock)
+        hideSystemUI()
 
         DebugLog.d(TAG, "onCreate — attempting immediate lock-task")
 
@@ -264,21 +268,25 @@ class BootLockActivity : Activity() {
     // ────────────────────────────────────────────────────────────────────
 
     private fun hideSystemUI() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            window.insetsController?.let { ctrl ->
-                ctrl.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
-                ctrl.systemBarsBehavior =
-                    WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                window.insetsController?.let { ctrl ->
+                    ctrl.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
+                    ctrl.systemBarsBehavior =
+                        WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                window.decorView.systemUiVisibility = (
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                        or View.SYSTEM_UI_FLAG_FULLSCREEN
+                        or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION)
             }
-        } else {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                    or View.SYSTEM_UI_FLAG_FULLSCREEN
-                    or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                    or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                    or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                    or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION)
+        } catch (e: Exception) {
+            DebugLog.errorProduction(TAG, "hideSystemUI failed (DecorView may not be ready): ${e.message}")
         }
     }
 }

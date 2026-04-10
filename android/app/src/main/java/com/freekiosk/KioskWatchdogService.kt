@@ -104,7 +104,18 @@ class KioskWatchdogService : Service() {
             return
         }
 
-        if (isMainActivityRunning()) return  // everything fine
+        // In external app mode, the external app is expected to be in the foreground.
+        // Don't relaunch MainActivity just because it's not the topActivity — check
+        // that either FreeKiosk OR the external app is running. (#106)
+        val externalAppMode = getDisplayMode() == "external_app"
+        val externalPkg = if (externalAppMode) getExternalAppPackage() else null
+
+        if (isMainActivityRunning()) return  // FreeKiosk itself is in foreground — fine
+
+        if (externalAppMode && externalPkg != null && isPackageInForeground(externalPkg)) {
+            // External app is in foreground — this is expected, don't relaunch FreeKiosk
+            return
+        }
 
         val now = System.currentTimeMillis()
         if (now - lastRelaunchTime < RELAUNCH_COOLDOWN_MS) {
@@ -118,7 +129,6 @@ class KioskWatchdogService : Service() {
         try {
             val intent = Intent(this, MainActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or
-                         Intent.FLAG_ACTIVITY_CLEAR_TOP or
                          Intent.FLAG_ACTIVITY_SINGLE_TOP)
             }
             startActivity(intent)
@@ -152,9 +162,66 @@ class KioskWatchdogService : Service() {
         }
     }
 
+    /**
+     * Check if a specific package is currently in the foreground.
+     * Used in external app mode to avoid relaunching MainActivity when the
+     * external app is legitimately in the foreground. (#106)
+     */
+    private fun isPackageInForeground(pkg: String): Boolean {
+        return try {
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val tasks = am.appTasks
+            tasks.any { task ->
+                try {
+                    val info = task.taskInfo
+                    info.topActivity?.packageName == pkg
+                } catch (e: Exception) {
+                    false
+                }
+            }
+        } catch (e: Exception) {
+            DebugLog.d(TAG, "Error checking foreground for $pkg: ${e.message}")
+            false
+        }
+    }
+
     // ────────────────────────────────────────────────────────────────────
     // AsyncStorage
     // ────────────────────────────────────────────────────────────────────
+
+    private fun getDisplayMode(): String {
+        return try {
+            val dbPath = getDatabasePath("RKStorage").absolutePath
+            val db = SQLiteDatabase.openDatabase(dbPath, null, SQLiteDatabase.OPEN_READONLY)
+            val cursor = db.rawQuery(
+                "SELECT value FROM catalystLocalStorage WHERE key = ?",
+                arrayOf("@kiosk_display_mode"))
+            val mode = if (cursor.moveToFirst()) cursor.getString(0) ?: "webview" else "webview"
+            cursor.close()
+            db.close()
+            mode
+        } catch (e: Exception) {
+            DebugLog.d(TAG, "Cannot read display_mode: ${e.message}")
+            "webview"
+        }
+    }
+
+    private fun getExternalAppPackage(): String? {
+        return try {
+            val dbPath = getDatabasePath("RKStorage").absolutePath
+            val db = SQLiteDatabase.openDatabase(dbPath, null, SQLiteDatabase.OPEN_READONLY)
+            val cursor = db.rawQuery(
+                "SELECT value FROM catalystLocalStorage WHERE key = ?",
+                arrayOf("@kiosk_external_app_package"))
+            val pkg = if (cursor.moveToFirst()) cursor.getString(0) else null
+            cursor.close()
+            db.close()
+            if (pkg.isNullOrEmpty()) null else pkg
+        } catch (e: Exception) {
+            DebugLog.d(TAG, "Cannot read external_app_package: ${e.message}")
+            null
+        }
+    }
 
     private fun isKioskEnabled(): Boolean {
         return try {

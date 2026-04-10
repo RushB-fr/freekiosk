@@ -231,6 +231,12 @@ class MainActivity : ReactActivity() {
 
         // Add all managed apps to lock task whitelist
         whitelist.addAll(getManagedAppPackages())
+        
+        // Add print spooler packages if printing is enabled
+        if (isPrintSettingEnabled()) {
+            whitelist.addAll(getPrintSpoolerPackages())
+        }
+        
         val uniqueWhitelist = whitelist.distinct()
 
         // Configurer la whitelist Lock Task
@@ -398,10 +404,13 @@ class MainActivity : ReactActivity() {
       DebugLog.d("MainActivity", "Voluntary return detected (5-tap), will navigate to PIN: $navigateToPin")
     }
 
-    // IMPORTANT: Quand FreeKiosk revient au premier plan, TOUJOURS arrêter l'overlay
-    // L'overlay ne doit être visible QUE quand une app externe est au premier plan
-    // Il sera relancé automatiquement quand on relance l'app externe
-    stopOverlayService()
+    // Fix #106: In external app mode, only stop the overlay on VOLUNTARY returns
+    // (e.g. admin 5-tap to access settings). On involuntary returns (system brought
+    // FreeKiosk back), keep the overlay running so the foreground monitor can
+    // relaunch the external app.
+    if (!isExternalAppMode || isVoluntaryReturn) {
+      stopOverlayService()
+    }
 
     // NOTE: navigateToPin event is now sent directly by OverlayService via KioskModule.
     // The backup send from handleNavigationIntent (500ms) handles edge cases.
@@ -412,13 +421,42 @@ class MainActivity : ReactActivity() {
     if (isExternalAppMode && !isVoluntaryReturn) {
       sendAppReturnedEvent(false)  // voluntary=false = auto-relaunch possible
     }
-    isVoluntaryReturn = false  // Reset pour le prochain resume
 
     val kioskEnabled = isKioskEnabled()
 
-    // Relancer Lock Task si nécessaire (WebView ET External App)
+    // Fix #106: In external app mode, on involuntary returns, do NOT re-enter
+    // startLockTask on MainActivity (which would pin FreeKiosk). Instead, immediately
+    // relaunch the external app from the native layer to minimize the flash.
+    if (isExternalAppMode && !isVoluntaryReturn && kioskEnabled) {
+      isVoluntaryReturn = false
+      // Relaunch the external app directly if possible
+      val targetPkg = externalAppPackage
+      if (targetPkg != null) {
+        DebugLog.d("MainActivity", "External app mode involuntary return — relaunching $targetPkg directly")
+        try {
+          val launchIntent = packageManager.getLaunchIntentForPackage(targetPkg)
+          if (launchIntent != null) {
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(launchIntent)
+            // Move FreeKiosk to background so external app stays visible
+            Handler(Looper.getMainLooper()).postDelayed({ moveTaskToBack(true) }, 300)
+            return
+          }
+        } catch (e: Exception) {
+          DebugLog.errorProduction("MainActivity", "Failed to relaunch external app: ${e.message}")
+        }
+      }
+    }
+    isVoluntaryReturn = false  // Reset pour le prochain resume
+
+    // Relancer Lock Task si nécessaire (WebView, Media, or external app voluntary return)
     if (kioskEnabled && devicePolicyManager.isDeviceOwnerApp(packageName)) {
-      if (!isTaskLocked()) {
+      // Skip re-lock if print dialog is active — the print system activity causes
+      // onResume and we must not re-enter lock task while the user is interacting
+      // with the printer selection dialog
+      if (PrintModule.isPrintActive) {
+        DebugLog.d("MainActivity", "Skipping lock task re-entry: print dialog is active")
+      } else if (!isTaskLocked()) {
         // Check if power button (GlobalActions) is allowed — if so, the brief focus
         // loss may be from the power menu. Delay the re-lock to avoid dismissing it.
         val allowPowerButton = getAsyncStorageValue("@kiosk_allow_power_button", "true") == "true"
@@ -483,11 +521,21 @@ class MainActivity : ReactActivity() {
   override fun onWindowFocusChanged(hasFocus: Boolean) {
     super.onWindowFocusChanged(hasFocus)
     if (!hasFocus) {
-      // Track when we lost focus (e.g. power menu / GlobalActions appeared)
+      // Track when we lost focus (e.g. power menu / GlobalActions / Print dialog appeared)
       lastFocusLostTime = System.currentTimeMillis()
       // Cancel any pending hideSystemUI to avoid fighting with the system window
       hideSystemUIHandler.removeCallbacksAndMessages(null)
     } else {
+      // If a print dialog was active, reset the flag now that focus has returned
+      if (PrintModule.isPrintActive) {
+        DebugLog.d("MainActivity", "Print dialog closed — resetting isPrintActive, deferring immersive mode")
+        PrintModule.isPrintActive = false
+        // Use a longer delay to let the print system activity fully dismiss
+        hideSystemUIHandler.removeCallbacksAndMessages(null)
+        hideSystemUIHandler.postDelayed({ hideSystemUI() }, 1500L)
+        return
+      }
+      
       // Debounce hideSystemUI: wait 600ms before re-applying immersive mode.
       // This prevents the power menu from being immediately dismissed on devices
       // where the WindowManager focus bounces rapidly (TECNO, Infinix, itel / HiOS).
@@ -529,7 +577,16 @@ class MainActivity : ReactActivity() {
   private val volumeUpTapTimeout = 2000L
 
   override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-    android.util.Log.d("MainActivity", "onKeyDown: keyCode=$keyCode")
+    android.util.Log.d("MainActivity", "onKeyDown: keyCode=$keyCode, repeatCount=${event?.repeatCount ?: -1}")
+    
+    // Ignore auto-repeat events (when user HOLDS the volume button)
+    // Only count the initial press (repeatCount == 0)
+    if (event != null && event.repeatCount > 0) {
+      if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+        android.util.Log.d("MainActivity", "Ignoring volume key repeat (repeatCount=${event.repeatCount})")
+      }
+      return super.onKeyDown(keyCode, event)
+    }
     
     // Intercept Volume Up key events
     if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
@@ -659,6 +716,37 @@ class MainActivity : ReactActivity() {
       DebugLog.d("MainActivity", "Could not read managed apps: ${e.message}")
       emptyList()
     }
+  }
+
+  /**
+   * Check if printing is enabled in settings (read from AsyncStorage)
+   */
+  private fun isPrintSettingEnabled(): Boolean {
+    return getAsyncStorageValue("@kiosk_print_enabled", "false") == "true"
+  }
+
+  /**
+   * Dynamically discover all print spooler/service packages installed on the device.
+   * Covers com.android.printspooler, Samsung Print Service, HP Print, etc.
+   */
+  private fun getPrintSpoolerPackages(): List<String> {
+    val packages = mutableSetOf<String>()
+    packages.add("com.android.printspooler")
+    try {
+      val printServices = packageManager.queryIntentServices(
+        Intent("android.printservice.PrintService"),
+        PackageManager.GET_META_DATA
+      )
+      for (service in printServices) {
+        service.serviceInfo?.packageName?.let { pkg ->
+          packages.add(pkg)
+        }
+      }
+      DebugLog.d("MainActivity", "Print spooler packages for whitelist: $packages")
+    } catch (e: Exception) {
+      DebugLog.d("MainActivity", "Could not discover print services: ${e.message}")
+    }
+    return packages.toList()
   }
 
   private fun bringToFrontWithPinNavigation() {
@@ -967,6 +1055,61 @@ class MainActivity : ReactActivity() {
     intent.getStringExtra("mqtt_device_name")?.let {
       editor.putString("@kiosk_mqtt_device_name", it)
     }
+
+    // Multi-app mode configuration
+    intent.getStringExtra("external_app_mode")?.let {
+      if (it == "single" || it == "multi") {
+        editor.putString("@kiosk_external_app_mode", it)
+        // If switching to multi mode, set display_mode to external_app
+        if (it == "multi") {
+          editor.putString("@kiosk_display_mode", "external_app")
+        }
+      } else {
+        android.util.Log.w("FreeKiosk-ADB", "Invalid external_app_mode: $it (must be 'single' or 'multi')")
+      }
+    }
+
+    // Managed apps: JSON array of apps for multi-app mode
+    // Format: '[{"packageName":"com.app1"},{"packageName":"com.app2","launchOnBoot":true}]'
+    intent.getStringExtra("managed_apps")?.let { jsonStr ->
+      try {
+        val appsArray = org.json.JSONArray(jsonStr)
+        val validatedApps = org.json.JSONArray()
+        for (i in 0 until appsArray.length()) {
+          val appObj = appsArray.getJSONObject(i)
+          val pkg = appObj.getString("packageName")
+          // Verify each package is installed
+          try {
+            val appInfo = packageManager.getApplicationInfo(pkg, 0)
+            val displayName = if (appObj.has("displayName") && appObj.getString("displayName").isNotEmpty()) {
+              appObj.getString("displayName")
+            } else {
+              packageManager.getApplicationLabel(appInfo).toString()
+            }
+            val validApp = org.json.JSONObject()
+            validApp.put("packageName", pkg)
+            validApp.put("displayName", displayName)
+            validApp.put("showOnHomeScreen", appObj.optBoolean("showOnHomeScreen", true))
+            validApp.put("launchOnBoot", appObj.optBoolean("launchOnBoot", false))
+            validApp.put("keepAlive", appObj.optBoolean("keepAlive", false))
+            validApp.put("allowAccessibility", appObj.optBoolean("allowAccessibility", false))
+            validatedApps.put(validApp)
+            android.util.Log.i("FreeKiosk-ADB", "Managed app added: $pkg ($displayName)")
+          } catch (e: android.content.pm.PackageManager.NameNotFoundException) {
+            android.util.Log.w("FreeKiosk-ADB", "Managed app not installed, skipping: $pkg")
+          }
+        }
+        if (validatedApps.length() > 0) {
+          editor.putString("@kiosk_managed_apps", validatedApps.toString())
+          android.util.Log.i("FreeKiosk-ADB", "Managed apps configured: ${validatedApps.length()} apps")
+        } else {
+          android.util.Log.w("FreeKiosk-ADB", "No valid managed apps found in the provided list")
+        }
+      } catch (e: Exception) {
+        android.util.Log.e("FreeKiosk-ADB", "Invalid managed_apps JSON: ${e.message}")
+        showAdbToast("❌ ADB Config: Invalid managed_apps JSON")
+      }
+    }
     
     // Mark that there is pending config
     editor.putBoolean("has_pending_config", true)
@@ -1141,7 +1284,9 @@ class MainActivity : ReactActivity() {
       "mqtt_discovery_prefix" to "@kiosk_mqtt_discovery_prefix",
       "mqtt_status_interval" to "@kiosk_mqtt_status_interval",
       "mqtt_allow_control" to "@kiosk_mqtt_allow_control",
-      "mqtt_device_name" to "@kiosk_mqtt_device_name"
+      "mqtt_device_name" to "@kiosk_mqtt_device_name",
+      // Multi-app
+      "external_app_mode" to "@kiosk_external_app_mode"
     )
     
     for ((jsonKey, storageKey) in keyMapping) {
@@ -1159,6 +1304,47 @@ class MainActivity : ReactActivity() {
     // MQTT password requires special handling (goes to secure Keychain, not AsyncStorage)
     if (config.has("mqtt_password")) {
       editor.putString("@mqtt_password_pending", config.getString("mqtt_password"))
+    }
+
+    // Managed apps: validate packages and resolve display names
+    if (config.has("managed_apps")) {
+      try {
+        val appsArray = config.getJSONArray("managed_apps")
+        val validatedApps = org.json.JSONArray()
+        val pm = packageManager
+        for (i in 0 until appsArray.length()) {
+          val appObj = appsArray.getJSONObject(i)
+          val pkg = appObj.getString("packageName")
+          try {
+            val appInfo = pm.getApplicationInfo(pkg, 0)
+            val displayName = if (appObj.has("displayName") && appObj.getString("displayName").isNotEmpty()) {
+              appObj.getString("displayName")
+            } else {
+              pm.getApplicationLabel(appInfo).toString()
+            }
+            val validApp = org.json.JSONObject()
+            validApp.put("packageName", pkg)
+            validApp.put("displayName", displayName)
+            validApp.put("showOnHomeScreen", appObj.optBoolean("showOnHomeScreen", true))
+            validApp.put("launchOnBoot", appObj.optBoolean("launchOnBoot", false))
+            validApp.put("keepAlive", appObj.optBoolean("keepAlive", false))
+            validApp.put("allowAccessibility", appObj.optBoolean("allowAccessibility", false))
+            validatedApps.put(validApp)
+          } catch (e: android.content.pm.PackageManager.NameNotFoundException) {
+            android.util.Log.w("FreeKiosk-ADB", "JSON config: managed app not installed, skipping: $pkg")
+          }
+        }
+        if (validatedApps.length() > 0) {
+          editor.putString("@kiosk_managed_apps", validatedApps.toString())
+        }
+      } catch (e: Exception) {
+        android.util.Log.e("FreeKiosk-ADB", "Invalid managed_apps in JSON config: ${e.message}")
+      }
+    }
+
+    // If external_app_mode is set to multi, ensure display_mode is external_app
+    if (config.optString("external_app_mode") == "multi" && !config.has("display_mode")) {
+      editor.putString("@kiosk_display_mode", "external_app")
     }
   }
   
