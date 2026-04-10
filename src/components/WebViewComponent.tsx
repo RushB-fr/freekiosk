@@ -39,6 +39,7 @@ interface WebViewComponentProps {
   pdfViewerEnabled?: boolean; // Enable inline PDF viewing via PDF.js
   printEnabled?: boolean; // Enable window.print() interception for native printing
   zoomLevel?: number; // Zoom level percentage (50-200, default 100)
+  disableUserZoom?: boolean; // Prevent pinch-to-zoom and double-tap zoom
   customUserAgent?: string; // Custom User-Agent string (empty = default modern Chrome UA)
 }
 
@@ -66,6 +67,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   pdfViewerEnabled = false,
   printEnabled = false,
   zoomLevel = 100,
+  disableUserZoom = false,
   customUserAgent = ''
 }, ref) => {
   const navigation = useNavigation<NavigationProp>();
@@ -250,6 +252,17 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
       return;
     }
     window.__FREEKIOSK_INITIALIZED__ = true;
+
+    // Disable user zoom (pinch-to-zoom and double-tap zoom) when configured
+    ${disableUserZoom ? `
+    document.addEventListener('touchstart', function(e) {
+      if (e.touches.length > 1) { e.preventDefault(); }
+    }, { passive: false });
+    document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
+    var meta = document.querySelector('meta[name="viewport"]');
+    if (!meta) { meta = document.createElement('meta'); meta.name = 'viewport'; document.head.appendChild(meta); }
+    meta.content = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no';
+    ` : '// User zoom not disabled'}
 
     // Ensure storage is working properly
     try {

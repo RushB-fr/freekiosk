@@ -67,6 +67,8 @@ interface DisplayTabProps {
   // WebView Zoom Level
   zoomLevel: number;
   onZoomLevelChange: (value: number) => void;
+  disableUserZoom: boolean;
+  onDisableUserZoomChange: (value: boolean) => void;
   
   // Custom User Agent
   customUserAgent: string;
@@ -142,6 +144,8 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
   onKeyboardModeChange,
   zoomLevel,
   onZoomLevelChange,
+  disableUserZoom,
+  onDisableUserZoomChange,
   customUserAgent,
   onCustomUserAgentChange,
   screensaverEnabled,
@@ -679,6 +683,12 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
               </Text>
             </SettingsInfoBox>
           )}
+          <SettingsSwitch
+            label="Disable User Zoom"
+            hint="Prevent pinch-to-zoom and double-tap zoom on the web page. The admin zoom level above still applies."
+            value={disableUserZoom}
+            onValueChange={onDisableUserZoomChange}
+          />
         </SettingsSection>
       )}
       
