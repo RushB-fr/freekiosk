@@ -1670,9 +1670,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           console.log('[KioskScreen] Launching external app:', savedExternalAppPackage);
           await launchExternalApp(savedExternalAppPackage, savedReturnTapCount, savedReturnTapTimeout, savedReturnMode, savedReturnButtonPosition);
         } else if (savedExternalAppMode === 'multi') {
-          // Multi-app mode: don't auto-launch, the grid will be displayed by ExternalAppOverlay
-          console.log('[KioskScreen] Multi-app mode: showing app grid (no auto-launch)');
-          // Still sync overlay settings for when user launches an app from grid
+          // Multi-app mode: sync overlay settings for when user launches an app from grid
           const savedTestMode = bool(K.EXTERNAL_APP_TEST_MODE, true);
           const savedBackBtnMode = str(K.BACK_BUTTON_MODE) || 'test';
           try {
@@ -1680,6 +1678,24 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
             await OverlayServiceModule.setBackButtonMode(savedBackBtnMode);
           } catch (e) {
             console.warn('[KioskScreen] Failed to sync overlay settings for multi-app:', e);
+          }
+
+          // If only one app is visible on the home screen, skip the grid and automatically launch it
+          const homeScreenApps = savedManagedApps.filter(app => app.showOnHomeScreen);
+          if (homeScreenApps.length === 1) {
+            const soleApp = homeScreenApps[0];
+            console.log('[KioskScreen] Multi-app mode with single home screen app - launching:', soleApp.packageName);
+            const blockBeforeLaunch = await KioskModule.shouldBlockAutoRelaunch();
+            if (blockBeforeLaunch || isNavigatingToPinRef.current) {
+              console.log('[KioskScreen] Skipping auto-launch (blockAutoRelaunch=' + blockBeforeLaunch + ', navigatingToPin=' + isNavigatingToPinRef.current + ')');
+              if (blockBeforeLaunch) {
+                await KioskModule.clearBlockAutoRelaunch();
+              }
+              return;
+            }
+            await launchExternalApp(soleApp.packageName, savedReturnTapCount, savedReturnTapTimeout, savedReturnMode, savedReturnButtonPosition);
+          } else {
+            console.log('[KioskScreen] Multi-app mode: showing app grid (' + homeScreenApps.length + ' apps)');
           }
         }
       } else {
@@ -2128,8 +2144,14 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const handleReturnToExternalApp = async (): Promise<void> => {
     // Read fresh mode from ref (most up-to-date)
     if (externalAppModeRef.current === 'multi') {
-      // Multi-app mode: return to the app grid
-      setIsAppLaunched(false);
+      // Multi-app mode: if only one home screen app, re-launch it directly
+      const homeScreenApps = managedApps.filter(app => app.showOnHomeScreen);
+      if (homeScreenApps.length === 1) {
+        await launchExternalApp(homeScreenApps[0].packageName);
+      } else {
+        // Multiple apps: return to the app grid
+        setIsAppLaunched(false);
+      }
     } else {
       // Single-app mode: read current package from storage (avoid stale state)
       const currentPkg = await StorageService.getExternalAppPackage();
