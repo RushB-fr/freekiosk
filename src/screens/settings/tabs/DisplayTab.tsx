@@ -59,6 +59,8 @@ interface DisplayTabProps {
   onShowVolumeChange: (value: boolean) => void;
   showTime: boolean;
   onShowTimeChange: (value: boolean) => void;
+  statusBarTheme: 'dark' | 'light';
+  onStatusBarThemeChange: (value: string) => void;
   
   // Keyboard mode
   keyboardMode: string;
@@ -140,6 +142,8 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
   onShowVolumeChange,
   showTime,
   onShowTimeChange,
+  statusBarTheme,
+  onStatusBarThemeChange,
   keyboardMode,
   onKeyboardModeChange,
   zoomLevel,
@@ -586,40 +590,66 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
           <View style={styles.subSection}>
             <SettingsInfoBox variant="info">
               <Text style={styles.infoText}>
-                📐 Layout: Items positioned left and right to avoid center camera area
+                Layout: items are positioned left and right to avoid the center camera area
               </Text>
             </SettingsInfoBox>
+
+            <SettingsRadioGroup
+              label="Status Bar Theme"
+              hint="Choose a dark or light style for icons and text"
+              options={[
+                {
+                  value: 'dark',
+                  label: 'Dark',
+                  hint: 'Dark background with light icons/text',
+                  icon: 'weather-night',
+                },
+                {
+                  value: 'light',
+                  label: 'Light',
+                  hint: 'Light background with dark icons/text',
+                  icon: 'brightness-7',
+                },
+              ]}
+              value={statusBarTheme}
+              onValueChange={onStatusBarThemeChange}
+            />
             
             {/* Customize Status Bar Items */}
-            <Text style={styles.subSectionTitle}>🎨 Customize Items</Text>
+            <Text style={styles.subSectionTitle}>Customize Items</Text>
             
             <View style={styles.itemsGrid}>
               <SettingsSwitch
-                label="🔋 Battery"
+                label="Battery"
+                icon="power"
                 value={showBattery}
                 onValueChange={onShowBatteryChange}
               />
               
               <SettingsSwitch
-                label="📶 Wi-Fi"
+                label="Wi-Fi"
+                icon="server-network"
                 value={showWifi}
                 onValueChange={onShowWifiChange}
               />
               
               <SettingsSwitch
-                label="📘 Bluetooth"
+                label="Bluetooth"
+                icon="remote"
                 value={showBluetooth}
                 onValueChange={onShowBluetoothChange}
               />
               
               <SettingsSwitch
-                label="🔊 Volume"
+                label="Volume"
+                icon="volume-high"
                 value={showVolume}
                 onValueChange={onShowVolumeChange}
               />
               
               <SettingsSwitch
-                label="🕐 Time"
+                label="Time"
+                icon="clock-outline"
                 value={showTime}
                 onValueChange={onShowTimeChange}
               />
@@ -628,7 +658,7 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
             {/* External App specific options */}
             {displayMode === 'external_app' && (
               <View style={styles.externalAppOptions}>
-                <Text style={styles.subSectionTitle}>📱 External App Mode Options</Text>
+                <Text style={styles.subSectionTitle}>External App Mode Options</Text>
                 
                 <SettingsSwitch
                   label="On External App (Overlay)"
