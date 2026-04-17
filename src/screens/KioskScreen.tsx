@@ -777,12 +777,13 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         await AsyncStorage.getItem('__force_init__');
       } catch (e) {}
       
-      await loadSettings();
-      
-      // Clear navigating-to-pin guard AFTER loadSettings completes.
-      // This ensures the guard is available during loadSettings execution
-      // to prevent external app relaunch during 5-tap→PIN navigation.
+      // Clear navigating-to-pin guard BEFORE loadSettings so that returning from
+      // PIN/Settings causes loadSettings to proceed with the external app launch.
+      // The guard's purpose (preventing a duplicate launch mid-5-tap-flow) is already
+      // served: by the time KioskScreen gains focus again, the PIN flow is complete.
       isNavigatingToPinRef.current = false;
+
+      await loadSettings();
       
       // Reload blocking overlays to ensure they stay active when returning from settings
       try {
