@@ -120,13 +120,25 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
 
     private fun initTts() {
         try {
-            tts = TextToSpeech(reactContext.applicationContext) { status ->
+            // Use the system's preferred TTS engine so that installed language packs
+            // (e.g. Chinese, Japanese) are available — the no-arg constructor may pick
+            // a different, more limited engine than what the user configured in Settings.
+            val preferredEngine = android.provider.Settings.Secure.getString(
+                reactContext.contentResolver,
+                "tts_default_engine"
+            )
+            val listener = TextToSpeech.OnInitListener { status ->
                 if (status == TextToSpeech.SUCCESS) {
                     ttsReady = true
-                    Log.d(TAG, "TextToSpeech initialized successfully")
+                    Log.d(TAG, "TextToSpeech initialized (engine=$preferredEngine)")
                 } else {
                     Log.e(TAG, "TextToSpeech initialization failed: $status")
                 }
+            }
+            tts = if (!preferredEngine.isNullOrEmpty()) {
+                TextToSpeech(reactContext.applicationContext, listener, preferredEngine)
+            } else {
+                TextToSpeech(reactContext.applicationContext, listener)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize TTS: ${e.message}")
@@ -1411,13 +1423,30 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
 
     /**
      * Parse a language string (e.g. "zh-CN", "en", "fr-FR") into a Locale.
+     * Uses Locale.forLanguageTag() for proper BCP 47 handling, with a manual
+     * split fallback for older Android versions or non-standard tags.
      */
     private fun parseLocale(language: String): Locale {
-        val parts = language.replace("_", "-").split("-")
-        return when (parts.size) {
-            1 -> Locale(parts[0])
-            2 -> Locale(parts[0], parts[1])
-            else -> Locale(parts[0], parts[1], parts[2])
+        val tag = language.replace("_", "-")
+        return try {
+            val locale = Locale.forLanguageTag(tag)
+            // forLanguageTag returns und (undetermined) for unknown tags — fall back in that case
+            if (locale.language.isNotEmpty() && locale.language != "und") locale
+            else {
+                val parts = tag.split("-")
+                when (parts.size) {
+                    1 -> Locale(parts[0])
+                    2 -> Locale(parts[0], parts[1])
+                    else -> Locale(parts[0], parts[1], parts[2])
+                }
+            }
+        } catch (e: Exception) {
+            val parts = tag.split("-")
+            when (parts.size) {
+                1 -> Locale(parts[0])
+                2 -> Locale(parts[0], parts[1])
+                else -> Locale(parts[0], parts[1], parts[2])
+            }
         }
     }
 

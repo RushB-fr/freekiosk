@@ -112,13 +112,24 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
 
     init {
         try {
-            tts = TextToSpeech(reactContext.applicationContext) { status ->
+            // Use the system's preferred TTS engine so installed language packs (e.g. Chinese)
+            // are available — the no-arg constructor may pick a different limited engine.
+            val preferredEngine = Settings.Secure.getString(
+                reactContext.contentResolver,
+                "tts_default_engine"
+            )
+            val listener = TextToSpeech.OnInitListener { status ->
                 if (status == TextToSpeech.SUCCESS) {
                     ttsReady = true
-                    Log.d(TAG, "TextToSpeech initialized successfully")
+                    Log.d(TAG, "TextToSpeech initialized (engine=$preferredEngine)")
                 } else {
                     Log.e(TAG, "TextToSpeech initialization failed: $status")
                 }
+            }
+            tts = if (!preferredEngine.isNullOrEmpty()) {
+                TextToSpeech(reactContext.applicationContext, listener, preferredEngine)
+            } else {
+                TextToSpeech(reactContext.applicationContext, listener)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize TTS: ${e.message}")
@@ -128,14 +139,54 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
     private fun speakText(text: String) {
         try {
             if (tts != null && ttsReady) {
+                val locale = detectLocaleForText(text)
+                val result = tts?.setLanguage(locale)
+                if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    Log.w(TAG, "TTS language not supported: $locale, falling back to default")
+                    tts?.setLanguage(java.util.Locale.getDefault())
+                }
                 tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "mqtt_tts_${System.currentTimeMillis()}")
-                Log.d(TAG, "TTS speaking: $text")
+                Log.d(TAG, "TTS speaking: $text (locale: $locale)")
             } else {
                 Log.w(TAG, "TTS not ready")
             }
         } catch (e: Exception) {
             Log.e(TAG, "TTS speak failed: ${e.message}")
         }
+    }
+
+    private fun detectLocaleForText(text: String): java.util.Locale {
+        var cjkCount = 0; var koreanCount = 0; var japaneseCount = 0
+        var arabicCount = 0; var thaiCount = 0; var devanagariCount = 0; var cyrillicCount = 0
+        var totalLetters = 0
+        for (ch in text) {
+            if (!ch.isLetter()) continue
+            totalLetters++
+            val type = Character.getType(ch)
+            when {
+                ch.code in 0x4E00..0x9FFF || ch.code in 0x3400..0x4DBF -> cjkCount++
+                ch.code in 0xAC00..0xD7AF || ch.code in 0x1100..0x11FF -> koreanCount++
+                ch.code in 0x3040..0x30FF -> japaneseCount++
+                type == Character.OTHER_LETTER.toInt() && ch.code in 0x0600..0x06FF -> arabicCount++
+                ch.code in 0x0E00..0x0E7F -> thaiCount++
+                ch.code in 0x0900..0x097F -> devanagariCount++
+                ch.code in 0x0400..0x04FF -> cyrillicCount++
+            }
+        }
+        if (totalLetters == 0) return java.util.Locale.getDefault()
+        val dominant = mapOf("cjk" to cjkCount, "korean" to koreanCount, "japanese" to japaneseCount,
+            "arabic" to arabicCount, "thai" to thaiCount, "devanagari" to devanagariCount,
+            "cyrillic" to cyrillicCount).maxByOrNull { it.value }
+        return if (dominant != null && dominant.value > 0) when (dominant.key) {
+            "korean" -> java.util.Locale.KOREAN
+            "japanese" -> java.util.Locale.JAPANESE
+            "cjk" -> java.util.Locale.SIMPLIFIED_CHINESE
+            "arabic" -> java.util.Locale("ar")
+            "thai" -> java.util.Locale("th")
+            "devanagari" -> java.util.Locale("hi")
+            "cyrillic" -> java.util.Locale("ru")
+            else -> java.util.Locale.getDefault()
+        } else java.util.Locale.getDefault()
     }
 
     private fun showToastMessage(text: String) {
