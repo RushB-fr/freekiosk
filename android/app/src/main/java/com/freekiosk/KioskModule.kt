@@ -68,9 +68,21 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
         try {
             val activity = reactApplicationContext.currentActivity
             if (activity != null && activity is MainActivity) {
-                // Write @kiosk_enabled=false to AsyncStorage BEFORE finishing activity
-                // so the watchdog cannot relaunch the app during its next poll cycle
-                setKioskEnabledInAsyncStorage(false)
+                // Do NOT write @kiosk_enabled=false here — the watchdog is stopped
+                // explicitly below, so the AsyncStorage write is unnecessary for that.
+                // Writing false was permanently disabling Lock Mode after an admin exit,
+                // which is a regression: kiosk mode should re-engage on the next FK launch.
+                // (#124, #138)
+                //
+                // Only clear the DE fast-boot flag so BootLockActivity does not
+                // hard-lock the device on the next reboot (the admin just exited
+                // intentionally; normal kiosk start via MainActivity still fires
+                // because @kiosk_enabled remains true in AsyncStorage).
+                try {
+                    BootReceiver.updateDeBootFlag(reactApplicationContext, false)
+                } catch (e: Exception) {
+                    android.util.Log.e("KioskModule", "Failed to clear DE boot flag: ${e.message}")
+                }
 
                 // Explicitly stop KioskWatchdogService (#96 fix)
                 stopKioskWatchdog()
@@ -107,46 +119,6 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
             android.util.Log.d("KioskModule", "KioskWatchdogService stopped and notification cleared")
         } catch (e: Exception) {
             android.util.Log.e("KioskModule", "Error stopping KioskWatchdogService: ${e.message}")
-        }
-    }
-
-    /**
-     * Write @kiosk_enabled directly to AsyncStorage's SQLite database.
-     * This ensures the value is persisted BEFORE the activity is destroyed,
-     * so the watchdog's next poll cycle (or a system-restart) reads the correct value.
-     *
-     * Also mirrors the value to DE (Device Encrypted) SharedPreferences so that
-     * BootReceiver can honour the setting at LOCKED_BOOT_COMPLETED time, before
-     * CE (user-encrypted) storage is available.
-     */
-    private fun setKioskEnabledInAsyncStorage(enabled: Boolean) {
-        try {
-            val dbPath = reactApplicationContext.getDatabasePath("RKStorage").absolutePath
-            val db = android.database.sqlite.SQLiteDatabase.openDatabase(
-                dbPath, null, android.database.sqlite.SQLiteDatabase.OPEN_READWRITE
-            )
-            val cv = android.content.ContentValues().apply {
-                put("key", "@kiosk_enabled")
-                put("value", enabled.toString())
-            }
-            db.insertWithOnConflict(
-                "catalystLocalStorage", null, cv,
-                android.database.sqlite.SQLiteDatabase.CONFLICT_REPLACE
-            )
-            db.close()
-            android.util.Log.d("KioskModule", "@kiosk_enabled set to $enabled in AsyncStorage")
-        } catch (e: Exception) {
-            android.util.Log.e("KioskModule", "Failed to write @kiosk_enabled: ${e.message}")
-        }
-        // Mirror to DE storage — only Device Owner installations use BootLockActivity,
-        // so the flag is meaningful only for that case. We still write false on any
-        // kiosk disable to ensure the early-boot path is always in sync.
-        try {
-            val dpm = reactApplicationContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-            val isOwner = dpm.isDeviceOwnerApp(reactApplicationContext.packageName)
-            BootReceiver.updateDeBootFlag(reactApplicationContext, enabled && isOwner)
-        } catch (e: Exception) {
-            android.util.Log.e("KioskModule", "Failed to update DE boot flag: ${e.message}")
         }
     }
 
