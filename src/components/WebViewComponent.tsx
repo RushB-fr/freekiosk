@@ -38,6 +38,7 @@ interface WebViewComponentProps {
   urlFilterShowFeedback?: boolean; // Show feedback when URL is blocked
   pdfViewerEnabled?: boolean; // Enable inline PDF viewing via PDF.js
   printEnabled?: boolean; // Enable window.print() interception for native printing
+  printPaperSize?: string; // Default paper size: 'A4' | 'A5' | 'A3' | 'LETTER' | 'LEGAL'
   zoomLevel?: number; // Zoom level percentage (50-200, default 100)
   disableUserZoom?: boolean; // Prevent pinch-to-zoom and double-tap zoom
   customUserAgent?: string; // Custom User-Agent string (empty = default modern Chrome UA)
@@ -66,6 +67,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   urlFilterShowFeedback = false,
   pdfViewerEnabled = false,
   printEnabled = false,
+  printPaperSize = 'A4',
   zoomLevel = 100,
   disableUserZoom = false,
   customUserAgent = ''
@@ -277,7 +279,8 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
     window.print = function() {
       window.ReactNativeWebView.postMessage(JSON.stringify({
         type: 'PRINT_REQUEST',
-        title: document.title || ''
+        title: document.title || '',
+        paperSize: '${printPaperSize}'
       }));
     };
     ` : '// Printing disabled - window.print() not intercepted'}
@@ -549,7 +552,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
           }
         } else if (data.type === 'PRINT_REQUEST') {
           // Handle print request from window.print()
-          PrintModule.printWebView(data.title || 'FreeKiosk Print')
+          PrintModule.printWebView(data.title || 'FreeKiosk Print', data.paperSize || 'A4')
             .then(() => console.log('[WebView] Print job started'))
             .catch((err: any) => console.error('[WebView] Print failed:', err));
         } else if (data.type === 'PDF_VIEWER_CLOSE') {

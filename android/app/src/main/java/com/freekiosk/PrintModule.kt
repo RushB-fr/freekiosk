@@ -116,9 +116,11 @@ class PrintModule(reactContext: ReactApplicationContext) :
     /**
      * Print the current WebView content
      * Called from JavaScript when window.print() is intercepted
+     * @param title  Print job name (from document.title)
+     * @param paperSize  Paper size identifier: "A4", "A5", "A3", "LETTER", "LEGAL" (default "A4")
      */
     @ReactMethod
-    fun printWebView(title: String?, promise: Promise) {
+    fun printWebView(title: String?, paperSize: String?, promise: Promise) {
         val activity = reactApplicationContext.currentActivity
         if (activity == null) {
             DebugLog.errorProduction(NAME, "No activity available for printing")
@@ -148,12 +150,22 @@ class PrintModule(reactContext: ReactApplicationContext) :
                     // to suspend immersive mode re-application
                     isPrintActive = true
 
+                    // Map paper size string to Android MediaSize constant
+                    val mediaSize = when (paperSize?.uppercase()) {
+                        "A3"     -> PrintAttributes.MediaSize.ISO_A3
+                        "A5"     -> PrintAttributes.MediaSize.ISO_A5
+                        "LETTER" -> PrintAttributes.MediaSize.NA_LETTER
+                        "LEGAL"  -> PrintAttributes.MediaSize.NA_LEGAL
+                        else     -> PrintAttributes.MediaSize.ISO_A4 // default
+                    }
+                    DebugLog.d(NAME, "Print paper size: ${paperSize ?: "A4 (default)"} → $mediaSize")
+
                     // Create print document adapter from WebView
                     val printAdapter = webView.createPrintDocumentAdapter(jobName)
 
-                    // Start print job with default attributes
+                    // Start print job with configured paper size as default
                     val printAttributes = PrintAttributes.Builder()
-                        .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+                        .setMediaSize(mediaSize)
                         .setResolution(PrintAttributes.Resolution("default", "Default", 300, 300))
                         .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
                         .build()

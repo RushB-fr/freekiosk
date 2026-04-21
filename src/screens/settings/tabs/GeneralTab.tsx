@@ -82,6 +82,8 @@ interface GeneralTabProps {
   // Printing (webview only)
   printEnabled: boolean;
   onPrintEnabledChange: (value: boolean) => void;
+  printPaperSize: string;
+  onPrintPaperSizeChange: (value: string) => void;
   
   // URL Rotation (webview only)
   urlRotationEnabled: boolean;
@@ -186,6 +188,8 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
   onPdfViewerEnabledChange,
   printEnabled,
   onPrintEnabledChange,
+  printPaperSize,
+  onPrintPaperSizeChange,
   urlRotationEnabled,
   onUrlRotationEnabledChange,
   urlRotationList,
@@ -911,6 +915,24 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
             onValueChange={onPrintEnabledChange}
           />
           
+          {printEnabled && (
+            <>
+              <View style={styles.rotationSpacer} />
+              <SettingsRadioGroup
+                label="Default Paper Size"
+                options={[
+                  { value: 'A4',     label: 'A4 (210 × 297 mm)' },
+                  { value: 'A5',     label: 'A5 (148 × 210 mm)' },
+                  { value: 'A3',     label: 'A3 (297 × 420 mm)' },
+                  { value: 'LETTER', label: 'Letter (8.5 × 11 in)' },
+                  { value: 'LEGAL',  label: 'Legal (8.5 × 14 in)' },
+                ]}
+                value={printPaperSize}
+                onValueChange={onPrintPaperSizeChange}
+              />
+            </>
+          )}
+
           {printEnabled && (
             <SettingsInfoBox variant="info">
               <Text style={styles.infoText}>

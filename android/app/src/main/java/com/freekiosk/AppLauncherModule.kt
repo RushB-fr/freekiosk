@@ -372,23 +372,11 @@ class AppLauncherModule(reactContext: ReactApplicationContext) : ReactContextBas
                     }
                 }
                 
-                // Bring FreeKiosk back to the foreground after launching all boot apps
-                if (launchedCount > 0) {
-                    try {
-                        Thread.sleep(500)
-                        val bringBackIntent = Intent(reactApplicationContext, MainActivity::class.java)
-                        bringBackIntent.addFlags(
-                            Intent.FLAG_ACTIVITY_NEW_TASK or
-                            Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
-                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                            Intent.FLAG_ACTIVITY_NO_ANIMATION
-                        )
-                        reactApplicationContext.startActivity(bringBackIntent)
-                        DebugLog.d("AppLauncherModule", "FreeKiosk brought back to front after $launchedCount boot app(s)")
-                    } catch (e: Exception) {
-                        DebugLog.d("AppLauncherModule", "Failed to bring FreeKiosk to front: ${e.message}")
-                    }
-                }
+                // Do NOT bring FreeKiosk to front here. loadSettings() will call
+                // launchExternalApp() right after, which properly starts OverlayService
+                // and launches the primary app. Bringing FreeKiosk back in between would
+                // trigger MainActivity.onResume() fast-path, causing a double-launch loop
+                // when launchOnBoot is enabled (#launchOnBoot-loop).
                 promise.resolve(launchedCount)
             } catch (e: Exception) {
                 promise.reject("ERROR_LAUNCH_BOOT", "Failed to launch boot apps: ${e.message}")

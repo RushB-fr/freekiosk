@@ -106,6 +106,7 @@ const KEYS = {
   PDF_VIEWER_ENABLED: '@kiosk_pdf_viewer_enabled',
   // Printing
   PRINT_ENABLED: '@kiosk_print_enabled',
+  PRINT_PAPER_SIZE: '@kiosk_print_paper_size',
   // WebView Zoom Level
   WEBVIEW_ZOOM_LEVEL: '@kiosk_webview_zoom_level',
   // Disable User Zoom (pinch-to-zoom)
@@ -1918,6 +1919,24 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting print enabled:', error);
       return false;
+    }
+  },
+
+  savePrintPaperSize: async (value: string): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.PRINT_PAPER_SIZE, value);
+    } catch (error) {
+      console.error('Error saving print paper size:', error);
+    }
+  },
+
+  getPrintPaperSize: async (): Promise<string> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.PRINT_PAPER_SIZE);
+      return value || 'A4';
+    } catch (error) {
+      console.error('Error getting print paper size:', error);
+      return 'A4';
     }
   },
 

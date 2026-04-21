@@ -163,25 +163,28 @@ class BootReceiver : BroadcastReceiver() {
     private fun launchMainActivityLegacy(context: Context) {
         Handler(Looper.getMainLooper()).postDelayed({
             DebugLog.d("BootReceiver", "Legacy path: launching MainActivity")
-            
-            // Launch background apps (launchOnBoot=true) before launching FreeKiosk
-            launchBackgroundApps(context)
-            
-            // Give boot apps a moment to initialize before FreeKiosk takes foreground
-            Thread.sleep(1000)
-            
-            // Launch the app on startup (FreeKiosk will be on top)
-            val launchIntent = Intent(context, MainActivity::class.java)
-            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            launchIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            launchIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            
-            try {
-                context.startActivity(launchIntent)
-                DebugLog.d("BootReceiver", "Successfully launched MainActivity")
-            } catch (e: Exception) {
-                DebugLog.errorProduction("BootReceiver", "Failed to launch app: ${e.message}")
-            }
+
+            // Launch background apps on a worker thread — launchBackgroundApps() uses
+            // Thread.sleep() between apps, which must not run on the main looper.
+            // MainActivity is launched 1 s later via a nested postDelayed so the main
+            // thread stays unblocked throughout (no ANR risk on Android 14+ devices).
+            val mainHandler = Handler(Looper.getMainLooper())
+            Thread {
+                launchBackgroundApps(context)
+                mainHandler.postDelayed({
+                    val launchIntent = Intent(context, MainActivity::class.java)
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+
+                    try {
+                        context.startActivity(launchIntent)
+                        DebugLog.d("BootReceiver", "Successfully launched MainActivity")
+                    } catch (e: Exception) {
+                        DebugLog.errorProduction("BootReceiver", "Failed to launch app: ${e.message}")
+                    }
+                }, 1000)
+            }.start()
         }, 3000) // 3 second delay to ensure system is ready
     }
 
