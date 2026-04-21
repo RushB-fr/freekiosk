@@ -84,6 +84,9 @@ yarn-error.log
 logs
 *.log
 
+# Claude Code
+.claude/
+
 # FreeKiosk specific
 release-builds/
 *.apk
