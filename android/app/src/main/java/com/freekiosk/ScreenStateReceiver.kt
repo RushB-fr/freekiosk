@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.PowerManager
 import android.util.Log
 import android.view.WindowManager
+import android.view.inputmethod.InputMethodManager
 
 /**
  * BroadcastReceiver to detect screen ON/OFF events
@@ -39,6 +40,11 @@ class ScreenStateReceiver : BroadcastReceiver() {
                 Log.d(TAG, "Screen turned OFF")
                 isScreenOn = false
 
+                // Dismiss the soft keyboard so it doesn't persist after the screen wakes up.
+                // Needed when the user leaves a focused input (e.g. Force Numeric mode) and the
+                // screen times out — without this the keyboard reappears on the next screen-on.
+                dismissKeyboard(context)
+
                 // Check if auto-wake is enabled
                 val prefs = context.getSharedPreferences("FreeKioskSettings", Context.MODE_PRIVATE)
                 val autoWakeEnabled = prefs.getBoolean("auto_wake_on_screen_off", false)
@@ -47,6 +53,31 @@ class ScreenStateReceiver : BroadcastReceiver() {
                     wakeScreen(context)
                 }
             }
+        }
+    }
+
+    private fun dismissKeyboard(context: Context) {
+        try {
+            val reactApp = context.applicationContext
+            if (reactApp is com.facebook.react.ReactApplication) {
+                val reactContext = reactApp.reactNativeHost.reactInstanceManager?.currentReactContext
+                val activity = reactContext?.currentActivity
+                if (activity != null) {
+                    activity.runOnUiThread {
+                        try {
+                            val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                            val focusedView = activity.currentFocus ?: activity.window.decorView
+                            imm.hideSoftInputFromWindow(focusedView.windowToken, 0)
+                            focusedView.clearFocus()
+                            Log.d(TAG, "Soft keyboard dismissed on screen off")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to dismiss keyboard: ${e.message}")
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not dismiss keyboard on screen off: ${e.message}")
         }
     }
 
