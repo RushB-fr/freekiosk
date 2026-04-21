@@ -974,6 +974,24 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
         </SettingsSection>
       )}
       
+      {/* Background Apps - WebView mode only */}
+      {displayMode === 'webview' && (
+        <SettingsSection title="Background Apps" icon="apps">
+          <SettingsInfoBox variant="info">
+            <Text style={styles.infoText}>
+              {'📋 Optional: add apps to launch and keep running in the background while the kiosk WebView is displayed.\n\n'}
+              {'Example: keep a music or audio receiver app alive alongside your web dashboard.'}
+            </Text>
+          </SettingsInfoBox>
+          <ManagedAppsSection
+            managedApps={managedApps}
+            onManagedAppsChange={onManagedAppsChange}
+            isDeviceOwner={isDeviceOwner}
+            showHomeScreenToggle={false}
+          />
+        </SettingsSection>
+      )}
+
       {/* Back to Kiosk Button */}
       <SettingsButton
         title="Back to Kiosk"

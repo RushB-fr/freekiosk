@@ -1617,6 +1617,16 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         return;
       }
       
+      // Start keep-alive background monitor for any mode that has keepAlive apps configured
+      if (savedDisplayMode === 'webview') {
+        try {
+          await AppLauncherModule.startBackgroundMonitor();
+          console.log('[KioskScreen] Background monitor started for webview mode (will auto-stop if no keep-alive apps)');
+        } catch (e) {
+          console.warn('[KioskScreen] Failed to start background monitor:', e);
+        }
+      }
+
       if (savedDisplayMode === 'external_app') {
         // Launch managed apps with launchOnBoot=true (both single and multi mode)
         try {

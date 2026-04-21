@@ -26,12 +26,14 @@ interface ManagedAppsSectionProps {
   managedApps: ManagedApp[];
   onManagedAppsChange: (apps: ManagedApp[]) => void;
   isDeviceOwner: boolean;
+  showHomeScreenToggle?: boolean;
 }
 
 const ManagedAppsSection: React.FC<ManagedAppsSectionProps> = ({
   managedApps,
   onManagedAppsChange,
   isDeviceOwner,
+  showHomeScreenToggle = true,
 }) => {
   const [showAppPicker, setShowAppPicker] = useState(false);
   const [allApps, setAllApps] = useState<AppInfoAll[]>([]);
@@ -123,13 +125,15 @@ const ManagedAppsSection: React.FC<ManagedAppsSectionProps> = ({
 
         {/* Toggle options */}
         <View style={styles.togglesContainer}>
-          <ToggleRow
-            label="Show on Home Screen"
-            hint="Display this app on the kiosk home screen"
-            icon="monitor"
-            value={app.showOnHomeScreen}
-            onToggle={() => handleToggle(app.packageName, 'showOnHomeScreen')}
-          />
+          {showHomeScreenToggle && (
+            <ToggleRow
+              label="Show on Home Screen"
+              hint="Display this app on the kiosk home screen"
+              icon="monitor"
+              value={app.showOnHomeScreen}
+              onToggle={() => handleToggle(app.packageName, 'showOnHomeScreen')}
+            />
+          )}
           <ToggleRow
             label="Launch on Boot"
             hint="Start this app automatically when device boots"

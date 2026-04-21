@@ -97,13 +97,6 @@ class BackgroundAppMonitorService : Service() {
      * Check if keep-alive apps are running and relaunch if needed.
      */
     private fun checkAndRelaunchApps() {
-        // Safety: check if display mode is still external_app — stop if not
-        if (!isExternalAppMode()) {
-            DebugLog.d(TAG, "Display mode is no longer external_app, stopping service")
-            stopSelf()
-            return
-        }
-
         // Don't relaunch if FreeKiosk is NOT in the foreground
         // (user might be in Settings, PIN screen, or another flow)
         if (!isFreeKioskInForeground()) {
@@ -308,34 +301,6 @@ class BackgroundAppMonitorService : Service() {
         } catch (e: Exception) {
             DebugLog.d(TAG, "Could not read managed apps: ${e.message}")
             emptyList()
-        }
-    }
-
-    /**
-     * Check if the current display mode is still external_app.
-     * If the user switched to webview/media, we should stop monitoring.
-     */
-    private fun isExternalAppMode(): Boolean {
-        return try {
-            val dbPath = getDatabasePath("RKStorage").absolutePath
-            val db = SQLiteDatabase.openDatabase(dbPath, null, SQLiteDatabase.OPEN_READONLY)
-            val cursor = db.rawQuery(
-                "SELECT value FROM catalystLocalStorage WHERE key = ?",
-                arrayOf("@kiosk_display_mode")
-            )
-            val result = if (cursor.moveToFirst()) {
-                val value = cursor.getString(0) ?: "webview"
-                value == "external_app"
-            } else {
-                false
-            }
-            cursor.close()
-            db.close()
-            result
-        } catch (e: Exception) {
-            DebugLog.d(TAG, "Could not read display mode: ${e.message}")
-            // On error, stop monitoring to be safe
-            false
         }
     }
 
