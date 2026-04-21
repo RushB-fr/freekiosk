@@ -146,6 +146,10 @@ class OverlayService : Service() {
     private var nfcEnabled = false // Whether NFC is enabled (to filter NFC system package from monitoring)
     private val foregroundMonitorHandler = Handler(Looper.getMainLooper())
     private val FOREGROUND_CHECK_INTERVAL = 5000L // Check every 5 seconds (was 2s, reduced for low-end device performance)
+    // Periodic re-pin: removes and re-adds the overlay so it lands at the top of the
+    // TYPE_APPLICATION_OVERLAY stack, recovering from camera/SurfaceView Z-order issues (#121)
+    private val overlayRepinHandler = Handler(Looper.getMainLooper())
+    private val OVERLAY_REPIN_INTERVAL = 3000L
     private var cachedLauncherPackages: Set<String>? = null // Cached list of launcher packages for Home detection
     private var cachedManagedPackages: Set<String>? = null // Cached list of managed app packages (keep-alive, etc.)
     // BroadcastReceiver pour détecter quand l'écran s'allume
@@ -304,6 +308,9 @@ class OverlayService : Service() {
             if (autoRelaunchEnabled && lockedPackage != null) {
                 startForegroundMonitoring()
             }
+            if (lockedPackage != null) {
+                startOverlayRepinLoop()
+            }
             return START_STICKY
         }
 
@@ -360,6 +367,13 @@ class OverlayService : Service() {
             startForegroundMonitoring()
         } else {
             stopForegroundMonitoring()
+        }
+
+        // Re-pin loop: keep the overlay above SurfaceView-based apps (camera, etc.) (#121)
+        if (lockedPackage != null) {
+            startOverlayRepinLoop()
+        } else {
+            stopOverlayRepinLoop()
         }
         
         // Vérifier la permission overlay avant de créer des vues
@@ -444,7 +458,8 @@ class OverlayService : Service() {
             else
                 @Suppress("DEPRECATION")
                 WindowManager.LayoutParams.TYPE_SYSTEM_ALERT,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, // Clickable but not focusable
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = getButtonGravity()
@@ -514,7 +529,8 @@ class OverlayService : Service() {
                 WindowManager.LayoutParams.TYPE_SYSTEM_ALERT,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
             WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-            WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
+            WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
+            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -1092,6 +1108,43 @@ class OverlayService : Service() {
     }
 
     /**
+     * Lightweight re-pin: removes and immediately re-adds the button/tap-anywhere overlay
+     * so it lands at the top of the TYPE_APPLICATION_OVERLAY stack.
+     * Camera apps whose SurfaceView draws over the overlay (#121) will be briefly eclipsed
+     * each cycle. Does NOT touch the status bar.
+     */
+    private fun repinOverlay() {
+        try {
+            overlayView?.let { windowManager?.removeView(it) }
+            overlayView = null
+            indicatorView?.let { windowManager?.removeView(it) }
+            indicatorView = null
+            returnButton = null
+            createOverlay()
+            DebugLog.d("OverlayService", "Overlay re-pinned (SurfaceView Z-order guard)")
+        } catch (e: Exception) {
+            DebugLog.e("OverlayService", "Overlay re-pin failed: ${e.message}")
+        }
+    }
+
+    private fun startOverlayRepinLoop() {
+        stopOverlayRepinLoop()
+        overlayRepinHandler.postDelayed(object : Runnable {
+            override fun run() {
+                if (lockedPackage != null) {
+                    repinOverlay()
+                    overlayRepinHandler.postDelayed(this, OVERLAY_REPIN_INTERVAL)
+                }
+            }
+        }, OVERLAY_REPIN_INTERVAL)
+        DebugLog.d("OverlayService", "Overlay re-pin loop started (interval=${OVERLAY_REPIN_INTERVAL}ms)")
+    }
+
+    private fun stopOverlayRepinLoop() {
+        overlayRepinHandler.removeCallbacksAndMessages(null)
+    }
+
+    /**
      * Start monitoring the foreground app to detect when the locked app exits
      */
     private fun startForegroundMonitoring() {
@@ -1370,6 +1423,7 @@ class OverlayService : Service() {
             
             // Arrêter le monitoring du foreground
             stopForegroundMonitoring()
+            stopOverlayRepinLoop()
 
             // Désenregistrer le receiver
             try {
