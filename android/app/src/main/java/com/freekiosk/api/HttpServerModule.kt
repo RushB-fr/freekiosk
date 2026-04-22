@@ -22,6 +22,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.os.BatteryManager
 import android.os.Environment
@@ -534,31 +535,37 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     private fun getWifiInfo(): JSONObject {
         return try {
             val connectivityManager = reactContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            val wifiManager = reactContext.applicationContext
-                .getSystemService(Context.WIFI_SERVICE) as WifiManager
-            val wifiInfo = wifiManager.connectionInfo
 
-            // Use ConnectivityManager for reliable WiFi connected check
+            val network = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) connectivityManager.activeNetwork else null
+            val capabilities = if (network != null) connectivityManager.getNetworkCapabilities(network) else null
+
             val isConnected = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                val network = connectivityManager.activeNetwork
-                val capabilities = connectivityManager.getNetworkCapabilities(network)
                 capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
             } else {
                 @Suppress("DEPRECATION")
-                val networkInfo = connectivityManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI)
-                networkInfo?.isConnected == true
+                connectivityManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI)?.isConnected == true
             }
 
-            val ssid = getSsidSafe(wifiInfo.ssid)
-            val signalLevel = WifiManager.calculateSignalLevel(wifiInfo.rssi, 100)
+            // API 31+: use transportInfo from NetworkCapabilities — connectionInfo returns <unknown ssid> on Android 12+
+            val wifiInfoObj: WifiInfo? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && capabilities != null) {
+                capabilities.transportInfo as? WifiInfo
+            } else {
+                val wifiManager = reactContext.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+                @Suppress("DEPRECATION")
+                wifiManager.connectionInfo
+            }
+
+            val ssid = getSsidSafe(wifiInfoObj?.ssid)
+            val rssi = wifiInfoObj?.rssi ?: -100
+            val signalLevel = WifiManager.calculateSignalLevel(rssi, 100)
 
             JSONObject().apply {
                 put("ssid", ssid)
-                put("signalStrength", wifiInfo.rssi)
+                put("signalStrength", rssi)
                 put("signalLevel", signalLevel)
                 put("connected", isConnected)
-                put("linkSpeed", wifiInfo.linkSpeed)
-                put("frequency", wifiInfo.frequency)
+                put("linkSpeed", wifiInfoObj?.linkSpeed ?: 0)
+                put("frequency", wifiInfoObj?.frequency ?: 0)
                 put("ipAddress", getLocalIpAddress())
             }
         } catch (e: Exception) {
