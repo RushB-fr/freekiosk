@@ -88,6 +88,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [screensaverEnabled, setScreensaverEnabled] = useState<boolean>(false);
   const [inactivityDelay, setInactivityDelay] = useState<string>('10');
   const [motionEnabled, setMotionEnabled] = useState<boolean>(false);
+  const [motionSensitivity, setMotionSensitivity] = useState<'low' | 'medium' | 'high'>('medium');
   const [motionCameraPosition, setMotionCameraPosition] = useState<'front' | 'back'>('front');
   const [availableCameras, setAvailableCameras] = useState<Array<{position: 'front' | 'back', id: string}>>([]);
   const [screensaverBrightness, setScreensaverBrightness] = useState<number>(0);
@@ -409,6 +410,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedDefaultBrightness = await StorageService.getDefaultBrightness();
     const savedInactivityDelay = await StorageService.getScreensaverInactivityDelay();
     const savedMotionEnabled = await StorageService.getScreensaverMotionEnabled();
+    const savedMotionSensitivity = await StorageService.getScreensaverMotionSensitivity();
     const savedMotionCameraPosition = await StorageService.getMotionCameraPosition();
     const savedScreensaverBrightness = await StorageService.getScreensaverBrightness();
     const hasPinConfigured = await hasSecurePin();
@@ -432,6 +434,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setScreensaverEnabled(savedScreensaverEnabled ?? false);
     setDefaultBrightness(savedDefaultBrightness ?? 0.5);
     setMotionEnabled(savedMotionEnabled ?? false);
+    setMotionSensitivity((savedMotionSensitivity as 'low' | 'medium' | 'high') ?? 'medium');
     setMotionCameraPosition(savedMotionCameraPosition ?? 'front');
     setScreensaverBrightness(savedScreensaverBrightness ?? 0);
 
@@ -1152,6 +1155,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       await StorageService.saveScreensaverInactivityEnabled(true);
       await StorageService.saveScreensaverInactivityDelay(inactivityDelayNumber * 60000);
       await StorageService.saveScreensaverMotionEnabled(motionEnabled);
+      await StorageService.saveScreensaverMotionSensitivity(motionSensitivity);
       await StorageService.saveScreensaverBrightness(screensaverBrightness);
       
       // Auto-brightness settings
@@ -1726,6 +1730,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             onInactivityDelayChange={setInactivityDelay}
             motionEnabled={motionEnabled}
             onMotionEnabledChange={toggleMotionDetection}
+            motionSensitivity={motionSensitivity}
+            onMotionSensitivityChange={setMotionSensitivity}
             motionCameraPosition={motionCameraPosition}
             onMotionCameraPositionChange={handleMotionCameraPositionChange}
             availableCameras={availableCameras}

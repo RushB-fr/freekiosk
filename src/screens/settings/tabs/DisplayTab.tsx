@@ -85,6 +85,8 @@ interface DisplayTabProps {
   // Motion detection
   motionEnabled: boolean;
   onMotionEnabledChange: (value: boolean) => void;
+  motionSensitivity: 'low' | 'medium' | 'high';
+  onMotionSensitivityChange: (value: 'low' | 'medium' | 'high') => void;
   motionCameraPosition: 'front' | 'back';
   onMotionCameraPositionChange: (value: 'front' | 'back') => void;
   availableCameras: Array<{position: 'front' | 'back', id: string}>;
@@ -156,6 +158,8 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
   onInactivityDelayChange,
   motionEnabled,
   onMotionEnabledChange,
+  motionSensitivity,
+  onMotionSensitivityChange,
   motionCameraPosition,
   onMotionCameraPositionChange,
   availableCameras,
@@ -175,6 +179,12 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
   const handleCameraPositionChange = (value: string) => {
     if (value === 'front' || value === 'back') {
       onMotionCameraPositionChange(value);
+    }
+  };
+
+  const handleMotionSensitivityChange = (value: string) => {
+    if (value === 'low' || value === 'medium' || value === 'high') {
+      onMotionSensitivityChange(value);
     }
   };
 
@@ -413,6 +423,18 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                 
                 {motionEnabled && (
                   <>
+                    <SettingsRadioGroup
+                      label="Sensitivity"
+                      hint="Higher sensitivity triggers on smaller movements"
+                      options={[
+                        { label: 'Low', value: 'low' },
+                        { label: 'Medium', value: 'medium' },
+                        { label: 'High', value: 'high' },
+                      ]}
+                      value={motionSensitivity}
+                      onValueChange={handleMotionSensitivityChange}
+                    />
+
                     {availableCameras.length === 0 && (
                       <SettingsInfoBox variant="error">
                         <Text style={styles.infoText}>

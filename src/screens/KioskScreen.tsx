@@ -50,6 +50,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [motionEnabled, setMotionEnabled] = useState(false);
   const [motionAlwaysOn, setMotionAlwaysOn] = useState(false);
   const [motionCameraPosition, setMotionCameraPosition] = useState<'front' | 'back'>('front');
+  const [motionSensitivity, setMotionSensitivity] = useState<'low' | 'medium' | 'high'>('medium');
   const [isPreCheckingMotion, setIsPreCheckingMotion] = useState(false); // Pré-vérification avant activation screensaver
   const preCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [statusBarEnabled, setStatusBarEnabled] = useState(false);
@@ -1298,6 +1299,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       const savedMotionEnabled = bool(K.SCREENSAVER_MOTION_ENABLED, false);
       const savedMotionAlwaysOn = bool(K.MQTT_MOTION_ALWAYS_ON, false);
       const savedMotionCameraPosition = (str(K.MOTION_CAMERA_POSITION) ?? 'front') as 'front' | 'back';
+      const savedMotionSensitivity = (str(K.SCREENSAVER_MOTION_SENSITIVITY) ?? 'medium') as 'low' | 'medium' | 'high';
       const savedStatusBarEnabled = bool(K.STATUS_BAR_ENABLED, false);
       const savedStatusBarOnOverlay = bool(K.STATUS_BAR_ON_OVERLAY, true);
       const savedStatusBarOnReturn = bool(K.STATUS_BAR_ON_RETURN, true);
@@ -1324,6 +1326,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       setMotionEnabled(savedMotionEnabled);
       setMotionAlwaysOn(savedMotionAlwaysOn);
       setMotionCameraPosition(savedMotionCameraPosition);
+      setMotionSensitivity(savedMotionSensitivity);
       setStatusBarEnabled(savedStatusBarEnabled);
       setStatusBarOnOverlay(savedStatusBarOnOverlay);
       setStatusBarOnReturn(savedStatusBarOnReturn);
@@ -2362,7 +2365,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       <MotionDetector
         enabled={isFocused && (motionAlwaysOn || (motionEnabled && (isPreCheckingMotion || isScreensaverActive)))}
         onMotionDetected={onMotionDetected}
-        sensitivity="medium"
+        sensitivity={motionSensitivity}
         cameraPosition={motionCameraPosition}
       />
 
