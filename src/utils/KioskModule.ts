@@ -35,6 +35,8 @@ interface KioskModuleInterface {
   clearPendingAdbConfig(): Promise<boolean>;
   // Open native Android settings
   openAndroidSettings(settingsPage?: string | null): Promise<boolean>;
+  // Bring FreeKiosk's activity to foreground (used when screensaver activates in External App mode)
+  bringToFront(): Promise<boolean>;
 }
 
 const { KioskModule } = NativeModules;

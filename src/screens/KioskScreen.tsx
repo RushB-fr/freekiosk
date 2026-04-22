@@ -223,6 +223,12 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           console.log('[KioskScreen] AppState: skipping relaunch (navigateToPin in progress)');
           return;
         }
+
+        // Screensaver brought FreeKiosk to foreground — don't relaunch the external app yet
+        if (isScreensaverActiveRef.current) {
+          console.log('[KioskScreen] AppState: skipping relaunch (screensaver active)');
+          return;
+        }
         
         try {
           // CRITICAL: Read current mode from storage to avoid stale closure values
@@ -933,17 +939,22 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     }
   }, [isScreensaverActive, screensaverBrightness, screensaverType]);
 
-  // External App mode: drive dim via native OverlayService overlay (visible above external app)
+  // External App mode: bring FreeKiosk to foreground when screensaver activates so the full
+  // screensaver (dim/URL/video) renders normally in React Native. On dismiss, re-launch the app.
+  const wasExternalAppScreensaverRef = useRef(false);
   useEffect(() => {
     if (displayMode !== 'external_app') return;
     if (!screensaverEnabled) return;
     if (isScreensaverActive) {
-      const dimAlpha = Math.max(0, Math.min(1, 1 - screensaverBrightness));
-      OverlayServiceModule.setScreensaverDim(true, dimAlpha).catch(() => {});
-    } else {
-      OverlayServiceModule.setScreensaverDim(false, 0).catch(() => {});
+      wasExternalAppScreensaverRef.current = true;
+      KioskModule.bringToFront().catch(() => {});
+    } else if (wasExternalAppScreensaverRef.current) {
+      wasExternalAppScreensaverRef.current = false;
+      if (externalAppPackage) {
+        launchExternalApp(externalAppPackage);
+      }
     }
-  }, [isScreensaverActive, screensaverEnabled, displayMode, screensaverBrightness]);
+  }, [isScreensaverActive, screensaverEnabled, displayMode, externalAppPackage]);
 
   useEffect(() => {
     if (screensaverEnabled && inactivityEnabled) {
@@ -1294,15 +1305,6 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       }
     );
 
-    // Wake screensaver when user taps in External App mode (event from OverlayService)
-    const screensaverWakeListener = eventEmitter.addListener(
-      'screensaverWake',
-      () => {
-        setIsScreensaverActive(false);
-        resetTimer();
-      }
-    );
-
     // Reset inactivity timer when user taps on external app (event from OverlayService tap handler)
     const screensaverActivityListener = eventEmitter.addListener(
       'screensaverActivity',
@@ -1316,7 +1318,6 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     return () => {
       appReturnedListener.remove();
       navigateToPinListener.remove();
-      screensaverWakeListener.remove();
       screensaverActivityListener.remove();
       if (relaunchTimerRef.current) {
         clearTimeout(relaunchTimerRef.current);

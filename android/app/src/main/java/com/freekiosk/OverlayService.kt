@@ -108,32 +108,10 @@ class OverlayService : Service() {
             }
         }
 
-        // Screensaver dim overlay (External App mode — drawn above external app via WindowManager)
-        @Volatile
-        var screensaverDimActive = false
-        @Volatile
-        private var lastDimAlpha = 0.0f
-
-        fun showScreensaverDim(dimAlpha: Float) {
-            screensaverDimActive = true
-            lastDimAlpha = dimAlpha
-            instance?.let { service ->
-                Handler(Looper.getMainLooper()).post { service.createDimView(dimAlpha) }
-            }
-        }
-
-        fun hideScreensaverDim() {
-            screensaverDimActive = false
-            lastDimAlpha = 0.0f
-            instance?.let { service ->
-                Handler(Looper.getMainLooper()).post { service.removeDimView() }
-            }
-        }
     }
 
     private var windowManager: WindowManager? = null
     private var overlayView: View? = null
-    private var dimView: View? = null
     private var indicatorView: View? = null  // Visual indicator in tap_anywhere mode
     private var returnButton: View? = null  // Changed from Button to View (now a FrameLayout)
     private var statusBarView: View? = null
@@ -532,10 +510,8 @@ class OverlayService : Service() {
             
             // Ce listener reçoit TOUS les taps de l'écran grâce à FLAG_WATCH_OUTSIDE_TOUCH
             setOnTouchListener { _, event ->
-                // Skip when screensaver dim is active — dim view handles the tap directly
-                if (!screensaverDimActive &&
-                    (event.action == android.view.MotionEvent.ACTION_OUTSIDE ||
-                     event.action == android.view.MotionEvent.ACTION_DOWN)) {
+                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE ||
+                    event.action == android.view.MotionEvent.ACTION_DOWN) {
                     handleTap()
                 }
                 false // Ne jamais bloquer
@@ -1000,61 +976,7 @@ class OverlayService : Service() {
         DebugLog.d("OverlayService", "Status updates stopped")
     }
 
-    private fun createDimView(dimAlpha: Float) {
-        removeDimView()
-        val view = View(this).apply {
-            setBackgroundColor(Color.BLACK)
-            alpha = dimAlpha.coerceIn(0.0f, 1.0f)
-            setOnTouchListener { _, event ->
-                if (event.action == android.view.MotionEvent.ACTION_DOWN) {
-                    handleTap()
-                }
-                true // consume touches so external app doesn't receive them
-            }
-        }
-        val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        else
-            @Suppress("DEPRECATION")
-            WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            layoutType,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON, // keeps screen on even when external app is in foreground
-            PixelFormat.TRANSLUCENT
-        )
-        try {
-            dimView = view
-            windowManager?.addView(view, params)
-            DebugLog.d("OverlayService", "Screensaver dim overlay created (alpha=$dimAlpha)")
-        } catch (e: Exception) {
-            DebugLog.errorProduction("OverlayService", "Failed to create dim overlay: ${e.message}")
-            dimView = null
-        }
-    }
-
-    private fun removeDimView() {
-        dimView?.let {
-            try { windowManager?.removeView(it) } catch (e: Exception) {}
-        }
-        dimView = null
-        DebugLog.d("OverlayService", "Screensaver dim overlay removed")
-    }
-
     private fun handleTap() {
-        // Screensaver dim active: first tap wakes it (don't count toward return-to-settings)
-        if (screensaverDimActive) {
-            screensaverDimActive = false
-            tapCount = 0
-            tapHandler.removeCallbacksAndMessages(null)
-            removeDimView()
-            try { KioskModule.sendEventFromNative("screensaverWake", null) } catch (e: Exception) {}
-            DebugLog.d("OverlayService", "Screensaver woken by tap")
-            return
-        }
         // Notify FreeKiosk of user activity so the inactivity timer resets in External App mode
         try { KioskModule.sendEventFromNative("screensaverActivity", null) } catch (e: Exception) {}
 
@@ -1568,17 +1490,6 @@ class OverlayService : Service() {
         try {
             DebugLog.d("OverlayService", "destroyOverlay() - statusBarView=${statusBarView != null}, overlayView=${overlayView != null}, indicatorView=${indicatorView != null}")
             
-            // Supprimer le dim overlay screensaver
-            dimView?.let {
-                try {
-                    windowManager?.removeView(it)
-                    DebugLog.d("OverlayService", "Dim overlay removed (destroyOverlay)")
-                } catch (e: Exception) {
-                    DebugLog.d("OverlayService", "Dim overlay already removed: ${e.message}")
-                }
-            }
-            dimView = null
-
             // Supprimer la status bar
             statusBarView?.let {
                 try {
@@ -1652,10 +1563,6 @@ class OverlayService : Service() {
             if (statusBarEnabled) {
                 createStatusBar()
                 startStatusUpdates()
-            }
-            // Recreate dim overlay if screensaver was active
-            if (screensaverDimActive) {
-                createDimView(lastDimAlpha)
             }
         } catch (e: Exception) {
             DebugLog.e("OverlayService", "Error recreating overlay on config change: ${e.message}")

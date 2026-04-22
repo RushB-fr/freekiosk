@@ -158,22 +158,6 @@ class OverlayServiceModule(reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
-    fun setScreensaverDim(active: Boolean, dimAlpha: Double, promise: Promise) {
-        try {
-            if (active) {
-                OverlayService.showScreensaverDim(dimAlpha.toFloat().coerceIn(0.0f, 1.0f))
-            } else {
-                OverlayService.hideScreensaverDim()
-            }
-            DebugLog.d("OverlayServiceModule", "setScreensaverDim active=$active alpha=$dimAlpha")
-            promise.resolve(true)
-        } catch (e: Exception) {
-            DebugLog.errorProduction("OverlayServiceModule", "Error setScreensaverDim: ${e.message}")
-            promise.reject("ERROR", "Failed to set screensaver dim: ${e.message}")
-        }
-    }
-
-    @ReactMethod
     fun setStatusBarItems(showBattery: Boolean, showWifi: Boolean, showBluetooth: Boolean, showVolume: Boolean, showTime: Boolean, promise: Promise) {
         try {
             // Sauvegarder dans SharedPreferences
