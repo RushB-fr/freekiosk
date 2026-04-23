@@ -714,16 +714,14 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
             setPageLoaded(false);
           }
 
-          // Clear any existing timeout
-          if (loadingTimeoutRef.current) {
-            clearTimeout(loadingTimeoutRef.current);
-          }
-
           // Fire OS/Fire Tablet workaround: Force hide loading spinner after 10s
-          // This handles cases where onLoadEnd doesn't fire on SPAs or redirects
-          if (!error) {
+          // This handles cases where onLoadEnd doesn't fire on SPAs or redirects.
+          // Only start the timer once — don't reset it on intermediate redirect/frame
+          // events, otherwise a redirect chain can keep resetting the countdown forever.
+          if (!error && !loadingTimeoutRef.current) {
             loadingTimeoutRef.current = setTimeout(() => {
               setLoading(false);
+              loadingTimeoutRef.current = null;
             }, 10000);
           }
         }}
