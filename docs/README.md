@@ -28,6 +28,16 @@ FreeKiosk is a **free, open-source kiosk platform** for Android tablets. It's de
 - Hotel/restaurant tablets
 - Industrial control panels
 
+| Reference | Scope | Link |
+|---|---|---|
+| ADB Configuration | Headless provisioning and scripts | [Open](adb-configuration.md) |
+| REST API | Endpoints and payloads | [Open](rest-api.md) |
+| MQTT | Topics, discovery, commands | [Open](MQTT.md) |
+| Production CI/CD | Nightly build and release promotion setup | [Open](production-pipeline-readme.md) |
+| Roadmap and Changelog | Release highlights and direction | [Open](roadmap-and-changelog.md) |
+| Development | Local setup and build flow | [Open](development.md) |
+| Pipeline and Wiki Sync | Docs publication workflow | [Open](pipeline-and-wiki-sync.md) |
+
 ### Why Choose FreeKiosk?
 
 - **100% Free** - No per-device costs, no subscriptions, MIT licensed
