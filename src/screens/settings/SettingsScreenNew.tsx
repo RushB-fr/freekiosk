@@ -49,7 +49,7 @@ import { ManagedApp } from '../../types/managedApps';
 import { MediaItem, MediaFitMode, generateMediaItemId, detectMediaType } from '../../types/mediaPlayer';
 import FilePickerModule from '../../utils/FilePickerModule';
 
-const { KioskModule } = NativeModules;
+const { KioskModule, RotationControlModule } = NativeModules;
 
 type SettingsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Settings'>;
 
@@ -194,7 +194,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [lockscreenAudioEnabled, setLockscreenAudioEnabled] = useState<boolean>(false);
   const [lockscreenFlashlightEnabled, setLockscreenFlashlightEnabled] = useState<boolean>(false);
   const [lockscreenBrightnessEnabled, setLockscreenBrightnessEnabled] = useState<boolean>(false);
-  
+  const [lockscreenRotationLockEnabled, setLockscreenRotationLockEnabled] = useState<boolean>(false);
+  const [lockscreenRotationLockAvailable, setLockscreenRotationLockAvailable] = useState<boolean>(false);
+
   // PDF Viewer state
   const [pdfViewerEnabled, setPdfViewerEnabled] = useState<boolean>(false);
   
@@ -616,13 +618,22 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedLockscreenAudio = await StorageService.getLockscreenAudioEnabled();
     const savedLockscreenFlashlight = await StorageService.getLockscreenFlashlightEnabled();
     const savedLockscreenBrightness = await StorageService.getLockscreenBrightnessEnabled();
+    const savedLockscreenRotationLock = await StorageService.getLockscreenRotationLockEnabled();
+    let rotationLockAvailable = false;
+    try {
+      rotationLockAvailable = Boolean(await RotationControlModule?.isAvailable?.());
+    } catch (error) {
+      rotationLockAvailable = false;
+    }
     setLockscreenControlsEnabled(savedLockscreenControls);
+    setLockscreenRotationLockAvailable(rotationLockAvailable);
     setLockscreenWifiEnabled(savedLockscreenWifi);
     setLockscreenBluetoothEnabled(savedLockscreenBt);
     setLockscreenEmergencyCallEnabled(savedLockscreenEmergency);
     setLockscreenAudioEnabled(savedLockscreenAudio);
     setLockscreenFlashlightEnabled(savedLockscreenFlashlight);
     setLockscreenBrightnessEnabled(savedLockscreenBrightness);
+    setLockscreenRotationLockEnabled(rotationLockAvailable && savedLockscreenRotationLock);
 
     // PDF Viewer setting
     const savedPdfViewerEnabled = await StorageService.getPdfViewerEnabled();
@@ -905,6 +916,16 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       setLockscreenFlashlightEnabled(true);
       setLockscreenBrightnessEnabled(true);
     }
+  };
+
+  const handleLockscreenRotationLockEnabledChange = (enabled: boolean) => {
+    if (enabled && !lockscreenRotationLockAvailable) {
+      Alert.alert('Rotation lock unavailable', 'This device does not expose the system rotation controls needed for the lock screen rotation toggle.');
+      setLockscreenRotationLockEnabled(false);
+      return;
+    }
+
+    setLockscreenRotationLockEnabled(enabled);
   };
 
   // Handle auto-brightness toggle with save/restore of manual brightness
@@ -1358,6 +1379,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.saveLockscreenAudioEnabled(lockscreenAudioEnabled);
     await StorageService.saveLockscreenFlashlightEnabled(lockscreenFlashlightEnabled);
     await StorageService.saveLockscreenBrightnessEnabled(lockscreenBrightnessEnabled);
+    await StorageService.saveLockscreenRotationLockEnabled(lockscreenRotationLockAvailable && lockscreenRotationLockEnabled);
 
     // Save PDF Viewer setting
     await StorageService.savePdfViewerEnabled(pdfViewerEnabled);
@@ -1942,6 +1964,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             onLockscreenFlashlightEnabledChange={setLockscreenFlashlightEnabled}
             lockscreenBrightnessEnabled={lockscreenBrightnessEnabled}
             onLockscreenBrightnessEnabledChange={setLockscreenBrightnessEnabled}
+            lockscreenRotationLockEnabled={lockscreenRotationLockEnabled}
+            onLockscreenRotationLockEnabledChange={handleLockscreenRotationLockEnabledChange}
+            lockscreenRotationLockAvailable={lockscreenRotationLockAvailable}
           />
         );
       

@@ -7,7 +7,7 @@ import BluetoothDialog from './BluetoothDialog';
 import AudioOutputDialog from './AudioOutputDialog';
 import BrightnessDialog from './BrightnessDialog';
 
-const { KioskModule, AudioControlModule, FlashlightModule } = NativeModules;
+const { KioskModule, AudioControlModule, FlashlightModule, RotationControlModule } = NativeModules;
 
 interface PinInputProps {
   onSuccess: () => void;
@@ -29,6 +29,7 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
   const [showEmergencyButton, setShowEmergencyButton] = useState(false);
   const [showFlashlightButton, setShowFlashlightButton] = useState(false);
   const [showBrightnessButton, setShowBrightnessButton] = useState(false);
+  const [showRotationLockButton, setShowRotationLockButton] = useState(false);
   const [wifiDialogVisible, setWifiDialogVisible] = useState(false);
   const [bluetoothDialogVisible, setBluetoothDialogVisible] = useState(false);
   const [audioDialogVisible, setAudioDialogVisible] = useState(false);
@@ -36,6 +37,9 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
   const [flashlightAvailable, setFlashlightAvailable] = useState(false);
   const [flashlightOn, setFlashlightOn] = useState(false);
   const [flashlightBusy, setFlashlightBusy] = useState(false);
+  const [rotationLockAvailable, setRotationLockAvailable] = useState(false);
+  const [rotationLocked, setRotationLocked] = useState(false);
+  const [rotationBusy, setRotationBusy] = useState(false);
 
   useEffect(() => {
     checkLockoutStatus();
@@ -49,7 +53,7 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
   }, []);
 
   const loadLockscreenSettings = async (): Promise<void> => {
-    const [controlsEnabled, wifi, bluetooth, audio, emergency, flashlight, brightness] = await Promise.all([
+    const [controlsEnabled, wifi, bluetooth, audio, emergency, flashlight, brightness, rotationLock] = await Promise.all([
       StorageService.getLockscreenControlsEnabled(),
       StorageService.getLockscreenWifiEnabled(),
       StorageService.getLockscreenBluetoothEnabled(),
@@ -57,6 +61,7 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
       StorageService.getLockscreenEmergencyCallEnabled(),
       StorageService.getLockscreenFlashlightEnabled(),
       StorageService.getLockscreenBrightnessEnabled(),
+      StorageService.getLockscreenRotationLockEnabled(),
     ]);
 
     setShowWifiButton(controlsEnabled && wifi);
@@ -65,6 +70,7 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
     setShowEmergencyButton(controlsEnabled && emergency);
     setShowFlashlightButton(controlsEnabled && flashlight);
     setShowBrightnessButton(controlsEnabled && brightness);
+    setShowRotationLockButton(controlsEnabled && rotationLock);
 
     if (controlsEnabled && flashlight && FlashlightModule?.isAvailable) {
       try {
@@ -77,6 +83,20 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
       } catch (e) {
         console.warn('[PinInput] flashlight availability error:', e);
         setFlashlightAvailable(false);
+      }
+    }
+
+    if (controlsEnabled && rotationLock && RotationControlModule?.isAvailable) {
+      try {
+        const available = await RotationControlModule.isAvailable();
+        setRotationLockAvailable(Boolean(available));
+        if (available && RotationControlModule?.getState) {
+          const state = await RotationControlModule.getState();
+          setRotationLocked(Boolean(state?.locked));
+        }
+      } catch (e) {
+        console.warn('[PinInput] rotation availability error:', e);
+        setRotationLockAvailable(false);
       }
     }
   };
@@ -201,6 +221,31 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
     }
   };
 
+  const handleRotationLockPress = async (): Promise<void> => {
+    if (rotationBusy) {
+      return;
+    }
+
+    if (!rotationLockAvailable || !RotationControlModule?.setLocked) {
+      Alert.alert('Rotation lock', 'Rotation lock is not available on this device right now.');
+      return;
+    }
+
+    const next = !rotationLocked;
+    setRotationBusy(true);
+    setRotationLocked(next);
+    try {
+      const state = await RotationControlModule.setLocked(next);
+      setRotationLocked(Boolean(state?.locked));
+    } catch (e) {
+      console.warn('[PinInput] rotation toggle error:', e);
+      setRotationLocked(!next);
+      Alert.alert('Rotation lock', 'Unable to change rotation lock state.');
+    } finally {
+      setRotationBusy(false);
+    }
+  };
+
   const formatTime = (milliseconds: number): string => {
     const minutes = Math.floor(milliseconds / 60000);
     const seconds = Math.floor((milliseconds % 60000) / 1000);
@@ -213,7 +258,8 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
     showAudioControls ||
     showEmergencyButton ||
     (showFlashlightButton && flashlightAvailable) ||
-    showBrightnessButton;
+    showBrightnessButton ||
+    showRotationLockButton;
 
   return (
     <View style={styles.container}>
@@ -316,6 +362,17 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
             <TouchableOpacity style={styles.quickBtn} onPress={() => setBrightnessDialogVisible(true)}>
               <Text style={styles.quickBtnIcon}>☀️</Text>
               <Text style={styles.quickBtnLabel}>Brightness</Text>
+            </TouchableOpacity>
+          )}
+
+          {showRotationLockButton && (
+            <TouchableOpacity
+              style={[styles.quickBtn, rotationLocked && styles.quickBtnActive]}
+              onPress={handleRotationLockPress}
+              disabled={rotationBusy}
+            >
+              <Text style={styles.quickBtnIcon}>{rotationLocked ? '🔒' : '🔓'}</Text>
+              <Text style={styles.quickBtnLabel}>Rotate</Text>
             </TouchableOpacity>
           )}
 

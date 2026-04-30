@@ -161,6 +161,7 @@ const KEYS = {
   LOCKSCREEN_AUDIO_ENABLED: '@kiosk_lockscreen_audio_enabled',
   LOCKSCREEN_FLASHLIGHT_ENABLED: '@kiosk_lockscreen_flashlight_enabled',
   LOCKSCREEN_BRIGHTNESS_ENABLED: '@kiosk_lockscreen_brightness_enabled',
+  LOCKSCREEN_ROTATION_LOCK_ENABLED: '@kiosk_lockscreen_rotation_lock_enabled',
   // HTTP Basic Auth
   HTTP_BASIC_AUTH_USERNAME: '@kiosk_http_basic_auth_username',
 };
@@ -396,6 +397,7 @@ export const StorageService = {
         KEYS.LOCKSCREEN_AUDIO_ENABLED,
         KEYS.LOCKSCREEN_FLASHLIGHT_ENABLED,
         KEYS.LOCKSCREEN_BRIGHTNESS_ENABLED,
+        KEYS.LOCKSCREEN_ROTATION_LOCK_ENABLED,
         // HTTP Basic Auth
         KEYS.HTTP_BASIC_AUTH_USERNAME,
         // Managed Apps
@@ -1477,6 +1479,44 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting return button position:', error);
       return 'bottom-right';
+    }
+  },
+
+  saveReturnButtonXPercent: async (value: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.RETURN_BUTTON_X_PERCENT, String(value));
+    } catch (error) {
+      console.error('Error saving return button X percent:', error);
+    }
+  },
+
+  getReturnButtonXPercent: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.RETURN_BUTTON_X_PERCENT);
+      const parsed = value ? parseFloat(value) : 92;
+      return isNaN(parsed) ? 92 : Math.max(0, Math.min(100, parsed));
+    } catch (error) {
+      console.error('Error getting return button X percent:', error);
+      return 92;
+    }
+  },
+
+  saveReturnButtonYPercent: async (value: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.RETURN_BUTTON_Y_PERCENT, String(value));
+    } catch (error) {
+      console.error('Error saving return button Y percent:', error);
+    }
+  },
+
+  getReturnButtonYPercent: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.RETURN_BUTTON_Y_PERCENT);
+      const parsed = value ? parseFloat(value) : 92;
+      return isNaN(parsed) ? 92 : Math.max(0, Math.min(100, parsed));
+    } catch (error) {
+      console.error('Error getting return button Y percent:', error);
+      return 92;
     }
   },
 
@@ -2624,6 +2664,7 @@ export const StorageService = {
         KEYS.LOCKSCREEN_AUDIO_ENABLED,
         KEYS.LOCKSCREEN_FLASHLIGHT_ENABLED,
         KEYS.LOCKSCREEN_BRIGHTNESS_ENABLED,
+        KEYS.LOCKSCREEN_ROTATION_LOCK_ENABLED,
       ]);
       return legacyValues.some(([, stored]) => stored ? JSON.parse(stored) : false);
     } catch (error) {
@@ -2736,6 +2777,24 @@ export const StorageService = {
       return value ? JSON.parse(value) : false;
     } catch (error) {
       console.error('Error getting lockscreen brightness enabled:', error);
+      return false;
+    }
+  },
+
+  saveLockscreenRotationLockEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.LOCKSCREEN_ROTATION_LOCK_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving lockscreen rotation lock enabled:', error);
+    }
+  },
+
+  getLockscreenRotationLockEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.LOCKSCREEN_ROTATION_LOCK_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting lockscreen rotation lock enabled:', error);
       return false;
     }
   },
