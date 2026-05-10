@@ -154,6 +154,7 @@ const KEYS = {
   DASHBOARD_MODE_ENABLED: '@kiosk_dashboard_mode_enabled',
   DASHBOARD_TILES: '@kiosk_dashboard_tiles',
   // Lock Screen Controls
+  LOCKSCREEN_CONTROLS_ENABLED: '@kiosk_lockscreen_controls_enabled',
   LOCKSCREEN_WIFI_ENABLED: '@kiosk_lockscreen_wifi_enabled',
   LOCKSCREEN_BLUETOOTH_ENABLED: '@kiosk_lockscreen_bluetooth_enabled',
   LOCKSCREEN_EMERGENCY_CALL_ENABLED: '@kiosk_lockscreen_emergency_call_enabled',
@@ -387,6 +388,14 @@ export const StorageService = {
         // Dashboard
         KEYS.DASHBOARD_MODE_ENABLED,
         KEYS.DASHBOARD_TILES,
+        // Lock Screen Controls
+        KEYS.LOCKSCREEN_CONTROLS_ENABLED,
+        KEYS.LOCKSCREEN_WIFI_ENABLED,
+        KEYS.LOCKSCREEN_BLUETOOTH_ENABLED,
+        KEYS.LOCKSCREEN_EMERGENCY_CALL_ENABLED,
+        KEYS.LOCKSCREEN_AUDIO_ENABLED,
+        KEYS.LOCKSCREEN_FLASHLIGHT_ENABLED,
+        KEYS.LOCKSCREEN_BRIGHTNESS_ENABLED,
         // HTTP Basic Auth
         KEYS.HTTP_BASIC_AUTH_USERNAME,
         // Managed Apps
@@ -2592,6 +2601,36 @@ export const StorageService = {
   KEYS,
 
   // ============ LOCK SCREEN CONTROLS ============
+
+  saveLockscreenControlsEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.LOCKSCREEN_CONTROLS_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving lockscreen controls enabled:', error);
+    }
+  },
+
+  getLockscreenControlsEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.LOCKSCREEN_CONTROLS_ENABLED);
+      if (value !== null) {
+        return JSON.parse(value);
+      }
+
+      const legacyValues = await AsyncStorage.multiGet([
+        KEYS.LOCKSCREEN_WIFI_ENABLED,
+        KEYS.LOCKSCREEN_BLUETOOTH_ENABLED,
+        KEYS.LOCKSCREEN_EMERGENCY_CALL_ENABLED,
+        KEYS.LOCKSCREEN_AUDIO_ENABLED,
+        KEYS.LOCKSCREEN_FLASHLIGHT_ENABLED,
+        KEYS.LOCKSCREEN_BRIGHTNESS_ENABLED,
+      ]);
+      return legacyValues.some(([, stored]) => stored ? JSON.parse(stored) : false);
+    } catch (error) {
+      console.error('Error getting lockscreen controls enabled:', error);
+      return false;
+    }
+  },
 
   saveLockscreenWifiEnabled: async (value: boolean): Promise<void> => {
     try {

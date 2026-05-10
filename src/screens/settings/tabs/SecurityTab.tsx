@@ -76,6 +76,8 @@ interface SecurityTabProps {
   onUrlFilterShowFeedbackChange: (value: boolean) => void;
 
   // Lock Screen Controls
+  lockscreenControlsEnabled: boolean;
+  onLockscreenControlsEnabledChange: (value: boolean) => void;
   lockscreenWifiEnabled: boolean;
   onLockscreenWifiEnabledChange: (value: boolean) => void;
   lockscreenBluetoothEnabled: boolean;
@@ -131,6 +133,8 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
   onUrlFilterListChange,
   urlFilterShowFeedback,
   onUrlFilterShowFeedbackChange,
+  lockscreenControlsEnabled,
+  onLockscreenControlsEnabledChange,
   lockscreenWifiEnabled,
   onLockscreenWifiEnabledChange,
   lockscreenBluetoothEnabled,
@@ -520,54 +524,64 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
       )}
       
       {/* Lock Screen Controls */}
-      <SettingsSection title="Lock Screen Controls" icon="cellphone-lock">
-        <SettingsInfoBox variant="info">
-          <Text style={styles.infoText}>
-            ℹ️ These controls appear on the PIN entry screen without giving access to Settings or other apps.
-          </Text>
-        </SettingsInfoBox>
-        <View style={styles.divider} />
+      <SettingsSection title="Lock Screen Controls" icon="lock">
         <SettingsSwitch
-          label="📶 WiFi control on lock screen"
-          hint="Show a WiFi button on the PIN entry screen. Users can turn WiFi on/off and connect to networks without unlocking."
-          value={lockscreenWifiEnabled}
-          onValueChange={onLockscreenWifiEnabledChange}
+          label="Enable Lock Screen Controls"
+          hint="Show selected quick controls on the PIN entry screen without giving access to Settings or other apps."
+          value={lockscreenControlsEnabled}
+          onValueChange={onLockscreenControlsEnabledChange}
         />
-        <View style={styles.divider} />
-        <SettingsSwitch
-          label="🔵 Bluetooth control on lock screen"
-          hint="Show a Bluetooth button on the PIN entry screen. Users can toggle Bluetooth and pair devices without unlocking."
-          value={lockscreenBluetoothEnabled}
-          onValueChange={onLockscreenBluetoothEnabledChange}
-        />
-        <View style={styles.divider} />
-        <SettingsSwitch
-          label="🆘 Emergency call button"
-          hint="Show an emergency call button on the PIN entry screen. Opens the phone emergency dialer."
-          value={lockscreenEmergencyCallEnabled}
-          onValueChange={onLockscreenEmergencyCallEnabledChange}
-        />
-        <View style={styles.divider} />
-        <SettingsSwitch
-          label="🔊 Audio controls on lock screen"
-          hint="Show mute and audio output controls on the PIN entry screen."
-          value={lockscreenAudioEnabled}
-          onValueChange={onLockscreenAudioEnabledChange}
-        />
-        <View style={styles.divider} />
-        <SettingsSwitch
-          label="🔦 Flashlight button on lock screen"
-          hint="Show a flashlight toggle on the PIN entry screen."
-          value={lockscreenFlashlightEnabled}
-          onValueChange={onLockscreenFlashlightEnabledChange}
-        />
-        <View style={styles.divider} />
-        <SettingsSwitch
-          label="☀️ Brightness control on lock screen"
-          hint="Show a brightness button on the PIN entry screen. Opens a slider."
-          value={lockscreenBrightnessEnabled}
-          onValueChange={onLockscreenBrightnessEnabledChange}
-        />
+        {lockscreenControlsEnabled && (
+          <>
+            <SettingsInfoBox variant="info">
+              <Text style={styles.infoText}>
+                ℹ️ These controls appear on the PIN entry screen without giving access to Settings or other apps.
+              </Text>
+            </SettingsInfoBox>
+            <View style={styles.divider} />
+            <SettingsSwitch
+              label="📶 WiFi control on lock screen"
+              hint="Show a WiFi button on the PIN entry screen. Users can turn WiFi on/off and connect to networks without unlocking."
+              value={lockscreenWifiEnabled}
+              onValueChange={onLockscreenWifiEnabledChange}
+            />
+            <View style={styles.divider} />
+            <SettingsSwitch
+              label="🔵 Bluetooth control on lock screen"
+              hint="Show a Bluetooth button on the PIN entry screen. Users can toggle Bluetooth and pair devices without unlocking."
+              value={lockscreenBluetoothEnabled}
+              onValueChange={onLockscreenBluetoothEnabledChange}
+            />
+            <View style={styles.divider} />
+            <SettingsSwitch
+              label="🆘 Emergency call button"
+              hint="Show an emergency call button on the PIN entry screen. Opens the phone emergency dialer."
+              value={lockscreenEmergencyCallEnabled}
+              onValueChange={onLockscreenEmergencyCallEnabledChange}
+            />
+            <View style={styles.divider} />
+            <SettingsSwitch
+              label="🔊 Audio controls on lock screen"
+              hint="Show mute and audio output controls on the PIN entry screen."
+              value={lockscreenAudioEnabled}
+              onValueChange={onLockscreenAudioEnabledChange}
+            />
+            <View style={styles.divider} />
+            <SettingsSwitch
+              label="🔦 Flashlight button on lock screen"
+              hint="Show a flashlight toggle on the PIN entry screen."
+              value={lockscreenFlashlightEnabled}
+              onValueChange={onLockscreenFlashlightEnabledChange}
+            />
+            <View style={styles.divider} />
+            <SettingsSwitch
+              label="☀️ Brightness control on lock screen"
+              hint="Show a brightness button on the PIN entry screen. Opens a slider."
+              value={lockscreenBrightnessEnabled}
+              onValueChange={onLockscreenBrightnessEnabledChange}
+            />
+          </>
+        )}
       </SettingsSection>
 
       {/* Return Mechanism Info - Always visible */}

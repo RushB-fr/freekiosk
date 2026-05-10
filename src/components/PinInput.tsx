@@ -49,7 +49,8 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
   }, []);
 
   const loadLockscreenSettings = async (): Promise<void> => {
-    const [wifi, bluetooth, audio, emergency, flashlight, brightness] = await Promise.all([
+    const [controlsEnabled, wifi, bluetooth, audio, emergency, flashlight, brightness] = await Promise.all([
+      StorageService.getLockscreenControlsEnabled(),
       StorageService.getLockscreenWifiEnabled(),
       StorageService.getLockscreenBluetoothEnabled(),
       StorageService.getLockscreenAudioEnabled(),
@@ -58,14 +59,14 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
       StorageService.getLockscreenBrightnessEnabled(),
     ]);
 
-    setShowWifiButton(wifi);
-    setShowBluetoothButton(bluetooth);
-    setShowAudioControls(audio);
-    setShowEmergencyButton(emergency);
-    setShowFlashlightButton(flashlight);
-    setShowBrightnessButton(brightness);
+    setShowWifiButton(controlsEnabled && wifi);
+    setShowBluetoothButton(controlsEnabled && bluetooth);
+    setShowAudioControls(controlsEnabled && audio);
+    setShowEmergencyButton(controlsEnabled && emergency);
+    setShowFlashlightButton(controlsEnabled && flashlight);
+    setShowBrightnessButton(controlsEnabled && brightness);
 
-    if (flashlight && FlashlightModule?.isAvailable) {
+    if (controlsEnabled && flashlight && FlashlightModule?.isAvailable) {
       try {
         const available = await FlashlightModule.isAvailable();
         setFlashlightAvailable(Boolean(available));
@@ -321,7 +322,7 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
           {showEmergencyButton && (
             <TouchableOpacity style={[styles.quickBtn, styles.emergencyBtn]} onPress={handleEmergencyCall}>
               <Text style={styles.quickBtnIcon}>🆘</Text>
-              <Text style={[styles.quickBtnLabel, styles.emergencyLabel]}>911</Text>
+              <Text style={[styles.quickBtnLabel, styles.emergencyLabel]}>Emergency</Text>
             </TouchableOpacity>
           )}
         </View>
