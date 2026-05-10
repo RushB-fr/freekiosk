@@ -255,7 +255,6 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
             maxLength={pinMode === 'alphanumeric' ? undefined : 6}
             placeholder={pinMode === 'alphanumeric' ? 'Enter password' : '••••'}
             placeholderTextColor="#999999"
-            autoFocus
             autoCapitalize={pinMode === 'alphanumeric' ? 'none' : undefined}
             autoCorrect={false}
             autoComplete="off"

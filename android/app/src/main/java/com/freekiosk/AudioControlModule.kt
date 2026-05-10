@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
+import androidx.mediarouter.app.SystemOutputSwitcherDialogController
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -180,7 +181,17 @@ class AudioControlModule(private val reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun showSystemOutputSwitcher(promise: Promise) {
-        promise.resolve(false)
+        try {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                promise.resolve(false)
+                return
+            }
+
+            val context = reactContext.currentActivity ?: reactContext
+            promise.resolve(SystemOutputSwitcherDialogController.showDialog(context))
+        } catch (e: Exception) {
+            promise.reject("OUTPUT_SWITCHER_ERROR", e.message, e)
+        }
     }
 
     private fun forceSpeakerRoute(am: AudioManager) {
