@@ -928,6 +928,50 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setLockscreenRotationLockEnabled(enabled);
   };
 
+  const handleLockscreenEmergencyCallEnabledChange = async (enabled: boolean) => {
+    if (!enabled) {
+      setLockscreenEmergencyCallEnabled(false);
+      return;
+    }
+
+    try {
+      const safetyHubEnabled = Boolean(await KioskModule?.isSafetyHubEnabled?.());
+      if (!safetyHubEnabled) {
+        setLockscreenEmergencyCallEnabled(true);
+        return;
+      }
+
+      Alert.alert(
+        'Disable Safety Hub?',
+        'Safety Hub is enabled. On some devices it can be opened from the Emergency button and may allow escaping kiosk mode. Disable Safety Hub now?',
+        [
+          {
+            text: 'Keep Enabled',
+            style: 'cancel',
+            onPress: () => setLockscreenEmergencyCallEnabled(true),
+          },
+          {
+            text: 'Disable',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                const disabled = Boolean(await KioskModule.disableSafetyHub());
+                if (!disabled) {
+                  Alert.alert('Safety Hub', 'Safety Hub could not be disabled automatically.');
+                }
+              } catch (error) {
+                Alert.alert('Safety Hub', 'Safety Hub could not be disabled automatically. Device Owner mode is required.');
+              }
+              setLockscreenEmergencyCallEnabled(true);
+            },
+          },
+        ],
+      );
+    } catch (error) {
+      setLockscreenEmergencyCallEnabled(true);
+    }
+  };
+
   // Handle auto-brightness toggle with save/restore of manual brightness
   const handleAutoBrightnessToggle = async (enabled: boolean) => {
     if (enabled) {
@@ -1957,7 +2001,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             lockscreenBluetoothEnabled={lockscreenBluetoothEnabled}
             onLockscreenBluetoothEnabledChange={setLockscreenBluetoothEnabled}
             lockscreenEmergencyCallEnabled={lockscreenEmergencyCallEnabled}
-            onLockscreenEmergencyCallEnabledChange={setLockscreenEmergencyCallEnabled}
+            onLockscreenEmergencyCallEnabledChange={handleLockscreenEmergencyCallEnabledChange}
             lockscreenAudioEnabled={lockscreenAudioEnabled}
             onLockscreenAudioEnabledChange={setLockscreenAudioEnabled}
             lockscreenFlashlightEnabled={lockscreenFlashlightEnabled}

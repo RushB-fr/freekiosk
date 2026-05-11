@@ -16,6 +16,8 @@ interface KioskModuleInterface {
   reboot(): Promise<boolean>;
   sendRemoteKey(key: string): Promise<boolean>;
   launchEmergencyDial(): Promise<boolean>;
+  isSafetyHubEnabled(): Promise<boolean>;
+  disableSafetyHub(): Promise<boolean>;
   // Screen control
   turnScreenOn(): Promise<boolean>;
   turnScreenOff(): Promise<boolean>;
