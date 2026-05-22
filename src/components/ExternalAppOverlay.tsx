@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, FlatList, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, FlatList, useWindowDimensions } from 'react-native';
 import StatusBar from './StatusBar';
 import AppLauncherModule, { AppInfo } from '../utils/AppLauncherModule';
 import { ManagedApp } from '../types/managedApps';
@@ -56,6 +56,16 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
   onGoToSettings,
   onLaunchApp,
 }) => {
+  // Window dimensions must be reactive — `Dimensions.get('window')` is evaluated once
+  // at module load, so tile widths captured in landscape stay wrong after rotation to portrait.
+  const { width: windowWidth } = useWindowDimensions();
+  const APP_GRID_NUM_COLUMNS = 4;
+  const APP_GRID_HORIZONTAL_PADDING = 16;
+  const APP_GRID_GAP = 8;
+  const appTileWidth =
+    (windowWidth - APP_GRID_HORIZONTAL_PADDING * 2 - APP_GRID_GAP * (APP_GRID_NUM_COLUMNS - 1)) /
+    APP_GRID_NUM_COLUMNS;
+
   const [appLabels, setAppLabels] = useState<Record<string, string>>({});
   const [appIcons, setAppIcons] = useState<Record<string, string>>({});
   
@@ -178,7 +188,7 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
     
     return (
       <TouchableOpacity
-        style={styles.appIconContainer}
+        style={[styles.appIconContainer, { width: appTileWidth }]}
         onPress={() => handleAppPress(item.packageName)}
         activeOpacity={0.7}
       >
@@ -230,7 +240,7 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
           data={homeScreenApps}
           renderItem={renderAppIcon}
           keyExtractor={item => item.packageName}
-          numColumns={4}
+          numColumns={APP_GRID_NUM_COLUMNS}
           contentContainerStyle={styles.appGrid}
           columnWrapperStyle={styles.appGridRow}
         />
@@ -539,7 +549,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   appIconContainer: {
-    width: (Dimensions.get('window').width - 64) / 4,
     alignItems: 'center',
     paddingVertical: 8,
   },
