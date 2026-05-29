@@ -113,6 +113,7 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     // Text-to-Speech
     private var tts: TextToSpeech? = null
     private var ttsReady: Boolean = false
+    private var ttsVoicesCache: List<Map<String, String>> = emptyList()
 
     init {
         initSensors()
@@ -132,6 +133,8 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 if (status == TextToSpeech.SUCCESS) {
                     ttsReady = true
                     Log.d(TAG, "TextToSpeech initialized (engine=$preferredEngine)")
+                    // Cache available voices so WebView polyfill can enumerate them
+                    cacheTtsVoices()
                 } else {
                     Log.e(TAG, "TextToSpeech initialization failed: $status")
                 }
@@ -143,6 +146,47 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize TTS: ${e.message}")
+        }
+    }
+
+    /**
+     * Cache available TTS voices for the WebView speechSynthesis polyfill.
+     * Exposes Google TTS voices (and any other engine voices) so web apps
+     * can enumerate and select them via speechSynthesis.getVoices().
+     */
+    private fun cacheTtsVoices() {
+        try {
+            val ttsEngine = tts ?: return
+            val voices = mutableListOf<Map<String, String>>()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                for (voice in ttsEngine.voices) {
+                    voices.add(mapOf(
+                        "name" to voice.name,
+                        "lang" to voice.locale.toLanguageTag(),
+                        "voiceUri" to voice.name,
+                        "localService" to (!voice.isNetworkConnectionRequired).toString(),
+                        "default" to (voices.isEmpty()).toString()  // first voice is default
+                    ))
+                }
+            }
+            // Fallback: if no voices via API, create voice from default engine info
+            if (voices.isEmpty()) {
+                val defaultLocale = ttsEngine.defaultVoice?.locale ?: ttsEngine.language ?: Locale.getDefault()
+                voices.add(mapOf(
+                    "name" to "Default TTS",
+                    "lang" to defaultLocale.toLanguageTag(),
+                    "voiceUri" to "default",
+                    "localService" to "true",
+                    "default" to "true"
+                ))
+            }
+            ttsVoicesCache = voices
+            Log.d(TAG, "TTS voices cached: ${voices.size} voices")
+            for (v in voices) {
+                Log.d(TAG, "  Voice: ${v["name"]} (${v["lang"]})")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to cache TTS voices: ${e.message}")
         }
     }
 
@@ -769,8 +813,9 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             "tts" -> {
                 val text = params?.optString("text", "") ?: ""
                 val language = params?.optString("language", "") ?: ""
+                val voice = params?.optString("voice", "") ?: ""
                 if (text.isNotEmpty()) {
-                    speakText(text, language.ifEmpty { null })
+                    speakText(text, language.ifEmpty { null }, voice.ifEmpty { null })
                     return JSONObject().apply {
                         put("executed", true)
                         put("command", command)
@@ -1059,15 +1104,45 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     }
 
     /**
+     * Return the list of available TTS voices as a JSON array.
+     * Called by the WebView speechSynthesis polyfill to populate getVoices().
+     */
+    @ReactMethod
+    fun getTtsVoices(promise: Promise) {
+        try {
+            if (!ttsReady || ttsVoicesCache.isEmpty()) {
+                // Try to re-cache if not ready
+                cacheTtsVoices()
+            }
+            val voices = Arguments.createArray()
+            for (voice in ttsVoicesCache) {
+                val v = Arguments.createMap()
+                v.putString("name", voice["name"] ?: "")
+                v.putString("lang", voice["lang"] ?: "")
+                v.putString("voiceUri", voice["voiceUri"] ?: "")
+                v.putBoolean("localService", voice["localService"] == "true")
+                v.putBoolean("default", voice["default"] == "true")
+                voices.pushMap(v)
+            }
+            promise.resolve(voices)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get TTS voices: ${e.message}")
+            promise.reject("TTS_ERROR", e.message)
+        }
+    }
+
+    /**
      * Speak text using the native Android TTS engine.
      * Exposed as a @ReactMethod so the WebView speechSynthesis polyfill can call it
      * via NativeModules.HttpServerModule.speak() from React Native.
+     * @param voiceUri optional voice name to use (from getTtsVoices)
      */
     @ReactMethod
-    fun speak(text: String, language: String, promise: Promise) {
+    fun speak(text: String, language: String, voiceUri: String, promise: Promise) {
         try {
             val lang = if (language.isNotEmpty()) language else null
-            speakText(text, lang)
+            val voice = if (voiceUri.isNotEmpty() && voiceUri != "default") voiceUri else null
+            speakText(text, lang, voice)
             promise.resolve(true)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to speak text", e)
@@ -1457,27 +1532,40 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
         }
     }
 
-    private fun speakText(text: String, language: String? = null) {
+    private fun speakText(text: String, language: String? = null, voiceName: String? = null) {
         try {
             if (tts != null && ttsReady) {
-                // Determine the target locale
-                val targetLocale = if (!language.isNullOrEmpty()) {
-                    parseLocale(language)
-                } else {
-                    detectLocaleForText(text)
+                // If a specific voice name is requested, try to find and set it
+                if (!voiceName.isNullOrEmpty() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    val matchingVoice = tts?.voices?.find { it.name == voiceName }
+                    if (matchingVoice != null) {
+                        val setResult = tts?.setVoice(matchingVoice)
+                        Log.d(TAG, "TTS set voice: $voiceName (result=$setResult)")
+                    } else {
+                        Log.w(TAG, "TTS voice not found: $voiceName, using locale-based selection")
+                        // Fall through to locale-based selection
+                    }
                 }
 
-                // Set the language on the TTS engine
-                val result = tts?.setLanguage(targetLocale)
-                if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                    Log.w(TAG, "TTS language not supported: $targetLocale, falling back to default")
-                    tts?.setLanguage(Locale.getDefault())
-                } else {
-                    Log.d(TAG, "TTS language set to: $targetLocale")
+                // If no voice was set (or pre-Lollipop), use locale-based selection
+                if (voiceName.isNullOrEmpty() || tts?.voice == null) {
+                    val targetLocale = if (!language.isNullOrEmpty()) {
+                        parseLocale(language)
+                    } else {
+                        detectLocaleForText(text)
+                    }
+
+                    val result = tts?.setLanguage(targetLocale)
+                    if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                        Log.w(TAG, "TTS language not supported: $targetLocale, falling back to default")
+                        tts?.setLanguage(Locale.getDefault())
+                    } else {
+                        Log.d(TAG, "TTS language set to: $targetLocale")
+                    }
                 }
 
                 tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "freekiosk_tts_${System.currentTimeMillis()}")
-                Log.d(TAG, "TTS speaking: $text (locale: $targetLocale)")
+                Log.d(TAG, "TTS speaking: $text (voice=$voiceName)")
             } else {
                 // TTS not ready, try to reinitialize
                 Log.w(TAG, "TTS not ready, reinitializing...")
@@ -1485,7 +1573,7 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 // Retry after a short delay
                 android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                     if (ttsReady) {
-                        speakText(text, language)
+                        speakText(text, language, voiceName)
                     }
                 }, 1000)
             }

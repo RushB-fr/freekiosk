@@ -328,20 +328,62 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
     // Android WebView does not implement the Web Speech API (speechSynthesis).
     // This polyfill bridges window.speechSynthesis.speak() to FreeKiosk's native
     // Android TextToSpeech engine via postMessage → React Native → NativeModules.
+    // It also enumerates real TTS voices (Google TTS etc.) via async query.
     // This allows web apps that use TTS to work transparently in kiosk mode.
     (function() {
       // Only polyfill if speechSynthesis is missing or non-functional
       if (window.speechSynthesis && typeof window.speechSynthesis.speak === 'function') {
-        // Test if it actually works by checking for voices
         try {
-          var voices = window.speechSynthesis.getVoices();
-          if (voices && voices.length > 0) return; // Native implementation works
+          var testVoices = window.speechSynthesis.getVoices();
+          // If native implementation returns voices, it might be real. Still polyfill
+          // because Android WebView speechSynthesis is notoriously broken (returns
+          // voices but speak() is a no-op). Only skip if there are > 2 voices.
+          if (testVoices && testVoices.length > 2) return;
         } catch(e) {}
-        // No voices = non-functional, polyfill it
       }
 
+      var _fkVoices = [];
+      var _fkVoicesLoaded = false;
+      var _fkVoicesChangedCbs = [];
       var _fkSpeaking = false;
       var _fkEndTimer = null;
+      var _fkPendingSpeak = null;  // utterance queued while voices not yet loaded
+
+      // Request real TTS voices from native Android
+      function _fkLoadVoices() {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'SPEECH_SYNTH_GET_VOICES'
+        }));
+      }
+
+      // Called from native via injectJavaScript when voices are ready
+      window.__fkSetVoices = function(voicesJson) {
+        try {
+          var voices = JSON.parse(voicesJson);
+          _fkVoices = voices.map(function(v, i) {
+            return {
+              default: v.default || (i === 0),
+              lang: v.lang || 'en-US',
+              localService: v.localService !== false,
+              name: v.name || ('Voice ' + i),
+              voiceURI: v.voiceUri || v.name || ('voice-' + i)
+            };
+          });
+          _fkVoicesLoaded = true;
+          // Fire voiceschanged event for each registered callback
+          var evt = new Event('voiceschanged');
+          _fkVoicesChangedCbs.forEach(function(cb) { try { cb(evt); } catch(e) {} });
+          _fkVoicesChangedCbs = [];
+          // If an utterance was queued before voices loaded, speak it now
+          if (_fkPendingSpeak) {
+            var u = _fkPendingSpeak;
+            _fkPendingSpeak = null;
+            synth.speak(u);
+          }
+        } catch(e) {
+          console.error('[FreeKiosk] Failed to parse voices:', e);
+        }
+      };
 
       function FKSpeechSynthesisUtterance(text) {
         this.text = text || '';
@@ -360,27 +402,41 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
       }
       window.SpeechSynthesisUtterance = FKSpeechSynthesisUtterance;
 
-      var _fkVoice = {
-        default: true,
-        lang: navigator.language || 'en-US',
-        localService: true,
-        name: 'FreeKiosk Native TTS',
-        voiceURI: 'freekiosk-native'
-      };
-
-      var _fkVoicesChangedCb = null;
       var synth = {
         speaking: false,
         pending: false,
         paused: false,
         speak: function(utterance) {
           if (!utterance || !utterance.text) return;
+          // If voices not yet loaded, queue the utterance
+          if (!_fkVoicesLoaded) {
+            _fkPendingSpeak = utterance;
+            _fkLoadVoices();
+            return;
+          }
           this.speaking = true;
           _fkSpeaking = true;
+          // Pick the best voice: use utterance.voice if set, else find matching lang
+          var voiceUri = '';
+          var lang = utterance.lang || '';
+          if (utterance.voice && utterance.voice.voiceURI) {
+            voiceUri = utterance.voice.voiceURI;
+            lang = utterance.voice.lang || lang;
+          } else if (lang) {
+            // Find a voice matching the requested language
+            var exactMatch = _fkVoices.find(function(v) { return v.lang === lang; });
+            var prefixMatch = _fkVoices.find(function(v) { return v.lang.indexOf(lang.split('-')[0]) === 0; });
+            var bestVoice = exactMatch || prefixMatch || (utterance.voice || (_fkVoices[0] || null));
+            if (bestVoice && bestVoice.voiceURI) {
+              voiceUri = bestVoice.voiceURI;
+              lang = bestVoice.lang || lang;
+            }
+          }
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'SPEECH_SYNTH_SPEAK',
             text: utterance.text,
-            lang: utterance.lang || '',
+            lang: lang,
+            voiceUri: voiceUri,
             rate: utterance.rate || 1,
             pitch: utterance.pitch || 1,
             volume: utterance.volume || 1
@@ -388,9 +444,9 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
           if (utterance.onstart) {
             try { utterance.onstart(new Event('start')); } catch(e) {}
           }
-          // Estimate duration and fire onend (rough: 80ms per character)
+          // Estimate duration and fire onend (rough: 100ms per character for normal rate)
           if (_fkEndTimer) clearTimeout(_fkEndTimer);
-          var estimatedMs = Math.max(500, utterance.text.length * 80);
+          var estimatedMs = Math.max(500, utterance.text.length * 100 / (utterance.rate || 1));
           var self = this;
           var utt = utterance;
           _fkEndTimer = setTimeout(function() {
@@ -404,33 +460,51 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
         cancel: function() {
           this.speaking = false;
           _fkSpeaking = false;
+          _fkPendingSpeak = null;
           if (_fkEndTimer) { clearTimeout(_fkEndTimer); _fkEndTimer = null; }
           window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'SPEECH_SYNTH_CANCEL' }));
         },
         pause: function() { this.paused = true; },
         resume: function() { this.paused = false; },
-        getVoices: function() { return [_fkVoice]; },
+        getVoices: function() {
+          // Trigger async load on first call (browsers typically call getVoices()
+          // and then listen for voiceschanged event to get the real list)
+          if (!_fkVoicesLoaded && _fkVoices.length === 0) {
+            _fkLoadVoices();
+          }
+          return _fkVoices.slice();
+        },
         addEventListener: function(type, fn) {
-          if (type === 'voiceschanged') _fkVoicesChangedCb = fn;
+          if (type === 'voiceschanged') {
+            if (_fkVoicesLoaded) {
+              // Voices already loaded, fire immediately
+              try { fn(new Event('voiceschanged')); } catch(e) {}
+            } else {
+              _fkVoicesChangedCbs.push(fn);
+            }
+          }
         },
         removeEventListener: function(type, fn) {
-          if (type === 'voiceschanged' && _fkVoicesChangedCb === fn) _fkVoicesChangedCb = null;
+          if (type === 'voiceschanged') {
+            _fkVoicesChangedCbs = _fkVoicesChangedCbs.filter(function(cb) { return cb !== fn; });
+          }
         }
       };
       Object.defineProperty(synth, 'onvoiceschanged', {
-        get: function() { return _fkVoicesChangedCb; },
-        set: function(fn) { _fkVoicesChangedCb = fn; }
+        get: function() { return _fkVoicesChangedCbs[0] || null; },
+        set: function(fn) {
+          _fkVoicesChangedCbs = fn ? [fn] : [];
+          if (fn && _fkVoicesLoaded) {
+            try { fn(new Event('voiceschanged')); } catch(e) {}
+          }
+        }
       });
       Object.defineProperty(window, 'speechSynthesis', {
         get: function() { return synth; },
         configurable: true
       });
-      // Fire voiceschanged so apps that wait for voices discover ours
-      setTimeout(function() {
-        if (_fkVoicesChangedCb) {
-          try { _fkVoicesChangedCb(new Event('voiceschanged')); } catch(e) {}
-        }
-      }, 100);
+      // Start loading voices immediately
+      _fkLoadVoices();
     })();
 
     // PDF link interception: prevent <a download href="...pdf"> from triggering
@@ -543,7 +617,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
         } else if (data.type === 'SPEECH_SYNTH_SPEAK') {
           // speechSynthesis polyfill: bridge to native Android TTS
           if (HttpServerModule?.speak) {
-            HttpServerModule.speak(data.text || '', data.lang || '')
+            HttpServerModule.speak(data.text || '', data.lang || '', data.voiceUri || '')
               .catch((err: any) => console.error('[WebView] TTS speak failed:', err));
           }
         } else if (data.type === 'SPEECH_SYNTH_CANCEL') {
@@ -551,6 +625,21 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
           if (HttpServerModule?.stopSpeaking) {
             HttpServerModule.stopSpeaking()
               .catch((err: any) => console.error('[WebView] TTS cancel failed:', err));
+          }
+        } else if (data.type === 'SPEECH_SYNTH_GET_VOICES') {
+          // speechSynthesis polyfill: query available TTS voices from native
+          if (HttpServerModule?.getTtsVoices) {
+            HttpServerModule.getTtsVoices()
+              .then((voices: any[]) => {
+                const voicesJson = JSON.stringify(voices || []);
+                // Use JSON.stringify on the already-stringified JSON to properly escape
+                // quotes and special chars for injection into a JS string literal
+                const safeArg = JSON.stringify(voicesJson);
+                webViewRef.current?.injectJavaScript(
+                  `window.__fkSetVoices && window.__fkSetVoices(${safeArg}); true;`
+                );
+              })
+              .catch((err: any) => console.error('[WebView] TTS getVoices failed:', err));
           }
         } else if (data.type === 'PRINT_REQUEST') {
           // Handle print request from window.print()
