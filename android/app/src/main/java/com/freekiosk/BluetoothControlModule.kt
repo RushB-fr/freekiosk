@@ -15,7 +15,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.provider.Settings
 import androidx.core.content.ContextCompat
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
@@ -143,20 +142,6 @@ class BluetoothControlModule(private val reactContext: ReactApplicationContext) 
             promise.resolve(result)
         } catch (e: Exception) {
             promise.reject("BT_TOGGLE_ERROR", e.message, e)
-        }
-    }
-
-    // Opens the Bluetooth settings panel (bottom-sheet on API 29+).
-    @ReactMethod
-    fun openSystemBluetoothPanel(promise: Promise) {
-        try {
-            val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            reactContext.startActivity(intent)
-            promise.resolve(true)
-        } catch (e: Exception) {
-            promise.reject("BT_PANEL_ERROR", e.message, e)
         }
     }
 

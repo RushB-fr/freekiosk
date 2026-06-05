@@ -49,9 +49,6 @@
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
         android:usesPermissionFlags="neverForLocation"
         tools:targetApi="s" />
-    <uses-permission android:name="android.permission.CALL_PRIVILEGED"
-        tools:ignore="ProtectedPermissions" />
-
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
