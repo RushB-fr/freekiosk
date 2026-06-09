@@ -5,19 +5,31 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.net.wifi.WifiInfo
+import android.net.wifi.WifiManager
+import android.os.BatteryManager
+import android.os.Environment
+import android.os.StatFs
 import android.os.SystemClock
 import android.view.KeyEvent
+import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.Promise
+import com.facebook.react.bridge.WritableMap
 import android.accessibilityservice.AccessibilityService
 import android.os.Build
 import android.os.PowerManager
 import android.view.WindowManager
 import com.facebook.react.bridge.UiThreadUtil
 import com.facebook.react.modules.core.DeviceEventManagerModule
+import java.net.Inet4Address
+import java.net.NetworkInterface
 
 class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
@@ -1113,6 +1125,160 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
             android.util.Log.w("KioskModule", "Could not read managed apps: ${e.message}")
             emptyList()
         }
+    }
+
+    // ==================== DEVICE STATUS (for Cloud Sync) ====================
+
+    @ReactMethod
+    fun getBatteryStatus(promise: Promise) {
+        try {
+            val intentFilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+            val batteryIntent = reactApplicationContext.registerReceiver(null, intentFilter)
+            val level = batteryIntent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: 0
+            val scale = batteryIntent?.getIntExtra(BatteryManager.EXTRA_SCALE, 100) ?: 100
+            val percentage = (level * 100) / scale
+            val status = batteryIntent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+            val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                             status == BatteryManager.BATTERY_STATUS_FULL
+            val plugged = batteryIntent?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1) ?: -1
+            val pluggedType = when (plugged) {
+                BatteryManager.BATTERY_PLUGGED_USB -> "usb"
+                BatteryManager.BATTERY_PLUGGED_AC -> "ac"
+                BatteryManager.BATTERY_PLUGGED_WIRELESS -> "wireless"
+                else -> "none"
+            }
+            val temperature = (batteryIntent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0) / 10.0
+            val map = Arguments.createMap()
+            map.putInt("level", percentage)
+            map.putBoolean("charging", isCharging)
+            map.putString("plugged", pluggedType)
+            map.putDouble("temperature", temperature)
+            promise.resolve(map)
+        } catch (e: Exception) {
+            val map = Arguments.createMap()
+            map.putInt("level", 0)
+            map.putBoolean("charging", false)
+            map.putString("plugged", "none")
+            map.putDouble("temperature", 0.0)
+            promise.resolve(map)
+        }
+    }
+
+    @ReactMethod
+    fun getWifiInfo(promise: Promise) {
+        try {
+            val connectivityManager = reactApplicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val network = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) connectivityManager.activeNetwork else null
+            val capabilities = if (network != null) connectivityManager.getNetworkCapabilities(network) else null
+            val isConnected = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+            } else {
+                @Suppress("DEPRECATION")
+                connectivityManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI)?.isConnected == true
+            }
+            val wifiInfoObj: WifiInfo? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && capabilities != null) {
+                capabilities.transportInfo as? WifiInfo
+            } else {
+                val wifiManager = reactApplicationContext.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+                @Suppress("DEPRECATION")
+                wifiManager.connectionInfo
+            }
+            val rawSsid = wifiInfoObj?.ssid?.replace("\"", "")?.trim() ?: ""
+            val ssid = if (rawSsid.isNotEmpty() && rawSsid != "<unknown ssid>" && rawSsid != "0x") rawSsid else ""
+            val rssi = wifiInfoObj?.rssi ?: -100
+            val map = Arguments.createMap()
+            map.putString("ssid", ssid)
+            map.putInt("rssi", rssi)
+            map.putBoolean("connected", isConnected)
+            map.putString("ipAddress", getIpAddress())
+            promise.resolve(map)
+        } catch (e: Exception) {
+            val map = Arguments.createMap()
+            map.putString("ssid", "")
+            map.putInt("rssi", 0)
+            map.putBoolean("connected", false)
+            map.putString("ipAddress", "0.0.0.0")
+            promise.resolve(map)
+        }
+    }
+
+    @ReactMethod
+    fun getLocalIpAddress(promise: Promise) {
+        promise.resolve(getIpAddress())
+    }
+
+    @ReactMethod
+    fun getStorageInfo(promise: Promise) {
+        try {
+            val stat = StatFs(Environment.getDataDirectory().path)
+            val blockSize = stat.blockSizeLong
+            val totalMB = (stat.blockCountLong * blockSize / (1024 * 1024)).toInt()
+            val availableMB = (stat.availableBlocksLong * blockSize / (1024 * 1024)).toInt()
+            val map = Arguments.createMap()
+            map.putInt("totalMB", totalMB)
+            map.putInt("availableMB", availableMB)
+            map.putInt("usedMB", totalMB - availableMB)
+            promise.resolve(map)
+        } catch (e: Exception) {
+            val map = Arguments.createMap()
+            map.putInt("totalMB", 0)
+            map.putInt("availableMB", 0)
+            map.putInt("usedMB", 0)
+            promise.resolve(map)
+        }
+    }
+
+    @ReactMethod
+    fun getMemoryInfo(promise: Promise) {
+        try {
+            val am = reactApplicationContext.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val memInfo = ActivityManager.MemoryInfo()
+            am.getMemoryInfo(memInfo)
+            val totalMB = (memInfo.totalMem / (1024 * 1024)).toInt()
+            val availableMB = (memInfo.availMem / (1024 * 1024)).toInt()
+            val map = Arguments.createMap()
+            map.putInt("totalMB", totalMB)
+            map.putInt("availableMB", availableMB)
+            map.putInt("usedMB", totalMB - availableMB)
+            promise.resolve(map)
+        } catch (e: Exception) {
+            val map = Arguments.createMap()
+            map.putInt("totalMB", 0)
+            map.putInt("availableMB", 0)
+            map.putInt("usedMB", 0)
+            promise.resolve(map)
+        }
+    }
+
+    @ReactMethod
+    fun getSystemInfo(promise: Promise) {
+        val map = Arguments.createMap()
+        map.putString("model", android.os.Build.MODEL ?: "")
+        map.putString("manufacturer", android.os.Build.MANUFACTURER ?: "")
+        map.putString("androidVersion", android.os.Build.VERSION.RELEASE ?: "")
+        map.putString("serial", if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) "unknown" else
+            @Suppress("DEPRECATION") (android.os.Build.SERIAL ?: ""))
+        map.putLong("uptimeSeconds", android.os.SystemClock.elapsedRealtime() / 1000)
+        promise.resolve(map)
+    }
+
+    private fun getIpAddress(): String {
+        try {
+            val interfaces = NetworkInterface.getNetworkInterfaces()
+            while (interfaces.hasMoreElements()) {
+                val iface = interfaces.nextElement()
+                val addresses = iface.inetAddresses
+                while (addresses.hasMoreElements()) {
+                    val addr = addresses.nextElement()
+                    if (!addr.isLoopbackAddress && addr is Inet4Address) {
+                        return addr.hostAddress ?: "0.0.0.0"
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("KioskModule", "Failed to get IP: ${e.message}")
+        }
+        return "0.0.0.0"
     }
 
     @ReactMethod

@@ -29,6 +29,7 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 import Icon from '../components/Icon';
 import { revokeSettingsAccess } from '../utils/authState';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { CloudSyncService, CONFIG_UPDATED_EVENT, FORCE_UNENROLL_EVENT } from '../utils/CloudSyncService';
 
 const { HttpServerModule } = NativeModules;
 
@@ -318,6 +319,32 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       return true;
     });
     return () => backHandler.remove();
+  }, []);
+
+  // Cloud sync: start heartbeat loop on mount, reload settings on config push
+  useEffect(() => {
+    DeviceControlService.registerWebViewCallbacks(
+      () => webViewRef.current?.reload(),
+      (_u: string) => {},
+      () => currentWebViewUrlRef.current || url,
+    );
+    CloudSyncService.start();
+
+    const onConfigUpdated = DeviceEventEmitter.addListener(CONFIG_UPDATED_EVENT, () => {
+      loadSettings();
+    });
+
+    const onForceUnenroll = DeviceEventEmitter.addListener(FORCE_UNENROLL_EVENT, () => {
+      // Settings were wiped — reload to pick up defaults
+      loadSettings();
+    });
+
+    return () => {
+      onConfigUpdated.remove();
+      onForceUnenroll.remove();
+      CloudSyncService.stop();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-brightness: pause when screensaver activates, resume when it deactivates

@@ -9,12 +9,14 @@ import {
   SettingsSection,
   SettingsButton,
   SettingsInfoBox,
+  SettingsInput,
   BackupRestoreSection,
 } from '../../../components/settings';
 import { ApiSettingsSection } from '../../../components/ApiSettingsSection';
 import { MqttSettingsSection } from '../../../components/MqttSettingsSection';
 import { CertificateInfo } from '../../../utils/CertificateModule';
 import AccessibilityModule from '../../../utils/AccessibilityModule';
+import { CloudSyncService } from '../../../utils/CloudSyncService';
 import { Colors, Spacing, Typography } from '../../../theme';
 
 const { KioskModule } = NativeModules;
@@ -75,6 +77,14 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
   const [accessibilityEnabled, setAccessibilityEnabled] = useState(false);
   const [accessibilityRunning, setAccessibilityRunning] = useState(false);
 
+  // Cloud management state
+  const [isEnrolled, setIsEnrolled] = useState(false);
+  const [orgName, setOrgName] = useState<string | null>(null);
+  const [cloudUrl, setCloudUrl] = useState('');
+  const [enrollToken, setEnrollToken] = useState('');
+  const [enrolling, setEnrolling] = useState(false);
+  const [unenrolling, setUnenrolling] = useState(false);
+
   const checkAccessibilityStatus = useCallback(async () => {
     try {
       const enabled = await AccessibilityModule.isAccessibilityServiceEnabled();
@@ -88,7 +98,6 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
 
   useEffect(() => {
     checkAccessibilityStatus();
-    // Re-check when the app returns from system settings
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         checkAccessibilityStatus();
@@ -96,6 +105,77 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
     });
     return () => subscription.remove();
   }, [checkAccessibilityStatus]);
+
+  useEffect(() => {
+    CloudSyncService.getCredentials().then(creds => {
+      if (creds) {
+        setIsEnrolled(true);
+        setOrgName(creds.organizationName ?? null);
+      } else {
+        setIsEnrolled(false);
+        setOrgName(null);
+      }
+    });
+  }, []);
+
+  const handleEnroll = () => {
+    if (!cloudUrl.trim() || !enrollToken.trim()) {
+      Alert.alert('Missing fields', 'Please enter both the cloud URL and the enrollment token.');
+      return;
+    }
+    Alert.alert(
+      'Enroll in Cloud Management',
+      'Enrolling will reset all local FreeKiosk settings. The device will then be configured from the cloud.\n\nContinue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Enroll',
+          style: 'destructive',
+          onPress: async () => {
+            setEnrolling(true);
+            const PC = NativeModules.PlatformConstants as any;
+            const result = await CloudSyncService.enroll(cloudUrl.trim(), enrollToken.trim(), {
+              model: PC?.Model ?? '',
+              manufacturer: PC?.Manufacturer ?? '',
+              android_version: PC?.Release ?? '',
+              app_version: PC?.appVersion ?? '',
+              serial_number: '',
+            });
+            setEnrolling(false);
+            if (result.success) {
+              setIsEnrolled(true);
+              setOrgName(result.organizationName ?? null);
+              setCloudUrl('');
+              setEnrollToken('');
+            } else {
+              Alert.alert('Enrollment failed', result.error ?? 'Unknown error');
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleUnenroll = () => {
+    Alert.alert(
+      'Leave Cloud Management',
+      'This will disconnect the device from the cloud and wipe all FreeKiosk settings.\n\nContinue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Unenroll',
+          style: 'destructive',
+          onPress: async () => {
+            setUnenrolling(true);
+            await CloudSyncService.unenroll();
+            setUnenrolling(false);
+            setIsEnrolled(false);
+            setOrgName(null);
+          },
+        },
+      ],
+    );
+  };
 
   const handleOpenAccessibilitySettings = async () => {
     try {
@@ -129,6 +209,60 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
   };
   return (
     <View>
+      {/* Cloud Management */}
+      <SettingsSection title="Cloud Management" icon="sync">
+        {isEnrolled ? (
+          <>
+            <SettingsInfoBox variant="success" title="☁️ Cloud-managed">
+              <Text style={styles.infoText}>
+                This device is enrolled{orgName ? ` in ${orgName}` : ''}.{'\n'}
+                Configuration is synced automatically every 30 seconds.
+              </Text>
+            </SettingsInfoBox>
+            <SettingsButton
+              title={unenrolling ? 'Unenrolling...' : 'Leave Cloud Management'}
+              icon="alert-circle"
+              variant="danger"
+              onPress={handleUnenroll}
+              disabled={unenrolling}
+              loading={unenrolling}
+            />
+          </>
+        ) : (
+          <>
+            <SettingsInfoBox variant="info" title="ℹ️ Zero-touch provisioning">
+              <Text style={styles.infoText}>
+                Enroll this device in a FreeKiosk Cloud instance to manage its configuration remotely.{'\n\n'}
+                Warning: enrolling will reset all current settings.
+              </Text>
+            </SettingsInfoBox>
+            <SettingsInput
+              label="Cloud URL"
+              icon="server"
+              placeholder="https://cloud.example.com"
+              value={cloudUrl}
+              onChangeText={setCloudUrl}
+              keyboardType="url"
+            />
+            <SettingsInput
+              label="Enrollment Token"
+              icon="key"
+              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              value={enrollToken}
+              onChangeText={setEnrollToken}
+            />
+            <SettingsButton
+              title={enrolling ? 'Enrolling...' : 'Enroll Device'}
+              icon="upload"
+              variant="primary"
+              onPress={handleEnroll}
+              disabled={enrolling}
+              loading={enrolling}
+            />
+          </>
+        )}
+      </SettingsSection>
+
       {/* App Updates - Hidden in Play Store builds (compliance: no in-app updates) */}
       {enableSelfUpdate && (
       <SettingsSection title="Updates" icon="update">

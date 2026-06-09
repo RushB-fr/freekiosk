@@ -34,6 +34,11 @@ export interface DeviceInfo {
   version: string;
   isDeviceOwner: boolean;
   kioskMode: boolean;
+  freeStorageMb: number;
+  freeMemoryMb: number;
+  model: string;
+  manufacturer: string;
+  androidVersion: string;
 }
 
 export interface WifiStatus {
@@ -166,16 +171,46 @@ class DeviceControlServiceClass {
       console.warn('DeviceControlService: isDeviceOwner error', error);
     }
 
-    // Get IP from NetworkUtils (will be set externally)
     const ip = await this.getLocalIpAddress();
+
+    let freeStorageMb = 0;
+    let freeMemoryMb = 0;
+    let model = '';
+    let manufacturer = '';
+    let androidVersion = '';
+    let uptime = 0;
+    try {
+      if (KioskModule?.getStorageInfo) {
+        const storage = await KioskModule.getStorageInfo();
+        freeStorageMb = storage.availableMB || 0;
+      }
+      if (KioskModule?.getMemoryInfo) {
+        const memory = await KioskModule.getMemoryInfo();
+        freeMemoryMb = memory.availableMB || 0;
+      }
+      if (KioskModule?.getSystemInfo) {
+        const sys = await KioskModule.getSystemInfo();
+        model = sys.model || '';
+        manufacturer = sys.manufacturer || '';
+        androidVersion = sys.androidVersion || '';
+        uptime = sys.uptimeSeconds || 0;
+      }
+    } catch (error) {
+      console.warn('DeviceControlService: storage/memory/system error', error);
+    }
 
     return {
       ip,
       hostname: 'freekiosk',
-      uptime: 0, // TODO: implement
+      uptime,
       version: this.appVersion,
       isDeviceOwner,
       kioskMode: this.kioskModeEnabled,
+      freeStorageMb,
+      freeMemoryMb,
+      model,
+      manufacturer,
+      androidVersion,
     };
   }
 
