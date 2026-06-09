@@ -197,6 +197,9 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [basicAuthUsername, setBasicAuthUsername] = useState<string>('');
   const [basicAuthPassword, setBasicAuthPassword] = useState<string>('');
 
+  // Lock screen quick controls
+  const [lockscreenEmergencyEnabled, setLockscreenEmergencyEnabled] = useState<boolean>(false);
+
   // Media Player states
   const [mediaPlayerItems, setMediaPlayerItems] = useState<MediaItem[]>([]);
   const [mediaPlayerAutoPlay, setMediaPlayerAutoPlay] = useState<boolean>(true);
@@ -221,7 +224,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         // Without this, the first call clears blockAutoRelaunch, and the
         // second call sees it as false → triggers unwanted relaunch.
         appStateRef.current = nextAppState;
-        
+
         // If navigateToPin is in progress, skip all relaunch logic
         if (isNavigatingToPinRef.current) {
           console.log('[KioskScreen] AppState: skipping relaunch (navigateToPin in progress)');
@@ -1607,6 +1610,10 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       setUrlFilterMode(savedUrlFilterMode as 'blacklist' | 'whitelist');
       setUrlFilterList(savedUrlFilterList);
       setUrlFilterShowFeedback(savedUrlFilterShowFeedback);
+
+      // Load Lock Screen Quick Controls settings
+      const savedEmergencyEnabled = bool(K.LOCKSCREEN_EMERGENCY_CALL_ENABLED, false);
+      setLockscreenEmergencyEnabled(savedEmergencyEnabled);
       
       // Load PDF Viewer setting
       const savedPdfViewerEnabled = bool(K.PDF_VIEWER_ENABLED, false);
@@ -1731,7 +1738,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         try {
           // Pass external app package so it gets added to whitelist
           const packageToWhitelist = savedDisplayMode === 'external_app' && savedExternalAppPackage ? savedExternalAppPackage : undefined;
-          await KioskModule.startLockTask(packageToWhitelist, savedAllowPowerButton, savedAllowNotifications, savedAllowSystemInfo);
+          await KioskModule.startLockTask(packageToWhitelist, savedAllowPowerButton, savedAllowNotifications, savedAllowSystemInfo, savedEmergencyEnabled);
         } catch {
           // Silent fail
         }

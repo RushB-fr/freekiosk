@@ -2,7 +2,7 @@ import { NativeModules } from 'react-native';
 
 interface KioskModuleInterface {
   exitKioskMode(): Promise<boolean>;
-  startLockTask(externalAppPackage?: string | null, allowPowerButton?: boolean, allowNotifications?: boolean, allowSystemInfo?: boolean): Promise<boolean>;
+  startLockTask(externalAppPackage?: string | null, allowPowerButton?: boolean, allowNotifications?: boolean, allowSystemInfo?: boolean, allowEmergencyCall?: boolean): Promise<boolean>;
   stopLockTask(): Promise<boolean>;
   isInLockTaskMode(): Promise<boolean>;
   getLockTaskModeState(): Promise<number>;
@@ -15,6 +15,9 @@ interface KioskModuleInterface {
   removeDeviceOwner(): Promise<boolean>;
   reboot(): Promise<boolean>;
   sendRemoteKey(key: string): Promise<boolean>;
+  launchEmergencyDial(): Promise<boolean>;
+  isSafetyHubEnabled(): Promise<boolean>;
+  disableSafetyHub(): Promise<boolean>;
   // Screen control
   turnScreenOn(): Promise<boolean>;
   turnScreenOff(): Promise<boolean>;

@@ -22,6 +22,9 @@ import com.facebook.react.modules.core.DeviceEventManagerModule
 class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
     private var wakeLock: PowerManager.WakeLock? = null
+    private val emergencyDialAction = "android.intent.action.DIAL_EMERGENCY"
+    private val emergencyDialerAction = "com.android.phone.EmergencyDialer.DIAL"
+    private val safetyHubPackage = "com.google.android.apps.safetyhub"
 
     companion object {
         // Store the current instance to allow sending events from MainActivity
@@ -128,7 +131,7 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     }
 
     @ReactMethod
-    fun startLockTask(externalAppPackage: String?, allowPowerButton: Boolean, allowNotifications: Boolean, allowSystemInfo: Boolean, promise: Promise) {
+    fun startLockTask(externalAppPackage: String?, allowPowerButton: Boolean, allowNotifications: Boolean, allowSystemInfo: Boolean, allowEmergencyCall: Boolean, promise: Promise) {
         try {
             val activity = reactApplicationContext.currentActivity
             if (activity != null && activity is MainActivity) {
@@ -140,7 +143,7 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                         if (dpm.isDeviceOwnerApp(reactApplicationContext.packageName)) {
                             // Build whitelist: FreeKiosk + external app + all managed apps
                             val whitelist = mutableListOf(reactApplicationContext.packageName)
-                            
+
                             // Use the passed parameter directly (more reliable than SharedPreferences timing)
                             if (!externalAppPackage.isNullOrEmpty()) {
                                 try {
@@ -151,13 +154,18 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                                     android.util.Log.e("KioskModule", "External app not found: $externalAppPackage")
                                 }
                             }
-                            
+
                             // Add all managed apps to the lock task whitelist
                             whitelist.addAll(getManagedAppPackages())
-                            
+
                             // Add print spooler packages if printing is enabled
                             if (isPrintEnabled()) {
                                 whitelist.addAll(getPrintSpoolerPackages())
+                            }
+
+                            // Whitelist the emergency dialer so the power-screen red button works
+                            if (allowEmergencyCall) {
+                                whitelist.addAll(getEmergencyDialerPackages())
                             }
                             
                             val uniqueWhitelist = whitelist.distinct()
@@ -186,7 +194,7 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                                 dpm.setLockTaskFeatures(adminComponent, lockTaskFeatures)
                                 android.util.Log.d("KioskModule", "Lock task features set: blockPowerButton=${!allowPowerButton}, notifications=$allowNotifications, systemInfo=$allowSystemInfo (flags=$lockTaskFeatures)")
                             }
-                            
+
                             dpm.setLockTaskPackages(adminComponent, uniqueWhitelist.toTypedArray())
                             activity.startLockTask()
                             dpm.setScreenCaptureDisabled(adminComponent, true)
@@ -258,6 +266,58 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     }
 
     @ReactMethod
+    fun launchEmergencyDial(promise: Promise) {
+        try {
+            val activity = reactApplicationContext.currentActivity
+            if (activity == null) {
+                promise.reject("ERROR", "Activity not available")
+                return
+            }
+            ensureEmergencyDialerWhitelisted()
+            val intent = createEmergencyDialIntent()
+            activity.startActivity(intent)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            android.util.Log.e("KioskModule", "Failed to launch emergency dialer: ${e.message}")
+            promise.reject("ERROR", "Failed to launch emergency dialer: ${e.message}")
+        }
+    }
+
+    @ReactMethod
+    fun isSafetyHubEnabled(promise: Promise) {
+        try {
+            promise.resolve(isPackageEnabledAndVisible(safetyHubPackage))
+        } catch (e: Exception) {
+            android.util.Log.e("KioskModule", "Failed to check Safety Hub status: ${e.message}")
+            promise.reject("ERROR", "Failed to check Safety Hub status: ${e.message}")
+        }
+    }
+
+    @ReactMethod
+    fun disableSafetyHub(promise: Promise) {
+        try {
+            val dpm = reactApplicationContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+            val adminComponent = ComponentName(reactApplicationContext, DeviceAdminReceiver::class.java)
+
+            if (!dpm.isDeviceOwnerApp(reactApplicationContext.packageName)) {
+                promise.reject("NOT_DEVICE_OWNER", "Disabling Safety Hub requires Device Owner mode")
+                return
+            }
+
+            if (!isPackageInstalled(safetyHubPackage)) {
+                promise.resolve(false)
+                return
+            }
+
+            dpm.setApplicationHidden(adminComponent, safetyHubPackage, true)
+            promise.resolve(!isPackageEnabledAndVisible(safetyHubPackage))
+        } catch (e: Exception) {
+            android.util.Log.e("KioskModule", "Failed to disable Safety Hub: ${e.message}")
+            promise.reject("ERROR", "Failed to disable Safety Hub: ${e.message}")
+        }
+    }
+
+    @ReactMethod
     fun isInLockTaskMode(promise: Promise) {
         try {
             val activityManager = reactApplicationContext.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
@@ -266,6 +326,33 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
             promise.resolve(isLocked)
         } catch (e: Exception) {
             promise.reject("ERROR", "Failed to check lock task mode: ${e.message}")
+        }
+    }
+
+    private fun isPackageInstalled(packageName: String): Boolean {
+        return try {
+            reactApplicationContext.packageManager.getPackageInfo(packageName, 0)
+            true
+        } catch (e: PackageManager.NameNotFoundException) {
+            false
+        }
+    }
+
+    private fun isPackageEnabledAndVisible(packageName: String): Boolean {
+        return try {
+            val pm = reactApplicationContext.packageManager
+            val appInfo = pm.getApplicationInfo(packageName, PackageManager.MATCH_DISABLED_COMPONENTS)
+            val dpm = reactApplicationContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+            val adminComponent = ComponentName(reactApplicationContext, DeviceAdminReceiver::class.java)
+            val hidden = try {
+                dpm.isDeviceOwnerApp(reactApplicationContext.packageName) &&
+                    dpm.isApplicationHidden(adminComponent, packageName)
+            } catch (_: Exception) {
+                false
+            }
+            appInfo.enabled && !hidden
+        } catch (e: PackageManager.NameNotFoundException) {
+            false
         }
     }
 
@@ -1077,6 +1164,87 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
             android.util.Log.w("KioskModule", "Could not discover print services: ${e.message}")
         }
         return packages.toList()
+    }
+
+    private fun getEmergencyDialerPackages(): List<String> {
+        val packages = mutableSetOf<String>()
+        val emergencyIntents = listOf(
+            Intent(emergencyDialerAction).addCategory(Intent.CATEGORY_DEFAULT),
+            Intent(emergencyDialAction).addCategory(Intent.CATEGORY_DEFAULT),
+        )
+        try {
+            emergencyIntents.forEach { emergencyIntent ->
+                reactApplicationContext.packageManager.resolveActivity(
+                    emergencyIntent, PackageManager.MATCH_DEFAULT_ONLY
+                )?.activityInfo?.packageName?.let { packages.add(it) }
+
+                reactApplicationContext.packageManager.queryIntentActivities(
+                    emergencyIntent, PackageManager.MATCH_DEFAULT_ONLY
+                ).forEach { info ->
+                    info.activityInfo?.packageName?.let { packages.add(it) }
+                }
+            }
+            packages.add("com.android.phone")
+            android.util.Log.d("KioskModule", "Emergency dialer packages for whitelist: $packages")
+        } catch (e: Exception) {
+            android.util.Log.w("KioskModule", "Could not resolve emergency dialer packages: ${e.message}")
+        }
+        return packages.toList()
+    }
+
+    private fun createEmergencyDialIntent(): Intent {
+        val intent = Intent(emergencyDialerAction).apply {
+            addCategory(Intent.CATEGORY_DEFAULT)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        try {
+            val activityInfo = listOf(
+                Intent(emergencyDialerAction).addCategory(Intent.CATEGORY_DEFAULT),
+                Intent(emergencyDialAction).addCategory(Intent.CATEGORY_DEFAULT),
+            ).asSequence()
+                .flatMap { emergencyIntent ->
+                    reactApplicationContext.packageManager.queryIntentActivities(
+                        emergencyIntent,
+                        PackageManager.MATCH_DEFAULT_ONLY
+                    ).asSequence()
+                }
+                .mapNotNull { it.activityInfo }
+                .firstOrNull()
+
+            if (activityInfo?.packageName != null && activityInfo.name != null) {
+                intent.component = ComponentName(activityInfo.packageName, activityInfo.name)
+                android.util.Log.d(
+                    "KioskModule",
+                    "Launching emergency dialer component: ${activityInfo.packageName}/${activityInfo.name}"
+                )
+            } else {
+                intent.component = ComponentName("com.android.phone", "com.android.phone.EmergencyDialer")
+                android.util.Log.d("KioskModule", "Launching fallback emergency dialer component: com.android.phone/.EmergencyDialer")
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("KioskModule", "Could not choose emergency dialer component: ${e.message}")
+            intent.component = ComponentName("com.android.phone", "com.android.phone.EmergencyDialer")
+        }
+        return intent
+    }
+
+    private fun ensureEmergencyDialerWhitelisted() {
+        try {
+            val dpm = reactApplicationContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+            if (!dpm.isDeviceOwnerApp(reactApplicationContext.packageName)) return
+
+            val adminComponent = ComponentName(reactApplicationContext, DeviceAdminReceiver::class.java)
+            val currentPackages = dpm.getLockTaskPackages(adminComponent).toMutableSet()
+            val updatedPackages = currentPackages.toMutableSet()
+            updatedPackages.addAll(getEmergencyDialerPackages())
+
+            if (updatedPackages != currentPackages) {
+                dpm.setLockTaskPackages(adminComponent, updatedPackages.toTypedArray())
+                android.util.Log.d("KioskModule", "Updated lock task whitelist for emergency dialer: $updatedPackages")
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("KioskModule", "Could not update emergency dialer whitelist: ${e.message}")
+        }
     }
 
     private fun getManagedAppPackages(): List<String> {

@@ -74,6 +74,25 @@ interface SecurityTabProps {
   onUrlFilterListChange: (patterns: string[]) => void;
   urlFilterShowFeedback: boolean;
   onUrlFilterShowFeedbackChange: (value: boolean) => void;
+
+  // Lock Screen Controls
+  lockscreenControlsEnabled: boolean;
+  onLockscreenControlsEnabledChange: (value: boolean) => void;
+  lockscreenWifiEnabled: boolean;
+  onLockscreenWifiEnabledChange: (value: boolean) => void;
+  lockscreenBluetoothEnabled: boolean;
+  onLockscreenBluetoothEnabledChange: (value: boolean) => void;
+  lockscreenEmergencyCallEnabled: boolean;
+  onLockscreenEmergencyCallEnabledChange: (value: boolean) => void;
+  lockscreenAudioEnabled: boolean;
+  onLockscreenAudioEnabledChange: (value: boolean) => void;
+  lockscreenFlashlightEnabled: boolean;
+  onLockscreenFlashlightEnabledChange: (value: boolean) => void;
+  lockscreenBrightnessEnabled: boolean;
+  onLockscreenBrightnessEnabledChange: (value: boolean) => void;
+  lockscreenRotationLockEnabled: boolean;
+  onLockscreenRotationLockEnabledChange: (value: boolean) => void;
+  lockscreenRotationLockAvailable: boolean;
 }
 
 const SecurityTab: React.FC<SecurityTabProps> = ({
@@ -117,6 +136,23 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
   onUrlFilterListChange,
   urlFilterShowFeedback,
   onUrlFilterShowFeedbackChange,
+  lockscreenControlsEnabled,
+  onLockscreenControlsEnabledChange,
+  lockscreenWifiEnabled,
+  onLockscreenWifiEnabledChange,
+  lockscreenBluetoothEnabled,
+  onLockscreenBluetoothEnabledChange,
+  lockscreenEmergencyCallEnabled,
+  onLockscreenEmergencyCallEnabledChange,
+  lockscreenAudioEnabled,
+  onLockscreenAudioEnabledChange,
+  lockscreenFlashlightEnabled,
+  onLockscreenFlashlightEnabledChange,
+  lockscreenBrightnessEnabled,
+  onLockscreenBrightnessEnabledChange,
+  lockscreenRotationLockEnabled,
+  onLockscreenRotationLockEnabledChange,
+  lockscreenRotationLockAvailable,
 }) => {
   return (
     <View>
@@ -493,6 +529,79 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
         </>
       )}
       
+      {/* Lock Screen Controls */}
+      <SettingsSection title="Lock Screen Controls" icon="lock">
+        <SettingsSwitch
+          label="Enable Lock Screen Controls"
+          hint="Show selected quick controls on the PIN entry screen without giving access to Settings or other apps."
+          value={lockscreenControlsEnabled}
+          onValueChange={onLockscreenControlsEnabledChange}
+        />
+        {lockscreenControlsEnabled && (
+          <>
+            <SettingsInfoBox variant="info">
+              <Text style={styles.infoText}>
+                ℹ️ These controls appear on the PIN entry screen without giving access to Settings or other apps.
+              </Text>
+            </SettingsInfoBox>
+            <View style={styles.divider} />
+            <SettingsSwitch
+              label="📶 WiFi control on lock screen"
+              hint="Show a WiFi button on the PIN entry screen. Users can turn WiFi on/off and connect to networks without unlocking."
+              value={lockscreenWifiEnabled}
+              onValueChange={onLockscreenWifiEnabledChange}
+            />
+            <View style={styles.divider} />
+            <SettingsSwitch
+              label="🔵 Bluetooth control on lock screen"
+              hint="Show a Bluetooth button on the PIN entry screen. Users can toggle Bluetooth and pair devices without unlocking."
+              value={lockscreenBluetoothEnabled}
+              onValueChange={onLockscreenBluetoothEnabledChange}
+            />
+            <View style={styles.divider} />
+            <SettingsSwitch
+              label="🆘 Emergency call button"
+              hint="Show an emergency call button on the PIN entry screen. Opens the phone emergency dialer."
+              value={lockscreenEmergencyCallEnabled}
+              onValueChange={onLockscreenEmergencyCallEnabledChange}
+            />
+            <View style={styles.divider} />
+            <SettingsSwitch
+              label="🔊 Audio controls on lock screen"
+              hint="Show mute and audio output controls on the PIN entry screen."
+              value={lockscreenAudioEnabled}
+              onValueChange={onLockscreenAudioEnabledChange}
+            />
+            <View style={styles.divider} />
+            <SettingsSwitch
+              label="🔦 Flashlight button on lock screen"
+              hint="Show a flashlight toggle on the PIN entry screen."
+              value={lockscreenFlashlightEnabled}
+              onValueChange={onLockscreenFlashlightEnabledChange}
+            />
+            <View style={styles.divider} />
+            <SettingsSwitch
+              label="☀️ Brightness control on lock screen"
+              hint="Show a brightness button on the PIN entry screen. Opens a slider."
+              value={lockscreenBrightnessEnabled}
+              onValueChange={onLockscreenBrightnessEnabledChange}
+            />
+            <View style={styles.divider} />
+            <SettingsSwitch
+              label="🔄 Rotation lock on lock screen"
+              hint={
+                lockscreenRotationLockAvailable
+                  ? 'Show a rotation lock toggle on the PIN entry screen.'
+                  : 'Unavailable on this device because Android is not allowing this app to change system rotation settings.'
+              }
+              value={lockscreenRotationLockAvailable && lockscreenRotationLockEnabled}
+              onValueChange={onLockscreenRotationLockEnabledChange}
+              disabled={!lockscreenRotationLockAvailable}
+            />
+          </>
+        )}
+      </SettingsSection>
+
       {/* Return Mechanism Info - Always visible */}
       <SettingsSection variant="info">
         <Text style={styles.infoTitle}>ℹ️ Return to Settings</Text>

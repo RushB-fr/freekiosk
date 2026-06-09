@@ -9,6 +9,7 @@ const { KioskModule } = NativeModules;
 const PIN_SERVICE = 'freekiosk_pin';
 const API_KEY_SERVICE = 'freekiosk_api_key';
 const MQTT_PASSWORD_SERVICE = 'freekiosk_mqtt_password';
+const WIFI_PASSWORD_SERVICE_PREFIX = 'freekiosk_wifi_password:';
 const BASIC_AUTH_PASSWORD_SERVICE = 'freekiosk_basic_auth_password';
 const LEGACY_API_KEY = '@kiosk_rest_api_key'; // Legacy AsyncStorage key for migration
 const ATTEMPTS_KEY = '@kiosk_pin_attempts';
@@ -25,6 +26,47 @@ interface PinAttempts {
   count: number;
   lastAttempt: number;
   lockoutUntil: number | null;
+}
+
+const wifiPasswordService = (ssid: string): string =>
+  `${WIFI_PASSWORD_SERVICE_PREFIX}${encodeURIComponent(ssid)}`;
+
+export async function saveSecureWifiPassword(ssid: string, password: string): Promise<boolean> {
+  if (!ssid || !password) return false;
+  try {
+    await Keychain.setGenericPassword(ssid, password, {
+      service: wifiPasswordService(ssid),
+      accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED,
+    });
+    return true;
+  } catch (error) {
+    console.error('[SecureStorage] Error saving WiFi password:', error);
+    return false;
+  }
+}
+
+export async function getSecureWifiPassword(ssid: string): Promise<string | null> {
+  if (!ssid) return null;
+  try {
+    const credentials = await Keychain.getGenericPassword({
+      service: wifiPasswordService(ssid),
+    });
+    return credentials ? credentials.password : null;
+  } catch (error) {
+    console.error('[SecureStorage] Error getting WiFi password:', error);
+    return null;
+  }
+}
+
+export async function clearSecureWifiPassword(ssid: string): Promise<void> {
+  if (!ssid) return;
+  try {
+    await Keychain.resetGenericPassword({
+      service: wifiPasswordService(ssid),
+    });
+  } catch (error) {
+    console.error('[SecureStorage] Error clearing WiFi password:', error);
+  }
 }
 
 /**
