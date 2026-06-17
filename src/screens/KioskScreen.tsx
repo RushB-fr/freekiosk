@@ -30,6 +30,7 @@ import Icon from '../components/Icon';
 import { revokeSettingsAccess } from '../utils/authState';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { CloudSyncService, CONFIG_UPDATED_EVENT, FORCE_UNENROLL_EVENT } from '../utils/CloudSyncService';
+import { CLOUD_ENABLED } from '../config/features';
 
 const { HttpServerModule } = NativeModules;
 
@@ -328,21 +329,24 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       (_u: string) => {},
       () => currentWebViewUrlRef.current || url,
     );
-    CloudSyncService.start();
+    if (CLOUD_ENABLED) {
+      CloudSyncService.start();
+    }
 
-    const onConfigUpdated = DeviceEventEmitter.addListener(CONFIG_UPDATED_EVENT, () => {
-      loadSettings();
-    });
+    const onConfigUpdated = CLOUD_ENABLED
+      ? DeviceEventEmitter.addListener(CONFIG_UPDATED_EVENT, () => { loadSettings(); })
+      : null;
 
-    const onForceUnenroll = DeviceEventEmitter.addListener(FORCE_UNENROLL_EVENT, () => {
-      // Settings were wiped — reload to pick up defaults
-      loadSettings();
-    });
+    const onForceUnenroll = CLOUD_ENABLED
+      ? DeviceEventEmitter.addListener(FORCE_UNENROLL_EVENT, () => { loadSettings(); })
+      : null;
 
     return () => {
-      onConfigUpdated.remove();
-      onForceUnenroll.remove();
-      CloudSyncService.stop();
+      onConfigUpdated?.remove();
+      onForceUnenroll?.remove();
+      if (CLOUD_ENABLED) {
+        CloudSyncService.stop();
+      }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

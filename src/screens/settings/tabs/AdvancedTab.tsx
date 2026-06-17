@@ -17,6 +17,7 @@ import { MqttSettingsSection } from '../../../components/MqttSettingsSection';
 import { CertificateInfo } from '../../../utils/CertificateModule';
 import AccessibilityModule from '../../../utils/AccessibilityModule';
 import { CloudSyncService } from '../../../utils/CloudSyncService';
+import { CLOUD_ENABLED } from '../../../config/features';
 import { Colors, Spacing, Typography } from '../../../theme';
 
 const { KioskModule } = NativeModules;
@@ -107,6 +108,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
   }, [checkAccessibilityStatus]);
 
   useEffect(() => {
+    if (!CLOUD_ENABLED) return;
     CloudSyncService.getCredentials().then(creds => {
       if (creds) {
         setIsEnrolled(true);
@@ -210,7 +212,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
   return (
     <View>
       {/* Cloud Management */}
-      <SettingsSection title="Cloud Management" icon="sync">
+      {CLOUD_ENABLED && <SettingsSection title="Cloud Management" icon="sync">
         {isEnrolled ? (
           <>
             <SettingsInfoBox variant="success" title="☁️ Cloud-managed">
@@ -261,7 +263,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
             />
           </>
         )}
-      </SettingsSection>
+      </SettingsSection>}
 
       {/* App Updates - Hidden in Play Store builds (compliance: no in-app updates) */}
       {enableSelfUpdate && (
