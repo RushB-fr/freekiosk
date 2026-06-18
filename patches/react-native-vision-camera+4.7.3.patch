@@ -1,0 +1,19 @@
+diff --git a/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraDevicesManager.kt b/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraDevicesManager.kt
+index 0386478..60e71a4 100644
+--- a/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraDevicesManager.kt
++++ b/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraDevicesManager.kt
+@@ -29,7 +29,13 @@ class CameraDevicesManager(private val reactContext: ReactApplicationContext) :
+   private var extensionsManager: ExtensionsManager? = null
+
+   private val callback = object : CameraManager.AvailabilityCallback() {
+-    private var deviceIds = cameraManager.cameraIdList.toMutableList()
++    private var deviceIds = try {
++      cameraManager.cameraIdList.toMutableList()
++    } catch (e: Throwable) {
++      // Cameraless x86 / BlissOS devices return null from getCameraIdList(),
++      // violating the platform @NonNull contract → NPE that crashes RN init. Treat as no cameras.
++      mutableListOf<String>()
++    }
+
+     // Check if device is still physically connected (even if onCameraUnavailable() is called)
+     private fun isDeviceConnected(cameraId: String): Boolean =

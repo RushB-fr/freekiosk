@@ -74,3 +74,9 @@ Shared TypeScript types for complex features live in `src/types/` — important 
 ### Dependency Patches
 
 `patches/` contains patch-package patches applied via `postinstall`. Do not upgrade patched dependencies without verifying the patches still apply.
+
+Current patches:
+- **`react-native-webview+13.16.0.patch`** — auto-grant camera/mic permissions in kiosk mode, SSL certificate handling for same-host redirects, and a native `DownloadListener` hook routing PDFs to the bundled viewer.
+- **`@react-native-community+slider+5.1.1.patch`** — re-entrancy guard in `ReactSliderManager.onProgressChanged()` to stop a `StackOverflowError` when initializing a Slider on Android 8.x (#86).
+- **`@react-native-cookies+cookies+6.2.1.patch`** — build/compat fix.
+- **`react-native-vision-camera+4.7.3.patch`** — guard `CameraDevicesManager` against `getCameraIdList()` returning `null` on cameraless x86 / BlissOS devices, which otherwise throws an NPE during TurboModule init and crashes the app on launch (#187).

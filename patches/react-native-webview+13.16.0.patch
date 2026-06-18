@@ -97,7 +97,7 @@ index 07f73fd..275f2cd 100644
  
      private PermissionAwareActivity getPermissionAwareActivity() {
 diff --git a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
-index 0287e1c..1abee9d 100644
+index 0287e1c..88d1fa8 100644
 --- a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
 +++ b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
 @@ -1,9 +1,11 @@
@@ -295,14 +295,16 @@ index 0287e1c..1abee9d 100644
      @Override
      public boolean shouldOverrideUrlLoading(WebView view, String url) {
          final RNCWebView rncWebView = (RNCWebView) view;
-@@ -157,23 +302,15 @@ public class RNCWebViewClient extends WebViewClient {
+@@ -155,25 +300,38 @@ public class RNCWebViewClient extends WebViewClient {
+         super.onReceivedHttpAuthRequest(view, handler, host, realm);
+     }
  
 +    /**
 +     * Returns true if the SSL error originates from the main frame rather than a sub-resource.
 +     * Handles three cases:
 +     *  - topWindowUrl is null/empty: initial navigation, webView.getUrl() not set yet
 +     *  - exact match: normal case
-+     *  - same host: redirect chain (e.g. http://host -> https://host or /path change)
++     *  - same host: redirect chain (e.g. http://host → https://host or /path change)
 +     */
 +    private boolean isMainFrameRequest(String topWindowUrl, String failingUrl) {
 +        if (topWindowUrl == null || topWindowUrl.isEmpty()) return true;
@@ -342,7 +344,7 @@ index 0287e1c..1abee9d 100644
          switch (code) {
              case SslError.SSL_DATE_INVALID:
                  description = "The date of the certificate is invalid";
-@@ -200,24 +337,226 @@ public class RNCWebViewClient extends WebViewClient {
+@@ -200,26 +358,230 @@ public class RNCWebViewClient extends WebViewClient {
  
          description = descriptionPrefix + description;
  
@@ -369,7 +371,7 @@ index 0287e1c..1abee9d 100644
 +            handler.proceed();
 +            return;
 +        }
-
+ 
 -        this.onReceivedError(
 +        // IMPORTANT: Only show dialog for self-signed (SSL_UNTRUSTED) on the main frame.
 +        // isMainFrameRequest() handles: null topWindowUrl (initial nav), exact match, and
@@ -442,9 +444,9 @@ index 0287e1c..1abee9d 100644
 +            code,
 +            description,
 +            failingUrl
-+        );
-+    }
-+
+         );
+     }
+ 
 +    // ✅ IMPROVED: Helper methods to manage certificate acceptance with SHA-256 and expiration
 +
 +    /**
@@ -516,7 +518,7 @@ index 0287e1c..1abee9d 100644
 +        SharedPreferences prefs = context.getSharedPreferences(
 +            "freekiosk_ssl_certs",
 +            Context.MODE_PRIVATE
-         );
++        );
 +
 +        // Check if certificate is accepted
 +        boolean isAccepted = prefs.getBoolean("cert_" + fingerprint, false);
@@ -580,10 +582,12 @@ index 0287e1c..1abee9d 100644
 +        if (BuildConfig.DEBUG) {
 +            Log.i(TAG, "All accepted certificates cleared");
 +        }
-     }
- 
++    }
++
      public void onReceivedSubResourceSslError(
-@@ -314,8 +653,6 @@ public class RNCWebViewClient extends WebViewClient {
+       WebView webView,
+       int errorCode,
+@@ -314,8 +676,6 @@ public class RNCWebViewClient extends WebViewClient {
      protected WritableMap createWebViewEvent(WebView webView, String url) {
          WritableMap event = Arguments.createMap();
          event.putDouble("target", RNCWebViewWrapper.getReactTagFromWebView(webView));
