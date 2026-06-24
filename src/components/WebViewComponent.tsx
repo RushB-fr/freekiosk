@@ -366,6 +366,17 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
     document.addEventListener('touchstart', sendInteraction, true);
     document.addEventListener('touchmove', sendInteraction, true);
 
+    // Keyboard / text input events — typing with the on-screen keyboard does NOT
+    // produce touch/scroll/click events, so without these the inactivity timer
+    // (screensaver + "Return to Start Page") keeps counting down while the user is
+    // typing into a text field. Android soft keyboards with predictive text fire
+    // 'keydown' with keyCode 229 and often skip per-character key events, but
+    // 'input' and 'compositionupdate' fire reliably for every character, so we
+    // listen to all of them (throttled via sendInteraction).
+    document.addEventListener('keydown', sendInteraction, true);
+    document.addEventListener('input', sendInteraction, true);
+    document.addEventListener('compositionupdate', sendInteraction, true);
+
     // ==================== speechSynthesis Polyfill ====================
     // Android WebView does not implement the Web Speech API (speechSynthesis).
     // This polyfill bridges window.speechSynthesis.speak() to FreeKiosk's native
