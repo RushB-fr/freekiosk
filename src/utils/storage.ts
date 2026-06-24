@@ -120,6 +120,8 @@ const KEYS = {
   DISABLE_USER_ZOOM: '@kiosk_disable_user_zoom',
   // Custom User Agent
   CUSTOM_USER_AGENT: '@kiosk_custom_user_agent',
+  // #177 — Pause WebView audio/video when the page is hidden (screensaver / screen off / background)
+  PAUSE_WEB_MEDIA_WHEN_HIDDEN: '@kiosk_pause_web_media_when_hidden',
   // MQTT (Home Assistant integration)
   MQTT_ENABLED: '@kiosk_mqtt_enabled',
   MQTT_BROKER_URL: '@kiosk_mqtt_broker_url',
@@ -2145,6 +2147,27 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting custom user agent:', error);
       return '';
+    }
+  },
+
+  // ============ Pause web media when hidden (#177) ============
+
+  savePauseWebMediaWhenHidden: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.PAUSE_WEB_MEDIA_WHEN_HIDDEN, value.toString());
+    } catch (error) {
+      console.error('Error saving pause web media when hidden:', error);
+    }
+  },
+
+  getPauseWebMediaWhenHidden: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.PAUSE_WEB_MEDIA_WHEN_HIDDEN);
+      // Default ON
+      return value === null ? true : value === 'true';
+    } catch (error) {
+      console.error('Error getting pause web media when hidden:', error);
+      return true;
     }
   },
 

@@ -8,6 +8,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.SystemClock
 import android.view.KeyEvent
+import android.view.View
+import android.view.ViewGroup
+import android.webkit.WebView
+import com.facebook.react.uimanager.UIManagerHelper
+import com.facebook.react.uimanager.common.UIManagerType
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
@@ -97,6 +102,46 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
         } catch (e: Exception) {
             promise.resolve(false)
         }
+    }
+
+    // #177 — Pause/resume the Android WebView identified by [tag] (its React node handle).
+    // react-native-webview's onHostPause() is a no-op, so WebView media keeps playing when the
+    // app is backgrounded / the screen is off / the screensaver overlay is shown. WebView.onPause()
+    // suspends the renderer (media, animations, WebRTC). Targeted by tag so only the main content
+    // WebView is affected — never the screensaver's own WebView.
+    @ReactMethod
+    fun pauseWebView(tag: Int, promise: Promise) = setWebViewPaused(tag, true, promise)
+
+    @ReactMethod
+    fun resumeWebView(tag: Int, promise: Promise) = setWebViewPaused(tag, false, promise)
+
+    private fun setWebViewPaused(tag: Int, paused: Boolean, promise: Promise) {
+        UiThreadUtil.runOnUiThread {
+            try {
+                val uiManager = UIManagerHelper.getUIManager(reactApplicationContext, UIManagerType.FABRIC)
+                val webView = findWebView(uiManager?.resolveView(tag))
+                if (webView == null) {
+                    promise.resolve(false)
+                    return@runOnUiThread
+                }
+                if (paused) webView.onPause() else webView.onResume()
+                promise.resolve(true)
+            } catch (e: Exception) {
+                // Never crash: the view may have been unmounted (race) or resolveView may throw.
+                promise.resolve(false)
+            }
+        }
+    }
+
+    private fun findWebView(view: View?): WebView? {
+        if (view == null) return null
+        if (view is WebView) return view
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) {
+                findWebView(view.getChildAt(i))?.let { return it }
+            }
+        }
+        return null
     }
 
     @ReactMethod

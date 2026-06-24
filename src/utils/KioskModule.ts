@@ -44,6 +44,10 @@ interface KioskModuleInterface {
   setKioskScreenActive(active: boolean): Promise<boolean>;
   // #135 — Dismiss the soft keyboard at the window level (works for WebView inputs too)
   hideKeyboard(): Promise<boolean>;
+  // #177 — Pause/resume the content WebView's renderer (stops background audio/video).
+  // tag is the React node handle of the WebView (from findNodeHandle).
+  pauseWebView(tag: number): Promise<boolean>;
+  resumeWebView(tag: number): Promise<boolean>;
 }
 
 const { KioskModule } = NativeModules;

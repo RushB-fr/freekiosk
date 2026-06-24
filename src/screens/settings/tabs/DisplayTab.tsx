@@ -79,6 +79,8 @@ interface DisplayTabProps {
   // Custom User Agent
   customUserAgent: string;
   onCustomUserAgentChange: (value: string) => void;
+  pauseWebMediaWhenHidden: boolean;
+  onPauseWebMediaWhenHiddenChange: (value: boolean) => void;
   
   // Screensaver
   screensaverEnabled: boolean;
@@ -172,6 +174,8 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
   onDisableUserZoomChange,
   customUserAgent,
   onCustomUserAgentChange,
+  pauseWebMediaWhenHidden,
+  onPauseWebMediaWhenHiddenChange,
   screensaverEnabled,
   onScreensaverEnabledChange,
   screensaverBrightness,
@@ -931,6 +935,18 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
         </SettingsSection>
       )}
       
+      {/* Web Media playback - Only in WebView mode (#177) */}
+      {displayMode === 'webview' && (
+        <SettingsSection title="Web Media" icon="volume-off">
+          <SettingsSwitch
+            label="Pause audio/video when hidden"
+            hint="Pause web page audio and video when the screensaver is shown, the screen turns off, or the app goes to the background — otherwise a web radio or video could keep playing unreachable in the background. Turn off to keep web audio playing continuously."
+            value={pauseWebMediaWhenHidden}
+            onValueChange={onPauseWebMediaWhenHiddenChange}
+          />
+        </SettingsSection>
+      )}
+
       {/* Keyboard Mode - Only in WebView mode */}
       {displayMode === 'webview' && (
         <SettingsSection title="Keyboard Mode" icon="keyboard-outline">

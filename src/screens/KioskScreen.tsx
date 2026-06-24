@@ -45,6 +45,8 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const isFocused = useIsFocused();
   const [url, setUrl] = useState<string>('');
   const [autoReload, setAutoReload] = useState<boolean>(false);
+  // #177 — Pause WebView audio/video when the page is hidden (screensaver / screen off / background)
+  const [pauseWebMediaWhenHidden, setPauseWebMediaWhenHidden] = useState<boolean>(true);
   const [screensaverEnabled, setScreensaverEnabled] = useState(false);
   const [isScreensaverActive, setIsScreensaverActive] = useState(false);
   const [defaultBrightness, setDefaultBrightness] = useState<number>(0.5);
@@ -378,6 +380,33 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       KioskModule.hideKeyboard?.().catch(() => {});
     }
   }, [isScreensaverActive]);
+
+  // #177 — Pause WebView audio/video while the screensaver overlay is shown (the page keeps
+  // running underneath, so a web radio would otherwise stay audible and uncontrollable), and
+  // resume the renderer when it's dismissed. Opt-in (default on); WebView mode only.
+  useEffect(() => {
+    if (!pauseWebMediaWhenHidden || displayMode !== 'webview') return;
+    if (isScreensaverActive) {
+      webViewRef.current?.pauseMedia();
+    } else {
+      webViewRef.current?.resumeMedia();
+    }
+  }, [isScreensaverActive, pauseWebMediaWhenHidden, displayMode]);
+
+  // #177 — Pause WebView audio/video when the whole app is backgrounded (e.g. system screen
+  // off when "Keep Screen On" is disabled — react-native-webview's onHostPause() is a no-op,
+  // so media would keep playing). Resume on return, unless the screensaver is still showing.
+  useEffect(() => {
+    if (!pauseWebMediaWhenHidden || displayMode !== 'webview') return;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'background') {
+        webViewRef.current?.pauseMedia();
+      } else if (state === 'active' && !isScreensaverActiveRef.current) {
+        webViewRef.current?.resumeMedia();
+      }
+    });
+    return () => sub.remove();
+  }, [pauseWebMediaWhenHidden, displayMode]);
 
   // Deactivate screensaver when the screen loses focus (navigating to Settings)
   // Only triggers cleanup on actual focus→blur transition (not when other deps change)
@@ -1435,6 +1464,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       const savedUrl = str(K.URL);
       console.log('[KioskScreen] savedUrl:', savedUrl);
       const savedAutoReload = bool(K.AUTO_RELOAD, true);
+      const savedPauseWebMediaWhenHidden = bool(K.PAUSE_WEB_MEDIA_WHEN_HIDDEN, true);
       const savedKioskEnabled = bool(K.KIOSK_ENABLED, false);
       const savedScreensaverEnabled = bool(K.SCREENSAVER_ENABLED, false);
       const savedDefaultBrightness = num(K.DEFAULT_BRIGHTNESS, 0.5);
@@ -1461,6 +1491,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
 
       if (savedUrl) setUrl(savedUrl);
       setAutoReload(savedAutoReload);
+      setPauseWebMediaWhenHidden(savedPauseWebMediaWhenHidden);
       setScreensaverEnabled(savedScreensaverEnabled);
       
       // Broadcast that settings are loaded (for ADB config waiting)

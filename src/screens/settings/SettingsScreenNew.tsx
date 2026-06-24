@@ -212,6 +212,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
 
   // Custom User Agent
   const [customUserAgent, setCustomUserAgent] = useState<string>('');
+  const [pauseWebMediaWhenHidden, setPauseWebMediaWhenHidden] = useState<boolean>(true);
   const [basicAuthUsername, setBasicAuthUsername] = useState<string>('');
   const [basicAuthPassword, setBasicAuthPassword] = useState<string>('');
   
@@ -663,6 +664,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     // Custom User Agent
     const savedCustomUserAgent = await StorageService.getCustomUserAgent();
     setCustomUserAgent(savedCustomUserAgent);
+    const savedPauseWebMediaWhenHidden = await StorageService.getPauseWebMediaWhenHidden();
+    setPauseWebMediaWhenHidden(savedPauseWebMediaWhenHidden);
 
     const savedBasicAuthUsername = await StorageService.getHttpBasicAuthUsername();
     const savedBasicAuthPassword = await getSecureBasicAuthPassword();
@@ -1377,6 +1380,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.saveWebViewZoomMode(zoomMode);
     await StorageService.saveDisableUserZoom(disableUserZoom);
     await StorageService.saveCustomUserAgent(customUserAgent);
+    await StorageService.savePauseWebMediaWhenHidden(pauseWebMediaWhenHidden);
     await StorageService.saveHttpBasicAuthUsername(basicAuthUsername);
     await saveSecureBasicAuthPassword(basicAuthPassword);
     await StorageService.saveAllowPowerButton(allowPowerButton);
@@ -1916,6 +1920,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             onDisableUserZoomChange={setDisableUserZoom}
             customUserAgent={customUserAgent}
             onCustomUserAgentChange={setCustomUserAgent}
+            pauseWebMediaWhenHidden={pauseWebMediaWhenHidden}
+            onPauseWebMediaWhenHiddenChange={setPauseWebMediaWhenHidden}
             screensaverEnabled={screensaverEnabled}
             onScreensaverEnabledChange={setScreensaverEnabled}
             screensaverBrightness={screensaverBrightness}

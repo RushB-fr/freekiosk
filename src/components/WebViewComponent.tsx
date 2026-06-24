@@ -9,11 +9,13 @@ import {
   Image,
   ScrollView,
   Linking,
-  NativeModules
+  NativeModules,
+  findNodeHandle
 } from 'react-native';
 
 const { HttpServerModule } = NativeModules;
 
+import KioskModule from '../utils/KioskModule';
 import { WebView } from 'react-native-webview';
 import type { WebViewErrorEvent, ShouldStartLoadRequest } from 'react-native-webview/lib/WebViewTypes';
 import { useNavigation } from '@react-navigation/native';
@@ -52,7 +54,14 @@ export interface WebViewComponentRef {
   reload: () => void;
   scrollToTop: () => void;
   clearCache: () => void;
+  pauseMedia: () => void;
+  resumeMedia: () => void;
 }
+
+// #177 — Pause any HTML5 media playing in the page. Injected on pause as a reliable
+// complement to the native WebView.onPause() (which alone doesn't stop <audio> on every
+// OEM WebView). Ends with `true;` to silence react-native-webview's injection warning.
+const MEDIA_PAUSE_JS = `(function(){try{document.querySelectorAll('audio,video').forEach(function(m){try{m.pause();}catch(e){}});}catch(e){}})();true;`;
 
 const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(({ 
   url, 
@@ -194,6 +203,27 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
       if (webViewRef.current) {
         webViewRef.current.clearCache(true);
         console.log('[WebView] Cache cleared via ref');
+      }
+    },
+    // #177 — Stop background audio/video when the page is hidden (screensaver / screen off
+    // / app backgrounded). JS-level pause of <audio>/<video> + native renderer suspend.
+    pauseMedia: () => {
+      const wv = webViewRef.current;
+      if (!wv) return;
+      wv.injectJavaScript(MEDIA_PAUSE_JS);
+      const node = findNodeHandle(wv);
+      if (node != null) {
+        KioskModule.pauseWebView?.(node).catch(() => {});
+      }
+    },
+    // Resume only re-enables the WebView renderer; media is intentionally left paused so
+    // audio doesn't auto-restart on its own (the page/user decides).
+    resumeMedia: () => {
+      const wv = webViewRef.current;
+      if (!wv) return;
+      const node = findNodeHandle(wv);
+      if (node != null) {
+        KioskModule.resumeWebView?.(node).catch(() => {});
       }
     }
   }));
