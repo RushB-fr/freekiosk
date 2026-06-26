@@ -3,6 +3,7 @@ import { DeviceEventEmitter } from 'react-native';
 
 import { StorageService, KEYS } from './storage';
 import DeviceControlService from '../services/DeviceControlService';
+import { CloudCommandService } from './CloudCommandService';
 import {
   CloudCredentials,
   SensitiveConfig,
@@ -181,6 +182,13 @@ class CloudSyncServiceClass {
         DeviceEventEmitter.emit(CONFIG_UPDATED_EVENT);
       } else if (data.config_version > configVersion) {
         await StorageService.saveConfigVersion(data.config_version);
+      }
+
+      // Pull + execute any pending commands / APK updates. Fire-and-forget so
+      // the heartbeat loop is never blocked by a long install; the service
+      // guards against overlapping polls internally.
+      if (data.pending_commands > 0) {
+        CloudCommandService.poll(c).catch(() => {/* poll() handles its own errors */});
       }
     } catch (error) {
       console.error('[CloudSync] Heartbeat error:', error);

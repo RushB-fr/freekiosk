@@ -1971,21 +1971,51 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             UiThreadUtil.runOnUiThread {
                 try {
                     val activity = reactContext.currentActivity
-                    val rootView = activity?.window?.decorView?.rootView
-                    
-                    if (rootView != null) {
-                        rootView.isDrawingCacheEnabled = true
-                        val bitmap = Bitmap.createBitmap(rootView.drawingCache)
-                        rootView.isDrawingCacheEnabled = false
-                        
-                        val outputStream = ByteArrayOutputStream()
-                        bitmap.compress(Bitmap.CompressFormat.PNG, 90, outputStream)
-                        screenshot = ByteArrayInputStream(outputStream.toByteArray())
-                        bitmap.recycle()
+                    val window = activity?.window
+                    val decorView = window?.decorView
+
+                    if (window != null && decorView != null &&
+                        decorView.width > 0 && decorView.height > 0
+                    ) {
+                        // PixelCopy captures hardware-accelerated layers (WebView, video,
+                        // SurfaceView) correctly, unlike the deprecated drawingCache which
+                        // rendered them black. It is asynchronous, so the latch is released
+                        // from the copy callback (and from every early-out path).
+                        val bitmap = Bitmap.createBitmap(
+                            decorView.width,
+                            decorView.height,
+                            Bitmap.Config.ARGB_8888,
+                        )
+                        val copyThread = android.os.HandlerThread("ScreenshotPixelCopy").apply { start() }
+                        val copyHandler = android.os.Handler(copyThread.looper)
+                        android.view.PixelCopy.request(
+                            window,
+                            bitmap,
+                            { copyResult ->
+                                try {
+                                    if (copyResult == android.view.PixelCopy.SUCCESS) {
+                                        val outputStream = ByteArrayOutputStream()
+                                        bitmap.compress(Bitmap.CompressFormat.PNG, 90, outputStream)
+                                        screenshot = ByteArrayInputStream(outputStream.toByteArray())
+                                    } else {
+                                        Log.e(TAG, "PixelCopy failed with result: $copyResult")
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Failed to encode screenshot bitmap", e)
+                                } finally {
+                                    bitmap.recycle()
+                                    copyThread.quitSafely()
+                                    latch.countDown()
+                                }
+                            },
+                            copyHandler,
+                        )
+                    } else {
+                        Log.e(TAG, "Cannot capture screenshot: no valid window/decorView")
+                        latch.countDown()
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to capture screenshot on UI thread", e)
-                } finally {
                     latch.countDown()
                 }
             }
@@ -1998,7 +2028,29 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             null
         }
     }
-    
+
+    /**
+     * JS-callable wrapper around captureScreenshot(): returns the current screen
+     * as a base64-encoded PNG. Used by the cloud command channel (screenshot
+     * command) to capture and upload, reusing the same capture path as the local
+     * REST `/api/screenshot` endpoint.
+     */
+    @ReactMethod
+    fun captureScreenshotBase64(promise: Promise) {
+        try {
+            val stream = captureScreenshot()
+            if (stream == null) {
+                promise.reject("CAPTURE_FAILED", "Unable to capture screenshot")
+                return
+            }
+            val bytes = stream.readBytes()
+            val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+            promise.resolve(base64)
+        } catch (e: Exception) {
+            promise.reject("CAPTURE_ERROR", e.message ?: "Screenshot capture error", e)
+        }
+    }
+
     /**
      * Clean up resources when module is destroyed
      */

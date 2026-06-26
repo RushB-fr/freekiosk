@@ -2,15 +2,19 @@
  * ApiService.ts
  * Service pour connecter l'API REST à l'application React Native
  * Gère les commandes reçues et fournit le statut en temps réel
+ *
+ * The command dispatch logic lives in `executeAction()` so it can be reused by
+ * BOTH the local REST/MQTT server (native `onApiCommand` events) AND the cloud
+ * command channel (CloudCommandService). A single source of truth for actions.
  */
 
-import { DeviceEventEmitter, NativeModules, NativeEventEmitter, Platform } from 'react-native';
+import { NativeModules, NativeEventEmitter, Platform } from 'react-native';
 import { httpServer } from './HttpServerModule';
 import { mqttClient } from './MqttModule';
 import { StorageService } from './storage';
 import { getSecureMqttPassword } from './secureStorage';
 
-const { HttpServerModule, MqttModule } = NativeModules;
+const { HttpServerModule, MqttModule, SoundPlayer } = NativeModules;
 
 export interface ApiCallbacks {
   onSetBrightness?: (value: number) => void;
@@ -37,6 +41,16 @@ export interface ApiCallbacks {
   onSetMode?: (mode: 'webview' | 'external_app', target?: string) => void;
 }
 
+/**
+ * Result of dispatching a single action. `ok=false` carries an error string so
+ * the cloud command channel can report a meaningful failure back to the server.
+ */
+export interface ActionResult {
+  ok: boolean;
+  result?: Record<string, unknown>;
+  error?: string;
+}
+
 export interface AppStatus {
   currentUrl: string;
   canGoBack: boolean;
@@ -57,6 +71,9 @@ export interface AppStatus {
   motionDetected?: boolean;
   motionAlwaysOn?: boolean;
 }
+
+const ok = (result?: Record<string, unknown>): ActionResult => ({ ok: true, result });
+const fail = (error: string): ActionResult => ({ ok: false, error });
 
 class ApiServiceClass {
   private callbacks: ApiCallbacks = {};
@@ -88,7 +105,7 @@ class ApiServiceClass {
 
     if (Platform.OS === 'android' && HttpServerModule) {
       this.eventEmitter = new NativeEventEmitter(HttpServerModule);
-      
+
       // Listen for API commands from native module
       // Defer to next tick to avoid CalledFromWrongThreadException
       // when react-native-screens manipulates views during commit on native thread
@@ -181,156 +198,187 @@ class ApiServiceClass {
   }
 
   /**
-   * Handle incoming API commands
+   * Handle incoming API commands from the native HTTP/MQTT server.
+   * Thin wrapper over executeAction() — the local server is fire-and-forget.
    */
   private handleCommand(event: { command: string; params: string }): void {
     console.log('ApiService: Received command', event.command);
-    
+    let params: Record<string, any> = {};
     try {
-      const params = JSON.parse(event.params || '{}');
-      
-      switch (event.command) {
-        case 'setBrightness':
-          if (this.callbacks.onSetBrightness && params.value !== undefined) {
-            this.callbacks.onSetBrightness(params.value);
-          }
-          break;
-          
-        case 'screenOn':
-          if (this.callbacks.onScreenOn) {
-            this.callbacks.onScreenOn();
-          }
-          break;
-          
-        case 'screenOff':
-          if (this.callbacks.onScreenOff) {
-            this.callbacks.onScreenOff();
-          }
-          break;
-          
-        case 'screensaverOn':
-          if (this.callbacks.onScreensaverOn) {
-            this.callbacks.onScreensaverOn();
-          }
-          break;
-          
-        case 'screensaverOff':
-          if (this.callbacks.onScreensaverOff) {
-            this.callbacks.onScreensaverOff();
-          }
-          break;
-          
-        case 'wake':
-          if (this.callbacks.onWake) {
-            this.callbacks.onWake();
-          }
-          break;
-          
-        case 'reload':
-          if (this.callbacks.onReload) {
-            this.callbacks.onReload();
-          }
-          break;
-          
-        case 'setUrl':
-          if (this.callbacks.onSetUrl && params.url) {
-            this.callbacks.onSetUrl(params.url);
-          }
-          break;
-          
-        case 'tts':
-          if (this.callbacks.onTts && params.text) {
-            this.callbacks.onTts(params.text);
-          }
-          break;
-          
-        case 'setVolume':
-          if (this.callbacks.onSetVolume && params.value !== undefined) {
-            this.callbacks.onSetVolume(params.value);
-          }
-          break;
-          
-        case 'rotationStart':
-          if (this.callbacks.onRotationStart) {
-            this.callbacks.onRotationStart();
-          }
-          break;
-          
-        case 'rotationStop':
-          if (this.callbacks.onRotationStop) {
-            this.callbacks.onRotationStop();
-          }
-          break;
-          
-        case 'toast':
-          if (this.callbacks.onToast && params.text) {
-            this.callbacks.onToast(params.text);
-          }
-          break;
-          
-        case 'launchApp':
-          if (this.callbacks.onLaunchApp && params.package) {
-            this.callbacks.onLaunchApp(params.package);
-          }
-          break;
-          
-        case 'executeJs':
-          if (this.callbacks.onExecuteJs && params.code) {
-            this.callbacks.onExecuteJs(params.code);
-          }
-          break;
-          
-        case 'reboot':
-          if (this.callbacks.onReboot) {
-            this.callbacks.onReboot();
-          }
-          break;
-          
-        case 'clearCache':
-          if (this.callbacks.onClearCache) {
-            this.callbacks.onClearCache();
-          }
-          break;
-          
-        case 'remoteKey':
-          if (this.callbacks.onRemoteKey && params.key) {
-            this.callbacks.onRemoteKey(params.key);
-          }
-          break;
-          
-        case 'autoBrightnessEnable':
-          if (this.callbacks.onAutoBrightnessEnable) {
-            const min = params.min !== undefined ? params.min : 10;
-            const max = params.max !== undefined ? params.max : 100;
-            const offset = params.offset !== undefined ? params.offset : undefined;
-            this.callbacks.onAutoBrightnessEnable(min, max, offset);
-          }
-          break;
-          
-        case 'autoBrightnessDisable':
-          if (this.callbacks.onAutoBrightnessDisable) {
-            this.callbacks.onAutoBrightnessDisable();
-          }
-          break;
-
-        case 'setMotionAlwaysOn':
-          if (this.callbacks.onSetMotionAlwaysOn) {
-            this.callbacks.onSetMotionAlwaysOn(params.value === true);
-          }
-          break;
-
-        case 'setMode':
-          if (this.callbacks.onSetMode && (params.mode === 'webview' || params.mode === 'external_app')) {
-            const target = params.url || params.package || undefined;
-            this.callbacks.onSetMode(params.mode, target);
-          }
-          break;
-
-        default:
-          console.warn('ApiService: Unknown command', event.command);
-      }
+      params = JSON.parse(event.params || '{}');
     } catch (error) {
-      console.error('ApiService: Error handling command', error);
+      console.error('ApiService: Invalid command params', error);
+      return;
+    }
+    this.executeAction(event.command, params)
+      .then(r => {
+        if (!r.ok) console.warn('ApiService: action not applied', event.command, r.error);
+      })
+      .catch(error => console.error('ApiService: Error handling command', error));
+  }
+
+  /**
+   * Dispatch a single action by command name. Shared by the local REST/MQTT
+   * server and the cloud command channel. Returns a structured result so the
+   * caller can report success/failure (the cloud needs this).
+   *
+   * Note: execution flows through the callbacks registered by KioskScreen, so a
+   * meaningful result requires that screen to be mounted (the normal runtime).
+   */
+  async executeAction(command: string, params: Record<string, any> = {}): Promise<ActionResult> {
+    const cb = this.callbacks;
+    const p = params || {};
+
+    switch (command) {
+      case 'setBrightness':
+        if (p.value === undefined) return fail('Missing brightness value');
+        if (!cb.onSetBrightness) return fail('Handler unavailable');
+        cb.onSetBrightness(p.value);
+        return ok();
+
+      case 'screenOn':
+        if (!cb.onScreenOn) return fail('Handler unavailable');
+        cb.onScreenOn();
+        return ok();
+
+      case 'screenOff':
+        if (!cb.onScreenOff) return fail('Handler unavailable');
+        cb.onScreenOff();
+        return ok();
+
+      case 'screensaverOn':
+        if (!cb.onScreensaverOn) return fail('Handler unavailable');
+        cb.onScreensaverOn();
+        return ok();
+
+      case 'screensaverOff':
+        if (!cb.onScreensaverOff) return fail('Handler unavailable');
+        cb.onScreensaverOff();
+        return ok();
+
+      case 'wake':
+        if (!cb.onWake) return fail('Handler unavailable');
+        cb.onWake();
+        return ok();
+
+      case 'reload':
+        if (!cb.onReload) return fail('Handler unavailable');
+        cb.onReload();
+        return ok();
+
+      case 'setUrl':
+        if (!p.url) return fail('Missing url');
+        if (!cb.onSetUrl) return fail('Handler unavailable');
+        cb.onSetUrl(p.url);
+        return ok();
+
+      case 'tts':
+        if (!p.text) return fail('Missing text');
+        if (!cb.onTts) return fail('Handler unavailable');
+        cb.onTts(p.text);
+        return ok();
+
+      case 'setVolume':
+        if (p.value === undefined) return fail('Missing volume value');
+        if (!cb.onSetVolume) return fail('Handler unavailable');
+        cb.onSetVolume(p.value);
+        return ok();
+
+      case 'rotationStart':
+        if (!cb.onRotationStart) return fail('Handler unavailable');
+        cb.onRotationStart();
+        return ok();
+
+      case 'rotationStop':
+        if (!cb.onRotationStop) return fail('Handler unavailable');
+        cb.onRotationStop();
+        return ok();
+
+      case 'toast':
+        if (!p.text) return fail('Missing toast text');
+        if (!cb.onToast) return fail('Handler unavailable');
+        cb.onToast(p.text);
+        return ok();
+
+      case 'launchApp':
+        if (!p.package) return fail('Missing package name');
+        if (!cb.onLaunchApp) return fail('Handler unavailable');
+        cb.onLaunchApp(p.package);
+        return ok();
+
+      case 'executeJs':
+        if (!p.code) return fail('Missing JS code');
+        if (!cb.onExecuteJs) return fail('Handler unavailable');
+        cb.onExecuteJs(p.code);
+        return ok();
+
+      case 'reboot':
+        if (!cb.onReboot) return fail('Handler unavailable');
+        cb.onReboot();
+        return ok();
+
+      case 'clearCache':
+        if (!cb.onClearCache) return fail('Handler unavailable');
+        cb.onClearCache();
+        return ok();
+
+      case 'remoteKey':
+        if (!p.key) return fail('Missing key');
+        if (!cb.onRemoteKey) return fail('Handler unavailable');
+        cb.onRemoteKey(p.key);
+        return ok();
+
+      case 'autoBrightnessEnable':
+        if (!cb.onAutoBrightnessEnable) return fail('Handler unavailable');
+        cb.onAutoBrightnessEnable(
+          p.min !== undefined ? p.min : 10,
+          p.max !== undefined ? p.max : 100,
+          p.offset !== undefined ? p.offset : undefined,
+        );
+        return ok();
+
+      case 'autoBrightnessDisable':
+        if (!cb.onAutoBrightnessDisable) return fail('Handler unavailable');
+        cb.onAutoBrightnessDisable();
+        return ok();
+
+      case 'setMotionAlwaysOn':
+        if (!cb.onSetMotionAlwaysOn) return fail('Handler unavailable');
+        cb.onSetMotionAlwaysOn(p.value === true);
+        return ok();
+
+      case 'setMode':
+        if (p.mode !== 'webview' && p.mode !== 'external_app') return fail('Invalid mode');
+        if (!cb.onSetMode) return fail('Handler unavailable');
+        cb.onSetMode(p.mode, p.url || p.package || undefined);
+        return ok();
+
+      // Screenshot needs a capture + upload round-trip, so it is handled directly
+      // by CloudCommandService — this stub only guards the local dispatch path.
+      case 'screenshot':
+        return fail('screenshot is handled by the cloud channel');
+
+      case 'playSound':
+        if (!p.url) return fail('Missing sound url');
+        if (!SoundPlayer?.playSound) return fail('Sound player unavailable');
+        try {
+          await SoundPlayer.playSound(p.url);
+          return ok();
+        } catch (e: any) {
+          return fail(e?.message ?? 'playSound failed');
+        }
+
+      case 'audioStop':
+        if (!SoundPlayer?.stopSound) return fail('Sound player unavailable');
+        try {
+          await SoundPlayer.stopSound();
+          return ok();
+        } catch (e: any) {
+          return fail(e?.message ?? 'audioStop failed');
+        }
+
+      default:
+        return fail(`Unknown command: ${command}`);
     }
   }
 
