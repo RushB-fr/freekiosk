@@ -5,8 +5,10 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.database.sqlite.SQLiteDatabase
 import android.os.Build
 import android.os.Handler
@@ -44,6 +46,7 @@ class KioskWatchdogService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private var isRunning = false
     private var lastRelaunchTime = 0L
+    private var screenOnReceiver: BroadcastReceiver? = null
 
     private val checkRunnable = object : Runnable {
         override fun run() {
@@ -60,6 +63,7 @@ class KioskWatchdogService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        registerScreenOnReceiver()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -88,6 +92,7 @@ class KioskWatchdogService : Service() {
     override fun onDestroy() {
         isRunning = false
         handler.removeCallbacks(checkRunnable)
+        unregisterScreenOnReceiver()
         super.onDestroy()
         DebugLog.d(TAG, "Watchdog destroyed")
     }
@@ -138,27 +143,50 @@ class KioskWatchdogService : Service() {
     }
 
     /**
-     * Check if MainActivity is still alive by inspecting the running app processes.
-     * This is more reliable than getRunningTasks() which is restricted on newer Android.
+     * Check if MainActivity is currently in the foreground by inspecting process importance.
+     * A task that exists in recents (but the launcher is in front) has
+     * IMPORTANCE_FOREGROUND_SERVICE — not IMPORTANCE_FOREGROUND — because the watchdog
+     * service is keeping the process alive but the activity is not visible.
+     * We only skip relaunch when the process importance is IMPORTANCE_FOREGROUND,
+     * meaning our activity is actually visible to the user.
      */
     private fun isMainActivityRunning(): Boolean {
         return try {
             val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            // getAppTasks() returns tasks belonging to our own application — no permission needed
-            val tasks = am.appTasks
-            tasks.any { task ->
-                try {
-                    val info = task.taskInfo
-                    info.baseActivity?.className == MainActivity::class.java.name ||
-                    info.topActivity?.className == MainActivity::class.java.name
-                } catch (e: Exception) {
-                    false
-                }
-            }
+            val processes = am.runningAppProcesses ?: return false
+            val self = processes.find { it.pid == android.os.Process.myPid() } ?: return false
+            self.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
         } catch (e: Exception) {
-            DebugLog.d(TAG, "Error checking tasks: ${e.message}")
-            // If we can't check, assume it's running (safer than relaunch-looping)
-            true
+            DebugLog.d(TAG, "Error checking foreground state: ${e.message}")
+            true // assume running if we can't check (avoids relaunch loops)
+        }
+    }
+
+    private fun registerScreenOnReceiver() {
+        if (screenOnReceiver != null) return
+        screenOnReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action != Intent.ACTION_SCREEN_ON) return
+                // In external app mode the external app is expected to come back via
+                // Android TV's task manager — don't interfere with a forced relaunch.
+                if (getDisplayMode() == "external_app") {
+                    DebugLog.d(TAG, "SCREEN_ON — external app mode, skipping forced relaunch")
+                    return
+                }
+                DebugLog.d(TAG, "SCREEN_ON — checking kiosk state immediately")
+                // Bypass the cooldown so we relaunch promptly after any standby/wake cycle.
+                lastRelaunchTime = 0L
+                checkAndRelaunch()
+            }
+        }
+        registerReceiver(screenOnReceiver, IntentFilter(Intent.ACTION_SCREEN_ON))
+        DebugLog.d(TAG, "SCREEN_ON receiver registered")
+    }
+
+    private fun unregisterScreenOnReceiver() {
+        screenOnReceiver?.let {
+            try { unregisterReceiver(it) } catch (_: Exception) {}
+            screenOnReceiver = null
         }
     }
 
