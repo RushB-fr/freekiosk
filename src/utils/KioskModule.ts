@@ -13,6 +13,8 @@ interface KioskModuleInterface {
   clearBlockAutoRelaunch(): Promise<boolean>;
   setBlockAutoRelaunch(block: boolean): Promise<boolean>;
   removeDeviceOwner(): Promise<boolean>;
+  setScreenLockCompatMode(enabled: boolean): Promise<boolean>;
+  setDefaultLauncherMode(enabled: boolean): Promise<boolean>;
   reboot(): Promise<boolean>;
   sendRemoteKey(key: string): Promise<boolean>;
   launchEmergencyDial(): Promise<boolean>;

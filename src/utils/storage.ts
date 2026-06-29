@@ -12,6 +12,8 @@ const KEYS = {
   AUTO_RELOAD: '@kiosk_auto_reload',
   KIOSK_ENABLED: '@kiosk_enabled',
   AUTO_LAUNCH: '@kiosk_auto_launch',
+  SCREEN_LOCK_COMPAT: '@kiosk_screen_lock_compat',
+  DEFAULT_LAUNCHER: '@kiosk_default_launcher',
   SCREENSAVER_ENABLED: '@screensaver_enabled',
   SCREENSAVER_INACTIVITY_ENABLED: '@screensaver_inactivity_enabled',
   SCREENSAVER_INACTIVITY_DELAY: '@screensaver_inactivity_delay',
@@ -264,6 +266,44 @@ export const StorageService = {
       return value ? JSON.parse(value) : false;
     } catch (error) {
       console.error('Error getting auto launch:', error);
+      return false;
+    }
+  },
+
+  //SCREEN LOCK COMPATIBILITY (#199) — opt-in; default false so behavior is unchanged
+  saveScreenLockCompat: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.SCREEN_LOCK_COMPAT, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving screen lock compatibility:', error);
+    }
+  },
+
+  getScreenLockCompat: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.SCREEN_LOCK_COMPAT);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting screen lock compatibility:', error);
+      return false;
+    }
+  },
+
+  //DEFAULT LAUNCHER (#199) — opt-in, Device Owner only; default false → behavior unchanged
+  saveDefaultLauncher: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.DEFAULT_LAUNCHER, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving default launcher:', error);
+    }
+  },
+
+  getDefaultLauncher: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.DEFAULT_LAUNCHER);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting default launcher:', error);
       return false;
     }
   },

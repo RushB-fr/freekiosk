@@ -127,6 +127,7 @@ class MainActivity : ReactActivity() {
     ensureBootReceiverEnabled()
     hideSystemUI()
     checkAndStartLockTask()
+    applyDefaultLauncherPolicy()
 
     // Start KioskWatchdogService (#96) — survives OOM kills via START_STICKY
     startKioskWatchdogIfNeeded()
@@ -277,11 +278,47 @@ class MainActivity : ReactActivity() {
   private fun checkAndStartLockTask() {
     val kioskEnabled = isKioskEnabled()
     DebugLog.d("MainActivity", "Kiosk enabled: $kioskEnabled")
-    
+
     if (kioskEnabled) {
       startLockTaskIfPossible()
     } else {
       DebugLog.d("MainActivity", "Kiosk mode disabled - normal mode")
+    }
+  }
+
+  /**
+   * Opt-in default-launcher policy (#199). When the "Set FreeKiosk as default launcher"
+   * setting is ON and we are Device Owner, register FreeKiosk (MainActivity) as the PERSISTENT
+   * preferred Home activity. The system then relaunches FreeKiosk itself at every boot and on
+   * Home — with no dependency on the OEM "appear on top" / autostart / background-pop-up
+   * permissions that Samsung resets on OS updates, which is what let the kiosk drop out after a
+   * reboot/update. The policy persists across updates as long as Device Owner is active.
+   *
+   * Reconciled on every launch (self-healing after an OS update): clear our own persistent
+   * preferences, then re-add only if the setting is ON. Gated on Device Owner, and a no-op
+   * unless the opt-in is enabled — so behavior is unchanged for everyone who hasn't turned it on.
+   */
+  private fun applyDefaultLauncherPolicy() {
+    if (!devicePolicyManager.isDeviceOwnerApp(packageName)) return
+    val enabled = getAsyncStorageValue("@kiosk_default_launcher", "false") == "true"
+    try {
+      // Only ever clears persistent preferences set by THIS admin (we set none other than HOME),
+      // so this is safe and idempotent — it prevents duplicate entries accumulating.
+      devicePolicyManager.clearPackagePersistentPreferredActivities(adminComponent, packageName)
+      if (enabled) {
+        val filter = IntentFilter(Intent.ACTION_MAIN).apply {
+          addCategory(Intent.CATEGORY_HOME)
+          addCategory(Intent.CATEGORY_DEFAULT)
+        }
+        devicePolicyManager.addPersistentPreferredActivity(
+          adminComponent, filter, ComponentName(this, MainActivity::class.java)
+        )
+        DebugLog.d("MainActivity", "Default launcher policy applied (FreeKiosk = persistent Home)")
+      } else {
+        DebugLog.d("MainActivity", "Default launcher policy off — persistent Home cleared")
+      }
+    } catch (e: Exception) {
+      DebugLog.errorProduction("MainActivity", "Failed to apply default launcher policy: ${e.message}")
     }
   }
 

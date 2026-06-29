@@ -85,6 +85,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [autoReload, setAutoReload] = useState<boolean>(false);
   const [kioskEnabled, setKioskEnabled] = useState<boolean>(false);
   const [autoLaunchEnabled, setAutoLaunchEnabled] = useState<boolean>(false);
+  const [screenLockCompatEnabled, setScreenLockCompatEnabled] = useState<boolean>(false);
+  const [defaultLauncherEnabled, setDefaultLauncherEnabled] = useState<boolean>(false);
   const [screensaverEnabled, setScreensaverEnabled] = useState<boolean>(false);
   const [inactivityDelay, setInactivityDelay] = useState<string>('10');
   const [motionEnabled, setMotionEnabled] = useState<boolean>(false);
@@ -427,6 +429,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedAutoReload = await StorageService.getAutoReload();
     const savedKioskEnabled = await StorageService.getKioskEnabled();
     const savedAutoLaunch = await StorageService.getAutoLaunch();
+    const savedScreenLockCompat = await StorageService.getScreenLockCompat();
+    const savedDefaultLauncher = await StorageService.getDefaultLauncher();
     const savedScreensaverEnabled = await StorageService.getScreensaverEnabled();
     const savedDefaultBrightness = await StorageService.getDefaultBrightness();
     const savedInactivityDelay = await StorageService.getScreensaverInactivityDelay();
@@ -447,6 +451,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setAutoReload(savedAutoReload);
     setKioskEnabled(savedKioskEnabled);
     setAutoLaunchEnabled(savedAutoLaunch ?? false);
+    setScreenLockCompatEnabled(savedScreenLockCompat ?? false);
+    setDefaultLauncherEnabled(savedDefaultLauncher ?? false);
     // Ensure BootReceiver component state matches the setting
     // This fixes installations where the component was previously disabled
     try {
@@ -829,6 +835,40 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       }
     } catch (error) {
       console.warn('Failed to toggle BootReceiver component:', error);
+    }
+  };
+
+  // #199 — opt-in: when ON and a native screen-lock is set, FreeKiosk steps aside for the
+  // secure keyguard at boot instead of fast-boot-locking over it (avoids the reboot freeze).
+  const toggleScreenLockCompat = async (value: boolean) => {
+    setScreenLockCompatEnabled(value);
+    await StorageService.saveScreenLockCompat(value);
+    // Mirror to device-encrypted storage so BootReceiver can read it at LOCKED_BOOT_COMPLETED,
+    // before credential-encrypted storage (AsyncStorage) is available.
+    try {
+      await KioskModule.setScreenLockCompatMode(value);
+    } catch (error) {
+      console.warn('Failed to sync screen-lock compat mode to native:', error);
+    }
+  };
+
+  // #199 — opt-in: make FreeKiosk the Home launcher so the system relaunches it after
+  // reboots/OS updates without depending on OEM autostart permissions. With Device Owner the
+  // policy is locked/automatic; without it we open the system Home-app picker (manual, not
+  // enforced — see SecurityTab hint).
+  const toggleDefaultLauncher = async (value: boolean) => {
+    setDefaultLauncherEnabled(value);
+    await StorageService.saveDefaultLauncher(value);
+    try {
+      if (isDeviceOwner) {
+        // Apply/clear the persistent Device Owner launcher policy immediately.
+        await KioskModule.setDefaultLauncherMode(value);
+      } else if (value) {
+        // No Device Owner: send the user to the system Home-app picker to choose FreeKiosk.
+        await KioskModule.openAndroidSettings('home');
+      }
+    } catch (error) {
+      console.warn('Failed to apply default launcher mode:', error);
     }
   };
 
@@ -2001,6 +2041,10 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             autoLaunchEnabled={autoLaunchEnabled}
             onAutoLaunchChange={toggleAutoLaunch}
             onOpenSystemSettings={openSystemSettingsSafely}
+            screenLockCompatEnabled={screenLockCompatEnabled}
+            onScreenLockCompatChange={toggleScreenLockCompat}
+            defaultLauncherEnabled={defaultLauncherEnabled}
+            onDefaultLauncherChange={toggleDefaultLauncher}
             autoRelaunchApp={autoRelaunchApp}
             onAutoRelaunchAppChange={setAutoRelaunchApp}
             backButtonMode={backButtonMode}

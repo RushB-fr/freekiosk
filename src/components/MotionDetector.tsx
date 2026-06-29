@@ -39,6 +39,10 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
   const cameraRef = useRef<Camera>(null);
   const lastMotionTime = useRef<number>(0);
   const detectionInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  // #198 — pending CAMERA_READY_DELAY startup timer. Tracked so stopDetection() can
+  // cancel it; otherwise a disable/restart within the delay window leaves it pending
+  // and it spins up an orphaned interval with a stale `enabled` closure.
+  const startDelayTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMounted = useRef<boolean>(true);
   const isCapturing = useRef<boolean>(false);
   const warmupFrames = useRef<number>(0);
@@ -105,6 +109,10 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
   }, [device]);
 
   const stopDetection = useCallback(() => {
+    if (startDelayTimeout.current) {
+      clearTimeout(startDelayTimeout.current);
+      startDelayTimeout.current = null;
+    }
     if (detectionInterval.current) {
       clearInterval(detectionInterval.current);
       detectionInterval.current = null;
@@ -266,7 +274,8 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
     onStatusChange?.('active');
 
     // Slightly longer delay for Camera2 — first capture includes camera open time
-    setTimeout(() => {
+    startDelayTimeout.current = setTimeout(() => {
+      startDelayTimeout.current = null;
       if (!isMounted.current || !enabled) return;
 
       detectionInterval.current = setInterval(() => {
@@ -281,7 +290,8 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
     stopDetection();
 
     // Add a small delay to ensure camera is fully initialized
-    setTimeout(() => {
+    startDelayTimeout.current = setTimeout(() => {
+      startDelayTimeout.current = null;
       if (!isMounted.current || !enabled) return;
 
       detectionInterval.current = setInterval(() => {

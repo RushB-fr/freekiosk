@@ -170,7 +170,18 @@ export type IconName =
   // Files & Folders
   | 'folder'
   | 'folder-open-outline'
-  | 'file-document-outline';
+  | 'file-document-outline'
+  // Network & MQTT
+  | 'lan-connect'
+  | 'lan-disconnect'
+  | 'home-search'
+  | 'timer-outline'
+  // Identity & misc
+  | 'account'
+  | 'identifier'
+  | 'rename-box'
+  | 'tag'
+  | 'printer';
 
 interface IconProps {
   name: IconName;

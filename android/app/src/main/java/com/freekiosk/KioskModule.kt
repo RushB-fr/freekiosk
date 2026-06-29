@@ -192,6 +192,57 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     }
 
     /**
+     * #199 — Persist the opt-in "system screen-lock compatibility" flag to device-encrypted
+     * storage the moment the user toggles it, so BootReceiver can honour it at the very next
+     * LOCKED_BOOT_COMPLETED (before AsyncStorage/CE is available). No-op effect on boot unless
+     * the user also has a secure screen-lock set.
+     */
+    @ReactMethod
+    fun setScreenLockCompatMode(enabled: Boolean, promise: Promise) {
+        try {
+            BootReceiver.updateScreenLockCompatFlag(reactApplicationContext, enabled)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERROR", "Failed to set screen-lock compat mode: ${e.message}")
+        }
+    }
+
+    /**
+     * #199 — Opt-in: register/unregister FreeKiosk as the PERSISTENT default Home launcher via the
+     * Device Owner policy, applied the instant the user toggles the setting. When ON, the system
+     * relaunches FreeKiosk at boot/Home without relying on OEM "appear on top" / autostart
+     * permissions (which Samsung resets on OS updates). Requires Device Owner. MainActivity also
+     * re-applies this on every launch (self-healing); clearing on toggle-OFF here restores the
+     * normal launcher immediately.
+     */
+    @ReactMethod
+    fun setDefaultLauncherMode(enabled: Boolean, promise: Promise) {
+        try {
+            val dpm = reactApplicationContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+            val admin = ComponentName(reactApplicationContext, DeviceAdminReceiver::class.java)
+            if (!dpm.isDeviceOwnerApp(reactApplicationContext.packageName)) {
+                promise.reject("NOT_DEVICE_OWNER", "Default launcher mode requires Device Owner")
+                return
+            }
+            // Clear our own persistent preferences first (idempotent), then re-add when enabling.
+            dpm.clearPackagePersistentPreferredActivities(admin, reactApplicationContext.packageName)
+            if (enabled) {
+                val filter = android.content.IntentFilter(Intent.ACTION_MAIN).apply {
+                    addCategory(Intent.CATEGORY_HOME)
+                    addCategory(Intent.CATEGORY_DEFAULT)
+                }
+                dpm.addPersistentPreferredActivity(
+                    admin, filter, ComponentName(reactApplicationContext, MainActivity::class.java)
+                )
+            }
+            android.util.Log.d("KioskModule", "Default launcher mode set: $enabled")
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERROR", "Failed to set default launcher mode: ${e.message}")
+        }
+    }
+
+    /**
      * Stop the KioskWatchdogService and cancel its notification.
      * Called on intentional kiosk exit to prevent the watchdog from relaunching the app.
      */
@@ -544,6 +595,13 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
             
             if (dpm.isDeviceOwnerApp(reactApplicationContext.packageName)) {
                 try {
+                    // #199 — Restore the normal launcher before relinquishing Device Owner, so the
+                    // user isn't left stuck with FreeKiosk as the persistent Home with no DO to undo it.
+                    try {
+                        dpm.clearPackagePersistentPreferredActivities(adminComponent, reactApplicationContext.packageName)
+                    } catch (e: Exception) {
+                        android.util.Log.w("KioskModule", "Could not clear launcher policy before DO removal: ${e.message}")
+                    }
                     dpm.clearDeviceOwnerApp(reactApplicationContext.packageName)
                     android.util.Log.d("KioskModule", "Device Owner removed successfully")
                     promise.resolve(true)
@@ -1142,6 +1200,7 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                 "date", "time" -> android.provider.Settings.ACTION_DATE_SETTINGS
                 "security" -> android.provider.Settings.ACTION_SECURITY_SETTINGS
                 "accessibility" -> android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS
+                "home", "launcher" -> android.provider.Settings.ACTION_HOME_SETTINGS
                 else -> android.provider.Settings.ACTION_SETTINGS
             }
 

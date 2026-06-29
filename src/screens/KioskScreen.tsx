@@ -167,6 +167,10 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
 
   // WebView reload key - increment to force reload
   const [webViewKey, setWebViewKey] = useState<number>(0);
+  // #198 — guard against a renderer crash-loop: track consecutive renderer-gone
+  // remounts within a short window so a WebView that dies immediately on every
+  // load doesn't get hammered into an infinite tight remount loop.
+  const rendererGoneRef = useRef<{ last: number; count: number }>({ last: 0, count: 0 });
   
   // JavaScript to execute in WebView (from API) - use object with counter to handle same code twice
   const [jsToExecute, setJsToExecute] = useState<string>('');
@@ -2037,6 +2041,28 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     lastUserInteractionRef.current = Date.now();
   }, []);
 
+  // #198 — WebView renderer process died (white screen). Force a full remount of the
+  // WebView (new native instance, as Android requires after onRenderProcessGone). A
+  // crash-loop guard backs off to a delayed remount if the renderer dies repeatedly in
+  // quick succession, so a page that crashes on every load can't pin the CPU.
+  const handleWebViewRenderProcessGone = useCallback((didCrash: boolean) => {
+    const now = Date.now();
+    const g = rendererGoneRef.current;
+    // Reset the streak if the last crash was a while ago (recovery considered stable).
+    if (now - g.last > 30000) {
+      g.count = 0;
+    }
+    g.last = now;
+    g.count += 1;
+    console.warn(`[KioskScreen] WebView renderer gone (didCrash=${didCrash}), remount #${g.count}`);
+    if (g.count > 3) {
+      // Repeated rapid crashes — back off before remounting to avoid a tight loop.
+      setTimeout(() => setWebViewKey(prev => prev + 1), 5000);
+    } else {
+      setWebViewKey(prev => prev + 1);
+    }
+  }, []);
+
   // Single useEffect that manages the inactivity return timer
   // It re-runs whenever relevant state changes
   useEffect(() => {
@@ -2567,6 +2593,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
                   ? { username: basicAuthUsername, password: basicAuthPassword }
                   : undefined
               }
+              onRenderProcessGone={handleWebViewRenderProcessGone}
             />
           )}
         </>

@@ -25,6 +25,14 @@ class BootReceiver : BroadcastReceiver() {
         const val DE_PREFS_NAME = "kiosk_de_boot_prefs"
         const val DE_KEY_FAST_BOOT_LOCK = "fast_boot_lock_enabled"
 
+        /**
+         * #199 — Opt-in "system screen-lock compatibility". Cached in DE storage (like the
+         * fast-boot flag) so it is readable at ACTION_LOCKED_BOOT_COMPLETED, before the user
+         * unlocks and CE storage (AsyncStorage) becomes available. Default false → no behavior
+         * change for anyone who hasn't enabled it.
+         */
+        const val DE_KEY_SCREEN_LOCK_COMPAT = "screen_lock_compat_enabled"
+
         fun updateDeBootFlag(context: Context, enabled: Boolean) {
             try {
                 val deCtx = context.createDeviceProtectedStorageContext()
@@ -45,6 +53,41 @@ class BootReceiver : BroadcastReceiver() {
                 false
             }
         }
+
+        /** #199 — Persist the opt-in screen-lock compatibility flag to DE storage. Called from
+         *  KioskModule the instant the user toggles the setting (so the very next boot honours it)
+         *  and again on every BOOT_COMPLETED to self-heal. */
+        fun updateScreenLockCompatFlag(context: Context, enabled: Boolean) {
+            try {
+                val deCtx = context.createDeviceProtectedStorageContext()
+                deCtx.getSharedPreferences(DE_PREFS_NAME, Context.MODE_PRIVATE)
+                    .edit().putBoolean(DE_KEY_SCREEN_LOCK_COMPAT, enabled).apply()
+                DebugLog.d("BootReceiver", "DE screen-lock-compat flag updated: $enabled")
+            } catch (e: Exception) {
+                DebugLog.errorProduction("BootReceiver", "Failed to update DE compat flag: ${e.message}")
+            }
+        }
+
+        fun readScreenLockCompatFlag(context: Context): Boolean {
+            return try {
+                val deCtx = context.createDeviceProtectedStorageContext()
+                deCtx.getSharedPreferences(DE_PREFS_NAME, Context.MODE_PRIVATE)
+                    .getBoolean(DE_KEY_SCREEN_LOCK_COMPAT, false)
+            } catch (e: Exception) {
+                false
+            }
+        }
+
+        /** True when a secure lock screen (PIN / pattern / password) is configured on the device.
+         *  Queryable early at boot — it does not depend on CE storage being unlocked. */
+        fun isDeviceSecure(context: Context): Boolean {
+            return try {
+                val km = context.getSystemService(Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
+                km.isDeviceSecure
+            } catch (e: Exception) {
+                false
+            }
+        }
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -60,7 +103,14 @@ class BootReceiver : BroadcastReceiver() {
             // We instead read the DE SharedPreferences flag that was saved on the previous
             // BOOT_COMPLETED and is still readable because DE storage is always unlocked.
             if (intent.action == Intent.ACTION_LOCKED_BOOT_COMPLETED) {
-                if (readDeBootFlag(context)) {
+                // #199 — When screen-lock compatibility is opt-in ON *and* a secure lock screen is
+                // actually set, do NOT fast-boot-lock: let the secure keyguard own the boot so the
+                // user can enter their password (CE then unlocks) and FreeKiosk starts cleanly at
+                // BOOT_COMPLETED. Without this, the kiosk lock-task fights the secure keyguard here
+                // and the device can dead-loop. Gated on both conditions → zero change when the
+                // setting is off or no screen-lock is configured.
+                val compatActive = readScreenLockCompatFlag(context) && isDeviceSecure(context)
+                if (readDeBootFlag(context) && !compatActive) {
                     DebugLog.d("BootReceiver", "LOCKED_BOOT: DE flag=true — launching BootLockActivity immediately")
                     try {
                         val lockIntent = Intent(context, BootLockActivity::class.java)
@@ -69,6 +119,8 @@ class BootReceiver : BroadcastReceiver() {
                     } catch (e: Exception) {
                         DebugLog.errorProduction("BootReceiver", "BootLockActivity failed at LOCKED_BOOT: ${e.message}")
                     }
+                } else if (compatActive) {
+                    DebugLog.d("BootReceiver", "LOCKED_BOOT: screen-lock compatibility active + device secure — deferring to the keyguard; FreeKiosk will start at BOOT_COMPLETED")
                 } else {
                     DebugLog.d("BootReceiver", "LOCKED_BOOT: DE flag=false — skipping BootLockActivity")
                 }
@@ -89,8 +141,17 @@ class BootReceiver : BroadcastReceiver() {
                 return
             }
 
-            // Persist current "fast boot lock" eligibility to DE storage for next boot
-            val fastLock = shouldUseFastBootLock(context)
+            // #199 — Persist the opt-in screen-lock compatibility setting to DE storage so the
+            // next LOCKED_BOOT_COMPLETED can read it before CE unlocks. CE is available now.
+            val compatSetting = isScreenLockCompatSetting(context)
+            updateScreenLockCompatFlag(context, compatSetting)
+
+            // Persist current "fast boot lock" eligibility to DE storage for next boot.
+            // When compatibility mode is on AND a secure screen-lock is set, suppress fast-boot-lock
+            // so we don't fight the secure keyguard at boot; FreeKiosk still starts via the normal
+            // path below (this BOOT_COMPLETED fires after the user unlocks). Off → unchanged.
+            val screenLockCompatActive = compatSetting && isDeviceSecure(context)
+            val fastLock = shouldUseFastBootLock(context) && !screenLockCompatActive
             updateDeBootFlag(context, fastLock)
 
             // ── #98 fix: launch BootLockActivity IMMEDIATELY if Device Owner + kiosk ──
@@ -148,6 +209,26 @@ class BootReceiver : BroadcastReceiver() {
             val cursor = db.rawQuery(
                 "SELECT value FROM catalystLocalStorage WHERE key = ?",
                 arrayOf("@kiosk_enabled"))
+            val enabled = if (cursor.moveToFirst()) cursor.getString(0) == "true" else false
+            cursor.close()
+            db.close()
+            enabled
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * #199 — Read the opt-in "system screen-lock compatibility" setting from AsyncStorage (CE).
+     * Only callable once CE storage is available (BOOT_COMPLETED), not at LOCKED_BOOT.
+     */
+    private fun isScreenLockCompatSetting(context: Context): Boolean {
+        return try {
+            val dbPath = context.getDatabasePath("RKStorage").absolutePath
+            val db = SQLiteDatabase.openDatabase(dbPath, null, SQLiteDatabase.OPEN_READONLY)
+            val cursor = db.rawQuery(
+                "SELECT value FROM catalystLocalStorage WHERE key = ?",
+                arrayOf("@kiosk_screen_lock_compat"))
             val enabled = if (cursor.moveToFirst()) cursor.getString(0) == "true" else false
             cursor.close()
             db.close()

@@ -86,7 +86,7 @@ export default function BluetoothDialog({ visible, onClose }: Props) {
       } catch (e) {
         console.warn('[BluetoothDialog] state poll error:', e);
       }
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      await new Promise<void>((resolve) => setTimeout(resolve, 600));
     }
     return false;
   };

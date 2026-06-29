@@ -18,7 +18,7 @@ const { HttpServerModule } = NativeModules;
 import KioskModule from '../utils/KioskModule';
 import UpdateModule from '../utils/UpdateModule';
 import { WebView } from 'react-native-webview';
-import type { WebViewErrorEvent, ShouldStartLoadRequest } from 'react-native-webview/lib/WebViewTypes';
+import type { WebViewErrorEvent, ShouldStartLoadRequest, WebViewRenderProcessGoneEvent } from 'react-native-webview/lib/WebViewTypes';
 import { useNavigation } from '@react-navigation/native';
 import PrintModule from '../utils/PrintModule';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -47,6 +47,7 @@ interface WebViewComponentProps {
   disableUserZoom?: boolean; // Prevent pinch-to-zoom and double-tap zoom
   customUserAgent?: string; // Custom User-Agent string (empty = default modern Chrome UA)
   basicAuthCredential?: { username: string; password: string };
+  onRenderProcessGone?: (didCrash: boolean) => void; // #198 — renderer process died, ask parent to remount
 }
 
 export interface WebViewComponentRef {
@@ -85,6 +86,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   disableUserZoom = false,
   customUserAgent = '',
   basicAuthCredential,
+  onRenderProcessGone,
 }, ref) => {
   const navigation = useNavigation<NavigationProp>();
   const webViewRef = useRef<WebView>(null);
@@ -802,6 +804,25 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
     }
   };
 
+  // #198 — The Chromium renderer process died (typically an OOM kill). The native
+  // RNCWebViewClient already returns true so the app process survives, but the WebView
+  // instance is now defunct (blank white screen) and, per Android's contract, must be
+  // remounted rather than reused. Best-effort clear the WebView cache to rebuild the
+  // corrupted Chromium code-cache index, then ask the parent to bump webViewKey for a
+  // full remount (same recovery pattern as inactivity return / planner).
+  const handleRenderProcessGone = (event: WebViewRenderProcessGoneEvent): void => {
+    const didCrash = !!event?.nativeEvent?.didCrash;
+    console.error('[FreeKiosk] WebView renderer process gone (didCrash=' + didCrash + '), recovering...');
+    try {
+      webViewRef.current?.clearCache(true);
+    } catch {
+      // Defunct WebView — clearing may throw; the remount below is the real recovery.
+    }
+    if (onRenderProcessGone) {
+      onRenderProcessGone(didCrash);
+    }
+  };
+
   const handleReload = (): void => {
     setError(false);
     setLoading(true);
@@ -960,6 +981,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
           }
         }}
         onError={handleError}
+        onRenderProcessGone={handleRenderProcessGone}
 
         javaScriptEnabled={true}
         domStorageEnabled={true}
