@@ -18,6 +18,9 @@ import { CertificateInfo } from '../../../utils/CertificateModule';
 import AccessibilityModule from '../../../utils/AccessibilityModule';
 import { CloudSyncService } from '../../../utils/CloudSyncService';
 import { CLOUD_ENABLED } from '../../../config/features';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../../navigation/AppNavigator';
 import { Colors, Spacing, Typography } from '../../../theme';
 
 const { KioskModule } = NativeModules;
@@ -86,6 +89,8 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
   const [enrolling, setEnrolling] = useState(false);
   const [unenrolling, setUnenrolling] = useState(false);
 
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
   const checkAccessibilityStatus = useCallback(async () => {
     try {
       const enabled = await AccessibilityModule.isAccessibilityServiceEnabled();
@@ -149,6 +154,9 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
               setOrgName(result.organizationName ?? null);
               setCloudUrl('');
               setEnrollToken('');
+              // Settings were wiped to defaults — send the user back to the base
+              // KioskScreen with a fresh mount so the reset config takes effect.
+              navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] });
             } else {
               Alert.alert('Enrollment failed', result.error ?? 'Unknown error');
             }
@@ -184,7 +192,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
       // Use KioskModule.openAndroidSettings which properly handles Lock Task Mode
       // (temporarily exits lock task before launching the settings intent)
       await KioskModule.openAndroidSettings('accessibility');
-    } catch (e: any) {
+    } catch {
       Alert.alert('Error', 'Could not open Accessibility Settings');
     }
   };

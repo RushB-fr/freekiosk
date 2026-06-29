@@ -235,6 +235,13 @@ class CloudSyncServiceClass {
       // First heartbeat — will pull cloud config if one exists
       await this.start();
 
+      // Local settings were wiped above. Force the running app to reload so the
+      // reset (or cloud-pushed) config takes effect immediately. Without this, the
+      // kiosk keeps its pre-enrollment config in memory until an app restart
+      // (the heartbeat only emits this event when the cloud actually pushes a
+      // config, so a freshly-enrolled device with no cloud config never reloaded).
+      DeviceEventEmitter.emit(CONFIG_UPDATED_EVENT);
+
       return { success: true, organizationName: data.organization_name };
     } catch {
       return { success: false, error: 'Cannot reach server' };
