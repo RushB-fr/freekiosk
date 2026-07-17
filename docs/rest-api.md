@@ -498,19 +498,31 @@ Navigate to a new URL.
 ```
 
 #### `POST /api/mode`
-Switch display mode at runtime. Switches between WebView and External App mode without restarting.
+Switch display mode at runtime, without rebooting the device. Supports all three display modes: WebView, External App, and Media Player. The switch is applied through the same setup path used when you change the mode in Settings, so it also persists across an app restart.
 
 **Switch to WebView mode:**
 ```json
 { "mode": "webview", "url": "https://example.com" }
 ```
-`url` is optional — omit to keep the current URL.
+`url` is optional (omit to keep the current URL). If the device is configured for Dashboard mode, WebView shows the dashboard grid as configured.
 
-**Switch to External App mode:**
+**Switch to External App mode (single app):**
 ```json
 { "mode": "external_app", "package": "com.example.app" }
 ```
 The app must be installed on the device. The overlay service (return button) is started automatically.
+
+**Switch to External App mode (stored config, e.g. multi-app grid):**
+```json
+{ "mode": "external_app" }
+```
+Omit `package` to restore the device's stored External App configuration (the multi-app launcher grid when configured).
+
+**Switch to Media Player mode:**
+```json
+{ "mode": "media_player" }
+```
+Uses the playlist and Media Player settings already configured on the device.
 
 #### `GET|POST /api/wake`
 Wake from screensaver.

@@ -324,7 +324,7 @@ Commands are sent by publishing to `{baseTopic}/{topicId}/set/{entity}`.
 | **clear_cache** | clearCache | any | Clear WebView cache |
 | **lock** | lockDevice | any | Lock device screen |
 | **url** | setUrl | URL string | Navigate to URL |
-| **mode** | setMode | JSON `{"mode":"webview","url":"https://..."}` or `{"mode":"external_app","package":"com.app"}` | Switch display mode at runtime |
+| **mode** | setMode | JSON: `{"mode":"webview","url":"https://..."}`, `{"mode":"external_app","package":"com.app"}` (omit `package` for the stored multi-app config), or `{"mode":"media_player"}` | Switch display mode at runtime (webview / external_app / media_player) |
 | **tts** | tts | text string | Text-to-speech (handled natively) |
 | **toast** | toast | text string | Show toast notification (handled natively) |
 | **launch_app** | launchApp | package name | Launch external app |

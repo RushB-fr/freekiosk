@@ -59,7 +59,8 @@ class KioskHttpServer(
         // POST-only endpoints that require a JSON body (GET on these → 405, not 404)
         val postOnlyUris = setOf(
             "/api/url", "/api/navigate", "/api/tts", "/api/toast",
-            "/api/app/launch", "/api/js", "/api/audio/play", "/api/remote/text"
+            "/api/app/launch", "/api/js", "/api/audio/play", "/api/remote/text",
+            "/api/mode"
         )
 
         val response = try {
@@ -97,6 +98,7 @@ class KioskHttpServer(
                 method == Method.POST && uri == "/api/tts" -> handleTts(session)
                 method == Method.POST && uri == "/api/toast" -> handleToast(session)
                 method == Method.POST && uri == "/api/app/launch" -> handleLaunchApp(session)
+                method == Method.POST && uri == "/api/mode" -> handleSetMode(session)
                 method == Method.POST && uri == "/api/js" -> handleExecuteJs(session)
                 method == Method.POST && uri == "/api/audio/play" -> handleAudioPlay(session)
                 method == Method.POST && uri == "/api/remote/text" -> handleKeyboardText(session)
@@ -183,6 +185,7 @@ class KioskHttpServer(
                     put("/api/toast - Show toast {text: string}")
                     put("/api/volume - Set volume {value: 0-100}")
                     put("/api/app/launch - Launch app {package: string}")
+                    put("/api/mode - Switch display mode {mode: webview|external_app|media_player, url?|package?}")
                     put("/api/js - Execute JavaScript {code: string}")
                     put("/api/audio/play - Play audio {url: string, loop: bool, volume: 0-100}")
                     put("/api/remote/text - Type text {text: string}")
@@ -328,6 +331,40 @@ class KioskHttpServer(
         }
 
         val result = commandHandler("setUrl", JSONObject().put("url", url))
+        return jsonSuccess(result)
+    }
+
+    private fun handleSetMode(session: IHTTPSession): Response {
+        checkControlAllowed()?.let { return it }
+
+        val body = parseBody(session)
+        val mode = body?.optString("mode", "") ?: ""
+
+        if (mode != "webview" && mode != "external_app" && mode != "media_player") {
+            return jsonError(Response.Status.BAD_REQUEST, "mode must be 'webview', 'external_app' or 'media_player'")
+        }
+
+        val params = JSONObject().put("mode", mode)
+        when (mode) {
+            "external_app" -> {
+                // package optional: given → single-app mode with that app; omitted →
+                // restore the stored external-app config (e.g. the multi-app grid).
+                val packageName = body?.optString("package", "") ?: ""
+                if (packageName.isNotEmpty()) {
+                    params.put("package", packageName)
+                }
+            }
+            "webview" -> {
+                // url optional: omit to keep the stored/current URL.
+                val url = body?.optString("url", "") ?: ""
+                if (url.isNotEmpty()) {
+                    params.put("url", url)
+                }
+            }
+            // media_player: no target, uses the stored playlist and settings.
+        }
+
+        val result = commandHandler("setMode", params)
         return jsonSuccess(result)
     }
 

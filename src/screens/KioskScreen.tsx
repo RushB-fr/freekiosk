@@ -682,56 +682,51 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
             console.error('[API] Error setting motion always-on:', error);
           }
         },
-        onSetMode: async (mode: 'webview' | 'external_app', target?: string) => {
+        onSetMode: async (mode: 'webview' | 'external_app' | 'media_player', target?: string) => {
           if (isNavigatingToPinRef.current) {
             console.log('[API] setMode ignored: navigateToPin in progress');
             return;
           }
 
+          // Persist the requested mode (and its target), then re-run loadSettings(): the
+          // same canonical setup path the app runs on every focus / return-from-settings.
+          // Delegating here means every transition between ANY modes (webview, external_app,
+          // media_player, including the dashboard and multi-app variants) is set up exactly
+          // as a normal launch would, without duplicating the per-mode logic. Side effect:
+          // the switch now persists across an app restart, like changing it in Settings.
           if (mode === 'webview') {
-            // Stop external-app services before switching back to webview
-            try { await OverlayServiceModule.stopOverlayService(); } catch {}
-            try { await AppLauncherModule.stopBackgroundMonitor(); } catch {}
-            setIsAppLaunched(false);
-            setDisplayMode('webview');
+            await StorageService.saveDisplayMode('webview');
             if (target) {
-              setUrl(target);
-              setBaseUrl(target);
-              setWebViewKey(k => k + 1);
               await StorageService.saveUrl(target);
             }
-            console.log('[API] Switched to webview mode', target ?? '');
-
-          } else if (mode === 'external_app' && target) {
-            const isInstalled = await AppLauncherModule.isAppInstalled(target);
-            if (!isInstalled) {
-              console.warn('[API] setMode: app not installed:', target);
-              return;
+          } else if (mode === 'external_app') {
+            if (target) {
+              // Explicit package: single-app mode with that app.
+              const isInstalled = await AppLauncherModule.isAppInstalled(target);
+              if (!isInstalled) {
+                console.warn('[API] setMode: app not installed:', target);
+                return;
+              }
+              await StorageService.saveDisplayMode('external_app');
+              await StorageService.saveExternalAppPackage(target);
+              await StorageService.saveExternalAppMode('single');
+            } else {
+              // No package: restore the stored external-app config (e.g. multi-app grid).
+              await StorageService.saveDisplayMode('external_app');
             }
-            // Read overlay settings fresh from storage to avoid stale closure
-            const tapCount = await StorageService.getReturnTapCount();
-            const tapTimeout = await StorageService.getReturnTapTimeout();
-            const retMode = await StorageService.getReturnMode();
-            const retPos = await StorageService.getReturnButtonPosition();
-            const autoRelaunch = await StorageService.getAutoRelaunchApp();
-            const allowNotif = await StorageService.getAllowNotifications();
-
-            setDisplayMode('external_app');
-            setExternalAppPackage(target);
-            setExternalAppMode('single');
-            externalAppModeRef.current = 'single';
-
-            try {
-              await OverlayServiceModule.startOverlayService(
-                tapCount, tapTimeout, retMode, retPos, target, autoRelaunch, allowNotif,
-              );
-            } catch (e) {
-              console.warn('[API] setMode: OverlayService start failed:', e);
-            }
-            await AppLauncherModule.launchExternalApp(target);
-            setIsAppLaunched(true);
-            console.log('[API] Switched to external_app mode:', target);
+          } else if (mode === 'media_player') {
+            await StorageService.saveDisplayMode('media_player');
+          } else {
+            console.warn('[API] setMode: unknown mode:', mode);
+            return;
           }
+
+          // In external_app mode FreeKiosk is backgrounded behind the launched app, so bring
+          // it forward first; loadSettings() then rebuilds the target mode (for external_app
+          // it re-launches the app over us). No-op when already in the foreground.
+          await KioskModule.bringToFront().catch(() => {});
+          await loadSettings();
+          console.log('[API] Switched to', mode, 'mode', target ?? '');
         },
       });
       

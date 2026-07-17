@@ -660,6 +660,18 @@ class KioskMqttClient(
             "launch_app" -> "launchApp" to JSONObject().put("package", payload)
             "execute_js" -> "executeJs" to JSONObject().put("code", payload)
 
+            "mode" -> {
+                // Payload is JSON: {"mode":"webview","url":"..."} or
+                // {"mode":"external_app","package":"com.app"}. A bare string
+                // (e.g. "webview") is accepted as the mode with no target.
+                val params = try {
+                    JSONObject(payload)
+                } catch (e: Exception) {
+                    JSONObject().put("mode", payload)
+                }
+                "setMode" to params
+            }
+
             "audio_play" -> {
                 val params = try {
                     JSONObject(payload)
