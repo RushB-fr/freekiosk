@@ -9,13 +9,16 @@ import {
   Image,
   ScrollView,
   Linking,
-  NativeModules
+  NativeModules,
+  findNodeHandle
 } from 'react-native';
 
 const { HttpServerModule } = NativeModules;
 
+import KioskModule from '../utils/KioskModule';
+import UpdateModule from '../utils/UpdateModule';
 import { WebView } from 'react-native-webview';
-import type { WebViewErrorEvent, ShouldStartLoadRequest } from 'react-native-webview/lib/WebViewTypes';
+import type { WebViewErrorEvent, ShouldStartLoadRequest, WebViewRenderProcessGoneEvent } from 'react-native-webview/lib/WebViewTypes';
 import { useNavigation } from '@react-navigation/native';
 import PrintModule from '../utils/PrintModule';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -27,7 +30,7 @@ interface WebViewComponentProps {
   url: string;
   autoReload: boolean;
   keyboardMode?: string; // 'default', 'force_numeric', 'smart'
-  onUserInteraction?: (event?: { isTap?: boolean; x?: number; y?: number }) => void; // callback optionnel pour interaction utilisateur
+  onUserInteraction?: (event?: { isTap?: boolean; x?: number; y?: number; fromFallbackButton?: boolean }) => void; // callback optionnel pour interaction utilisateur
   jsToExecute?: string; // JavaScript code to execute from API
   onJsExecuted?: () => void; // callback when JS is executed
   showBackButton?: boolean; // Enable web navigation back button
@@ -40,9 +43,11 @@ interface WebViewComponentProps {
   printEnabled?: boolean; // Enable window.print() interception for native printing
   printPaperSize?: string; // Default paper size: 'A4' | 'A5' | 'A3' | 'LETTER' | 'LEGAL'
   zoomLevel?: number; // Zoom level percentage (50-200, default 100)
+  zoomMode?: string; // 'standard' (CSS zoom) | 'fit' (viewport reflow, #188)
   disableUserZoom?: boolean; // Prevent pinch-to-zoom and double-tap zoom
   customUserAgent?: string; // Custom User-Agent string (empty = default modern Chrome UA)
   basicAuthCredential?: { username: string; password: string };
+  onRenderProcessGone?: (didCrash: boolean) => void; // #198 — renderer process died, ask parent to remount
 }
 
 export interface WebViewComponentRef {
@@ -51,7 +56,14 @@ export interface WebViewComponentRef {
   reload: () => void;
   scrollToTop: () => void;
   clearCache: () => void;
+  pauseMedia: () => void;
+  resumeMedia: () => void;
 }
+
+// #177 — Pause any HTML5 media playing in the page. Injected on pause as a reliable
+// complement to the native WebView.onPause() (which alone doesn't stop <audio> on every
+// OEM WebView). Ends with `true;` to silence react-native-webview's injection warning.
+const MEDIA_PAUSE_JS = `(function(){try{document.querySelectorAll('audio,video').forEach(function(m){try{m.pause();}catch(e){}});}catch(e){}})();true;`;
 
 const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(({ 
   url, 
@@ -70,20 +82,33 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   printEnabled = false,
   printPaperSize = 'A4',
   zoomLevel = 100,
+  zoomMode = 'standard',
   disableUserZoom = false,
   customUserAgent = '',
   basicAuthCredential,
+  onRenderProcessGone,
 }, ref) => {
   const navigation = useNavigation<NavigationProp>();
   const webViewRef = useRef<WebView>(null);
+  // #190 — Host-view ref for pauseMedia/resumeMedia. react-native-webview's ref is a
+  // methods-only imperative handle, NOT a ReactComponent: passing it to findNodeHandle
+  // throws and crashes the app (JavascriptException on screensaver activation). The
+  // native pauseWebView() walks the subtree for the WebView, so the container's tag works.
+  const containerViewRef = useRef<View>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<boolean>(false);
   const [pageLoaded, setPageLoaded] = useState<boolean>(false);
   const [blockedUrlMessage, setBlockedUrlMessage] = useState<string | null>(null);
+  // App version for the error-overlay footer — read from the installed APK (build.gradle)
+  // via UpdateModule rather than hardcoded, so it never drifts on release bumps.
+  const [appVersion, setAppVersion] = useState<string>('');
   const blockedUrlTimerRef = useRef<any>(null);
   const isGoingBackRef = useRef<boolean>(false); // Prevent goBack loop for URL filter
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const loadingTimeoutRef = useRef<any>(null);
+  // Last top-frame (main document) URL requested — used to distinguish a fatal
+  // main-page HTTP error from a harmless sub-resource error (favicon, analytics…).
+  const lastTopFrameUrlRef = useRef<string | null>(null);
 
   // Pre-compile URL filter patterns into RegExp for performance
   const compiledFilterPatterns = useMemo(() => {
@@ -190,6 +215,33 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
         webViewRef.current.clearCache(true);
         console.log('[WebView] Cache cleared via ref');
       }
+    },
+    // #177 — Stop background audio/video when the page is hidden (screensaver / screen off
+    // / app backgrounded). JS-level pause of <audio>/<video> + native renderer suspend.
+    pauseMedia: () => {
+      const wv = webViewRef.current;
+      if (!wv) return;
+      wv.injectJavaScript(MEDIA_PAUSE_JS);
+      // #190 — resolve the tag from the container host view, never from the WebView ref
+      // (a methods-only imperative handle that makes findNodeHandle throw → app crash)
+      try {
+        const node = findNodeHandle(containerViewRef.current);
+        if (node != null) {
+          KioskModule.pauseWebView?.(node).catch(() => {});
+        }
+      } catch {}
+    },
+    // Resume only re-enables the WebView renderer; media is intentionally left paused so
+    // audio doesn't auto-restart on its own (the page/user decides).
+    resumeMedia: () => {
+      const wv = webViewRef.current;
+      if (!wv) return;
+      try {
+        const node = findNodeHandle(containerViewRef.current);
+        if (node != null) {
+          KioskModule.resumeWebView?.(node).catch(() => {});
+        }
+      } catch {}
     }
   }));
 
@@ -200,6 +252,13 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
       useNativeDriver: true,
     }).start();
   }, [fadeAnim]);
+
+  // Fetch the installed app version once for the error-overlay footer.
+  React.useEffect(() => {
+    UpdateModule.getCurrentVersion()
+      .then(info => setAppVersion(info.versionName))
+      .catch(() => {});
+  }, []);
 
   // Execute JavaScript from API — with retry if page is still loading
   React.useEffect(() => {
@@ -257,16 +316,53 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
     }
     window.__FREEKIOSK_INITIALIZED__ = true;
 
-    // Disable user zoom (pinch-to-zoom and double-tap zoom) when configured
-    ${disableUserZoom ? `
-    document.addEventListener('touchstart', function(e) {
-      if (e.touches.length > 1) { e.preventDefault(); }
-    }, { passive: false });
-    document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
-    var meta = document.querySelector('meta[name="viewport"]');
-    if (!meta) { meta = document.createElement('meta'); meta.name = 'viewport'; document.head.appendChild(meta); }
-    meta.content = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no';
-    ` : '// User zoom not disabled'}
+    // ===== Web page zoom (#188) =====
+    // CSS zoom, but the target element differs:
+    //   'standard' -> document.documentElement (<html>). Good for most sites.
+    //   'fit'      -> document.body. This is exactly what HADashboard does
+    //                 (twanjaarsveld/HADashboard, MainActivity.applyCssZoom:
+    //                 'document.body.style.zoom = factor'). Home Assistant measures
+    //                 its card layout from the body's content box, so zooming the
+    //                 body makes the dashboard RE-FLOW its columns and fill the
+    //                 screen, instead of just enlarging card contents inside cards
+    //                 that don't grow (which is what zooming <html> does). The native
+    //                 useWideViewPort + loadWithOverviewMode (scalesPageToFit) are
+    //                 already enabled, matching HADashboard's WebView settings.
+    (function() {
+      var ZOOM = ${zoomLevel} / 100;
+      var FIT = ${zoomMode === 'fit' ? 'true' : 'false'};
+      var DISABLE_USER_ZOOM = ${disableUserZoom ? 'true' : 'false'};
+
+      // Block pinch / double-tap zoom gestures when requested (applies in both modes).
+      if (DISABLE_USER_ZOOM) {
+        document.addEventListener('touchstart', function(e) {
+          if (e.touches.length > 1) { e.preventDefault(); }
+        }, { passive: false });
+        document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
+        var vp = document.querySelector('meta[name="viewport"]');
+        if (!vp) {
+          vp = document.createElement('meta');
+          vp.setAttribute('name', 'viewport');
+          (document.head || document.documentElement).appendChild(vp);
+        }
+        vp.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
+      }
+
+      if (ZOOM !== 1) {
+        var applyZoom = function() {
+          if (FIT) {
+            if (document.body) { document.body.style.zoom = String(ZOOM); }
+          } else {
+            document.documentElement.style.zoom = String(ZOOM);
+          }
+        };
+        applyZoom();
+        // body may not exist yet if injected very early — re-apply once on DOM ready.
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', applyZoom);
+        }
+      }
+    })();
 
     // Ensure storage is working properly
     try {
@@ -323,6 +419,17 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
     // Touch events avec throttling (for screensaver only, not for tap counting)
     document.addEventListener('touchstart', sendInteraction, true);
     document.addEventListener('touchmove', sendInteraction, true);
+
+    // Keyboard / text input events — typing with the on-screen keyboard does NOT
+    // produce touch/scroll/click events, so without these the inactivity timer
+    // (screensaver + "Return to Start Page") keeps counting down while the user is
+    // typing into a text field. Android soft keyboards with predictive text fire
+    // 'keydown' with keyCode 229 and often skip per-character key events, but
+    // 'input' and 'compositionupdate' fire reliably for every character, so we
+    // listen to all of them (throttled via sendInteraction).
+    document.addEventListener('keydown', sendInteraction, true);
+    document.addEventListener('input', sendInteraction, true);
+    document.addEventListener('compositionupdate', sendInteraction, true);
 
     // ==================== speechSynthesis Polyfill ====================
     // Android WebView does not implement the Web Speech API (speechSynthesis).
@@ -681,16 +788,49 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
 
   const handleHttpError = (event: any): void => {
     const statusCode = event.nativeEvent.statusCode;
-    console.error('[FreeKiosk] HTTP Error:', statusCode, event.nativeEvent.url);
-    if (autoReload && statusCode >= 500) {
-      setError(true);
-      setLoading(false);
-      webViewRef.current?.injectJavaScript('window.location.href = "about:blank"; true;');
+    const failedUrl = event.nativeEvent.url;
+    console.error('[FreeKiosk] HTTP Error:', statusCode, failedUrl);
+
+    // Only treat the error as fatal when it comes from the main document.
+    // onReceivedHttpError also fires for sub-resources (images, scripts,
+    // favicons…); a 404 on those must not hijack an otherwise-working page.
+    if (failedUrl && lastTopFrameUrlRef.current && failedUrl !== lastTopFrameUrlRef.current) {
+      return;
+    }
+
+    // Show the error overlay (with the fallback settings button) for ANY main-page
+    // HTTP error code, regardless of autoReload — otherwise the user is stranded
+    // with no way back to settings when the page can't load (#180).
+    setError(true);
+    setLoading(false);
+    webViewRef.current?.injectJavaScript('window.location.href = "about:blank"; true;');
+
+    // Auto-retry only when the feature is enabled.
+    if (autoReload) {
       setTimeout(() => {
         setError(false);
         setLoading(true);
         setPageLoaded(false);
       }, 5000);
+    }
+  };
+
+  // #198 — The Chromium renderer process died (typically an OOM kill). The native
+  // RNCWebViewClient already returns true so the app process survives, but the WebView
+  // instance is now defunct (blank white screen) and, per Android's contract, must be
+  // remounted rather than reused. Best-effort clear the WebView cache to rebuild the
+  // corrupted Chromium code-cache index, then ask the parent to bump webViewKey for a
+  // full remount (same recovery pattern as inactivity return / planner).
+  const handleRenderProcessGone = (event: WebViewRenderProcessGoneEvent): void => {
+    const didCrash = !!event?.nativeEvent?.didCrash;
+    console.error('[FreeKiosk] WebView renderer process gone (didCrash=' + didCrash + '), recovering...');
+    try {
+      webViewRef.current?.clearCache(true);
+    } catch {
+      // Defunct WebView — clearing may throw; the remount below is the real recovery.
+    }
+    if (onRenderProcessGone) {
+      onRenderProcessGone(didCrash);
     }
   };
 
@@ -783,7 +923,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
 
             {/* Footer */}
             <Text style={styles.footerText}>
-              Version 1.2.20 • by Rushb
+              {appVersion ? `Version ${appVersion} • by Rushb` : 'by Rushb'}
             </Text>
           </Animated.View>
         </ScrollView>
@@ -792,7 +932,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   }
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} ref={containerViewRef}>
       <WebView
         ref={webViewRef}
         source={{ uri: error ? 'about:blank' : url }}
@@ -852,6 +992,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
           }
         }}
         onError={handleError}
+        onRenderProcessGone={handleRenderProcessGone}
 
         javaScriptEnabled={true}
         domStorageEnabled={true}
@@ -939,6 +1080,12 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
             return false;
           }
 
+          // Remember the main-document navigation target so HTTP errors can be
+          // attributed to the main frame vs. a sub-resource (see handleHttpError).
+          if (request.isTopFrame) {
+            lastTopFrameUrlRef.current = request.url;
+          }
+
           return true;
         }}
 
@@ -969,7 +1116,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
           }
         }}
 
-        textZoom={zoomLevel}
+        textZoom={100}
         scalesPageToFit={true}
         cacheEnabled={true}
         incognito={false}
@@ -1044,7 +1191,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
             activeOpacity={0.7}
             onPress={() => {
               if (onUserInteraction) {
-                onUserInteraction({ isTap: true, x: 0, y: 0 });
+                onUserInteraction({ isTap: true, x: 0, y: 0, fromFallbackButton: true });
               }
             }}
           >
@@ -1075,7 +1222,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
             activeOpacity={0.7}
             onPress={() => {
               if (onUserInteraction) {
-                onUserInteraction({ isTap: true, x: 0, y: 0 });
+                onUserInteraction({ isTap: true, x: 0, y: 0, fromFallbackButton: true });
               }
             }}
           >

@@ -119,10 +119,34 @@ class BootLockActivity : Activity() {
 
             dpm.setLockTaskPackages(admin, unique)
 
-            // Configure minimal lock-task features (just power button for safety)
+            // Configure lock-task features from user settings, matching MainActivity /
+            // AppLauncherModule. Previously this applied GLOBAL_ACTIONS only and relied on
+            // MainActivity.enableKioskRestrictions() to upgrade to NOTIFICATIONS / SYSTEM_INFO.
+            // In multi-app mode an external app takes the foreground at boot and MainActivity
+            // stays backgrounded, so that upgrade is delayed or never applied — leaving the
+            // notification panel and status bar disabled after a reboot (#191). Applying the
+            // full feature set here makes them correct from the first lock-task session.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                dpm.setLockTaskFeatures(admin,
-                    DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS)
+                val allowPowerButton = readAsyncStorageValue("@kiosk_allow_power_button", "true") == "true"
+                val allowNotifications = readAsyncStorageValue("@kiosk_allow_notifications", "false") == "true"
+                val allowSystemInfo = readAsyncStorageValue("@kiosk_allow_system_info", "false") == "true"
+
+                // GLOBAL_ACTIONS is the base (Android default; prevents Samsung audio mute).
+                var features = DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS
+                // allowPowerButton=false means the admin wants to BLOCK the power menu.
+                if (!allowPowerButton) {
+                    features = features and DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS.inv()
+                }
+                if (allowSystemInfo) {
+                    features = features or DevicePolicyManager.LOCK_TASK_FEATURE_SYSTEM_INFO
+                }
+                if (allowNotifications) {
+                    features = features or DevicePolicyManager.LOCK_TASK_FEATURE_NOTIFICATIONS
+                    // Android requires HOME when NOTIFICATIONS is enabled.
+                    features = features or DevicePolicyManager.LOCK_TASK_FEATURE_HOME
+                }
+                dpm.setLockTaskFeatures(admin, features)
+                DebugLog.d(TAG, "Lock-task features at boot: blockPowerButton=${!allowPowerButton}, notifications=$allowNotifications, systemInfo=$allowSystemInfo (flags=$features)")
             }
 
             startLockTask()

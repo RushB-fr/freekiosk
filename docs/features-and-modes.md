@@ -106,6 +106,7 @@
 - **Overlay Prevention** - Block system dialogs and notifications
 - **Watchdog Service** - Automatic recovery and monitoring
 - **PIN Protection** - Secure settings access
+- **Lock Screen Controls** - Optional PIN-screen controls for Wi-Fi, Bluetooth, audio output, flashlight, brightness, emergency dialing, and supported device rotation lock
 - **Screen Pinning** - Task locking policies
 
 

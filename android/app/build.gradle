@@ -98,7 +98,7 @@ android {
         applicationId "com.freekiosk"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 40
+        versionCode 44
         versionName "1.2.20"
 
         // Expose self-update flag to both Kotlin (BuildConfig) and JS (via UpdateModule constants)
@@ -205,6 +205,7 @@ apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+    implementation("androidx.mediarouter:mediarouter:1.8.1")
 
     // NanoHTTPD for REST API server
     implementation("org.nanohttpd:nanohttpd:2.3.1")

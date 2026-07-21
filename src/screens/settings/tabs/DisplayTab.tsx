@@ -71,13 +71,19 @@ interface DisplayTabProps {
   // WebView Zoom Level
   zoomLevel: number;
   onZoomLevelChange: (value: number) => void;
+  zoomMode: string;
+  onZoomModeChange: (value: string) => void;
   disableUserZoom: boolean;
   onDisableUserZoomChange: (value: boolean) => void;
   
   // Custom User Agent
   customUserAgent: string;
   onCustomUserAgentChange: (value: string) => void;
-  
+  pauseWebMediaWhenHidden: boolean;
+  onPauseWebMediaWhenHiddenChange: (value: boolean) => void;
+  intercomModeEnabled: boolean;
+  onIntercomModeChange: (value: boolean) => void;
+
   // Screensaver
   screensaverEnabled: boolean;
   onScreensaverEnabledChange: (value: boolean) => void;
@@ -164,10 +170,16 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
   onKeyboardModeChange,
   zoomLevel,
   onZoomLevelChange,
+  zoomMode,
+  onZoomModeChange,
   disableUserZoom,
   onDisableUserZoomChange,
   customUserAgent,
   onCustomUserAgentChange,
+  pauseWebMediaWhenHidden,
+  onPauseWebMediaWhenHiddenChange,
+  intercomModeEnabled,
+  onIntercomModeChange,
   screensaverEnabled,
   onScreensaverEnabledChange,
   screensaverBrightness,
@@ -397,6 +409,17 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
             value={screensaverEnabled}
             onValueChange={onScreensaverEnabledChange}
           />
+
+          {displayMode === 'external_app' && screensaverEnabled && (
+            <SettingsInfoBox variant="info">
+              <Text style={styles.infoText}>
+                ℹ️ In External App mode the system manages the screen. For the screensaver to
+                appear before the device turns the screen off on its own, set the Android screen
+                timeout to a value greater than or equal to the inactivity delay below — or to
+                "Never" (Android Settings → Display → Screen Timeout).
+              </Text>
+            </SettingsInfoBox>
+          )}
 
           {screensaverEnabled && (
             <>
@@ -838,6 +861,30 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
       {/* Web Page Zoom - Only in WebView mode */}
       {displayMode === 'webview' && (
         <SettingsSection title="Web Page Zoom" icon="magnify">
+          <SettingsRadioGroup
+            hint="How the zoom level is applied to the page"
+            options={[
+              {
+                value: 'standard',
+                label: 'Standard',
+                hint: 'Zooms the whole document (html). Recommended for most websites.',
+              },
+              {
+                value: 'fit',
+                label: 'Home Assistant',
+                hint: 'Zooms the page body instead, the same way HADashboard does — Home Assistant dashboards re-flow their cards and fill the screen.',
+              },
+            ]}
+            value={zoomMode}
+            onValueChange={onZoomModeChange}
+          />
+          {zoomMode === 'fit' && (
+            <SettingsInfoBox variant="info">
+              <Text style={styles.infoText}>
+                🏠 Home Assistant mode zooms the page body (the HADashboard method), so dashboards re-flow and fill the screen instead of cards overflowing. If a non-HA site looks off, switch back to "Standard".
+              </Text>
+            </SettingsInfoBox>
+          )}
           <SettingsSlider
             label=""
             hint={`Zoom level: ${zoomLevel}% — Adjusts how web pages are rendered. 100% matches Chrome's default.`}
@@ -892,6 +939,24 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
         </SettingsSection>
       )}
       
+      {/* Web Media playback - Only in WebView mode (#177) */}
+      {displayMode === 'webview' && (
+        <SettingsSection title="Web Media" icon="volume-off">
+          <SettingsSwitch
+            label="Pause audio/video when hidden"
+            hint="Pause web page audio and video when the screensaver is shown, the screen turns off, or the app goes to the background — otherwise a web radio or video could keep playing unreachable in the background. Turn off to keep web audio playing continuously."
+            value={pauseWebMediaWhenHidden}
+            onValueChange={onPauseWebMediaWhenHiddenChange}
+          />
+          <SettingsSwitch
+            label="🎙️ 2-way audio (intercom) mode"
+            hint="Enable for WebRTC 2-way audio / talk-back (e.g. a Home Assistant / go2rtc doorbell intercom card). While the web page is actively using the microphone, FreeKiosk switches the device to communication audio mode so the microphone back-channel transmits, then restores normal audio when you stop talking. Leave off for normal browsing — it only engages while the mic is in use."
+            value={intercomModeEnabled}
+            onValueChange={onIntercomModeChange}
+          />
+        </SettingsSection>
+      )}
+
       {/* Keyboard Mode - Only in WebView mode */}
       {displayMode === 'webview' && (
         <SettingsSection title="Keyboard Mode" icon="keyboard-outline">

@@ -9,11 +9,16 @@ const { KioskModule } = NativeModules;
 const PIN_SERVICE = 'freekiosk_pin';
 const API_KEY_SERVICE = 'freekiosk_api_key';
 const MQTT_PASSWORD_SERVICE = 'freekiosk_mqtt_password';
+const WIFI_PASSWORD_SERVICE_PREFIX = 'freekiosk_wifi_password:';
 const BASIC_AUTH_PASSWORD_SERVICE = 'freekiosk_basic_auth_password';
 const CLOUD_CREDENTIALS_SERVICE = 'freekiosk_cloud';
 const LEGACY_API_KEY = '@kiosk_rest_api_key'; // Legacy AsyncStorage key for migration
 const ATTEMPTS_KEY = '@kiosk_pin_attempts';
 const LOCKOUT_KEY = '@kiosk_pin_lockout';
+// AsyncStorage fallback for the PIN hash+salt, used when the device's Keychain
+// (AndroidKeyStore) silently fails to persist — e.g. Rockchip signage firmwares
+// (issue #200). Holds the same irreversible PBKDF2 payload, never plaintext.
+const PIN_FALLBACK_KEY = '@kiosk_pin_secure_fallback';
 const DEFAULT_MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes in milliseconds
 const ATTEMPTS_RESET_DURATION = 60 * 60 * 1000; // 1 hour - Reset attempts after 1 hour of no activity
@@ -26,6 +31,47 @@ interface PinAttempts {
   count: number;
   lastAttempt: number;
   lockoutUntil: number | null;
+}
+
+const wifiPasswordService = (ssid: string): string =>
+  `${WIFI_PASSWORD_SERVICE_PREFIX}${encodeURIComponent(ssid)}`;
+
+export async function saveSecureWifiPassword(ssid: string, password: string): Promise<boolean> {
+  if (!ssid || !password) return false;
+  try {
+    await Keychain.setGenericPassword(ssid, password, {
+      service: wifiPasswordService(ssid),
+      accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED,
+    });
+    return true;
+  } catch (error) {
+    console.error('[SecureStorage] Error saving WiFi password:', error);
+    return false;
+  }
+}
+
+export async function getSecureWifiPassword(ssid: string): Promise<string | null> {
+  if (!ssid) return null;
+  try {
+    const credentials = await Keychain.getGenericPassword({
+      service: wifiPasswordService(ssid),
+    });
+    return credentials ? credentials.password : null;
+  } catch (error) {
+    console.error('[SecureStorage] Error getting WiFi password:', error);
+    return null;
+  }
+}
+
+export async function clearSecureWifiPassword(ssid: string): Promise<void> {
+  if (!ssid) return;
+  try {
+    await Keychain.resetGenericPassword({
+      service: wifiPasswordService(ssid),
+    });
+  } catch (error) {
+    console.error('[SecureStorage] Error clearing WiFi password:', error);
+  }
 }
 
 /**
@@ -145,6 +191,41 @@ function hexToBytes(hex: string): Uint8Array {
   return bytes;
 }
 
+// ── Keychain fallback (devices with a broken/absent AndroidKeyStore, #200) ──
+// These persist the SAME PBKDF2 hash+salt as the Keychain (never the plaintext
+// PIN) in AsyncStorage, which does survive restarts on the affected firmwares.
+
+async function savePinFallback(payload: string): Promise<void> {
+  try {
+    await AsyncStorage.setItem(PIN_FALLBACK_KEY, payload);
+  } catch (e) {
+    console.error('[SecureStorage] Error saving PIN fallback:', e);
+  }
+}
+
+async function getPinFallback(): Promise<{ hash: string; salt: string } | null> {
+  try {
+    const raw = await AsyncStorage.getItem(PIN_FALLBACK_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.hash === 'string' && typeof parsed.salt === 'string') {
+      return parsed;
+    }
+    return null;
+  } catch (e) {
+    console.error('[SecureStorage] Error reading PIN fallback:', e);
+    return null;
+  }
+}
+
+async function clearPinFallback(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(PIN_FALLBACK_KEY);
+  } catch (e) {
+    console.error('[SecureStorage] Error clearing PIN fallback:', e);
+  }
+}
+
 /**
  * Securely save PIN with PBKDF2 hashing
  */
@@ -152,19 +233,34 @@ export async function saveSecurePin(pin: string): Promise<boolean> {
   try {
     const salt = generateSalt();
     const hashedPin = await hashPin(pin, salt);
+    const payload = JSON.stringify({ hash: hashedPin, salt: bytesToHex(salt) });
 
-    // Store hashed PIN + salt in Android Keystore via react-native-keychain
-    await Keychain.setGenericPassword(
-      'pin',
-      JSON.stringify({
-        hash: hashedPin,
-        salt: bytesToHex(salt)
-      }),
-      {
+    // Primary store: Android Keystore via react-native-keychain.
+    let keychainOk = false;
+    try {
+      await Keychain.setGenericPassword('pin', payload, {
         service: PIN_SERVICE,
         accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED,
-      }
-    );
+      });
+      // Read-back check: some firmwares (e.g. Rockchip RK3568 signage boards,
+      // issue #200) report a successful write but never persist a readable
+      // value. Trust the Keychain only if we can read the payload straight back.
+      const check = await Keychain.getGenericPassword({ service: PIN_SERVICE });
+      keychainOk = !!check && check.password === payload;
+    } catch (e) {
+      console.warn('[SecureStorage] Keychain write/read-back failed:', e);
+    }
+
+    if (keychainOk) {
+      // Keychain is reliable here → make sure no stale fallback lingers.
+      await clearPinFallback();
+    } else {
+      // Keychain unreliable on this device → persist the irreversible PBKDF2
+      // hash+salt (never the plaintext PIN) in AsyncStorage, which does survive
+      // restarts on these boards (other settings already persist fine there).
+      console.warn('[SecureStorage] Keychain did not persist PIN; using AsyncStorage fallback (issue #200)');
+      await savePinFallback(payload);
+    }
 
     // Also save hash for ADB verification (keeps native and RN in sync)
     if (Platform.OS === 'android' && KioskModule?.saveAdbPinHash) {
@@ -208,10 +304,44 @@ export async function verifySecurePin(inputPin: string): Promise<{
       };
     }
 
-    // Get stored PIN data from Keystore
-    const credentials = await Keychain.getGenericPassword({ service: PIN_SERVICE });
+    // Get stored PIN data from Keystore. A broken keystore (issue #200) can
+    // throw here rather than return null — treat that as "no value" so we can
+    // still fall back to AsyncStorage / the default PIN instead of dead-ending.
+    let credentials: Awaited<ReturnType<typeof Keychain.getGenericPassword>> = false;
+    try {
+      credentials = await Keychain.getGenericPassword({ service: PIN_SERVICE });
+    } catch (e) {
+      console.warn('[SecureStorage] Keychain read failed during verify:', e);
+    }
 
     if (!credentials) {
+      // Keychain empty — either genuinely unset, or a broken keystore that
+      // never persisted the PIN (issue #200). Try the AsyncStorage fallback
+      // (same PBKDF2 hash+salt) BEFORE the legacy/default paths.
+      const fallback = await getPinFallback();
+      if (fallback) {
+        const inputHash = await hashPin(inputPin, hexToBytes(fallback.salt));
+        if (inputHash === fallback.hash) {
+          await resetPinAttempts();
+          return { success: true };
+        }
+        await recordFailedAttempt();
+        const maxAttempts = await getMaxAttempts();
+        const attempts = await getPinAttempts();
+        if (attempts.count >= maxAttempts) {
+          return {
+            success: false,
+            lockoutTimeRemaining: LOCKOUT_DURATION,
+            message: `Too many failed attempts. Locked for 15 minutes.`,
+          };
+        }
+        return {
+          success: false,
+          attemptsRemaining: maxAttempts - attempts.count,
+          message: 'Incorrect PIN',
+        };
+      }
+
       // No PIN in Keystore - Check for legacy plaintext PIN in AsyncStorage (v0)
       const legacyPlaintextPin = await checkLegacyPlaintextPin();
 
@@ -441,12 +571,21 @@ export async function getLockoutStatus(): Promise<{
  */
 export async function hasSecurePin(): Promise<boolean> {
   try {
-    // Check Keychain first
-    const credentials = await Keychain.getGenericPassword({ service: PIN_SERVICE });
-    if (credentials) {
+    // Check Keychain first (may throw on a broken keystore — treat as absent)
+    try {
+      const credentials = await Keychain.getGenericPassword({ service: PIN_SERVICE });
+      if (credentials) {
+        return true;
+      }
+    } catch (e) {
+      console.warn('[SecureStorage] Keychain read failed in hasSecurePin:', e);
+    }
+
+    // AsyncStorage fallback (set when the keystore is unreliable — issue #200)
+    if (await getPinFallback()) {
       return true;
     }
-    
+
     // Check for legacy plaintext PIN in AsyncStorage
     const legacyPin = await checkLegacyPlaintextPin();
     return !!legacyPin;
@@ -476,6 +615,7 @@ export async function clearSecurePin(): Promise<void> {
     await Keychain.resetGenericPassword({ service: PIN_SERVICE });
     await resetPinAttempts();
     await clearLegacyPlaintextPin(); // Also clear any plaintext PIN
+    await clearPinFallback(); // And the AsyncStorage fallback (issue #200)
     
     // Also clear ADB PIN hash
     if (Platform.OS === 'android' && KioskModule?.clearAdbPinHash) {

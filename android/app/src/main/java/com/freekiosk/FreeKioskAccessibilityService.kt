@@ -577,7 +577,23 @@ class FreeKioskAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // Not used — we only use this service for key/text injection
+        // Track the foreground app package so per-package blocking overlays
+        // (BlockingRegion.targetPackage, e.g. masking part of the Settings UI) can be
+        // shown/hidden for the right app. Without this, currentForegroundPackage stayed
+        // null forever and any region with a targetPackage never rendered (#199).
+        //
+        // The service is registered with typeAllMask, so this is a hot path: bail out
+        // immediately on anything that isn't a window switch. setForegroundPackage()
+        // itself no-ops when the package is unchanged, so updateOverlays() only runs on
+        // an actual app change.
+        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        val pkg = event.packageName?.toString()
+        if (pkg.isNullOrBlank()) return
+        try {
+            BlockingOverlayManager.getInstance(this).setForegroundPackage(pkg)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to update foreground package for blocking overlays: ${e.message}")
+        }
     }
 
     override fun onInterrupt() {

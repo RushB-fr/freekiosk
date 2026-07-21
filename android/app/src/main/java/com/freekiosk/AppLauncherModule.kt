@@ -75,12 +75,26 @@ class AppLauncherModule(reactContext: ReactApplicationContext) : ReactContextBas
                                         }
                                         if (allowNotifications) {
                                             lockTaskFeatures = lockTaskFeatures or android.app.admin.DevicePolicyManager.LOCK_TASK_FEATURE_NOTIFICATIONS
+                                            // Android requires HOME when NOTIFICATIONS is enabled — without it
+                                            // setLockTaskFeatures() throws and aborts the whole feature update,
+                                            // leaving the notification panel disabled in multi-app mode (#191).
+                                            lockTaskFeatures = lockTaskFeatures or android.app.admin.DevicePolicyManager.LOCK_TASK_FEATURE_HOME
                                         }
-                                        DebugLog.d("AppLauncherModule", "Lock task features: blockPowerButton=${!allowPowerButton}, notifications=$allowNotifications, systemInfo=$allowSystemInfo (flags=$lockTaskFeatures)")
+                                        // #208 — Preserve the system keyguard when re-applying features
+                                        // to launch a whitelisted app in multi-app mode. Without this, the
+                                        // KEYGUARD flag set at lock-task entry would be dropped here and the
+                                        // native screen-lock would stop prompting on screen off/on again.
+                                        // Same opt-in gate as MainActivity/KioskModule.
+                                        val screenLockCompat = BootReceiver.readScreenLockCompatFlag(reactApplicationContext) &&
+                                            BootReceiver.isDeviceSecure(reactApplicationContext)
+                                        if (screenLockCompat) {
+                                            lockTaskFeatures = lockTaskFeatures or android.app.admin.DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD
+                                        }
+                                        DebugLog.d("AppLauncherModule", "Lock task features: blockPowerButton=${!allowPowerButton}, notifications=$allowNotifications, systemInfo=$allowSystemInfo, keyguard=$screenLockCompat (flags=$lockTaskFeatures)")
                                     } catch (e: Exception) {
                                         DebugLog.d("AppLauncherModule", "Could not read settings, using GLOBAL_ACTIONS default: ${e.message}")
                                     }
-                                    
+
                                     dpm.setLockTaskFeatures(adminComponent, lockTaskFeatures)
                                     DebugLog.d("AppLauncherModule", "Lock task features applied before launching external app")
                                 }

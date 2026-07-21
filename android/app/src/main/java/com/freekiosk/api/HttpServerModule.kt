@@ -43,6 +43,7 @@ import android.os.Build
 import com.freekiosk.DeviceAdminReceiver
 import com.freekiosk.CameraPhotoModule
 import com.freekiosk.FreeKioskAccessibilityService
+import com.freekiosk.ScreenController
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -99,8 +100,6 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     // Audio playback
     private var mediaPlayer: MediaPlayer? = null
     
-    // Screen control
-    private var wakeLock: PowerManager.WakeLock? = null
     private var toneGenerator: ToneGenerator? = null
     
     // Server lifecycle management
@@ -1314,122 +1313,9 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
 
     // ==================== Screen Control Methods ====================
 
-    private fun turnScreenOn() {
-        UiThreadUtil.runOnUiThread {
-            try {
-                val powerManager = reactContext.getSystemService(Context.POWER_SERVICE) as PowerManager
-                
-                // Release old wakeLock if exists
-                wakeLock?.release()
-                
-                // Create WakeLock to turn on screen — this works even without activity
-                @Suppress("DEPRECATION")
-                wakeLock = powerManager.newWakeLock(
-                    PowerManager.FULL_WAKE_LOCK or 
-                    PowerManager.ACQUIRE_CAUSES_WAKEUP or 
-                    PowerManager.ON_AFTER_RELEASE,
-                    "FreeKiosk:HttpScreenOn"
-                )
-                wakeLock?.acquire(10*60*1000L) // 10 minutes timeout
-                
-                val activity = reactContext.currentActivity
-                if (activity != null) {
-                    // Re-enable FLAG_KEEP_SCREEN_ON only if not in system-managed mode
-                    val prefs = reactContext.getSharedPreferences("FreeKioskSettings", Context.MODE_PRIVATE)
-                    val keepScreenOn = prefs.getBoolean("keep_screen_on", true)
-                    if (keepScreenOn) {
-                        activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                    }
-                    
-                    // Set screen to normal brightness (-1 = use system default)
-                    val layoutParams = activity.window.attributes
-                    layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-                    activity.window.attributes = layoutParams
-                    
-                    // Dismiss keyguard if locked
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
-                        activity.setShowWhenLocked(true)
-                        activity.setTurnScreenOn(true)
-                        val keyguardManager = reactContext.getSystemService(Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
-                        keyguardManager.requestDismissKeyguard(activity, null)
-                    } else {
-                        @Suppress("DEPRECATION")
-                        activity.window.addFlags(
-                            WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
-                            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-                        )
-                    }
-                    
-                    Log.d(TAG, "Screen turned ON via HTTP API (activity available)")
-                } else {
-                    Log.d(TAG, "Screen turned ON via WakeLock only (activity not available)")
-                }
-                
-                // Release wakeLock after a short delay — FLAG_KEEP_SCREEN_ON handles persistence
-                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                    try {
-                        wakeLock?.release()
-                        wakeLock = null
-                        Log.d(TAG, "WakeLock released after screen on")
-                    } catch (e: Exception) {
-                        // Already released
-                    }
-                }, 5000)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to turn screen on: ${e.message}")
-            }
-        }
-    }
+    private fun turnScreenOn() = ScreenController.turnScreenOn(reactContext)
 
-    private fun turnScreenOff() {
-        UiThreadUtil.runOnUiThread {
-            try {
-                val activity = reactContext.currentActivity
-                if (activity != null) {
-                    // Release wakeLock to allow screen to turn off
-                    wakeLock?.release()
-                    wakeLock = null
-                    
-                    // Try Device Owner/Admin lockNow() first (truly turns off screen)
-                    val dpm = reactContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as android.app.admin.DevicePolicyManager
-                    val adminComp = android.content.ComponentName(reactContext, DeviceAdminReceiver::class.java)
-                    if (dpm.isDeviceOwnerApp(reactContext.packageName) || dpm.isAdminActive(adminComp)) {
-                        // Device Owner OR Device Admin: lockNow() is available to both
-                        dpm.lockNow()
-                        val method = if (dpm.isDeviceOwnerApp(reactContext.packageName)) "Device Owner" else "Device Admin"
-                        Log.d(TAG, "Screen turned OFF via $method lockNow()")
-                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && FreeKioskAccessibilityService.isRunning()) {
-                        // AccessibilityService fallback (API 28+): truly lock screen without Device Owner
-                        wakeLock?.release()
-                        wakeLock = null
-                        val ok = FreeKioskAccessibilityService.performAction(AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
-                        if (ok) {
-                            Log.d(TAG, "Screen locked via AccessibilityService GLOBAL_ACTION_LOCK_SCREEN")
-                        } else {
-                            // Failed, fall through to brightness fallback
-                            activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                            val layoutParams = activity.window.attributes
-                            layoutParams.screenBrightness = 0f
-                            activity.window.attributes = layoutParams
-                            Log.d(TAG, "GLOBAL_ACTION_LOCK_SCREEN failed, dimmed brightness as fallback")
-                        }
-                    } else {
-                        // Last resort: dim brightness to absolute minimum
-                        activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                        
-                        val layoutParams = activity.window.attributes
-                        layoutParams.screenBrightness = 0f
-                        activity.window.attributes = layoutParams
-                        
-                        Log.d(TAG, "Screen dimmed to 0 brightness (no Device Owner, no AccessibilityService)")
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to turn screen off: ${e.message}")
-            }
-        }
-    }
+    private fun turnScreenOff() = ScreenController.turnScreenOff(reactContext)
 
     // ==================== Text-to-Speech ====================
 

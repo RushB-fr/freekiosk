@@ -38,7 +38,7 @@ export interface ApiCallbacks {
   onAutoBrightnessEnable?: (min: number, max: number, offset?: number) => void;
   onAutoBrightnessDisable?: () => void;
   onSetMotionAlwaysOn?: (value: boolean) => void;
-  onSetMode?: (mode: 'webview' | 'external_app', target?: string) => void;
+  onSetMode?: (mode: 'webview' | 'external_app' | 'media_player', target?: string) => void;
 }
 
 /**
@@ -348,7 +348,7 @@ class ApiServiceClass {
         return ok();
 
       case 'setMode':
-        if (p.mode !== 'webview' && p.mode !== 'external_app') return fail('Invalid mode');
+        if (p.mode !== 'webview' && p.mode !== 'external_app' && p.mode !== 'media_player') return fail('Invalid mode');
         if (!cb.onSetMode) return fail('Handler unavailable');
         cb.onSetMode(p.mode, p.url || p.package || undefined);
         return ok();

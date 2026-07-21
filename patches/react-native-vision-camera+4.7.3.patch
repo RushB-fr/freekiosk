@@ -1,0 +1,60 @@
+diff --git a/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/core/utils/runOnUiThread.kt b/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/core/utils/runOnUiThread.kt
+index e96e78e..d077747 100644
+--- a/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/core/utils/runOnUiThread.kt
++++ b/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/core/utils/runOnUiThread.kt
+@@ -13,9 +13,16 @@ suspend inline fun <T> runOnUiThreadAndWait(crossinline function: () -> T): T {
+ 
+   return suspendCancellableCoroutine { continuation ->
+     UiThreadUtil.runOnUiThread {
+-      if (continuation.isCancelled) throw CancellationException()
+-      val result = function()
+-      continuation.resume(result)
++      if (continuation.isCancelled) return@runOnUiThread
++      try {
++        val result = function()
++        continuation.resume(result)
++      } catch (e: Throwable) {
++        // Route the failure back to the suspended coroutine instead of letting it
++        // escape as an uncaught exception on the UI Handler thread (which crashes the
++        // whole app). e.g. ViewNotFoundError when the CameraView was unmounted mid-call.
++        continuation.resumeWith(Result.failure(e))
++      }
+     }
+   }
+ }
+diff --git a/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraDevicesManager.kt b/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraDevicesManager.kt
+index 0386478..60e71a4 100644
+--- a/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraDevicesManager.kt
++++ b/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraDevicesManager.kt
+@@ -29,7 +29,13 @@ class CameraDevicesManager(private val reactContext: ReactApplicationContext) :
+   private var extensionsManager: ExtensionsManager? = null
+ 
+   private val callback = object : CameraManager.AvailabilityCallback() {
+-    private var deviceIds = cameraManager.cameraIdList.toMutableList()
++    private var deviceIds = try {
++      cameraManager.cameraIdList.toMutableList()
++    } catch (e: Throwable) {
++      // Cameraless x86 / BlissOS devices return null from getCameraIdList(),
++      // violating the platform @NonNull contract → NPE that crashes RN init. Treat as no cameras.
++      mutableListOf<String>()
++    }
+ 
+     // Check if device is still physically connected (even if onCameraUnavailable() is called)
+     private fun isDeviceConnected(cameraId: String): Boolean =
+diff --git a/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraViewModule.kt b/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraViewModule.kt
+index 059f677..68aafa8 100644
+--- a/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraViewModule.kt
++++ b/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraViewModule.kt
+@@ -91,8 +91,11 @@ class CameraViewModule(reactContext: ReactApplicationContext) : ReactContextBase
+   @ReactMethod
+   fun takePhoto(viewTag: Int, options: ReadableMap, promise: Promise) {
+     backgroundCoroutineScope.launch {
+-      val view = findCameraView(viewTag)
+       withPromise(promise) {
++        // findCameraView() must run inside withPromise: the coroutine scope has no
++        // exception handler, so a ViewNotFoundError thrown here (CameraView unmounted
++        // mid-capture) would otherwise crash the app instead of rejecting the promise.
++        val view = findCameraView(viewTag)
+         view.takePhoto(options)
+       }
+     }

@@ -1,2 +1,7 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# patch-package patches must keep LF line endings.
+# On Windows, autocrlf would otherwise check them out as CRLF, which
+# patch-package 8 fails to parse ("Failed to apply patch ...") — see #184.
+*.patch text eol=lf

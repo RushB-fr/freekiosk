@@ -12,6 +12,9 @@ export const KEYS = {
   AUTO_RELOAD: '@kiosk_auto_reload',
   KIOSK_ENABLED: '@kiosk_enabled',
   AUTO_LAUNCH: '@kiosk_auto_launch',
+  SCREEN_LOCK_COMPAT: '@kiosk_screen_lock_compat',
+  DEFAULT_LAUNCHER: '@kiosk_default_launcher',
+  INTERCOM_MODE: '@kiosk_intercom_mode',
   SCREENSAVER_ENABLED: '@screensaver_enabled',
   SCREENSAVER_INACTIVITY_ENABLED: '@screensaver_inactivity_enabled',
   SCREENSAVER_INACTIVITY_DELAY: '@screensaver_inactivity_delay',
@@ -60,6 +63,8 @@ export const KEYS = {
   REST_API_ALLOW_CONTROL: '@kiosk_rest_api_allow_control',
   // Power Button setting
   ALLOW_POWER_BUTTON: '@kiosk_allow_power_button',
+  // Block factory reset in system Settings (Device Owner user restriction) (#201)
+  BLOCK_FACTORY_RESET: '@kiosk_block_factory_reset',
   // Notifications (NFC support)
   ALLOW_NOTIFICATIONS: '@kiosk_allow_notifications',
   // Allow System Info (audio fix for Samsung in lock mode)
@@ -114,10 +119,14 @@ export const KEYS = {
   PRINT_PAPER_SIZE: '@kiosk_print_paper_size',
   // WebView Zoom Level
   WEBVIEW_ZOOM_LEVEL: '@kiosk_webview_zoom_level',
+  // WebView Zoom Mode ('standard' = CSS zoom | 'fit' = viewport reflow, #188)
+  WEBVIEW_ZOOM_MODE: '@kiosk_webview_zoom_mode',
   // Disable User Zoom (pinch-to-zoom)
   DISABLE_USER_ZOOM: '@kiosk_disable_user_zoom',
   // Custom User Agent
   CUSTOM_USER_AGENT: '@kiosk_custom_user_agent',
+  // #177 — Pause WebView audio/video when the page is hidden (screensaver / screen off / background)
+  PAUSE_WEB_MEDIA_WHEN_HIDDEN: '@kiosk_pause_web_media_when_hidden',
   // MQTT (Home Assistant integration)
   MQTT_ENABLED: '@kiosk_mqtt_enabled',
   MQTT_BROKER_URL: '@kiosk_mqtt_broker_url',
@@ -154,6 +163,15 @@ export const KEYS = {
   // Dashboard
   DASHBOARD_MODE_ENABLED: '@kiosk_dashboard_mode_enabled',
   DASHBOARD_TILES: '@kiosk_dashboard_tiles',
+  // Lock Screen Controls
+  LOCKSCREEN_CONTROLS_ENABLED: '@kiosk_lockscreen_controls_enabled',
+  LOCKSCREEN_WIFI_ENABLED: '@kiosk_lockscreen_wifi_enabled',
+  LOCKSCREEN_BLUETOOTH_ENABLED: '@kiosk_lockscreen_bluetooth_enabled',
+  LOCKSCREEN_EMERGENCY_CALL_ENABLED: '@kiosk_lockscreen_emergency_call_enabled',
+  LOCKSCREEN_AUDIO_ENABLED: '@kiosk_lockscreen_audio_enabled',
+  LOCKSCREEN_FLASHLIGHT_ENABLED: '@kiosk_lockscreen_flashlight_enabled',
+  LOCKSCREEN_BRIGHTNESS_ENABLED: '@kiosk_lockscreen_brightness_enabled',
+  LOCKSCREEN_ROTATION_LOCK_ENABLED: '@kiosk_lockscreen_rotation_lock_enabled',
   // HTTP Basic Auth
   HTTP_BASIC_AUTH_USERNAME: '@kiosk_http_basic_auth_username',
   // Cloud sync metadata (local tracking only, never synced)
@@ -255,6 +273,63 @@ export const StorageService = {
       return value ? JSON.parse(value) : false;
     } catch (error) {
       console.error('Error getting auto launch:', error);
+      return false;
+    }
+  },
+
+  //SCREEN LOCK COMPATIBILITY (#199) — opt-in; default false so behavior is unchanged
+  saveScreenLockCompat: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.SCREEN_LOCK_COMPAT, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving screen lock compatibility:', error);
+    }
+  },
+
+  getScreenLockCompat: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.SCREEN_LOCK_COMPAT);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting screen lock compatibility:', error);
+      return false;
+    }
+  },
+
+  //DEFAULT LAUNCHER (#199) — opt-in, Device Owner only; default false → behavior unchanged
+  saveDefaultLauncher: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.DEFAULT_LAUNCHER, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving default launcher:', error);
+    }
+  },
+
+  getDefaultLauncher: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.DEFAULT_LAUNCHER);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting default launcher:', error);
+      return false;
+    }
+  },
+
+  //2-WAY AUDIO / INTERCOM MODE (#205) — opt-in; default false → behavior unchanged
+  saveIntercomMode: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.INTERCOM_MODE, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving intercom mode:', error);
+    }
+  },
+
+  getIntercomMode: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.INTERCOM_MODE);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting intercom mode:', error);
       return false;
     }
   },
@@ -369,6 +444,7 @@ export const StorageService = {
         KEYS.PRINT_ENABLED,
         // WebView Zoom Level
         KEYS.WEBVIEW_ZOOM_LEVEL,
+        KEYS.WEBVIEW_ZOOM_MODE,
         // Custom User Agent
         KEYS.CUSTOM_USER_AGENT,
         // MQTT
@@ -386,6 +462,15 @@ export const StorageService = {
         // Dashboard
         KEYS.DASHBOARD_MODE_ENABLED,
         KEYS.DASHBOARD_TILES,
+        // Lock Screen Controls
+        KEYS.LOCKSCREEN_CONTROLS_ENABLED,
+        KEYS.LOCKSCREEN_WIFI_ENABLED,
+        KEYS.LOCKSCREEN_BLUETOOTH_ENABLED,
+        KEYS.LOCKSCREEN_EMERGENCY_CALL_ENABLED,
+        KEYS.LOCKSCREEN_AUDIO_ENABLED,
+        KEYS.LOCKSCREEN_FLASHLIGHT_ENABLED,
+        KEYS.LOCKSCREEN_BRIGHTNESS_ENABLED,
+        KEYS.LOCKSCREEN_ROTATION_LOCK_ENABLED,
         // HTTP Basic Auth
         KEYS.HTTP_BASIC_AUTH_USERNAME,
         // Managed Apps
@@ -1374,6 +1459,25 @@ export const StorageService = {
     }
   },
 
+  // BLOCK FACTORY RESET (#201)
+  saveBlockFactoryReset: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.BLOCK_FACTORY_RESET, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving block factory reset:', error);
+    }
+  },
+
+  getBlockFactoryReset: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.BLOCK_FACTORY_RESET);
+      return value ? JSON.parse(value) : false; // Default OFF - opt-in, no behavior change for existing installs
+    } catch (error) {
+      console.error('Error getting block factory reset:', error);
+      return false;
+    }
+  },
+
   // NOTIFICATIONS (NFC SUPPORT)
   saveAllowNotifications: async (value: boolean): Promise<void> => {
     try {
@@ -2068,6 +2172,29 @@ export const StorageService = {
     }
   },
 
+  // ============ WebView Zoom Mode (#188) ============
+  // 'standard' = CSS zoom on document.documentElement (<html>).
+  // 'fit' = CSS zoom on document.body instead (the HADashboard method), so Home
+  //          Assistant dashboards re-flow their cards and fill the screen.
+
+  saveWebViewZoomMode: async (value: string): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.WEBVIEW_ZOOM_MODE, value);
+    } catch (error) {
+      console.error('Error saving WebView zoom mode:', error);
+    }
+  },
+
+  getWebViewZoomMode: async (): Promise<string> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.WEBVIEW_ZOOM_MODE);
+      return value || 'standard';
+    } catch (error) {
+      console.error('Error getting WebView zoom mode:', error);
+      return 'standard';
+    }
+  },
+
   // ============ Disable User Zoom ============
 
   saveDisableUserZoom: async (value: boolean): Promise<void> => {
@@ -2105,6 +2232,27 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting custom user agent:', error);
       return '';
+    }
+  },
+
+  // ============ Pause web media when hidden (#177) ============
+
+  savePauseWebMediaWhenHidden: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.PAUSE_WEB_MEDIA_WHEN_HIDDEN, value.toString());
+    } catch (error) {
+      console.error('Error saving pause web media when hidden:', error);
+    }
+  },
+
+  getPauseWebMediaWhenHidden: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.PAUSE_WEB_MEDIA_WHEN_HIDDEN);
+      // Default ON
+      return value === null ? true : value === 'true';
+    } catch (error) {
+      console.error('Error getting pause web media when hidden:', error);
+      return true;
     }
   },
 
@@ -3011,6 +3159,165 @@ export const StorageService = {
 
     if (pairs.length > 0) {
       await AsyncStorage.multiSet(pairs);
+    }
+  },
+
+  // ============ LOCK SCREEN CONTROLS ============
+
+  saveLockscreenControlsEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.LOCKSCREEN_CONTROLS_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving lockscreen controls enabled:', error);
+    }
+  },
+
+  getLockscreenControlsEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.LOCKSCREEN_CONTROLS_ENABLED);
+      if (value !== null) {
+        return JSON.parse(value);
+      }
+
+      const legacyValues = await AsyncStorage.multiGet([
+        KEYS.LOCKSCREEN_WIFI_ENABLED,
+        KEYS.LOCKSCREEN_BLUETOOTH_ENABLED,
+        KEYS.LOCKSCREEN_EMERGENCY_CALL_ENABLED,
+        KEYS.LOCKSCREEN_AUDIO_ENABLED,
+        KEYS.LOCKSCREEN_FLASHLIGHT_ENABLED,
+        KEYS.LOCKSCREEN_BRIGHTNESS_ENABLED,
+        KEYS.LOCKSCREEN_ROTATION_LOCK_ENABLED,
+      ]);
+      return legacyValues.some(([, stored]) => stored ? JSON.parse(stored) : false);
+    } catch (error) {
+      console.error('Error getting lockscreen controls enabled:', error);
+      return false;
+    }
+  },
+
+  saveLockscreenWifiEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.LOCKSCREEN_WIFI_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving lockscreen wifi enabled:', error);
+    }
+  },
+
+  getLockscreenWifiEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.LOCKSCREEN_WIFI_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting lockscreen wifi enabled:', error);
+      return false;
+    }
+  },
+
+  saveLockscreenBluetoothEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.LOCKSCREEN_BLUETOOTH_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving lockscreen bluetooth enabled:', error);
+    }
+  },
+
+  getLockscreenBluetoothEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.LOCKSCREEN_BLUETOOTH_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting lockscreen bluetooth enabled:', error);
+      return false;
+    }
+  },
+
+  saveLockscreenEmergencyCallEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.LOCKSCREEN_EMERGENCY_CALL_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving lockscreen emergency call enabled:', error);
+    }
+  },
+
+  getLockscreenEmergencyCallEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.LOCKSCREEN_EMERGENCY_CALL_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting lockscreen emergency call enabled:', error);
+      return false;
+    }
+  },
+
+  saveLockscreenAudioEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.LOCKSCREEN_AUDIO_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving lockscreen audio enabled:', error);
+    }
+  },
+
+  getLockscreenAudioEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.LOCKSCREEN_AUDIO_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting lockscreen audio enabled:', error);
+      return false;
+    }
+  },
+
+  saveLockscreenFlashlightEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.LOCKSCREEN_FLASHLIGHT_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving lockscreen flashlight enabled:', error);
+    }
+  },
+
+  getLockscreenFlashlightEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.LOCKSCREEN_FLASHLIGHT_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting lockscreen flashlight enabled:', error);
+      return false;
+    }
+  },
+
+  saveLockscreenBrightnessEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.LOCKSCREEN_BRIGHTNESS_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving lockscreen brightness enabled:', error);
+    }
+  },
+
+  getLockscreenBrightnessEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.LOCKSCREEN_BRIGHTNESS_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting lockscreen brightness enabled:', error);
+      return false;
+    }
+  },
+
+  saveLockscreenRotationLockEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.LOCKSCREEN_ROTATION_LOCK_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving lockscreen rotation lock enabled:', error);
+    }
+  },
+
+  getLockscreenRotationLockEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.LOCKSCREEN_ROTATION_LOCK_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting lockscreen rotation lock enabled:', error);
+      return false;
     }
   },
 

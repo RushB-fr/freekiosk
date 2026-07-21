@@ -5,6 +5,7 @@
 
 import { NativeModules, DeviceEventEmitter } from 'react-native';
 import RNBrightness from '../utils/BrightnessModule';
+import UpdateModule from '../utils/UpdateModule';
 
 const { KioskModule } = NativeModules;
 
@@ -71,8 +72,16 @@ class DeviceControlServiceClass {
   private getScreensaverCallback: GetScreensaverCallback | null = null;
   private currentBrightness: number = 0.5;
   private kioskModeEnabled: boolean = false;
-  private appVersion: string = '1.2.20';
+  private appVersion: string = '';
   private scheduledSleep: boolean = false;
+
+  constructor() {
+    // Source the version from the installed APK (same native source as the update
+    // checker), so it's never a hardcoded literal that drifts from build.gradle.
+    UpdateModule.getCurrentVersion()
+      .then(info => { this.appVersion = info.versionName; })
+      .catch(() => { /* leave empty if unavailable */ });
+  }
 
   // Register callbacks from KioskScreen
   registerWebViewCallbacks(

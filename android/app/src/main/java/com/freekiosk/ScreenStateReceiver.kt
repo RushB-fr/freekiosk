@@ -8,7 +8,6 @@ import android.os.Build
 import android.os.PowerManager
 import android.util.Log
 import android.view.WindowManager
-import android.view.inputmethod.InputMethodManager
 
 /**
  * BroadcastReceiver to detect screen ON/OFF events
@@ -63,17 +62,7 @@ class ScreenStateReceiver : BroadcastReceiver() {
                 val reactContext = reactApp.reactNativeHost.reactInstanceManager?.currentReactContext
                 val activity = reactContext?.currentActivity
                 if (activity != null) {
-                    activity.runOnUiThread {
-                        try {
-                            val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-                            val focusedView = activity.currentFocus ?: activity.window.decorView
-                            imm.hideSoftInputFromWindow(focusedView.windowToken, 0)
-                            focusedView.clearFocus()
-                            Log.d(TAG, "Soft keyboard dismissed on screen off")
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Failed to dismiss keyboard: ${e.message}")
-                        }
-                    }
+                    KeyboardUtils.dismiss(activity)
                 }
             }
         } catch (e: Exception) {

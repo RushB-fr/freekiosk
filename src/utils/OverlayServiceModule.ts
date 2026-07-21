@@ -10,6 +10,8 @@ interface OverlayServiceModuleType {
     autoRelaunch?: boolean,
     nfcEnabled?: boolean
   ): Promise<boolean>;
+  // #190 — Configure the native inactivity countdown for External App screensaver activation
+  updateInactivityConfig(delayMs: number, enabled: boolean): Promise<boolean>;
   stopOverlayService(): Promise<boolean>;
   setButtonOpacity(opacity: number): Promise<boolean>;
   getButtonOpacity(): Promise<number>;

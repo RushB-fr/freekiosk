@@ -63,6 +63,7 @@ class MainActivity : ReactActivity() {
   
   // Volume change receiver (also handles 5-tap gesture detection)
   private var volumeChangeReceiver: VolumeChangeReceiver? = null
+  private val emergencyDialAction = "android.intent.action.DIAL_EMERGENCY"
 
   // Debounce handler for hideSystemUI to avoid dismissing the power menu (GlobalActions)
   // on devices where onWindowFocusChanged fires rapidly (e.g. TECNO/HiOS on Android 14)
@@ -103,6 +104,12 @@ class MainActivity : ReactActivity() {
     // Request location permission for WiFi SSID access (Android 8+ requires it)
     requestLocationPermission()
 
+    // Request Bluetooth runtime permissions (Android 12+ / API 31+)
+    requestBluetoothPermissions()
+
+    // Request Android 13+ WiFi scan permission for visible SSID results
+    requestWifiPermissions()
+
     // Request camera permission for motion detection
     requestCameraPermission()
 
@@ -120,6 +127,7 @@ class MainActivity : ReactActivity() {
     ensureBootReceiverEnabled()
     hideSystemUI()
     checkAndStartLockTask()
+    applyDefaultLauncherPolicy()
 
     // Start KioskWatchdogService (#96) — survives OOM kills via START_STICKY
     startKioskWatchdogIfNeeded()
@@ -188,9 +196,30 @@ class MainActivity : ReactActivity() {
   }
 
   private fun requestLocationPermission() {
+    val needed = mutableListOf<String>()
     if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
         != PackageManager.PERMISSION_GRANTED) {
-      ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 1001)
+      needed.add(Manifest.permission.ACCESS_FINE_LOCATION)
+    }
+    if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+        != PackageManager.PERMISSION_GRANTED) {
+      needed.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+    }
+    if (needed.isEmpty()) return
+
+    if (devicePolicyManager.isDeviceOwnerApp(packageName)) {
+      needed.forEach { perm ->
+        try {
+          devicePolicyManager.setPermissionGrantState(
+            adminComponent,
+            packageName,
+            perm,
+            DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
+          )
+        } catch (_: Exception) {}
+      }
+    } else {
+      ActivityCompat.requestPermissions(this, needed.toTypedArray(), 1001)
     }
   }
 
@@ -201,14 +230,95 @@ class MainActivity : ReactActivity() {
     }
   }
 
+  private fun requestBluetoothPermissions() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+
+    val needed = mutableListOf<String>()
+    if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
+        != PackageManager.PERMISSION_GRANTED) needed.add(Manifest.permission.BLUETOOTH_CONNECT)
+    if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN)
+        != PackageManager.PERMISSION_GRANTED) needed.add(Manifest.permission.BLUETOOTH_SCAN)
+    if (needed.isEmpty()) return
+
+    if (devicePolicyManager.isDeviceOwnerApp(packageName)) {
+      needed.forEach { perm ->
+        try {
+          devicePolicyManager.setPermissionGrantState(
+            adminComponent,
+            packageName,
+            perm,
+            DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
+          )
+        } catch (_: Exception) {}
+      }
+    } else {
+      ActivityCompat.requestPermissions(this, needed.toTypedArray(), 1003)
+    }
+  }
+
+  private fun requestWifiPermissions() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+    if (ContextCompat.checkSelfPermission(this, Manifest.permission.NEARBY_WIFI_DEVICES)
+        == PackageManager.PERMISSION_GRANTED) return
+
+    if (devicePolicyManager.isDeviceOwnerApp(packageName)) {
+      try {
+        devicePolicyManager.setPermissionGrantState(
+          adminComponent,
+          packageName,
+          Manifest.permission.NEARBY_WIFI_DEVICES,
+          DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
+        )
+      } catch (_: Exception) {}
+    } else {
+      ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.NEARBY_WIFI_DEVICES), 1004)
+    }
+  }
+
   private fun checkAndStartLockTask() {
     val kioskEnabled = isKioskEnabled()
     DebugLog.d("MainActivity", "Kiosk enabled: $kioskEnabled")
-    
+
     if (kioskEnabled) {
       startLockTaskIfPossible()
     } else {
       DebugLog.d("MainActivity", "Kiosk mode disabled - normal mode")
+    }
+  }
+
+  /**
+   * Opt-in default-launcher policy (#199). When the "Set FreeKiosk as default launcher"
+   * setting is ON and we are Device Owner, register FreeKiosk (MainActivity) as the PERSISTENT
+   * preferred Home activity. The system then relaunches FreeKiosk itself at every boot and on
+   * Home — with no dependency on the OEM "appear on top" / autostart / background-pop-up
+   * permissions that Samsung resets on OS updates, which is what let the kiosk drop out after a
+   * reboot/update. The policy persists across updates as long as Device Owner is active.
+   *
+   * Reconciled on every launch (self-healing after an OS update): clear our own persistent
+   * preferences, then re-add only if the setting is ON. Gated on Device Owner, and a no-op
+   * unless the opt-in is enabled — so behavior is unchanged for everyone who hasn't turned it on.
+   */
+  private fun applyDefaultLauncherPolicy() {
+    if (!devicePolicyManager.isDeviceOwnerApp(packageName)) return
+    val enabled = getAsyncStorageValue("@kiosk_default_launcher", "false") == "true"
+    try {
+      // Only ever clears persistent preferences set by THIS admin (we set none other than HOME),
+      // so this is safe and idempotent — it prevents duplicate entries accumulating.
+      devicePolicyManager.clearPackagePersistentPreferredActivities(adminComponent, packageName)
+      if (enabled) {
+        val filter = IntentFilter(Intent.ACTION_MAIN).apply {
+          addCategory(Intent.CATEGORY_HOME)
+          addCategory(Intent.CATEGORY_DEFAULT)
+        }
+        devicePolicyManager.addPersistentPreferredActivity(
+          adminComponent, filter, ComponentName(this, MainActivity::class.java)
+        )
+        DebugLog.d("MainActivity", "Default launcher policy applied (FreeKiosk = persistent Home)")
+      } else {
+        DebugLog.d("MainActivity", "Default launcher policy off — persistent Home cleared")
+      }
+    } catch (e: Exception) {
+      DebugLog.errorProduction("MainActivity", "Failed to apply default launcher policy: ${e.message}")
     }
   }
 
@@ -224,6 +334,38 @@ class MainActivity : ReactActivity() {
     } catch (e: Exception) {
       DebugLog.errorProduction("MainActivity", "Error reading preference: ${e.message}")
       false
+    }
+  }
+
+  // Set when startLockTask() failed because the task was not yet in the foreground.
+  // We retry the lock task once the activity actually gains window focus (onWindowFocusChanged).
+  private var lockTaskPending = false
+
+  /**
+   * Calls startLockTask() defensively.
+   *
+   * startLockTask() throws IllegalArgumentException("Invalid task, not in foreground")
+   * when the task is not the foreground task at the moment of the call — which happens
+   * when checkAndStartLockTask() runs from onCreate() while MainActivity is still
+   * backgrounded (e.g. at boot, or the external-app-at-boot path that moves the task to
+   * back). That exception is NOT a SecurityException, so it used to escape the catch in
+   * startLockTaskIfPossible() and crash the app on launch. On that failure we flag the
+   * attempt as pending and retry once the activity gains window focus.
+   */
+  private fun tryStartLockTask(context: String) {
+    try {
+      startLockTask()
+      lockTaskPending = false
+      DebugLog.d("MainActivity", "Lock task started ($context)")
+    } catch (e: IllegalArgumentException) {
+      // "Invalid task, not in foreground" — defer until the activity is truly foregrounded.
+      lockTaskPending = true
+      DebugLog.errorProduction("MainActivity", "Lock task not in foreground yet ($context), will retry on focus: ${e.message}")
+    } catch (e: IllegalStateException) {
+      lockTaskPending = true
+      DebugLog.errorProduction("MainActivity", "Lock task not ready yet ($context), will retry on focus: ${e.message}")
+    } catch (e: Exception) {
+      DebugLog.errorProduction("MainActivity", "Lock task failed ($context): ${e.message}")
     }
   }
 
@@ -253,6 +395,10 @@ class MainActivity : ReactActivity() {
         if (isPrintSettingEnabled()) {
             whitelist.addAll(getPrintSpoolerPackages())
         }
+
+        if (getAsyncStorageValue("@kiosk_lockscreen_emergency_call_enabled", "false") == "true") {
+          whitelist.addAll(getEmergencyDialerPackages())
+        }
         
         val uniqueWhitelist = whitelist.distinct()
 
@@ -262,25 +408,15 @@ class MainActivity : ReactActivity() {
         // Lancer Lock Task sur MainActivity
         // Avec la whitelist, l'utilisateur peut naviguer entre FreeKiosk et l'app externe
         // Mais ne peut PAS sortir vers d'autres apps, launcher, ou paramètres
-        startLockTask()
-        DebugLog.d("MainActivity", "Lock task started (Device Owner) with whitelist: $uniqueWhitelist")
+        tryStartLockTask("Device Owner, whitelist: $uniqueWhitelist")
       } catch (e: SecurityException) {
         DebugLog.errorProduction("MainActivity", "Device Owner lock task failed (admin invalid?): ${e.message}")
         // Fall back to screen pinning
-        try {
-          startLockTask()
-        } catch (e2: Exception) {
-          DebugLog.errorProduction("MainActivity", "Fallback screen pinning also failed: ${e2.message}")
-        }
+        tryStartLockTask("fallback screen pinning")
       }
     } else {
       // Mode non-Device Owner: Screen Pinning manuel (demande confirmation utilisateur)
-      try {
-        startLockTask()
-        DebugLog.d("MainActivity", "Lock task started (Screen Pinning mode - user confirmation required)")
-      } catch (e: Exception) {
-        DebugLog.errorProduction("MainActivity", "Failed to start lock task: ${e.message}")
-      }
+      tryStartLockTask("Screen Pinning mode - user confirmation required")
     }
   }
 
@@ -318,8 +454,20 @@ class MainActivity : ReactActivity() {
           // Android requires HOME feature when NOTIFICATIONS is enabled
           lockTaskFeatures = lockTaskFeatures or DevicePolicyManager.LOCK_TASK_FEATURE_HOME
         }
+
+        // #208 — Keep the system keyguard alive while in lock task so a native Android
+        // screen-lock (PIN/pattern/password) actually prompts after the screen turns off
+        // and back on. Without LOCK_TASK_FEATURE_KEYGUARD, Android DISABLES the keyguard in
+        // LockTask mode, so the configured screen-lock never appears in multi-app/kiosk mode.
+        // Gated on the opt-in "System screen-lock compatibility" setting AND a secure lock
+        // actually being set (same gate as the boot path in BootReceiver).
+        val screenLockCompat = BootReceiver.readScreenLockCompatFlag(this) && BootReceiver.isDeviceSecure(this)
+        if (screenLockCompat) {
+          lockTaskFeatures = lockTaskFeatures or DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD
+        }
+
         devicePolicyManager.setLockTaskFeatures(adminComponent, lockTaskFeatures)
-        DebugLog.d("MainActivity", "Lock task features set: blockPowerButton=${!allowPowerButton}, notifications=$allowNotifications, systemInfo=$allowSystemInfo (flags=$lockTaskFeatures)")
+        DebugLog.d("MainActivity", "Lock task features set: blockPowerButton=${!allowPowerButton}, notifications=$allowNotifications, systemInfo=$allowSystemInfo, keyguard=$screenLockCompat (flags=$lockTaskFeatures)")
       }
       
       // Safety net: force unmute audio streams after configuring lock task
@@ -451,19 +599,12 @@ class MainActivity : ReactActivity() {
     // The backup send from handleNavigationIntent (500ms) handles edge cases.
     // No need for a third send here.
 
-    // Notifier React Native qu'on est revenu sur FreeKiosk (depuis une app externe)
-    // NE PAS envoyer si c'est un retour volontaire (l'overlay l'a déjà envoyé)
-    if (isExternalAppMode && !isVoluntaryReturn) {
-      sendAppReturnedEvent(false)  // voluntary=false = auto-relaunch possible
-    }
-
     val kioskEnabled = isKioskEnabled()
 
     // Fix #106: In external app mode, on involuntary returns, do NOT re-enter
     // startLockTask on MainActivity (which would pin FreeKiosk). Instead, immediately
     // relaunch the external app from the native layer to minimize the flash.
     if (isExternalAppMode && !isVoluntaryReturn && kioskEnabled) {
-      isVoluntaryReturn = false
       // Relaunch the external app directly if possible
       val targetPkg = externalAppPackage
       if (targetPkg != null) {
@@ -478,12 +619,25 @@ class MainActivity : ReactActivity() {
             startActivity(launchIntent)
             // Move FreeKiosk to background so external app stays visible
             Handler(Looper.getMainLooper()).postDelayed({ moveTaskToBack(true) }, 300)
+            // #203 — Deliberately NOT sending onAppReturned on this path: JS answers
+            // that event with stopOverlayService(), and since FreeKiosk goes straight
+            // back to the background its JS timers freeze — the pending stop then fires
+            // on the NEXT foreground pass (e.g. returning from Settings) and kills the
+            // OverlayService that was just restarted, leaving the 5-tap escape dead.
+            isVoluntaryReturn = false
             return
           }
         } catch (e: Exception) {
           DebugLog.errorProduction("MainActivity", "Failed to relaunch external app: ${e.message}")
         }
       }
+    }
+
+    // Notifier React Native qu'on est revenu sur FreeKiosk (depuis une app externe)
+    // NE PAS envoyer si c'est un retour volontaire (l'overlay l'a déjà envoyé),
+    // ni si le fast-path ci-dessus a relancé l'app externe directement (#203)
+    if (isExternalAppMode && !isVoluntaryReturn) {
+      sendAppReturnedEvent(false)  // voluntary=false = auto-relaunch possible
     }
     isVoluntaryReturn = false  // Reset pour le prochain resume
 
@@ -604,6 +758,13 @@ class MainActivity : ReactActivity() {
       // Cancel any pending hideSystemUI to avoid fighting with the system window
       hideSystemUIHandler.removeCallbacksAndMessages(null)
     } else {
+      // Retry a lock task that was deferred because the task wasn't in the foreground
+      // when checkAndStartLockTask() ran in onCreate(). Window focus gained is the most
+      // reliable signal that the activity is now truly foregrounded.
+      if (lockTaskPending) {
+        tryStartLockTask("onWindowFocusChanged retry")
+      }
+
       // If a print dialog was active, reset the flag now that focus has returned
       if (PrintModule.isPrintActive) {
         DebugLog.d("MainActivity", "Print dialog closed — resetting isPrintActive, deferring immersive mode")
@@ -670,8 +831,13 @@ class MainActivity : ReactActivity() {
     if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
       // Check if feature is enabled
       val volumeUp5TapEnabled = getAsyncStorageValue("@kiosk_volume_up_5tap_enabled", "true") == "true"
-      
-      if (volumeUp5TapEnabled) {
+
+      // #180 — Only act while the Kiosk screen is the active route, so Volume-Up x5
+      // doesn't kick the user out of Pin/Settings (same gate as the tap fallback).
+      // kioskScreenActive is set true on KioskScreen mount/focus, so a genuinely
+      // stuck user (still on the kiosk screen) keeps the escape; it only goes false
+      // once we've already navigated to Pin/Settings.
+      if (volumeUp5TapEnabled && kioskScreenActive) {
         val currentTime = System.currentTimeMillis()
         
         // Reset counter if timeout exceeded
@@ -716,6 +882,117 @@ class MainActivity : ReactActivity() {
     }
     return super.onKeyUp(keyCode, event)
   }
+
+  // ============================================================================
+  // #180 — Native tap-to-settings fallback (REVERTABLE BLOCK)
+  // ----------------------------------------------------------------------------
+  // In WebView/media `tap_anywhere` mode the "N taps -> settings" gesture relies
+  // on JavaScript injected into the page (a `touchend` listener). On some OEM
+  // WebViews, or pages that route touches into a cross-origin iframe, that
+  // in-page event never reaches our listener, so the user is stranded with no
+  // way back to settings even though the page loaded fine (#180, benfrancois).
+  //
+  // dispatchTouchEvent() observes every touch at the Activity level, BEFORE it
+  // is dispatched to any view, completely independently of the page JS, iframes
+  // or OEM WebView quirks, and works under lock-task. It counts N spatially
+  // grouped taps (same proximity/timeout idea as the JS path) and then fires the
+  // existing `navigateToPin` event. It NEVER consumes the touch (always returns
+  // super.dispatchTouchEvent), so page interaction is unaffected. This mirrors
+  // the existing Volume-Up x5 escape hatch.
+  //
+  // To revert this feature entirely: delete this whole block (fields + methods +
+  // the dispatchTouchEvent override below). Nothing else references it.
+  // Disable at runtime: set AsyncStorage `@kiosk_tap_to_settings_native_enabled`
+  // to "false".
+  // ============================================================================
+  // Set from JS (KioskScreen focus/blur via KioskModule.setKioskScreenActive).
+  // This is a SINGLE-Activity app: dispatchTouchEvent() fires for every screen
+  // (Kiosk, Pin, Settings…). Without this gate, 5 grouped taps while *inside*
+  // Settings would also fire navigateToPin and kick the user out. Defaults false
+  // (fail-safe: no false positives if the focus signal never arrives).
+  @Volatile var kioskScreenActive = false
+
+  private var tapSettingsCount = 0
+  private var tapSettingsFirstTapTime = 0L
+  private var tapSettingsFirstX = 0f
+  private var tapSettingsFirstY = 0f
+  // Physical px radius for grouping taps. ~80 CSS px (JS TAP_PROXIMITY_RADIUS)
+  // maps to roughly this on typical tablet densities; kept generous on purpose
+  // since this is an escape hatch, not a precision gesture.
+  private val tapSettingsProximityPx = 150f
+
+  // Cached config — AsyncStorage is SQLite-backed, so we must NOT read it on
+  // every touch. Re-read at most once per TTL.
+  private var tapSettingsCfgReadAt = 0L
+  private val tapSettingsCfgTtlMs = 3000L
+  private var tapSettingsEnabled = false
+  private var tapSettingsRequiredTaps = 5
+  private var tapSettingsTimeoutMs = 1500L
+
+  private fun refreshTapSettingsConfig() {
+    val now = System.currentTimeMillis()
+    if (now - tapSettingsCfgReadAt < tapSettingsCfgTtlMs) return
+    tapSettingsCfgReadAt = now
+    try {
+      val featureEnabled = getAsyncStorageValue("@kiosk_tap_to_settings_native_enabled", "true") == "true"
+      val displayMode = getAsyncStorageValue("@kiosk_display_mode", "webview")
+      val returnMode = getAsyncStorageValue("@kiosk_return_mode", "tap_anywhere")
+      // Only active where the JS path is the sole escape: WebView/media + tap_anywhere.
+      // (button mode has its own RN return button; external_app uses OverlayService.)
+      tapSettingsEnabled = featureEnabled &&
+        (displayMode == "webview" || displayMode == "media_player") &&
+        returnMode == "tap_anywhere"
+      tapSettingsRequiredTaps = getAsyncStorageValue("@kiosk_return_tap_count", "5").toIntOrNull()?.coerceIn(2, 20) ?: 5
+      tapSettingsTimeoutMs = getAsyncStorageValue("@kiosk_return_tap_timeout", "1500").toLongOrNull()?.coerceIn(500L, 5000L) ?: 1500L
+    } catch (e: Exception) {
+      tapSettingsEnabled = false
+    }
+  }
+
+  private fun handleTapForSettings(x: Float, y: Float) {
+    val now = System.currentTimeMillis()
+    if (tapSettingsCount == 0) {
+      tapSettingsFirstTapTime = now
+      tapSettingsFirstX = x
+      tapSettingsFirstY = y
+      tapSettingsCount = 1
+    } else {
+      val elapsed = now - tapSettingsFirstTapTime
+      val dx = x - tapSettingsFirstX
+      val dy = y - tapSettingsFirstY
+      val withinProximity = (dx * dx + dy * dy) <= (tapSettingsProximityPx * tapSettingsProximityPx)
+      if (elapsed > tapSettingsTimeoutMs || !withinProximity) {
+        // Too slow or too far from the first tap -> start a fresh sequence here.
+        tapSettingsFirstTapTime = now
+        tapSettingsFirstX = x
+        tapSettingsFirstY = y
+        tapSettingsCount = 1
+      } else {
+        tapSettingsCount++
+      }
+    }
+
+    if (tapSettingsCount >= tapSettingsRequiredTaps) {
+      tapSettingsCount = 0
+      android.util.Log.d("MainActivity", "Native $tapSettingsRequiredTaps-tap detected (#180 fallback) - navigating to PIN")
+      blockAutoRelaunch = true
+      Handler(Looper.getMainLooper()).postDelayed({
+        sendNavigateToPinEvent()
+      }, 100)
+    }
+  }
+
+  override fun dispatchTouchEvent(ev: android.view.MotionEvent?): Boolean {
+    // Observe (never consume) the initial press of each gesture.
+    if (ev != null && ev.actionMasked == android.view.MotionEvent.ACTION_DOWN && kioskScreenActive) {
+      refreshTapSettingsConfig()
+      if (tapSettingsEnabled) {
+        handleTapForSettings(ev.rawX, ev.rawY)
+      }
+    }
+    return super.dispatchTouchEvent(ev)
+  }
+  // ===== END #180 native tap-to-settings fallback =====
 
   override fun onBackPressed() {
     val prefs = getSharedPreferences("FreeKioskSettings", Context.MODE_PRIVATE)
@@ -823,6 +1100,25 @@ class MainActivity : ReactActivity() {
       DebugLog.d("MainActivity", "Print spooler packages for whitelist: $packages")
     } catch (e: Exception) {
       DebugLog.d("MainActivity", "Could not discover print services: ${e.message}")
+    }
+    return packages.toList()
+  }
+
+  private fun getEmergencyDialerPackages(): List<String> {
+    val packages = mutableSetOf<String>()
+    val emergencyIntent = Intent(emergencyDialAction)
+    try {
+      packageManager.resolveActivity(emergencyIntent, PackageManager.MATCH_DEFAULT_ONLY)
+        ?.activityInfo?.packageName
+        ?.let { packages.add(it) }
+
+      packageManager.queryIntentActivities(emergencyIntent, PackageManager.MATCH_DEFAULT_ONLY)
+        .forEach { info ->
+          info.activityInfo?.packageName?.let { packages.add(it) }
+        }
+      DebugLog.d("MainActivity", "Emergency dialer packages for whitelist: $packages")
+    } catch (e: Exception) {
+      DebugLog.errorProduction("MainActivity", "Could not resolve emergency dialer packages: ${e.message}")
     }
     return packages.toList()
   }
@@ -945,8 +1241,22 @@ class MainActivity : ReactActivity() {
     val configJson = intent.getStringExtra("config") // Full JSON config
     val mqttBroker = intent.getStringExtra("mqtt_broker_url")
 
-    // Skip if no config parameters
-    if (lockPackage == null && url == null && configJson == null && mqttBroker == null) return false
+    // Skip if no config parameters.
+    // Treat the intent as an ADB config command if ANY recognized extra is present — not
+    // just the "content" keys (lock_package / url / config / mqtt_broker_url). Previously an
+    // intent that set only e.g. REST API or MQTT options (plus the required pin) bailed out
+    // here and was silently ignored (#193). Keep this list in sync with the extras read below.
+    val adbConfigKeys = arrayOf(
+      "lock_package", "url", "pin", "config",
+      "kiosk_enabled", "auto_launch", "auto_start", "screensaver_enabled", "auto_relaunch",
+      "test_mode", "back_button_mode", "status_bar", "pin_mode",
+      "rest_api_enabled", "rest_api_port", "rest_api_key",
+      "mqtt_enabled", "mqtt_broker_url", "mqtt_port", "mqtt_username", "mqtt_password",
+      "mqtt_client_id", "mqtt_base_topic", "mqtt_discovery_prefix", "mqtt_status_interval",
+      "mqtt_allow_control", "mqtt_device_name",
+      "external_app_mode", "managed_apps"
+    )
+    if (adbConfigKeys.none { intent.hasExtra(it) }) return false
     
     android.util.Log.i("FreeKiosk-ADB", "ADB config received: lock_package=$lockPackage, url=$url, config=${configJson != null}")
     

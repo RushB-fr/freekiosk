@@ -34,6 +34,7 @@ import android.util.Log
 import android.widget.Toast
 import com.facebook.react.bridge.*
 import com.facebook.react.modules.core.DeviceEventManagerModule
+import com.freekiosk.ScreenController
 import org.json.JSONObject
 import java.net.Inet4Address
 import java.net.NetworkInterface
@@ -302,8 +303,11 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
             client.statusProvider = { getDeviceStatus() }
 
             client.commandHandler = { command, params ->
-                // Handle TTS, Toast and Audio natively (JS callback doesn't execute them)
+                // Handle natively: JS thread is suspended when screen is off via lockNow(),
+                // so screen and audio commands must not rely on the JS event bridge.
                 when (command) {
+                    "screenOn" -> ScreenController.turnScreenOn(reactApplicationContext)
+                    "screenOff" -> ScreenController.turnScreenOff(reactApplicationContext)
                     "tts" -> {
                         val text = params?.optString("text", "") ?: ""
                         if (text.isNotEmpty()) speakText(text)

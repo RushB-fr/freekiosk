@@ -54,6 +54,25 @@ class OverlayServiceModule(reactContext: ReactApplicationContext) :
         }
     }
 
+    // #190 — Configure the native inactivity countdown used to activate the screensaver
+    // in External App mode (JS timers are frozen while FreeKiosk is backgrounded). Uses a
+    // dedicated UPDATE_INACTIVITY action so the service does not reset its tap/return params.
+    @ReactMethod
+    fun updateInactivityConfig(delayMs: Double, enabled: Boolean, promise: Promise) {
+        try {
+            val serviceIntent = Intent(reactApplicationContext, OverlayService::class.java)
+            serviceIntent.action = "UPDATE_INACTIVITY"
+            serviceIntent.putExtra("SCREENSAVER_INACTIVITY_ENABLED", enabled)
+            serviceIntent.putExtra("INACTIVITY_DELAY", delayMs.toLong())
+            reactApplicationContext.startService(serviceIntent)
+            DebugLog.d("OverlayServiceModule", "Updated inactivity config: enabled=$enabled, delay=${delayMs.toLong()}ms")
+            promise.resolve(true)
+        } catch (e: Exception) {
+            DebugLog.errorProduction("OverlayServiceModule", "Error updating inactivity config: ${e.message}")
+            promise.resolve(false)
+        }
+    }
+
     @ReactMethod
     fun stopOverlayService(promise: Promise) {
         try {
