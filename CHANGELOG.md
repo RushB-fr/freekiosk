@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.20-beta.5] - 2026-07-21
+
 ### Fixed
 - 🔄 **Kiosk WebView refreshes randomly, wiping user input** (#211): On some devices the WebView would reload on its own at random, losing anything the user had typed, even with auto-reload, the return button, and auto-restart all disabled. Root cause: `MainActivity` (the React Native host) declared `android:configChanges` for only the common set (`keyboard|orientation|screenLayout|screenSize|smallestScreenSize|uiMode`), so any *other* runtime configuration change recreated the whole activity, tearing down and rebuilding the React view tree, which reloads the WebView from its start URL and discards in-page state. The triggers are system-driven and unrelated to any FreeKiosk setting: a font-size or display-size (density) change, a locale change, and, on cellular tablets, a carrier/network change (`mcc`/`mnc`) as the modem registers/handoffs. Fixed by broadening `MainActivity`'s `configChanges` to also handle `fontScale|density|locale|layoutDirection|navigation|touchscreen|colorMode|mcc|mnc`, so React Native absorbs these changes in place (updating dimensions/appearance) instead of the activity being recreated. The legitimate WebView remount on an actual renderer-process death (#198) is unchanged. Reported by @faif.
 
