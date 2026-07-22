@@ -52,6 +52,13 @@ interface KioskModuleInterface {
   // tag is the React node handle of the WebView (from findNodeHandle).
   pauseWebView(tag: number): Promise<boolean>;
   resumeWebView(tag: number): Promise<boolean>;
+  // Cloud sync keep-alive: CPU + WiFi lock so the heartbeat/poll loop survives screen-off
+  // (otherwise the device drops off the cloud and can't be woken remotely).
+  acquireCloudWakeLock(): Promise<boolean>;
+  releaseCloudWakeLock(): Promise<boolean>;
+  // Exempt from Doze/battery optimization (silent on Android 14+ Device Owner, else a
+  // one-time system dialog). No-op in Play builds where the permission is stripped.
+  requestIgnoreBatteryOptimizations(): Promise<boolean>;
 }
 
 const { KioskModule } = NativeModules;

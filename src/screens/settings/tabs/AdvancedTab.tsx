@@ -18,6 +18,7 @@ import { CertificateInfo } from '../../../utils/CertificateModule';
 import AccessibilityModule from '../../../utils/AccessibilityModule';
 import { CloudSyncService } from '../../../utils/CloudSyncService';
 import { CLOUD_ENABLED } from '../../../config/features';
+import QrScannerModal from '../../../components/QrScannerModal';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../../navigation/AppNavigator';
@@ -84,10 +85,11 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
   // Cloud management state
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [orgName, setOrgName] = useState<string | null>(null);
-  const [cloudUrl, setCloudUrl] = useState('');
+  const [cloudUrl, setCloudUrl] = useState('https://cloud.freekiosk.app');
   const [enrollToken, setEnrollToken] = useState('');
   const [enrolling, setEnrolling] = useState(false);
   const [unenrolling, setUnenrolling] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
 
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
@@ -164,6 +166,31 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
         },
       ],
     );
+  };
+
+  // Fill the enrollment fields from a scanned QR. The cloud dashboard encodes the bare
+  // token; we also tolerate a structured payload (JSON {url,token} or "url|token") so a
+  // future richer QR can fill the server URL too.
+  const handleScanned = (raw: string) => {
+    setShowScanner(false);
+    const data = raw.trim();
+    let url: string | undefined;
+    let token = data;
+    try {
+      const obj = JSON.parse(data);
+      if (obj && (obj.token || obj.url)) {
+        url = typeof obj.url === 'string' ? obj.url : undefined;
+        token = obj.token != null ? String(obj.token) : '';
+      }
+    } catch {
+      if (data.includes('|')) {
+        const [u, t] = data.split('|');
+        url = u;
+        token = t;
+      }
+    }
+    if (url) setCloudUrl(url);
+    if (token) setEnrollToken(token);
   };
 
   const handleUnenroll = () => {
@@ -249,7 +276,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
             <SettingsInput
               label="Cloud URL"
               icon="server"
-              placeholder="https://cloud.example.com"
+              placeholder="https://cloud.freekiosk.app"
               value={cloudUrl}
               onChangeText={setCloudUrl}
               keyboardType="url"
@@ -262,12 +289,23 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
               onChangeText={setEnrollToken}
             />
             <SettingsButton
+              title="Scan QR Code"
+              icon="camera"
+              variant="secondary"
+              onPress={() => setShowScanner(true)}
+            />
+            <SettingsButton
               title={enrolling ? 'Enrolling...' : 'Enroll Device'}
               icon="upload"
               variant="primary"
               onPress={handleEnroll}
               disabled={enrolling}
               loading={enrolling}
+            />
+            <QrScannerModal
+              visible={showScanner}
+              onClose={() => setShowScanner(false)}
+              onScanned={handleScanned}
             />
           </>
         )}

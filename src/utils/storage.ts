@@ -178,6 +178,28 @@ export const KEYS = {
   CONFIG_UPDATED_AT: '@cloud_config_updated_at',
   CONFIG_VERSION: '@cloud_config_version',
   LAST_SENT_CONFIG_HASH: '@cloud_last_sent_hash',
+  // Full raw config last received from the cloud. Used to preserve fields this app
+  // version doesn't model yet, so unknown settings survive an export round-trip
+  // (prevents an older app from stripping newer settings when it echoes to the cloud).
+  RAW_CLOUD_CONFIG: '@cloud_raw_config',
+};
+
+const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/**
+ * Deep-merge `overlay` onto `base`. Plain objects merge recursively; arrays and
+ * primitives from `overlay` replace `base`. Keys present only in `base` are kept.
+ * Used so exportConfig can overlay this app's known settings on top of the last raw
+ * config from the cloud, preserving fields this version doesn't understand.
+ */
+const deepMerge = (base: unknown, overlay: unknown): unknown => {
+  if (!isPlainObject(overlay) || !isPlainObject(base)) return overlay;
+  const out: Record<string, unknown> = { ...base };
+  for (const k of Object.keys(overlay)) {
+    out[k] = deepMerge(base[k], overlay[k]);
+  }
+  return out;
 };
 
 export const StorageService = {
@@ -2819,7 +2841,7 @@ export const StorageService = {
       try { return JSON.parse(v as string); } catch { return def; }
     };
 
-    return {
+    const structured: Record<string, unknown> = {
       general: {
         displayMode: str(KEYS.DISPLAY_MODE, 'webview'),
         url: str(KEYS.URL),
@@ -2870,6 +2892,8 @@ export const StorageService = {
         managedApps: json(KEYS.MANAGED_APPS, []),
         dashboardMode: bool(KEYS.DASHBOARD_MODE_ENABLED),
         dashboardTiles: json(KEYS.DASHBOARD_TILES, []),
+        pauseWebMediaWhenHidden: bool(KEYS.PAUSE_WEB_MEDIA_WHEN_HIDDEN, true),
+        intercomMode: bool(KEYS.INTERCOM_MODE),
       },
       display: {
         brightnessManagement: bool(KEYS.BRIGHTNESS_MANAGEMENT_ENABLED, true),
@@ -2895,12 +2919,15 @@ export const StorageService = {
         keyboardMode: str(KEYS.KEYBOARD_MODE, 'default'),
         zoom: {
           level: num(KEYS.WEBVIEW_ZOOM_LEVEL, 100),
+          mode: str(KEYS.WEBVIEW_ZOOM_MODE, 'standard'),
           disableUserZoom: bool(KEYS.DISABLE_USER_ZOOM),
         },
         customUserAgent: str(KEYS.CUSTOM_USER_AGENT),
         screensaver: {
           enabled: bool(KEYS.SCREENSAVER_ENABLED),
+          inactivityEnabled: bool(KEYS.SCREENSAVER_INACTIVITY_ENABLED, true),
           inactivityDelay: num(KEYS.SCREENSAVER_INACTIVITY_DELAY, 600000),
+          delay: num(KEYS.SCREENSAVER_DELAY, 60000),
           brightness: num(KEYS.SCREENSAVER_BRIGHTNESS, 0),
           type: str(KEYS.SCREENSAVER_TYPE, 'dim'),
           url: str(KEYS.SCREENSAVER_URL),
@@ -2948,6 +2975,20 @@ export const StorageService = {
           enabled: bool(KEYS.BLOCKING_OVERLAYS_ENABLED),
           regions: json(KEYS.BLOCKING_OVERLAYS_REGIONS, []),
         },
+        overlayButtonPosition: str(KEYS.OVERLAY_BUTTON_POSITION, 'bottom-right'),
+        blockFactoryReset: bool(KEYS.BLOCK_FACTORY_RESET),
+        defaultLauncher: bool(KEYS.DEFAULT_LAUNCHER),
+        screenLockCompat: bool(KEYS.SCREEN_LOCK_COMPAT),
+        lockscreen: {
+          enabled: bool(KEYS.LOCKSCREEN_CONTROLS_ENABLED),
+          wifi: bool(KEYS.LOCKSCREEN_WIFI_ENABLED),
+          bluetooth: bool(KEYS.LOCKSCREEN_BLUETOOTH_ENABLED),
+          emergencyCall: bool(KEYS.LOCKSCREEN_EMERGENCY_CALL_ENABLED),
+          audio: bool(KEYS.LOCKSCREEN_AUDIO_ENABLED),
+          flashlight: bool(KEYS.LOCKSCREEN_FLASHLIGHT_ENABLED),
+          brightness: bool(KEYS.LOCKSCREEN_BRIGHTNESS_ENABLED),
+          rotationLock: bool(KEYS.LOCKSCREEN_ROTATION_LOCK_ENABLED),
+        },
       },
       advanced: {
         restApi: {
@@ -2970,6 +3011,18 @@ export const StorageService = {
         },
       },
     };
+
+    // Preserve fields a newer app/cloud sent that this version doesn't model: overlay the
+    // current (structured) config on top of the last raw config received, so unknown keys
+    // survive the round-trip instead of being dropped and echoed back as a downgrade.
+    const rawStr = s.get(KEYS.RAW_CLOUD_CONFIG) as string | null | undefined;
+    if (rawStr) {
+      try {
+        const raw = JSON.parse(rawStr);
+        if (isPlainObject(raw)) return deepMerge(raw, structured) as Record<string, unknown>;
+      } catch { /* malformed raw: fall through to the structured config */ }
+    }
+    return structured;
   },
 
   importConfig: async (config: Record<string, unknown>): Promise<void> => {
@@ -2978,6 +3031,10 @@ export const StorageService = {
       if (value === undefined || value === null) return;
       pairs.push([key, typeof value === 'string' ? value : JSON.stringify(value)]);
     };
+
+    // Remember the full raw config so exportConfig can re-emit any fields this app
+    // version doesn't model (forward-compatible round-trip; see deepMerge).
+    set(KEYS.RAW_CLOUD_CONFIG, config);
 
     const g = config.general as Record<string, unknown> | undefined;
     const d = config.display as Record<string, unknown> | undefined;
@@ -3041,6 +3098,8 @@ export const StorageService = {
       set(KEYS.MANAGED_APPS, g.managedApps);
       set(KEYS.DASHBOARD_MODE_ENABLED, g.dashboardMode);
       set(KEYS.DASHBOARD_TILES, g.dashboardTiles);
+      set(KEYS.PAUSE_WEB_MEDIA_WHEN_HIDDEN, g.pauseWebMediaWhenHidden);
+      set(KEYS.INTERCOM_MODE, g.intercomMode);
     }
 
     if (d) {
@@ -3070,13 +3129,16 @@ export const StorageService = {
       const z = d.zoom as Record<string, unknown> | undefined;
       if (z) {
         set(KEYS.WEBVIEW_ZOOM_LEVEL, z.level);
+        set(KEYS.WEBVIEW_ZOOM_MODE, z.mode);
         set(KEYS.DISABLE_USER_ZOOM, z.disableUserZoom);
       }
       set(KEYS.CUSTOM_USER_AGENT, d.customUserAgent);
       const ss = d.screensaver as Record<string, unknown> | undefined;
       if (ss) {
         set(KEYS.SCREENSAVER_ENABLED, ss.enabled);
+        set(KEYS.SCREENSAVER_INACTIVITY_ENABLED, ss.inactivityEnabled);
         set(KEYS.SCREENSAVER_INACTIVITY_DELAY, ss.inactivityDelay);
+        set(KEYS.SCREENSAVER_DELAY, ss.delay);
         set(KEYS.SCREENSAVER_BRIGHTNESS, ss.brightness);
         set(KEYS.SCREENSAVER_TYPE, ss.type);
         set(KEYS.SCREENSAVER_URL, ss.url);
@@ -3131,6 +3193,21 @@ export const StorageService = {
       if (bo) {
         set(KEYS.BLOCKING_OVERLAYS_ENABLED, bo.enabled);
         set(KEYS.BLOCKING_OVERLAYS_REGIONS, bo.regions);
+      }
+      set(KEYS.OVERLAY_BUTTON_POSITION, sec.overlayButtonPosition);
+      set(KEYS.BLOCK_FACTORY_RESET, sec.blockFactoryReset);
+      set(KEYS.DEFAULT_LAUNCHER, sec.defaultLauncher);
+      set(KEYS.SCREEN_LOCK_COMPAT, sec.screenLockCompat);
+      const ls = sec.lockscreen as Record<string, unknown> | undefined;
+      if (ls) {
+        set(KEYS.LOCKSCREEN_CONTROLS_ENABLED, ls.enabled);
+        set(KEYS.LOCKSCREEN_WIFI_ENABLED, ls.wifi);
+        set(KEYS.LOCKSCREEN_BLUETOOTH_ENABLED, ls.bluetooth);
+        set(KEYS.LOCKSCREEN_EMERGENCY_CALL_ENABLED, ls.emergencyCall);
+        set(KEYS.LOCKSCREEN_AUDIO_ENABLED, ls.audio);
+        set(KEYS.LOCKSCREEN_FLASHLIGHT_ENABLED, ls.flashlight);
+        set(KEYS.LOCKSCREEN_BRIGHTNESS_ENABLED, ls.brightness);
+        set(KEYS.LOCKSCREEN_ROTATION_LOCK_ENABLED, ls.rotationLock);
       }
     }
 

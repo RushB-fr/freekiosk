@@ -13,6 +13,11 @@
         android:name="android.permission.REQUEST_INSTALL_PACKAGES"
         tools:node="remove" />
 
+    <!-- Strip REQUEST_IGNORE_BATTERY_OPTIMIZATIONS (App power management policy) -->
+    <uses-permission
+        android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
+        tools:node="remove" />
+
     <!-- Strip READ_MEDIA_* (photo/video policy) -->
     <uses-permission
         android:name="android.permission.READ_MEDIA_VIDEO"

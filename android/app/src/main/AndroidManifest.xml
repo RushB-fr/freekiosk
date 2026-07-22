@@ -32,6 +32,10 @@
          Removed entirely in Play Store builds via src/playstore overlay (tools:node="remove"). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Exempt from Doze so the cloud heartbeat/poll loop survives screen-off on
+         battery-powered devices. Play-sensitive: removed in Play Store builds via the
+         src/playstore overlay (tools:node="remove"); Device Owner builds keep it. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
 

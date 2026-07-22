@@ -4,6 +4,7 @@ import { DeviceEventEmitter } from 'react-native';
 import { StorageService, KEYS } from './storage';
 import DeviceControlService from '../services/DeviceControlService';
 import { CloudCommandService } from './CloudCommandService';
+import KioskModule from './KioskModule';
 import {
   CloudCredentials,
   SensitiveConfig,
@@ -63,6 +64,12 @@ class CloudSyncServiceClass {
     const creds = await getCloudCredentials();
     if (!creds) return;
     this.isRunning = true;
+    // Keep the CPU + WiFi awake so this heartbeat/poll loop survives screen-off; without
+    // it the device drops off the cloud and can no longer be woken remotely.
+    KioskModule.acquireCloudWakeLock().catch(() => {/* best-effort */});
+    // Also exempt from Doze so it holds up on battery-powered devices (silent in DO, no-op
+    // in Play builds). Best-effort: the wake lock is the primary mechanism.
+    KioskModule.requestIgnoreBatteryOptimizations().catch(() => {/* best-effort */});
     await this.sendHeartbeat(creds);
     this.heartbeatTimer = setInterval(
       () => getCloudCredentials().then(c => c && this.sendHeartbeat(c)),
@@ -75,6 +82,7 @@ class CloudSyncServiceClass {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
     }
+    KioskModule.releaseCloudWakeLock().catch(() => {/* best-effort */});
     this.isRunning = false;
   }
 

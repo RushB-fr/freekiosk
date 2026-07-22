@@ -39,6 +39,10 @@ import java.net.NetworkInterface
 class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
     private var wakeLock: PowerManager.WakeLock? = null
+    // Cloud sync keep-alive: CPU + WiFi locks so the RN JS heartbeat/poll loop keeps
+    // running when the screen is off (mirrors HttpServerModule's server locks).
+    private var cloudCpuWakeLock: PowerManager.WakeLock? = null
+    private var cloudWifiLock: WifiManager.WifiLock? = null
     private val emergencyDialAction = "android.intent.action.DIAL_EMERGENCY"
     private val emergencyDialerAction = "com.android.phone.EmergencyDialer.DIAL"
     private val safetyHubPackage = "com.google.android.apps.safetyhub"
@@ -77,6 +81,10 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
         // Release WakeLock when module is destroyed to prevent battery drain
         wakeLock?.release()
         wakeLock = null
+        cloudCpuWakeLock?.let { if (it.isHeld) it.release() }
+        cloudCpuWakeLock = null
+        cloudWifiLock?.let { if (it.isHeld) it.release() }
+        cloudWifiLock = null
         if (currentInstance == this) {
             currentInstance = null
         }
@@ -126,6 +134,81 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
 
     @ReactMethod
     fun resumeWebView(tag: Int, promise: Promise) = setWebViewPaused(tag, false, promise)
+
+    // Cloud sync must survive screen-off. The heartbeat/command-poll loop runs on the RN
+    // JS thread, which the OS freezes once the CPU sleeps (screen off, Device Owner). Holding
+    // a PARTIAL_WAKE_LOCK (CPU) + WifiLock (network) keeps that loop alive, so the device
+    // stays reachable and a `wake`/`screenOn` command can still land to turn the screen back
+    // on. Acquired from CloudSyncService.start(), released on stop(). Idempotent.
+    @ReactMethod
+    fun acquireCloudWakeLock(promise: Promise) {
+        try {
+            if (cloudWifiLock?.isHeld != true) {
+                val wifiManager = reactApplicationContext.applicationContext
+                    .getSystemService(Context.WIFI_SERVICE) as WifiManager
+                cloudWifiLock = wifiManager.createWifiLock(
+                    WifiManager.WIFI_MODE_FULL_HIGH_PERF, "FreeKiosk:CloudSync"
+                ).also { it.acquire() }
+            }
+            if (cloudCpuWakeLock?.isHeld != true) {
+                val powerManager = reactApplicationContext
+                    .getSystemService(Context.POWER_SERVICE) as PowerManager
+                cloudCpuWakeLock = powerManager.newWakeLock(
+                    PowerManager.PARTIAL_WAKE_LOCK, "FreeKiosk:CloudSyncCPU"
+                ).also { it.acquire() }
+            }
+            android.util.Log.d("KioskModule", "Cloud sync wake locks acquired")
+            promise.resolve(true)
+        } catch (e: Exception) {
+            android.util.Log.e("KioskModule", "Failed to acquire cloud wake locks: ${e.message}")
+            promise.resolve(false)
+        }
+    }
+
+    @ReactMethod
+    fun releaseCloudWakeLock(promise: Promise) {
+        try {
+            cloudCpuWakeLock?.let { if (it.isHeld) it.release() }
+            cloudCpuWakeLock = null
+            cloudWifiLock?.let { if (it.isHeld) it.release() }
+            cloudWifiLock = null
+            android.util.Log.d("KioskModule", "Cloud sync wake locks released")
+            promise.resolve(true)
+        } catch (e: Exception) {
+            android.util.Log.e("KioskModule", "Failed to release cloud wake locks: ${e.message}")
+            promise.resolve(false)
+        }
+    }
+
+    // Exempt the app from Doze/battery optimization so the cloud loop holds up on
+    // battery-powered devices (the PARTIAL_WAKE_LOCK keeps the CPU awake, but Doze can still
+    // defer network/wakelocks once the device is unplugged and idle). Uses the public
+    // ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS intent (a one-time system dialog; grant it
+    // during provisioning, before lock task). No public silent path exists even for a Device
+    // Owner (setApplicationExemptions is a @SystemApi). The permission is stripped from Play
+    // builds, so there startActivity throws, is caught, and the wake lock alone is relied upon.
+    // No-op once already exempted.
+    @ReactMethod
+    fun requestIgnoreBatteryOptimizations(promise: Promise) {
+        try {
+            val ctx = reactApplicationContext
+            val pkg = ctx.packageName
+            val pm = ctx.getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (pm.isIgnoringBatteryOptimizations(pkg)) {
+                promise.resolve(true)
+                return
+            }
+            val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = android.net.Uri.parse("package:$pkg")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            ctx.startActivity(intent)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            android.util.Log.e("KioskModule", "requestIgnoreBatteryOptimizations failed: ${e.message}")
+            promise.resolve(false)
+        }
+    }
 
     private fun setWebViewPaused(tag: Int, paused: Boolean, promise: Promise) {
         UiThreadUtil.runOnUiThread {
