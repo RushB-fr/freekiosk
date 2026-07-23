@@ -44,7 +44,16 @@ export const settingsStyles = StyleSheet.create({
     borderRadius: Spacing.inputRadius,
     alignItems: 'center',
   },
-  
+
+  deviceOwnerBadgeRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+
+  deviceOwnerBadgeIcon: {
+    marginRight: Spacing.sm,
+  },
+
   deviceOwnerBadgeActive: {
     backgroundColor: Colors.successLight,
     borderWidth: 1,

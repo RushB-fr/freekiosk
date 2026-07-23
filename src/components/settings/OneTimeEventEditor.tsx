@@ -16,6 +16,7 @@ import {
   Platform,
 } from 'react-native';
 import { Colors, Spacing, Typography } from '../../theme';
+import Icon from '../Icon';
 import { ScheduledEvent, generateEventId, isValidTime, isValidDate, PRIORITY_LEVELS } from '../../types/planner';
 import { SettingsInput, SettingsSwitch } from './index';
 import DateInput from './DateInput';
@@ -177,7 +178,7 @@ const OneTimeEventEditor: React.FC<OneTimeEventEditorProps> = ({
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>📆 Event Details</Text>
+            <Text style={styles.sectionTitle}>Event Details</Text>
             
             <SettingsInput
               label="Event Name"
@@ -198,7 +199,7 @@ const OneTimeEventEditor: React.FC<OneTimeEventEditorProps> = ({
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>📅 Date Range</Text>
+            <Text style={styles.sectionTitle}>Date Range</Text>
             
             <View style={styles.dateRow}>
               <DateInput
@@ -242,7 +243,7 @@ const OneTimeEventEditor: React.FC<OneTimeEventEditorProps> = ({
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>⚙️ Options</Text>
+            <Text style={styles.sectionTitle}>Options</Text>
             
             <Text style={styles.label}>Priority (for overlapping events)</Text>
             <View style={styles.priorityRow}>
@@ -275,7 +276,7 @@ const OneTimeEventEditor: React.FC<OneTimeEventEditorProps> = ({
               onPress={() => setEnabled(!enabled)}
             >
               <Text style={styles.label}>Event Enabled</Text>
-              <Text style={styles.enabledIcon}>{enabled ? '✅' : '⬜'}</Text>
+              <Icon name={enabled ? 'checkbox-marked' : 'checkbox-blank-outline'} size={22} color={enabled ? Colors.primary : Colors.textHint} style={styles.enabledIcon} />
             </TouchableOpacity>
           </View>
 

@@ -113,7 +113,7 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
 const styles = StyleSheet.create({
   button: {
     borderRadius: Spacing.buttonRadius,
-    borderWidth: 2,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: Spacing.sm,
@@ -123,10 +123,10 @@ const styles = StyleSheet.create({
   },
   shadow: {
     shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 3,
   },
   content: {
     flexDirection: 'row',

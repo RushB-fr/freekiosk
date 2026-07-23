@@ -19,6 +19,7 @@ import AccessibilityModule from '../../../utils/AccessibilityModule';
 import { CloudSyncService } from '../../../utils/CloudSyncService';
 import { CLOUD_ENABLED } from '../../../config/features';
 import QrScannerModal from '../../../components/QrScannerModal';
+import Icon from '../../../components/Icon';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../../navigation/AppNavigator';
@@ -250,7 +251,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
       {CLOUD_ENABLED && <SettingsSection title="Cloud Management" icon="sync">
         {isEnrolled ? (
           <>
-            <SettingsInfoBox variant="success" title="☁️ Cloud-managed">
+            <SettingsInfoBox variant="success" icon="cloud-check" title="Cloud-managed">
               <Text style={styles.infoText}>
                 This device is enrolled{orgName ? ` in ${orgName}` : ''}.{'\n'}
                 Configuration is synced automatically every 30 seconds.
@@ -267,7 +268,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
           </>
         ) : (
           <>
-            <SettingsInfoBox variant="info" title="ℹ️ Zero-touch provisioning">
+            <SettingsInfoBox variant="info" title="Zero-touch provisioning">
               <Text style={styles.infoText}>
                 Enroll this device in a FreeKiosk Cloud instance to manage its configuration remotely.{'\n\n'}
                 Warning: enrolling will reset all current settings.
@@ -320,7 +321,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
         </View>
         
         {updateAvailable && updateInfo && (
-          <SettingsInfoBox variant="success" title={`🎉 ${updateInfo.isPrerelease ? '🧪 Beta ' : ''}Update Available`}>
+          <SettingsInfoBox variant="success" icon="party-popper" title={`${updateInfo.isPrerelease ? 'Beta ' : ''}Update Available`}>
             <Text style={styles.infoText}>
               Version {updateInfo.version} is available!{updateInfo.isPrerelease ? ' (pre-release)' : ''}
               {updateInfo.notes && `\n\n${updateInfo.notes.substring(0, 150)}...`}
@@ -330,7 +331,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
         
         <View style={styles.betaRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.betaLabel}>🧪 Beta Updates</Text>
+            <Text style={styles.betaLabel}>Beta Updates</Text>
             <Text style={styles.betaHint}>Receive pre-release versions before stable</Text>
           </View>
           <TouchableOpacity
@@ -392,7 +393,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
                       {cert.fingerprint.substring(0, 24)}...
                     </Text>
                     <Text style={[styles.certificateExpiry, cert.isExpired && styles.certificateExpired]}>
-                      {cert.isExpired ? '⚠️ Expired: ' : 'Expires: '}
+                      {cert.isExpired ? 'Expired: ' : 'Expires: '}
                       {cert.expiryDate}
                     </Text>
                   </View>
@@ -400,7 +401,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
                     style={styles.deleteButton}
                     onPress={() => onRemoveCertificate(cert.fingerprint, cert.url)}
                   >
-                    <Text style={styles.deleteButtonText}>🗑️</Text>
+                    <Icon name="delete-outline" size={22} color={Colors.error} />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -433,7 +434,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
           </View>
         </View>
 
-        <SettingsInfoBox variant="info" title="ℹ️ Why is this needed?">
+        <SettingsInfoBox variant="info" icon="help-circle" title="Why is this needed?">
           <Text style={styles.infoText}>
             The Accessibility Service allows FreeKiosk to send keyboard input (remote control, text input) to external apps.{'\n\n'}
             Without it, keyboard emulation only works inside FreeKiosk's own WebView.
@@ -466,12 +467,12 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
 
         {accessibilityRunning && (
           <Text style={styles.hint}>
-            ✅ Keyboard emulation is available for all apps (WebView + External Apps).
+            Keyboard emulation is available for all apps (WebView + External Apps).
           </Text>
         )}
 
         {isDeviceOwner && displayMode === 'external_app' && (
-          <SettingsInfoBox variant="info" title="🔧 Managed Apps Accessibility">
+          <SettingsInfoBox variant="info" icon="cog-outline" title="Managed Apps Accessibility">
             <Text style={styles.infoText}>
               You can allow other apps' accessibility services in the "Managed Apps" section of the General tab.{'\n'}
               Toggle "Allow Accessibility" per app to whitelist their accessibility services via Device Owner.
@@ -491,7 +492,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
           Useful when your device has no physical navigation buttons.
         </Text>
         {kioskEnabled && (
-          <SettingsInfoBox variant="info" title="🔒 Kiosk Mode Active">
+          <SettingsInfoBox variant="info" icon="lock" title="Kiosk Mode Active">
             <Text style={styles.infoText}>
               Kiosk mode will be temporarily paused to open Android settings.{' '}
               It will automatically re-engage when you return to FreeKiosk.
@@ -509,37 +510,43 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
             style={styles.shortcutButton}
             onPress={() => KioskModule.openAndroidSettings('wifi')}
           >
-            <Text style={styles.shortcutText}>📶 WiFi</Text>
+            <Icon name="wifi" size={22} color={Colors.primary} style={styles.shortcutIcon} />
+            <Text style={styles.shortcutText}>WiFi</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.shortcutButton}
             onPress={() => KioskModule.openAndroidSettings('sound')}
           >
-            <Text style={styles.shortcutText}>🔊 Sound</Text>
+            <Icon name="volume-high" size={22} color={Colors.primary} style={styles.shortcutIcon} />
+            <Text style={styles.shortcutText}>Sound</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.shortcutButton}
             onPress={() => KioskModule.openAndroidSettings('display')}
           >
-            <Text style={styles.shortcutText}>🔆 Display</Text>
+            <Icon name="brightness-6" size={22} color={Colors.primary} style={styles.shortcutIcon} />
+            <Text style={styles.shortcutText}>Display</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.shortcutButton}
             onPress={() => KioskModule.openAndroidSettings('bluetooth')}
           >
-            <Text style={styles.shortcutText}>📡 Bluetooth</Text>
+            <Icon name="bluetooth" size={22} color={Colors.primary} style={styles.shortcutIcon} />
+            <Text style={styles.shortcutText}>Bluetooth</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.shortcutButton}
             onPress={() => KioskModule.openAndroidSettings('date')}
           >
-            <Text style={styles.shortcutText}>📅 Date & Time</Text>
+            <Icon name="calendar-clock" size={22} color={Colors.primary} style={styles.shortcutIcon} />
+            <Text style={styles.shortcutText}>Date & Time</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.shortcutButton}
             onPress={() => KioskModule.openAndroidSettings('apps')}
           >
-            <Text style={styles.shortcutText}>📱 Apps</Text>
+            <Icon name="apps" size={22} color={Colors.primary} style={styles.shortcutIcon} />
+            <Text style={styles.shortcutText}>Apps</Text>
           </TouchableOpacity>
         </View>
       </SettingsSection>
@@ -699,6 +706,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.surfaceVariant,
+  },
+  shortcutIcon: {
+    marginBottom: 4,
   },
   shortcutText: {
     ...Typography.label,

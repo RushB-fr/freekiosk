@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, Text, NativeEventEmitter, NativeModules, AppState, DeviceEventEmitter, Dimensions, Pressable, BackHandler, Keyboard } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, NativeEventEmitter, NativeModules, AppState, DeviceEventEmitter, Dimensions, Pressable, BackHandler, Keyboard } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RNBrightness from '../utils/BrightnessModule';
 import { useIsFocused, useFocusEffect } from '@react-navigation/native';
@@ -2710,13 +2710,13 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
             styles.visualIndicator,
             {
               opacity: returnButtonVisible ? 1 : 0,
-              backgroundColor: returnButtonVisible ? '#2196F3' : 'transparent',
+              backgroundColor: returnButtonVisible ? '#2b7fff' : 'transparent',
             },
           ]}
           activeOpacity={1}
           onPress={handleReturnButtonTap}
         >
-          <Text style={[styles.visualIndicatorText, { opacity: returnButtonVisible ? 1 : 0 }]}>↩</Text>
+          <Icon name="arrow-u-left-top" size={28} color="#fff" style={{ opacity: returnButtonVisible ? 1 : 0 }} />
         </TouchableOpacity>
       )}
 
@@ -2808,7 +2808,7 @@ const styles = StyleSheet.create({
     right: 20,
     width: 50,
     height: 50,
-    backgroundColor: '#2196F3',
+    backgroundColor: '#2b7fff',
     borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',

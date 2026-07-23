@@ -70,19 +70,19 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
       // Build JSON content first
       const built = await buildBackupJson();
       if (!built.success || !built.json || !built.filename) {
-        Alert.alert('❌ Export Failed', built.error || 'Failed to prepare backup data', [{ text: 'OK' }]);
+        Alert.alert('Export Failed', built.error || 'Failed to prepare backup data', [{ text: 'OK' }]);
         return;
       }
       // Use SAF "Save As" dialog — works on all Android versions without storage permissions
       const saved = await FilePickerModule.saveJsonFile(built.json, built.filename);
       Alert.alert(
-        '✅ Backup Created',
+        'Backup Created',
         `Configuration exported successfully!\n\nSaved as: ${saved.name}`,
         [{ text: 'OK' }]
       );
     } catch (error: any) {
       if (error?.code === 'PICKER_CANCELLED') return;
-      Alert.alert('❌ Export Failed', error?.message || String(error), [{ text: 'OK' }]);
+      Alert.alert('Export Failed', error?.message || String(error), [{ text: 'OK' }]);
     } finally {
       setIsExporting(false);
     }
@@ -125,7 +125,7 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
           setBackupPreview(parsed.data);
         } else {
           Alert.alert(
-            '❌ Invalid Backup',
+            'Invalid Backup',
             parsed.error || 'The selected file is not a valid FreeKiosk backup.',
             [{ text: 'OK' }]
           );
@@ -142,7 +142,7 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
     if (!browsedContent) return;
 
     Alert.alert(
-      '⚠️ Restore Configuration',
+      'Restore Configuration',
       `This will replace all current settings with the backup from "${browsedFileName}".\n\nAre you sure you want to continue?`,
       [
         { text: 'Cancel', style: 'cancel' },
@@ -160,7 +160,7 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
                 }
                 message += '\n\nPlease restart the app for all changes to take effect.';
 
-                Alert.alert('✅ Restore Complete', message, [
+                Alert.alert('Restore Complete', message, [
                   {
                     text: 'OK',
                     onPress: () => {
@@ -175,7 +175,7 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
                 ]);
               } else {
                 Alert.alert(
-                  '❌ Restore Failed',
+                  'Restore Failed',
                   result.error || 'Unknown error occurred',
                   [{ text: 'OK' }]
                 );
@@ -193,7 +193,7 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
     if (!selectedBackup) return;
 
     Alert.alert(
-      '⚠️ Restore Configuration',
+      'Restore Configuration',
       'This will replace all current settings with the backup.\n\nAre you sure you want to continue?',
       [
         { text: 'Cancel', style: 'cancel' },
@@ -211,7 +211,7 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
                 }
                 message += '\n\nPlease restart the app for all changes to take effect.';
                 
-                Alert.alert('✅ Restore Complete', message, [
+                Alert.alert('Restore Complete', message, [
                   {
                     text: 'OK',
                     onPress: () => {
@@ -224,7 +224,7 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
                 ]);
               } else {
                 Alert.alert(
-                  '❌ Restore Failed',
+                  'Restore Failed',
                   result.error || 'Unknown error occurred',
                   [{ text: 'OK' }]
                 );
@@ -240,7 +240,7 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
 
   const handleDeleteBackup = async (file: BackupFile) => {
     Alert.alert(
-      '🗑️ Delete Backup',
+      'Delete Backup',
       `Are you sure you want to delete this backup?\n\n${file.name}`,
       [
         { text: 'Cancel', style: 'cancel' },
@@ -360,7 +360,7 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>📂 Select Backup to Restore</Text>
+            <Text style={styles.modalTitle}>Select Backup to Restore</Text>
             <TouchableOpacity
               style={styles.modalCloseButton}
               onPress={() => {
@@ -371,7 +371,7 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
                 setBrowsedFileName(null);
               }}
             >
-              <Text style={styles.modalCloseButtonText}>✕</Text>
+              <Icon name="close" size={22} color={Colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -462,7 +462,7 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
                       {browsedContent && (
                         <View style={styles.previewRow}>
                           <Text style={styles.previewLabel}>Source:</Text>
-                          <Text style={styles.previewValue}>📂 Browsed file</Text>
+                          <Text style={styles.previewValue}>Browsed file</Text>
                         </View>
                       )}
                     </>

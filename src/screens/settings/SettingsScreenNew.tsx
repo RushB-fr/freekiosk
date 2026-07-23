@@ -1139,9 +1139,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
         // Latest version is newer than current
         setUpdateAvailable(true);
         setUpdateInfo(latestUpdate);
-        const betaTag = latestUpdate.isPrerelease ? ' 🧪 Beta' : '';
+        const betaTag = latestUpdate.isPrerelease ? ' Beta' : '';
         Alert.alert(
-          `🎉 Update Available${betaTag}`,
+          `Update Available${betaTag}`,
           `New version ${latestVer} available!${latestUpdate.isPrerelease ? ' (pre-release)' : ''}\n\nCurrent: ${currentVer}\n\nDo you want to download and install it?`,
           [
             { text: 'Later', style: 'cancel' },
@@ -1149,7 +1149,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
           ]
         );
       } else {
-        Alert.alert('✓ Up to Date', `You are using the latest version (${currentVer})`);
+        Alert.alert('Up to Date', `You are using the latest version (${currentVer})`);
       }
     } catch (error: any) {
       Alert.alert('Error', `Unable to check for updates: ${error.message || error.toString()}`);
@@ -1172,7 +1172,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       const canInstall = await UpdateModule.checkInstallPermission();
       if (!canInstall) {
         Alert.alert(
-          '⚠️ Permission Required',
+          'Permission Required',
           'FreeKiosk needs permission to install updates.\n\nPlease enable "Allow from this source" on the next screen, then come back and try the update again.',
           [
             { text: 'Cancel', style: 'cancel' },
@@ -1204,7 +1204,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       await UpdateModule.downloadAndInstall(updateData.downloadUrl, updateData.version);
       setDownloading(false);
       Alert.alert(
-        '✅ Update Ready',
+        'Update Ready',
         'The update has been downloaded successfully. The installation screen should appear shortly.\n\nIf nothing happens:\n• Check notification panel\n• Look for "Package installer"\n• Grant installation permission if prompted',
         [{ text: 'OK' }]
       );
@@ -1215,7 +1215,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       // Provide helpful message for install permission errors
       if (error?.code === 'INSTALL_PERMISSION' || errorMsg.includes('unknown sources')) {
         Alert.alert(
-          '⚠️ Install Permission Needed',
+          'Install Permission Needed',
           'The update was downloaded but cannot be installed.\n\nPlease enable "Install from unknown sources" for FreeKiosk in your device settings, then try again.\n\nOn restricted devices (e.g. Echo Show), use:\nadb install -r <apk>',
         );
       } else {
@@ -1730,7 +1730,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
 
   const handleRemoveDeviceOwner = async (): Promise<void> => {
     Alert.alert(
-      '⚠️ Remove Device Owner',
+      'Remove Device Owner',
       'WARNING: This will remove Device Owner privileges.\n\n' +
       'You will lose:\n' +
       '• Full kiosk mode\n' +
@@ -2148,7 +2148,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       <Modal visible={downloading} transparent animationType="fade" onRequestClose={() => {}}>
         <View style={settingsStyles.modalOverlay}>
           <View style={settingsStyles.modalContent}>
-            <Text style={settingsStyles.modalTitle}>📥 Downloading</Text>
+            <Text style={settingsStyles.modalTitle}>Downloading</Text>
             <Text style={settingsStyles.modalText}>
               Please wait while downloading...
             </Text>
@@ -2161,18 +2161,25 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
 
       {/* Header */}
       <View style={settingsStyles.header}>
-        <Text style={settingsStyles.headerTitle}>⚙️ Settings</Text>
+        <Text style={settingsStyles.headerTitle}>Settings</Text>
         
         {/* Device Owner Badge */}
         <View style={[
           settingsStyles.deviceOwnerBadge,
+          settingsStyles.deviceOwnerBadgeRow,
           isDeviceOwner ? settingsStyles.deviceOwnerBadgeActive : settingsStyles.deviceOwnerBadgeInactive
         ]}>
+          <Icon
+            name={isDeviceOwner ? 'shield-check' : 'shield-off'}
+            size={16}
+            color={isDeviceOwner ? Colors.successDark : Colors.warningDark}
+            style={settingsStyles.deviceOwnerBadgeIcon}
+          />
           <Text style={[
             settingsStyles.deviceOwnerBadgeText,
             isDeviceOwner ? settingsStyles.deviceOwnerBadgeTextActive : settingsStyles.deviceOwnerBadgeTextInactive
           ]}>
-            {isDeviceOwner ? '🔒 Device Owner Active' : '🔓 Device Owner Inactive'}
+            {isDeviceOwner ? 'Device Owner Active' : 'Device Owner Inactive'}
           </Text>
         </View>
         
@@ -2212,8 +2219,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
         
         {/* Save Button - Always visible */}
         {activeTab !== 'advanced' && (
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-            <Text style={styles.saveButtonText}>💾 Save</Text>
+          <TouchableOpacity style={[styles.saveButton, styles.saveButtonRow]} onPress={handleSave}>
+            <Icon name="content-save" size={20} color={Colors.textOnPrimary} style={styles.saveButtonIcon} />
+            <Text style={styles.saveButtonText}>Save</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -2222,12 +2230,12 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       <Modal visible={showAppPicker} animationType="slide" onRequestClose={() => setShowAppPicker(false)}>
         <View style={settingsStyles.appPickerContainer}>
           <View style={settingsStyles.appPickerHeader}>
-            <Text style={settingsStyles.appPickerTitle}>📱 Select an App</Text>
+            <Text style={settingsStyles.appPickerTitle}>Select an App</Text>
             <TouchableOpacity
               style={settingsStyles.appPickerCloseButton}
               onPress={() => setShowAppPicker(false)}
             >
-              <Text style={settingsStyles.appPickerCloseText}>✕</Text>
+              <Icon name="close" size={24} color={Colors.textOnPrimary} />
             </TouchableOpacity>
           </View>
           <FlatList
@@ -2322,6 +2330,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 5,
+  },
+  saveButtonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButtonIcon: {
+    marginRight: 8,
   },
   saveButtonText: {
     color: Colors.textOnPrimary,

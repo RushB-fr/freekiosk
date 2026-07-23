@@ -238,14 +238,13 @@ const ManagedAppsSection: React.FC<ManagedAppsSectionProps> = ({
                     styles.pickerIconCircle,
                     !item.hasLauncherActivity && styles.pickerIconCircleService,
                   ]}>
-                    <Text style={[
-                      styles.pickerIconText,
-                      !item.hasLauncherActivity && styles.pickerIconTextService,
-                    ]}>
-                      {item.hasLauncherActivity
-                        ? item.appName.charAt(0).toUpperCase()
-                        : '⚙'}
-                    </Text>
+                    {item.hasLauncherActivity ? (
+                      <Text style={styles.pickerIconText}>
+                        {item.appName.charAt(0).toUpperCase()}
+                      </Text>
+                    ) : (
+                      <Icon name="cog" size={20} color={Colors.textSecondary} />
+                    )}
                   </View>
                   <View style={styles.pickerInfo}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>

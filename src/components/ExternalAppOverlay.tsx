@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, FlatList, useWindowDimensions } from 'react-native';
 import StatusBar from './StatusBar';
+import Icon from './Icon';
 import AppLauncherModule, { AppInfo } from '../utils/AppLauncherModule';
 import { ManagedApp } from '../types/managedApps';
 
@@ -251,7 +252,7 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
         {/* Test mode warning */}
         {backButtonMode === 'test' && (
           <View style={styles.testModeBar}>
-            <Text style={styles.testModeText}>🧪 Test Mode — Back button returns to settings</Text>
+            <Text style={styles.testModeText}>Test Mode — Back button returns to settings</Text>
           </View>
         )}
 
@@ -263,13 +264,13 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
               buttonPositionStyle,
               {
                 opacity: returnButtonVisible ? 1 : 0,
-                backgroundColor: returnButtonVisible ? '#2196F3' : 'transparent',
+                backgroundColor: returnButtonVisible ? '#2b7fff' : 'transparent',
               },
             ]}
             activeOpacity={1}
             onPress={handleGridButtonTap}
           >
-            <Text style={[styles.floatingReturnButtonText, { opacity: returnButtonVisible ? 1 : 0 }]}>↩</Text>
+            <Icon name="arrow-u-left-top" size={28} color="#fff" style={{ opacity: returnButtonVisible ? 1 : 0 }} />
           </TouchableOpacity>
         )}
       </View>
@@ -312,9 +313,12 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
           {/* Status Message */}
           <View style={styles.statusContainer}>
             <View style={styles.statusCard}>
-              <Text style={styles.statusIcon}>
-                {isAppLaunched ? '📱' : '⏳'}
-              </Text>
+              <Icon
+                name={isAppLaunched ? 'cellphone' : 'timer-sand'}
+                size={32}
+                color="#2b7fff"
+                style={styles.statusIcon}
+              />
               <Text style={styles.statusText}>
                 {isAppLaunched
                   ? 'External application is running'
@@ -330,7 +334,7 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
           {backButtonMode === 'test' && (
             <View style={styles.warningContainer}>
               <View style={styles.warningCard}>
-                <Text style={styles.warningIcon}>🧪</Text>
+                <Icon name="test-tube" size={28} color="#f59e0b" style={styles.warningIcon} />
                 <Text style={styles.warningTitle}>Test Mode Active</Text>
                 <Text style={styles.warningText}>
                   You can use the Android back button to return to FreeKiosk.
@@ -347,7 +351,7 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
               activeOpacity={0.8}
             >
               <Text style={styles.primaryButtonText}>
-                ↩ Return to Application
+                Return to Application
               </Text>
             </TouchableOpacity>
 
@@ -356,14 +360,14 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
               onPress={onGoToSettings}
               activeOpacity={0.8}
             >
-              <Text style={styles.secondaryButtonText}>⚙ Settings</Text>
+              <Text style={styles.secondaryButtonText}>Settings</Text>
             </TouchableOpacity>
           </View>
 
           {/* Hint */}
           <View style={styles.hintContainer}>
             <Text style={styles.hintText}>
-              💡 Tip: While in the external app, tap 5× on the secret button to return here (position configurable)
+              Tip: While in the external app, tap 5× on the secret button to return here (position configurable)
             </Text>
           </View>
         </View>
@@ -375,7 +379,7 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0066cc',
+    backgroundColor: '#2b7fff',
   },
   scrollContent: {
     flexGrow: 1,
@@ -493,7 +497,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   primaryButtonText: {
-    color: '#0066cc',
+    color: '#2b7fff',
     fontSize: 18,
     fontWeight: 'bold',
   },

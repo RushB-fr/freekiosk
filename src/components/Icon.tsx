@@ -181,7 +181,37 @@ export type IconName =
   | 'identifier'
   | 'rename-box'
   | 'tag'
-  | 'printer';
+  | 'printer'
+  // Connectivity & hardware (emoji replacements)
+  | 'wifi'
+  | 'wifi-strength-1'
+  | 'wifi-strength-2'
+  | 'wifi-strength-3'
+  | 'wifi-strength-4'
+  | 'wifi-strength-outline'
+  | 'lock-open-variant'
+  | 'eye-off-outline'
+  | 'bluetooth'
+  | 'nfc'
+  | 'headphones'
+  | 'television'
+  | 'microphone'
+  | 'flashlight'
+  | 'screen-rotation'
+  | 'phone'
+  | 'content-save'
+  | 'cloud-check'
+  | 'cloud-cog'
+  | 'lock-reset'
+  | 'shield-alert'
+  | 'shield-off'
+  | 'white-balance-sunny'
+  | 'movie-outline'
+  | 'party-popper'
+  | 'github'
+  | 'star'
+  | 'block-helper'
+  | 'rocket';
 
 interface IconProps {
   name: IconName;
