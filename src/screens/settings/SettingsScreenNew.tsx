@@ -156,7 +156,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [webViewBackButtonEnabled, setWebViewBackButtonEnabled] = useState<boolean>(false);
   const [webViewBackButtonXPercent, setWebViewBackButtonXPercent] = useState<string>('2');
   const [webViewBackButtonYPercent, setWebViewBackButtonYPercent] = useState<string>('10');
-  
+  const [restartButtonEnabled, setRestartButtonEnabled] = useState<boolean>(true);
+  const [restartButtonLongPressSeconds, setRestartButtonLongPressSeconds] = useState<number>(5);
+
   // Auto-Brightness states
   const [autoBrightnessEnabled, setAutoBrightnessEnabled] = useState<boolean>(false);
   const [autoBrightnessMin, setAutoBrightnessMin] = useState<number>(0.1);
@@ -526,7 +528,11 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedWebViewBackButtonEnabled = await StorageService.getWebViewBackButtonEnabled();
     const savedWebViewBackButtonXPercent = await StorageService.getWebViewBackButtonXPercent();
     const savedWebViewBackButtonYPercent = await StorageService.getWebViewBackButtonYPercent();
-    
+
+    // Restart Button settings
+    const savedRestartButtonEnabled = await StorageService.getRestartButtonEnabled();
+    const savedRestartButtonLongPressSeconds = await StorageService.getRestartButtonLongPressSeconds();
+
     // Auto-Brightness settings
     const savedAutoBrightnessEnabled = await StorageService.getAutoBrightnessEnabled();
     const savedAutoBrightnessMin = await StorageService.getAutoBrightnessMin();
@@ -590,6 +596,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setWebViewBackButtonEnabled(savedWebViewBackButtonEnabled);
     setWebViewBackButtonXPercent(String(savedWebViewBackButtonXPercent));
     setWebViewBackButtonYPercent(String(savedWebViewBackButtonYPercent));
+    setRestartButtonEnabled(savedRestartButtonEnabled);
+    setRestartButtonLongPressSeconds(savedRestartButtonLongPressSeconds);
     setAutoBrightnessEnabled(savedAutoBrightnessEnabled);
     setAutoBrightnessMin(savedAutoBrightnessMin);
     setAutoBrightnessMax(savedAutoBrightnessMax);
@@ -1473,6 +1481,10 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       const yPercent = parseFloat(webViewBackButtonYPercent);
       await StorageService.saveWebViewBackButtonXPercent(isNaN(xPercent) ? 2 : Math.max(0, Math.min(100, xPercent)));
       await StorageService.saveWebViewBackButtonYPercent(isNaN(yPercent) ? 10 : Math.max(0, Math.min(100, yPercent)));
+
+      // Save Restart Button settings
+      await StorageService.saveRestartButtonEnabled(restartButtonEnabled);
+      await StorageService.saveRestartButtonLongPressSeconds(Math.max(1, Math.min(10, restartButtonLongPressSeconds)));
     } else {
       await StorageService.saveUrlRotationEnabled(false);
       await StorageService.saveUrlPlannerEnabled(false);
@@ -1886,6 +1898,10 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
               setWebViewBackButtonXPercent('2');
               setWebViewBackButtonYPercent('10');
             }}
+            restartButtonEnabled={restartButtonEnabled}
+            onRestartButtonEnabledChange={setRestartButtonEnabled}
+            restartButtonLongPressSeconds={restartButtonLongPressSeconds}
+            onRestartButtonLongPressSecondsChange={setRestartButtonLongPressSeconds}
             inactivityReturnEnabled={inactivityReturnEnabled}
             onInactivityReturnEnabledChange={setInactivityReturnEnabled}
             inactivityReturnDelay={inactivityReturnDelay}

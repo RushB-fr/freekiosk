@@ -27,6 +27,7 @@ import { ScreenScheduleRule, getNextWakeTime, getActiveSleepRule, getNextSleepTi
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import Icon from '../components/Icon';
+import RestartButton from '../components/RestartButton';
 import { revokeSettingsAccess } from '../utils/authState';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -182,6 +183,10 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [webViewBackButtonXPercent, setWebViewBackButtonXPercent] = useState<number>(2);
   const [webViewBackButtonYPercent, setWebViewBackButtonYPercent] = useState<number>(10);
   const [canGoBack, setCanGoBack] = useState<boolean>(false);
+
+  // Restart Button (top-right overlay, long-press reloads the WebView)
+  const [restartButtonEnabled, setRestartButtonEnabled] = useState<boolean>(true);
+  const [restartButtonLongPressSeconds, setRestartButtonLongPressSeconds] = useState<number>(5);
 
   // URL Filtering states
   const [urlFilterEnabled, setUrlFilterEnabled] = useState<boolean>(false);
@@ -1611,6 +1616,11 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       setWebViewBackButtonEnabled(savedWebViewBackButtonEnabled);
       setWebViewBackButtonXPercent(savedWebViewBackButtonXPercent);
       setWebViewBackButtonYPercent(savedWebViewBackButtonYPercent);
+
+      const savedRestartButtonEnabled = bool(K.RESTART_BUTTON_ENABLED, true);
+      const savedRestartButtonLongPressSeconds = num(K.RESTART_BUTTON_LONG_PRESS_SECONDS, 5);
+      setRestartButtonEnabled(savedRestartButtonEnabled);
+      setRestartButtonLongPressSeconds(savedRestartButtonLongPressSeconds);
       
       // Load Auto-Brightness settings
       const savedAutoBrightnessEnabled = bool(K.AUTO_BRIGHTNESS_ENABLED, false);
@@ -2706,6 +2716,17 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
             </View>
           </TouchableWithoutFeedback>
         </View>
+      )}
+
+      {/* Restart button - always present over WebView content. Long-press reloads the
+          WebView (remount via webViewKey). Top-right, red, circular reload arrow. A short
+          tap does nothing (no onPress) so it can't be triggered accidentally. Hidden on the
+          dashboard grid, where no WebView is mounted to reload. */}
+      {restartButtonEnabled && displayMode === 'webview' && !(dashboardModeEnabled && dashboardShowGrid) && (
+        <RestartButton
+          longPressSeconds={restartButtonLongPressSeconds}
+          onTrigger={() => setWebViewKey(prev => prev + 1)}
+        />
       )}
 
       {/* Screensaver overlay - dim mode uses black/transparent based on brightness; URL/video modes render content */}
