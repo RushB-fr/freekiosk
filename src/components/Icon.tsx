@@ -130,7 +130,6 @@ export type IconName =
   | 'camera-outline'
   | 'camera-retake'
   | 'monitor-screenshot'
-  | 'image-refresh'
   | 'quality-high'
   | 'arrow-expand-horizontal'
   | 'motion-sensor'

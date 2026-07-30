@@ -20,7 +20,8 @@ import java.util.concurrent.TimeUnit
  */
 object ScreenCapture {
 
-    private const val TAG = "ScreenCapture"
+    // Prefixed: a bare "ScreenCapture" tag collides with SurfaceFlinger's own logs
+    private const val TAG = "FreeKioskScreenCapture"
     private const val CAPTURE_TIMEOUT_SECONDS = 5L
 
     /**

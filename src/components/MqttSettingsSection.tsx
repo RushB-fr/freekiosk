@@ -677,7 +677,7 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
                 label="Screenshot Auto-publish"
                 value={screenshotAuto}
                 onValueChange={handleScreenshotAutoChange}
-                icon="image-refresh"
+                icon="refresh"
                 hint="Publish a screenshot periodically. Can also be toggled from Home Assistant."
               />
 
