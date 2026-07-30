@@ -798,7 +798,7 @@ entities:
 |---|---|
 | **Stream Disabled** | Enable "Publish Screenshot" / "Publish Camera Snapshots" in Settings > MQTT — both are off by default |
 | **Entities Missing** | The entity set is published on connect: reconnect MQTT after enabling a stream |
-| **Camera Busy** | Motion detection holds the camera; a snapshot then fails and the previous image is kept. Turn off always-on motion detection or capture between detections |
+| **Camera Busy** | Motion detection holds the camera: the snapshot gives up after ~10 s (`Camera capture failed … nothing published`), the previous image is kept and motion detection recovers on its own. Turn off always-on motion detection, or capture while the screensaver is idle |
 | **Screen Off** | Screenshots need a visible window: they fail while the screen is off (camera snapshots still work) |
 | **Camera Permission** | Grant camera permission (requested when enabling the camera stream) |
 | **Payload Too Large** | Some brokers cap message size (Mosquitto `message_size_limit`). Lower the JPEG quality / max width; a warning is logged above 1 MB |
