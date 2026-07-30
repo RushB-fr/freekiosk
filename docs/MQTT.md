@@ -101,6 +101,8 @@ For a device with `deviceName = lobby` (or `deviceId` if no name set) and defaul
 | **Availability (LWT)** | `freekiosk/lobby/availability` | 1 | Yes |
 | **State (all data)** | `freekiosk/lobby/state` | 0 | Yes |
 | **Commands** | `freekiosk/lobby/set/{entity}` | 1 | No |
+| **Screenshot (JPEG)** | `freekiosk/lobby/image/screenshot` | 0 | Yes |
+| **Camera (JPEG)** | `freekiosk/lobby/image/camera_front` `freekiosk/lobby/image/camera_back` | 0 | Yes |
 | **Discovery** | `homeassistant/{component}/freekiosk_{deviceId}/{objectId}/config` | 1 | Yes |
 
 
@@ -165,9 +167,20 @@ A JSON object published periodically (default: every 30 seconds) containing all 
   "webview": {
     "currentUrl": "http://192.168.1.244",
     "motionDetected": false
+  },
+  "images": {
+    "screenshotEnabled": true,
+    "screenshotAuto": false,
+    "screenshotInterval": 60,
+    "cameraEnabled": false,
+    "cameraAuto": false,
+    "cameraInterval": 300
   }
 }
 ```
+
+> 💡 The `images` block is only present when MQTT image publishing is available (see
+> [Images (Screenshot & Camera)](#-images-screenshot--camera)).
 
 
 
@@ -302,7 +315,46 @@ All entities are grouped under one HA device:
 
 
 
-**Total: 42 entities** auto-discovered in Home Assistant.
+#### 📷 Images (Screenshot & Camera)
+
+**Opt-in** — nothing is captured or published until enabled in **Settings → MQTT**. Each enabled
+stream publishes a JPEG payload on its own topic and adds these entities:
+
+
+
+| Stream | Entities *(prefix `freekiosk_{deviceId}_`)* | Enabled by |
+|---|---|---|
+| **Screenshot** | `image.*_screenshot_image`, `camera.*_screenshot_cam`, `button.*_screenshot_capture`, `switch.*_screenshot_auto`, `number.*_screenshot_interval` | "Publish Screenshot" |
+| **Camera** *(one set per camera present)* | `image.*_camera_front_image`, `camera.*_camera_front_cam`, `button.*_camera_front_capture` (+ `camera_back_*` variants), `switch.*_camera_auto`, `number.*_camera_interval` | "Publish Camera Snapshots" |
+
+
+
+Both an `image` and a `camera` entity are published for each stream: `image` works well in
+Markdown/picture cards and notifications, `camera` in `picture-glance` / `picture-entity` cards.
+They share the same topic, so both show the same picture.
+
+
+
+| Setting | Default | Notes |
+|---|---|---|
+| **Auto-publish** | Off | Publishes periodically; also togglable from HA (`switch`) |
+| **Interval** | 60 s (screenshot) / 300 s (camera) | 5-3600 s, also settable from HA (`number`) |
+| **JPEG quality** | 70 | Lower quality = smaller MQTT messages |
+| **Screenshot max width** | 1280 px | `0` keeps the native resolution |
+
+
+
+> [!NOTE]
+> Images are published **retained** so Home Assistant restores the last picture after a restart.
+> Disabling a stream clears both its discovery config and its retained image, so nothing stale
+> is left on the broker.
+
+> [!IMPORTANT]
+> These are still images, not a video stream. A capture takes ~1-2 s for the camera
+> (sensor warm-up), so intervals below 5 s are rejected and repeated requests within 2 s are ignored.
+
+**Total: 42 entities** auto-discovered in Home Assistant, plus up to 11 image entities when
+screenshot and camera publishing are enabled.
 
 
 ## Command Reference
@@ -347,6 +399,13 @@ Commands are sent by publishing to `{baseTopic}/{topicId}/set/{entity}`.
 | **keyboard_key** | keyboardKey | key name (e.g. `enter`, `a`, `f5`) | Press a single key |
 | **keyboard_combo** | keyboardCombo | combo string (e.g. `ctrl+c`) | Press a key combination |
 | **keyboard_text** | keyboardText | text string | Type text into focused field |
+| **screenshot_capture** | publishScreenshot | `PRESS` | Capture the screen and publish it on `.../image/screenshot` |
+| **camera_capture_front** | publishCameraPhoto (front) | `PRESS` | Capture the front camera and publish it on `.../image/camera_front` |
+| **camera_capture_back** | publishCameraPhoto (back) | `PRESS` | Capture the back camera and publish it on `.../image/camera_back` |
+| **screenshot_auto** | setImageAutoPublish (screenshot) | `ON` / `OFF` | Toggle periodic screenshot publishing |
+| **camera_auto** | setImageAutoPublish (camera) | `ON` / `OFF` | Toggle periodic camera publishing |
+| **screenshot_interval** | setImageInterval (screenshot) | `5-3600` (seconds) | Screenshot auto-publish interval |
+| **camera_interval** | setImageInterval (camera) | `5-3600` (seconds) | Camera auto-publish interval |
 
 
 
@@ -438,6 +497,18 @@ mosquitto_pub -h BROKER_IP -t "freekiosk/TOPIC_ID/set/toast" -m "Hello!"
 
 # Toggle always-on motion detection
 mosquitto_pub -h BROKER_IP -t "freekiosk/TOPIC_ID/set/motion_always_on" -m "ON"
+
+# Request a screenshot, then watch the payload size arriving
+mosquitto_sub -h BROKER_IP -t "freekiosk/TOPIC_ID/image/#" -F "%t %l bytes" &
+mosquitto_pub -h BROKER_IP -t "freekiosk/TOPIC_ID/set/screenshot_capture" -m "PRESS"
+
+# Request a front camera snapshot and save it to a file
+mosquitto_pub -h BROKER_IP -t "freekiosk/TOPIC_ID/set/camera_capture_front" -m "PRESS"
+mosquitto_sub -h BROKER_IP -t "freekiosk/TOPIC_ID/image/camera_front" -C 1 > snapshot.jpg
+
+# Publish a screenshot every 30 seconds
+mosquitto_pub -h BROKER_IP -t "freekiosk/TOPIC_ID/set/screenshot_interval" -m "30"
+mosquitto_pub -h BROKER_IP -t "freekiosk/TOPIC_ID/set/screenshot_auto" -m "ON"
 
 # View HA discovery configs
 mosquitto_sub -h BROKER_IP -t "homeassistant/#" -v
@@ -581,6 +652,33 @@ automation:
 
 
 
+#### 📷 Check what the kiosk is displaying after an update
+
+
+
+```yaml
+automation:
+  - alias: "Notify with Kiosk Screenshot"
+    trigger:
+      - platform: state
+        entity_id: update.freekiosk_lobby
+        to: "off"
+    action:
+      # Ask for a fresh screenshot, then give the tablet time to capture and publish it
+      - service: mqtt.publish
+        data:
+          topic: "freekiosk/lobby/set/screenshot_capture"
+          payload: "PRESS"
+      - delay: "00:00:05"
+      - service: notify.mobile_app_phone
+        data:
+          message: "Lobby kiosk after update"
+          data:
+            image: /api/image_proxy/image.freekiosk_abc123_screenshot_image
+```
+
+
+
 ### 📊 Dashboard Card (Lovelace)
 
 
@@ -605,6 +703,23 @@ entities:
   - entity: button.freekiosk_abc123_reload
   - entity: button.freekiosk_abc123_wake
   - entity: button.freekiosk_abc123_reboot
+```
+
+
+
+Kiosk screen and camera (when image publishing is enabled):
+
+
+
+```yaml
+type: picture-glance
+title: Lobby Kiosk
+camera_image: camera.freekiosk_abc123_screenshot_cam
+camera_view: auto
+entities:
+  - entity: button.freekiosk_abc123_screenshot_capture
+  - entity: switch.freekiosk_abc123_screenshot_auto
+  - entity: binary_sensor.freekiosk_abc123_screen_on
 ```
 
 
@@ -675,6 +790,23 @@ entities:
 
 
 
+### Screenshot or camera image not updating
+
+
+
+| Issue | Solution |
+|---|---|
+| **Stream Disabled** | Enable "Publish Screenshot" / "Publish Camera Snapshots" in Settings > MQTT — both are off by default |
+| **Entities Missing** | The entity set is published on connect: reconnect MQTT after enabling a stream |
+| **Camera Busy** | Motion detection holds the camera; a snapshot then fails and the previous image is kept. Turn off always-on motion detection or capture between detections |
+| **Screen Off** | Screenshots need a visible window: they fail while the screen is off (camera snapshots still work) |
+| **Camera Permission** | Grant camera permission (requested when enabling the camera stream) |
+| **Payload Too Large** | Some brokers cap message size (Mosquitto `message_size_limit`). Lower the JPEG quality / max width; a warning is logged above 1 MB |
+| **Repeated Requests** | Two captures of the same stream within 2 seconds are throttled — the second is ignored |
+| **Debug Logs** | Check logs: `adb logcat \| grep MqttImagePublisher` |
+
+
+
 ### WiFi SSID showing "WiFi" instead of real name
 
 
@@ -712,6 +844,7 @@ entities:
 | **Thread Safety** | MQTT callbacks are dispatched to the main thread via `Handler(Looper.getMainLooper())` |
 | **Password Storage** | Encrypted in Android Keychain (same as REST API key) |
 | **TTS & Toast** | Handled natively in the MQTT module (no JS round-trip) |
+| **Image Publishing** | Captured and published natively (works with the screen off), JPEG payloads on `.../image/*`, QoS 0, retained |
 
 
 

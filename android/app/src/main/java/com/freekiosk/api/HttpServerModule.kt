@@ -43,10 +43,10 @@ import android.os.Build
 import com.freekiosk.DeviceAdminReceiver
 import com.freekiosk.CameraPhotoModule
 import com.freekiosk.FreeKioskAccessibilityService
+import com.freekiosk.ScreenCapture
 import com.freekiosk.ScreenController
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.Locale
@@ -1850,39 +1850,15 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     // ==================== Screenshot Method ====================
 
     private fun captureScreenshot(): java.io.InputStream? {
-        return try {
-            var screenshot: ByteArrayInputStream? = null
-            val latch = java.util.concurrent.CountDownLatch(1)
-            
-            UiThreadUtil.runOnUiThread {
-                try {
-                    val activity = reactContext.currentActivity
-                    val rootView = activity?.window?.decorView?.rootView
-                    
-                    if (rootView != null) {
-                        rootView.isDrawingCacheEnabled = true
-                        val bitmap = Bitmap.createBitmap(rootView.drawingCache)
-                        rootView.isDrawingCacheEnabled = false
-                        
-                        val outputStream = ByteArrayOutputStream()
-                        bitmap.compress(Bitmap.CompressFormat.PNG, 90, outputStream)
-                        screenshot = ByteArrayInputStream(outputStream.toByteArray())
-                        bitmap.recycle()
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to capture screenshot on UI thread", e)
-                } finally {
-                    latch.countDown()
-                }
-            }
-            
-            // Wait for UI thread to complete (max 5 seconds)
-            latch.await(5, java.util.concurrent.TimeUnit.SECONDS)
-            screenshot
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to capture screenshot", e)
-            null
-        }
+        // Shared with the MQTT image publisher — see ScreenCapture.
+        // Called from a NanoHTTPD worker thread, never from the main thread.
+        val bytes = ScreenCapture.capture(
+            reactContext,
+            format = Bitmap.CompressFormat.PNG,
+            quality = 90,
+            maxWidth = 0
+        ) ?: return null
+        return ByteArrayInputStream(bytes)
     }
     
     /**

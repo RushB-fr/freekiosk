@@ -35,7 +35,12 @@ export interface ApiCallbacks {
   onAutoBrightnessDisable?: () => void;
   onSetMotionAlwaysOn?: (value: boolean) => void;
   onSetMode?: (mode: 'webview' | 'external_app' | 'media_player', target?: string) => void;
+  onSetMqttImageAuto?: (stream: MqttImageStream, value: boolean) => void;
+  onSetMqttImageInterval?: (stream: MqttImageStream, seconds: number) => void;
 }
+
+/** Image streams that can be published over MQTT. */
+export type MqttImageStream = 'screenshot' | 'camera';
 
 export interface AppStatus {
   currentUrl: string;
@@ -56,6 +61,10 @@ export interface AppStatus {
   scheduledSleep?: boolean;
   motionDetected?: boolean;
   motionAlwaysOn?: boolean;
+}
+
+function isMqttImageStream(value: unknown): value is MqttImageStream {
+  return value === 'screenshot' || value === 'camera';
 }
 
 class ApiServiceClass {
@@ -151,6 +160,17 @@ class ApiServiceClass {
     const allowControl = await StorageService.getMqttAllowControl();
     const deviceName = await StorageService.getMqttDeviceName();
 
+    // Image publishing (screenshot / camera snapshots) — all opt-in
+    const screenshotEnabled = await StorageService.getMqttScreenshotEnabled();
+    const screenshotAuto = await StorageService.getMqttScreenshotAuto();
+    const screenshotInterval = await StorageService.getMqttScreenshotInterval();
+    const screenshotQuality = await StorageService.getMqttScreenshotQuality();
+    const screenshotMaxWidth = await StorageService.getMqttScreenshotMaxWidth();
+    const cameraEnabled = await StorageService.getMqttCameraEnabled();
+    const cameraAuto = await StorageService.getMqttCameraAuto();
+    const cameraInterval = await StorageService.getMqttCameraInterval();
+    const cameraQuality = await StorageService.getMqttCameraQuality();
+
     await mqttClient.start({
       brokerUrl,
       port,
@@ -163,6 +183,15 @@ class ApiServiceClass {
       allowControl,
       deviceName: deviceName || undefined,
       useTls: port === 8883,
+      screenshotEnabled,
+      screenshotAuto,
+      screenshotInterval,
+      screenshotQuality,
+      screenshotMaxWidth,
+      cameraEnabled,
+      cameraAuto,
+      cameraInterval,
+      cameraQuality,
     });
 
     console.log(`ApiService: MQTT client started for ${brokerUrl}:${port}`);
@@ -325,6 +354,29 @@ class ApiServiceClass {
             const target = params.url || params.package || undefined;
             this.callbacks.onSetMode(params.mode, target);
           }
+          break;
+
+        // Image publishing is executed natively; JS only persists the new setting so it
+        // survives an app restart (same pattern as setMotionAlwaysOn).
+        case 'setImageAutoPublish':
+          if (this.callbacks.onSetMqttImageAuto && isMqttImageStream(params.stream)) {
+            this.callbacks.onSetMqttImageAuto(params.stream, params.value === true);
+          }
+          break;
+
+        case 'setImageInterval':
+          if (
+            this.callbacks.onSetMqttImageInterval &&
+            isMqttImageStream(params.stream) &&
+            typeof params.seconds === 'number'
+          ) {
+            this.callbacks.onSetMqttImageInterval(params.stream, params.seconds);
+          }
+          break;
+
+        case 'publishScreenshot':
+        case 'publishCameraPhoto':
+          // Handled natively by MqttImagePublisher, nothing to do on the JS side
           break;
 
         default:

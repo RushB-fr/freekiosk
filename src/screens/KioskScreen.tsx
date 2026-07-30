@@ -16,7 +16,7 @@ import AppLauncherModule from '../utils/AppLauncherModule';
 import OverlayServiceModule from '../utils/OverlayServiceModule';
 import BlockingOverlayModule from '../utils/BlockingOverlayModule';
 import AutoBrightnessModule from '../utils/AutoBrightnessModule';
-import { ApiService } from '../utils/ApiService';
+import { ApiService, MqttImageStream } from '../utils/ApiService';
 import { mqttClient } from '../utils/MqttModule';
 import DeviceControlService from '../services/DeviceControlService';
 import { ScheduledEvent, getActiveEvent } from '../types/planner';
@@ -680,6 +680,32 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
             console.log('[API] Motion always-on set to', value);
           } catch (error) {
             console.error('[API] Error setting motion always-on:', error);
+          }
+        },
+        // MQTT image publishing: the capture itself is done natively, we only persist the
+        // setting changed from Home Assistant so it survives an app restart.
+        onSetMqttImageAuto: async (stream: MqttImageStream, value: boolean) => {
+          try {
+            if (stream === 'screenshot') {
+              await StorageService.saveMqttScreenshotAuto(value);
+            } else {
+              await StorageService.saveMqttCameraAuto(value);
+            }
+            console.log(`[API] MQTT ${stream} auto-publish set to`, value);
+          } catch (error) {
+            console.error('[API] Error setting MQTT image auto-publish:', error);
+          }
+        },
+        onSetMqttImageInterval: async (stream: MqttImageStream, seconds: number) => {
+          try {
+            if (stream === 'screenshot') {
+              await StorageService.saveMqttScreenshotInterval(seconds);
+            } else {
+              await StorageService.saveMqttCameraInterval(seconds);
+            }
+            console.log(`[API] MQTT ${stream} publish interval set to`, seconds);
+          } catch (error) {
+            console.error('[API] Error setting MQTT image interval:', error);
           }
         },
         onSetMode: async (mode: 'webview' | 'external_app' | 'media_player', target?: string) => {

@@ -119,6 +119,15 @@ const BACKUP_KEYS = [
   '@kiosk_mqtt_allow_control',
   '@kiosk_mqtt_device_name',
   '@kiosk_mqtt_motion_always_on',
+  '@kiosk_mqtt_screenshot_enabled',
+  '@kiosk_mqtt_screenshot_auto',
+  '@kiosk_mqtt_screenshot_interval',
+  '@kiosk_mqtt_screenshot_quality',
+  '@kiosk_mqtt_screenshot_max_width',
+  '@kiosk_mqtt_camera_enabled',
+  '@kiosk_mqtt_camera_auto',
+  '@kiosk_mqtt_camera_interval',
+  '@kiosk_mqtt_camera_quality',
   // Beta Updates
   '@kiosk_beta_updates_enabled',
   // Managed Apps (Multi-App mode, accessibility, keep-alive)

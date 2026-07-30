@@ -34,10 +34,19 @@ import android.util.Log
 import android.widget.Toast
 import com.facebook.react.bridge.*
 import com.facebook.react.modules.core.DeviceEventManagerModule
+import com.freekiosk.CameraPhotoModule
 import com.freekiosk.ScreenController
 import org.json.JSONObject
 import java.net.Inet4Address
 import java.net.NetworkInterface
+
+/** Read an optional boolean from a JS config map. */
+private fun ReadableMap.optBoolean(key: String, default: Boolean): Boolean =
+    if (hasKey(key) && !isNull(key)) getBoolean(key) else default
+
+/** Read an optional int from a JS config map. */
+private fun ReadableMap.optInt(key: String, default: Int): Int =
+    if (hasKey(key) && !isNull(key)) getInt(key) else default
 
 /**
  * React Native bridge module for MQTT integration.
@@ -294,7 +303,16 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
                 statusInterval = if (configMap.hasKey("statusInterval")) configMap.getInt("statusInterval").toLong() else 30000L,
                 allowControl = if (configMap.hasKey("allowControl")) configMap.getBoolean("allowControl") else true,
                 deviceName = if (configMap.hasKey("deviceName")) configMap.getString("deviceName") else null,
-                useTls = if (configMap.hasKey("useTls")) configMap.getBoolean("useTls") else false
+                useTls = if (configMap.hasKey("useTls")) configMap.getBoolean("useTls") else false,
+                screenshotEnabled = configMap.optBoolean("screenshotEnabled", false),
+                screenshotAuto = configMap.optBoolean("screenshotAuto", false),
+                screenshotIntervalMs = configMap.optInt("screenshotInterval", 60) * 1000L,
+                screenshotQuality = configMap.optInt("screenshotQuality", 70),
+                screenshotMaxWidth = configMap.optInt("screenshotMaxWidth", 1280),
+                cameraEnabled = configMap.optBoolean("cameraEnabled", false),
+                cameraAuto = configMap.optBoolean("cameraAuto", false),
+                cameraIntervalMs = configMap.optInt("cameraInterval", 300) * 1000L,
+                cameraQuality = configMap.optInt("cameraQuality", 70)
             )
 
             val client = KioskMqttClient(reactContext.applicationContext, config)
@@ -328,6 +346,25 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
                     "audioBeep" -> {
                         playBeep()
                     }
+                    // Image publishing runs fully natively: captures must work even when the
+                    // JS thread is suspended (screen off via lockNow()).
+                    "publishScreenshot" -> client.imagePublisher?.publishScreenshot()
+                    "publishCameraPhoto" -> {
+                        val facing = params?.optString("facing", "back") ?: "back"
+                        client.imagePublisher?.publishCameraPhoto(facing)
+                    }
+                    "setImageAutoPublish" -> {
+                        val stream = params?.optString("stream", "") ?: ""
+                        val value = params?.optBoolean("value", false) ?: false
+                        client.imagePublisher?.setAutoPublish(stream, value)
+                        publishStatusNow()
+                    }
+                    "setImageInterval" -> {
+                        val stream = params?.optString("stream", "") ?: ""
+                        val seconds = params?.optInt("seconds", 0) ?: 0
+                        client.imagePublisher?.setInterval(stream, seconds)
+                        publishStatusNow()
+                    }
                 }
                 emitCommand(command, params)
             }
@@ -355,6 +392,18 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
                 deviceName = config.deviceName
             )
             client.discovery = discovery
+
+            // Set up image publishing (screenshot / camera snapshots) and advertise the
+            // matching entities. Cameras are only advertised when the device actually has one.
+            val imagePublisher = MqttImagePublisher(
+                reactContext = reactContext,
+                client = client,
+                topicPrefix = client.deviceTopicPrefix,
+                config = config,
+                availableFacings = if (config.cameraEnabled) detectCameraFacings() else emptyList()
+            )
+            client.imagePublisher = imagePublisher
+            discovery.imageStreams = buildImageStreams(config.baseTopic, topicId, imagePublisher)
 
             mqttClient = client
             client.connect()
@@ -437,15 +486,7 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
             Log.d(TAG, "Status updated: url=$jsCurrentUrl, screensaver=$jsScreensaverActive, rotation=$jsRotationEnabled, motion=$jsMotionDetected")
 
             // Trigger immediate MQTT status publish
-            mqttClient?.let { client ->
-                if (client.isConnected()) {
-                    try {
-                        client.publishStatus(getDeviceStatus())
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Failed to publish immediate status: ${e.message}")
-                    }
-                }
-            }
+            publishStatusNow()
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse status update from JS", e)
         }
@@ -473,6 +514,116 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
     @ReactMethod
     fun getDeviceModel(promise: Promise) {
         promise.resolve(Build.MODEL)
+    }
+
+    /**
+     * Apply image publishing settings changed in the app while MQTT is running.
+     * Resolves false when no MQTT client is running (settings are then picked up on start).
+     *
+     * The enabled flags are intentionally not applied here: they change the set of entities
+     * published through Home Assistant discovery, which requires a reconnect.
+     */
+    @ReactMethod
+    fun updateImageSettings(configMap: ReadableMap, promise: Promise) {
+        try {
+            val publisher = mqttClient?.imagePublisher
+            if (publisher == null) {
+                promise.resolve(false)
+                return
+            }
+
+            publisher.applySettings(
+                screenshotAuto = configMap.optBoolean("screenshotAuto", false),
+                screenshotIntervalSeconds = configMap.optInt("screenshotInterval", 60),
+                screenshotQuality = configMap.optInt("screenshotQuality", 70),
+                screenshotMaxWidth = configMap.optInt("screenshotMaxWidth", 1280),
+                cameraAuto = configMap.optBoolean("cameraAuto", false),
+                cameraIntervalSeconds = configMap.optInt("cameraInterval", 300),
+                cameraQuality = configMap.optInt("cameraQuality", 70)
+            )
+            publishStatusNow()
+            promise.resolve(true)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to update image settings", e)
+            promise.reject("UPDATE_ERROR", e.message)
+        }
+    }
+
+    // ==================== Image publishing helpers ====================
+
+    /**
+     * Camera facings physically present on this device ("front" / "back").
+     * Uses Camera2 directly (same source as the REST API) so it also works on devices where
+     * CameraX/vision-camera fails to enumerate cameras.
+     */
+    private fun detectCameraFacings(): List<String> {
+        return try {
+            CameraPhotoModule(reactContext.applicationContext)
+                .getAvailableCameras()
+                .mapNotNull { it["facing"] as? String }
+                .filter { it == "front" || it == "back" }
+                .distinct()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to enumerate cameras for MQTT image streams: ${e.message}")
+            emptyList()
+        }
+    }
+
+    /**
+     * Build the list of image streams to advertise in Home Assistant discovery, based on what
+     * is enabled in settings and on the cameras available.
+     */
+    private fun buildImageStreams(
+        baseTopic: String,
+        topicId: String,
+        publisher: MqttImagePublisher
+    ): List<MqttDiscovery.ImageStream> {
+        val streams = mutableListOf<MqttDiscovery.ImageStream>()
+        val setPrefix = "$baseTopic/$topicId/set"
+
+        if (publisher.screenshotEnabled) {
+            streams.add(
+                MqttDiscovery.ImageStream(
+                    objectId = MqttImagePublisher.STREAM_SCREENSHOT,
+                    name = "Screenshot",
+                    imageTopic = publisher.screenshotTopic(),
+                    commandTopic = "$setPrefix/screenshot_capture",
+                    icon = "mdi:monitor-screenshot"
+                )
+            )
+        }
+
+        if (publisher.cameraEnabled) {
+            for (facing in publisher.availableFacings) {
+                streams.add(
+                    MqttDiscovery.ImageStream(
+                        objectId = "${MqttImagePublisher.STREAM_CAMERA}_$facing",
+                        name = "Camera ${facing.replaceFirstChar { it.uppercase() }}",
+                        imageTopic = publisher.cameraTopic(facing),
+                        commandTopic = "$setPrefix/camera_capture_$facing",
+                        icon = if (facing == "front") "mdi:camera-front" else "mdi:camera-rear"
+                    )
+                )
+            }
+        }
+
+        return streams
+    }
+
+    /**
+     * Publish the device status immediately so Home Assistant reflects a state change
+     * without waiting for the next periodic publish.
+     */
+    private fun publishStatusNow() {
+        mqttClient?.let { client ->
+            if (client.isConnected()) {
+                try {
+                    client.publishStatus(getDeviceStatus())
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to publish immediate status: ${e.message}")
+                }
+            }
+        }
     }
 
     // ==================== Status Provider ====================
@@ -579,6 +730,9 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
 
         // Memory
         status.put("memory", getMemoryInfo())
+
+        // Image publishing (screenshot / camera snapshots)
+        mqttClient?.imagePublisher?.let { status.put("images", it.statusJson()) }
 
         return status
     }

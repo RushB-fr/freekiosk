@@ -31,7 +31,17 @@ data class MqttConfig(
     val statusInterval: Long = 30000, // 30 seconds
     val allowControl: Boolean = true,
     val deviceName: String? = null,
-    val useTls: Boolean = false
+    val useTls: Boolean = false,
+    // Image publishing (screenshot / camera snapshots over MQTT) — all disabled by default
+    val screenshotEnabled: Boolean = false,
+    val screenshotAuto: Boolean = false,
+    val screenshotIntervalMs: Long = 60000,
+    val screenshotQuality: Int = 70,
+    val screenshotMaxWidth: Int = 1280,
+    val cameraEnabled: Boolean = false,
+    val cameraAuto: Boolean = false,
+    val cameraIntervalMs: Long = 300000,
+    val cameraQuality: Int = 70
 )
 
 /**
@@ -219,6 +229,9 @@ class KioskMqttClient(
     /** Optional MqttDiscovery instance for Home Assistant discovery config publishing. */
     var discovery: MqttDiscovery? = null
 
+    /** Publishes screenshot / camera snapshots. Null when no image stream is enabled. */
+    var imagePublisher: MqttImagePublisher? = null
+
     // ==================== Topic helpers ====================
 
     /** Base topic prefix for this device: {baseTopic}/{topicId} */
@@ -327,6 +340,8 @@ class KioskMqttClient(
     fun disconnect() {
         disconnectRequested = true
         stopStatusPublishing()
+        imagePublisher?.stop()
+        imagePublisher = null
         unregisterNetworkCallback()
         releaseLocks()
 
@@ -455,8 +470,18 @@ class KioskMqttClient(
         try {
             val currentIp = ipProvider?.invoke() ?: "0.0.0.0"
             discovery?.publishDiscoveryConfigs(this, currentIp)
+            // Remove entities of image streams that are no longer enabled
+            discovery?.publishImageDiscoveryRemovals(this)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to publish HA discovery configs: ${e.message}", e)
+        }
+
+        // 2b. Image streams: clear stale payloads, publish a first image, arm the timers
+        try {
+            imagePublisher?.clearDisabledTopics()
+            imagePublisher?.onConnected()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to initialize image publishing: ${e.message}", e)
         }
 
         // 3. Subscribe to command topics if control is allowed
@@ -524,11 +549,24 @@ class KioskMqttClient(
      * @param retained whether the message should be retained by the broker
      */
     fun publish(topic: String, payload: String, qos: Int = 0, retained: Boolean = false) {
+        publish(topic, payload.toByteArray(), qos, retained)
+    }
+
+    /**
+     * Publish a binary message to the given topic.
+     * Used for image payloads (JPEG screenshots and camera snapshots).
+     *
+     * @param topic    MQTT topic
+     * @param payload  raw message bytes
+     * @param qos      quality of service level (0 or 1)
+     * @param retained whether the message should be retained by the broker
+     */
+    fun publish(topic: String, payload: ByteArray, qos: Int = 0, retained: Boolean = false) {
         try {
             val mqttQos = if (qos >= 1) MqttQos.AT_LEAST_ONCE else MqttQos.AT_MOST_ONCE
             mqttClient?.publishWith()
                 ?.topic(topic)
-                ?.payload(payload.toByteArray())
+                ?.payload(payload)
                 ?.qos(mqttQos)
                 ?.retain(retained)
                 ?.send()
@@ -711,9 +749,33 @@ class KioskMqttClient(
             "keyboard_combo" -> "keyboardCombo" to JSONObject().put("map", payload)
             "keyboard_text" -> "keyboardText" to JSONObject().put("text", payload)
 
+            // Image publishing (screenshot / camera snapshots)
+            "screenshot_capture" -> "publishScreenshot" to null
+            "camera_capture_front" -> "publishCameraPhoto" to JSONObject().put("facing", "front")
+            "camera_capture_back" -> "publishCameraPhoto" to JSONObject().put("facing", "back")
+
+            "screenshot_auto" -> "setImageAutoPublish" to JSONObject()
+                .put("stream", "screenshot")
+                .put("value", payload.uppercase() == "ON")
+            "camera_auto" -> "setImageAutoPublish" to JSONObject()
+                .put("stream", "camera")
+                .put("value", payload.uppercase() == "ON")
+
+            // Home Assistant sends integers for integer steps, but tolerate "30.0" too
+            "screenshot_interval" -> "setImageInterval" to JSONObject()
+                .put("stream", "screenshot")
+                .put("seconds", parseSeconds(payload))
+            "camera_interval" -> "setImageInterval" to JSONObject()
+                .put("stream", "camera")
+                .put("seconds", parseSeconds(payload))
+
             else -> null to null
         }
     }
+
+    /** Parse an interval payload in seconds, accepting both "30" and "30.0". */
+    private fun parseSeconds(payload: String): Int =
+        payload.toIntOrNull() ?: payload.toDoubleOrNull()?.toInt() ?: 0
 
     // ==================== State queries ====================
 
