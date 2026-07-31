@@ -42,6 +42,7 @@ import android.accessibilityservice.AccessibilityService
 import android.os.Build
 import com.freekiosk.DeviceAdminReceiver
 import com.freekiosk.CameraPhotoModule
+import com.freekiosk.camera.CameraStreamManager
 import com.freekiosk.FreeKioskAccessibilityService
 import com.freekiosk.ScreenController
 import org.json.JSONObject
@@ -60,6 +61,12 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     companion object {
         private const val TAG = "HttpServerModule"
         private const val NAME = "HttpServerModule"
+
+        /**
+         * Time given to MotionDetector to release the camera before a stream opens it.
+         * Measured on a Xiaomi tablet: unmounting the CameraView takes a few hundred ms.
+         */
+        private const val MOTION_RELEASE_WAIT_MS = 1200L
     }
 
     private var server: KioskHttpServer? = null
@@ -75,6 +82,7 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     private var jsLoading: Boolean = false
     private var jsBrightness: Int = 50
     private var jsScreensaverActive: Boolean = false
+    private var jsMotionAlwaysOn: Boolean = false
     private var jsKioskMode: Boolean = false
     private var jsRotationEnabled: Boolean = false
     private var jsRotationUrls: List<String> = emptyList()
@@ -108,6 +116,7 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     
     // Camera
     private var cameraPhotoModule: CameraPhotoModule? = null
+    private var cameraStreamManager: CameraStreamManager? = null
     
     // Text-to-Speech
     private var tts: TextToSpeech? = null
@@ -240,6 +249,20 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 cameraPhotoModule = CameraPhotoModule(reactContext.applicationContext)
             }
 
+            // Initialize the MJPEG stream manager and wire the camera arbitration:
+            // motion detection holds the camera through vision-camera, so it must release it
+            // before we can open a streaming session (and resume once the last viewer left).
+            val streamManager = cameraStreamManager ?: CameraStreamManager(reactContext.applicationContext).also {
+                cameraStreamManager = it
+            }
+            streamManager.prepareCamera = {
+                emitCameraStreamState(true)
+                // Give MotionDetector time to unmount its CameraView. Only worth waiting when
+                // motion detection can actually be running.
+                if (jsMotionActive()) MOTION_RELEASE_WAIT_MS else 0L
+            }
+            streamManager.releaseCamera = { emitCameraStreamState(false) }
+
             server = KioskHttpServer(
                 port = port,
                 apiKey = if (apiKey.isNullOrEmpty()) null else apiKey,
@@ -247,7 +270,8 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 statusProvider = { getDeviceStatus() },
                 commandHandler = { command, params -> handleCommand(command, params) },
                 screenshotProvider = { captureScreenshot() },
-                cameraPhotoProvider = { camera, quality -> cameraPhotoModule?.capturePhoto(camera, quality) }
+                cameraPhotoProvider = { camera, quality -> cameraPhotoModule?.capturePhoto(camera, quality) },
+                cameraStreamProvider = { params -> streamManager.openClient(params) }
             )
 
             server?.start()
@@ -270,6 +294,8 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     @ReactMethod
     fun stopServer(promise: Promise) {
         try {
+            // Drop viewers first so the camera is released before the server goes away
+            cameraStreamManager?.stopAll()
             server?.stop()
             server = null
             releaseServerLocks()
@@ -1020,6 +1046,25 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             .emit(eventName, params)
     }
 
+    // ==================== Camera stream arbitration ====================
+
+    /**
+     * Whether motion detection may currently be holding the camera: it runs continuously in
+     * always-on mode, and during the screensaver otherwise.
+     */
+    private fun jsMotionActive(): Boolean = jsMotionAlwaysOn || jsScreensaverActive
+
+    /**
+     * Tell JS that a camera stream started or stopped, so MotionDetector can release the
+     * camera and pick it up again afterwards.
+     */
+    private fun emitCameraStreamState(streaming: Boolean) {
+        Log.i(TAG, "Camera stream state: streaming=$streaming")
+        sendEvent("onCameraStreamState", Arguments.createMap().apply {
+            putBoolean("streaming", streaming)
+        })
+    }
+
     // ==================== JS Interface for Status Updates ====================
 
     @ReactMethod
@@ -1044,6 +1089,8 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             if (status.has("autoBrightnessEnabled")) jsAutoBrightnessEnabled = status.getBoolean("autoBrightnessEnabled")
             if (status.has("autoBrightnessMin")) jsAutoBrightnessMin = status.getInt("autoBrightnessMin")
             if (status.has("autoBrightnessMax")) jsAutoBrightnessMax = status.getInt("autoBrightnessMax")
+            // Tells the stream manager whether motion detection may be holding the camera
+            if (status.has("motionAlwaysOn")) jsMotionAlwaysOn = status.getBoolean("motionAlwaysOn")
             Log.d(TAG, "Status updated: url=$jsCurrentUrl, screensaver=$jsScreensaverActive, rotation=$jsRotationEnabled, autoBrightness=$jsAutoBrightnessEnabled")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse status update from JS", e)
@@ -1903,6 +1950,8 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             tts = null
             ttsReady = false
             sensorManager?.unregisterListener(this)
+            cameraStreamManager?.stopAll()
+            cameraStreamManager = null
             cameraPhotoModule = null
             Log.d(TAG, "HttpServerModule cleaned up")
         } catch (e: Exception) {

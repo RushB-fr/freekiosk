@@ -3,7 +3,9 @@ package com.freekiosk.api
 import fi.iki.elonen.NanoHTTPD
 import org.json.JSONObject
 import org.json.JSONArray
+import android.util.Base64
 import android.util.Log
+import com.freekiosk.camera.CameraStreamManager
 
 /**
  * FreeKiosk REST API Server
@@ -16,7 +18,8 @@ class KioskHttpServer(
     private val statusProvider: () -> JSONObject,
     private val commandHandler: (String, JSONObject?) -> JSONObject,
     private val screenshotProvider: (() -> java.io.InputStream?)? = null,
-    private val cameraPhotoProvider: ((camera: String, quality: Int) -> java.io.InputStream?)? = null
+    private val cameraPhotoProvider: ((camera: String, quality: Int) -> java.io.InputStream?)? = null,
+    private val cameraStreamProvider: ((params: CameraStreamManager.StreamParams) -> CameraStreamManager.StreamResult)? = null
 ) : NanoHTTPD(port) {
 
     companion object {
@@ -44,12 +47,18 @@ class KioskHttpServer(
             }
         }
 
-        // Check authentication if API key is set
+        // Check authentication if API key is set.
+        // The key can be sent either as the X-Api-Key header or as the password of an HTTP
+        // Basic credential (any username): clients such as Home Assistant's MJPEG IP Camera
+        // integration can only send Basic auth.
         if (!apiKey.isNullOrEmpty()) {
             val providedKey = session.headers["x-api-key"]
+                ?: basicAuthPassword(session.headers["authorization"])
             if (providedKey != apiKey) {
-                return jsonError(Response.Status.UNAUTHORIZED, "Invalid or missing API key")
-                    .apply { corsHeaders.forEach { (key, value) -> addHeader(key, value) } }
+                return jsonError(Response.Status.UNAUTHORIZED, "Invalid or missing API key").apply {
+                    addHeader("WWW-Authenticate", "Basic realm=\"FreeKiosk\"")
+                    corsHeaders.forEach { (key, value) -> addHeader(key, value) }
+                }
             }
         }
 
@@ -91,6 +100,9 @@ class KioskHttpServer(
 
                 // Camera photo: GET or POST (query params drive behavior)
                 isGetOrPost && uri == "/api/camera/photo" -> handleCameraPhoto(session)
+
+                // Live MJPEG stream (GET only: the response never ends)
+                method == Method.GET && uri == "/api/camera/stream" -> handleCameraStream(session)
 
                 // POST-only control endpoints requiring a JSON body
                 method == Method.POST && uri == "/api/url" -> handleSetUrl(session)
@@ -174,6 +186,7 @@ class KioskHttpServer(
                     put("/api/health - Health check")
                     put("/api/camera/photo - Take photo (params: camera=front|back, quality=0-100)")
                     put("/api/camera/list - List available cameras")
+                    put("/api/camera/stream - Live MJPEG stream (params: camera, fps, quality, width, rotate)")
                     put("/api/volume - Get current volume {level, maxLevel}")
                     put("/api/location - GPS coordinates (latitude, longitude, accuracy)")
                 })
@@ -637,7 +650,63 @@ class KioskHttpServer(
         return jsonSuccess(result)
     }
 
+    /**
+     * Live MJPEG stream: an endless `multipart/x-mixed-replace` response, one JPEG part per
+     * frame. Consumed by Home Assistant's MJPEG IP Camera integration, ffplay, VLC or a plain
+     * <img> tag. The response only ends when the client disconnects.
+     */
+    private fun handleCameraStream(session: IHTTPSession): Response {
+        val provider = cameraStreamProvider
+            ?: return jsonError(Response.Status.SERVICE_UNAVAILABLE, "Camera streaming not available")
+
+        val params = session.parms ?: emptyMap()
+        val streamParams = CameraStreamManager.StreamParams(
+            facing = params["camera"] ?: "back",
+            fps = (params["fps"]?.toIntOrNull() ?: 10).coerceIn(1, 30),
+            quality = (params["quality"]?.toIntOrNull() ?: 60).coerceIn(1, 100),
+            maxWidth = (params["width"]?.toIntOrNull() ?: 1280).coerceIn(160, 3840),
+            rotate = params["rotate"]?.toIntOrNull()?.let { ((it % 360) + 360) % 360 }
+        )
+
+        Log.i(TAG, "Camera stream request: $streamParams")
+
+        return when (val result = provider(streamParams)) {
+            is CameraStreamManager.StreamResult.Ok -> {
+                val boundary = "frame"
+                newChunkedResponse(
+                    Response.Status.OK,
+                    "multipart/x-mixed-replace; boundary=$boundary",
+                    CameraStreamManager.MjpegInputStream(result.client, boundary)
+                ).apply {
+                    addHeader("Cache-Control", "no-cache, no-store, must-revalidate, private")
+                    addHeader("Pragma", "no-cache")
+                    addHeader("Connection", "close")
+                }
+            }
+            is CameraStreamManager.StreamResult.Error -> {
+                Log.w(TAG, "Camera stream refused: ${result.message}")
+                jsonError(Response.Status.SERVICE_UNAVAILABLE, result.message)
+            }
+        }
+    }
+
     // ==================== Helpers ====================
+
+    /**
+     * Extract the password from an HTTP Basic `Authorization` header. The username is ignored:
+     * the API key is carried in the password field so clients limited to Basic auth can
+     * authenticate.
+     */
+    private fun basicAuthPassword(header: String?): String? {
+        if (header == null || !header.startsWith("Basic ", ignoreCase = true)) return null
+        return try {
+            val decoded = String(Base64.decode(header.substring(6).trim(), Base64.DEFAULT))
+            if (!decoded.contains(':')) null else decoded.substringAfter(':')
+        } catch (e: Exception) {
+            Log.w(TAG, "Malformed Basic authorization header")
+            null
+        }
+    }
 
     private fun parseBody(session: IHTTPSession): JSONObject? {
         return try {

@@ -59,6 +59,8 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [inactivityDelay, setInactivityDelay] = useState(600000);
   const [motionEnabled, setMotionEnabled] = useState(false);
   const [motionAlwaysOn, setMotionAlwaysOn] = useState(false);
+  // A live MJPEG stream holds the camera: motion detection must stand down while it runs
+  const [cameraStreamActive, setCameraStreamActive] = useState(false);
   const [motionCameraPosition, setMotionCameraPosition] = useState<'front' | 'back'>('front');
   const [motionSensitivity, setMotionSensitivity] = useState<'low' | 'medium' | 'high'>('medium');
   const [isPreCheckingMotion, setIsPreCheckingMotion] = useState(false); // Pre-check phase: motion is being monitored before activating the screensaver
@@ -672,6 +674,11 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           } catch (error) {
             console.error('[API] Error disabling auto-brightness:', error);
           }
+        },
+        onCameraStreamStateChanged: (streaming: boolean) => {
+          // Releases the camera for the stream, and picks detection back up afterwards
+          console.log('[API] Camera stream active:', streaming);
+          setCameraStreamActive(streaming);
         },
         onSetMotionAlwaysOn: async (value: boolean) => {
           try {
@@ -2664,7 +2671,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
 
       {/* Motion Detector - Active during pre-check OR when screensaver is ON (only if screen is focused) */}
       <MotionDetector
-        enabled={isFocused && (motionAlwaysOn || (motionEnabled && (isPreCheckingMotion || isScreensaverActive)))}
+        enabled={isFocused && !cameraStreamActive && (motionAlwaysOn || (motionEnabled && (isPreCheckingMotion || isScreensaverActive)))}
         onMotionDetected={onMotionDetected}
         sensitivity={motionSensitivity}
         cameraPosition={motionCameraPosition}

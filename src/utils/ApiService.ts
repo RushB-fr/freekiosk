@@ -35,6 +35,11 @@ export interface ApiCallbacks {
   onAutoBrightnessDisable?: () => void;
   onSetMotionAlwaysOn?: (value: boolean) => void;
   onSetMode?: (mode: 'webview' | 'external_app' | 'media_player', target?: string) => void;
+  /**
+   * A live camera stream started (true) or ended (false). Motion detection must release the
+   * camera while a stream is running: only one client can hold the sensor.
+   */
+  onCameraStreamStateChanged?: (streaming: boolean) => void;
 }
 
 export interface AppStatus {
@@ -62,6 +67,7 @@ class ApiServiceClass {
   private callbacks: ApiCallbacks = {};
   private eventEmitter: NativeEventEmitter | null = null;
   private commandSubscription: any = null;
+  private cameraStreamSubscription: any = null;
   private appStatus: AppStatus = {
     currentUrl: '',
     canGoBack: false,
@@ -96,6 +102,15 @@ class ApiServiceClass {
         'onApiCommand',
         (event: { command: string; params: string }) => {
           setTimeout(() => this.handleCommand(event), 0);
+        }
+      );
+
+      // Camera arbitration: the native stream manager tells us when it needs the camera
+      this.cameraStreamSubscription = this.eventEmitter.addListener(
+        'onCameraStreamState',
+        (event: { streaming: boolean }) => {
+          console.log('ApiService: Camera stream state', event.streaming);
+          this.callbacks.onCameraStreamStateChanged?.(event.streaming === true);
         }
       );
 
@@ -369,6 +384,10 @@ class ApiServiceClass {
     if (this.commandSubscription) {
       this.commandSubscription.remove();
       this.commandSubscription = null;
+    }
+    if (this.cameraStreamSubscription) {
+      this.cameraStreamSubscription.remove();
+      this.cameraStreamSubscription = null;
     }
     this.isInitialized = false;
     console.log('ApiService: Destroyed');
