@@ -42,6 +42,7 @@ import android.accessibilityservice.AccessibilityService
 import android.os.Build
 import com.freekiosk.DeviceAdminReceiver
 import com.freekiosk.CameraPhotoModule
+import com.freekiosk.camera.CameraStreamManager
 import com.freekiosk.FreeKioskAccessibilityService
 import com.freekiosk.ScreenController
 import org.json.JSONObject
@@ -60,6 +61,12 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     companion object {
         private const val TAG = "HttpServerModule"
         private const val NAME = "HttpServerModule"
+
+        /**
+         * Time given to MotionDetector to release the camera before a stream opens it.
+         * Measured on a Xiaomi tablet: unmounting the CameraView takes a few hundred ms.
+         */
+        private const val MOTION_RELEASE_WAIT_MS = 1200L
     }
 
     private var server: KioskHttpServer? = null
@@ -75,6 +82,8 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     private var jsLoading: Boolean = false
     private var jsBrightness: Int = 50
     private var jsScreensaverActive: Boolean = false
+    private var jsMotionAlwaysOn: Boolean = false
+    private var jsMotionSensitivity: String = "medium"
     private var jsKioskMode: Boolean = false
     private var jsRotationEnabled: Boolean = false
     private var jsRotationUrls: List<String> = emptyList()
@@ -108,6 +117,7 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     
     // Camera
     private var cameraPhotoModule: CameraPhotoModule? = null
+    private var cameraStreamManager: CameraStreamManager? = null
     
     // Text-to-Speech
     private var tts: TextToSpeech? = null
@@ -240,6 +250,29 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 cameraPhotoModule = CameraPhotoModule(reactContext.applicationContext)
             }
 
+            // Initialize the MJPEG stream manager and wire the camera arbitration:
+            // motion detection holds the camera through vision-camera, so it must release it
+            // before we can open a streaming session (and resume once the last viewer left).
+            val streamManager = cameraStreamManager ?: CameraStreamManager(reactContext.applicationContext).also {
+                cameraStreamManager = it
+            }
+            streamManager.prepareCamera = {
+                emitCameraStreamState(true)
+                // Give MotionDetector time to unmount its CameraView. Only worth waiting when
+                // motion detection can actually be running.
+                if (jsMotionActive()) MOTION_RELEASE_WAIT_MS else 0L
+            }
+            streamManager.releaseCamera = { emitCameraStreamState(false) }
+            // While a stream holds the camera, motion is derived from its own frames: the
+            // regular detector cannot open the sensor at the same time.
+            streamManager.motionThreshold = motionThresholdForSensitivity()
+            // Reported unconditionally: whether movement should wake the screen depends on
+            // settings and screensaver state that JS already arbitrates for the regular
+            // detector. Duplicating that decision here would drift out of sync.
+            streamManager.onMotionDetected = {
+                sendEvent("onCameraStreamMotion", Arguments.createMap())
+            }
+
             server = KioskHttpServer(
                 port = port,
                 apiKey = if (apiKey.isNullOrEmpty()) null else apiKey,
@@ -247,7 +280,17 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 statusProvider = { getDeviceStatus() },
                 commandHandler = { command, params -> handleCommand(command, params) },
                 screenshotProvider = { captureScreenshot() },
-                cameraPhotoProvider = { camera, quality -> cameraPhotoModule?.capturePhoto(camera, quality) }
+                cameraPhotoProvider = { camera, quality -> cameraPhotoModule?.capturePhoto(camera, quality) },
+                cameraStreamProvider = { params -> streamManager.openClient(params) },
+                cameraStreamDefaults = {
+                    CameraStreamManager.StreamParams(
+                        facing = streamManager.defaultFacing,
+                        fps = streamManager.defaultFps,
+                        quality = streamManager.defaultQuality,
+                        maxWidth = streamManager.defaultWidth,
+                        rotate = streamManager.defaultRotate
+                    )
+                }
             )
 
             server?.start()
@@ -270,6 +313,8 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     @ReactMethod
     fun stopServer(promise: Promise) {
         try {
+            // Drop viewers first so the camera is released before the server goes away
+            cameraStreamManager?.stopAll()
             server?.stop()
             server = null
             releaseServerLocks()
@@ -1020,7 +1065,92 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             .emit(eventName, params)
     }
 
+    // ==================== Camera stream arbitration ====================
+
+    /**
+     * Whether motion detection may currently be holding the camera: it runs continuously in
+     * always-on mode, and during the screensaver otherwise.
+     */
+    private fun jsMotionActive(): Boolean = jsMotionAlwaysOn || jsScreensaverActive
+
+    /**
+     * Same thresholds as MotionDetector on the JS side, so switching between the two detection
+     * paths does not change how sensitive the kiosk feels.
+     */
+    private fun motionThresholdForSensitivity(): Double = when (jsMotionSensitivity) {
+        "low" -> 0.15
+        "high" -> 0.04
+        else -> 0.08
+    }
+
+    /**
+     * Tell JS that a camera stream started or stopped, so MotionDetector can release the
+     * camera and pick it up again afterwards.
+     */
+    private fun emitCameraStreamState(streaming: Boolean) {
+        Log.i(TAG, "Camera stream state: streaming=$streaming")
+        sendEvent("onCameraStreamState", Arguments.createMap().apply {
+            putBoolean("streaming", streaming)
+        })
+    }
+
     // ==================== JS Interface for Status Updates ====================
+
+    /**
+     * Whether a camera stream is currently running. JS state is lost whenever the kiosk screen
+     * remounts, so it must be able to ask the native side for the truth — otherwise motion
+     * detection restarts and steals the camera from a live stream.
+     */
+    /**
+     * Apply the live stream settings. Streaming stays refused until this is called with
+     * `enabled: true`, so the endpoint is opt-in like the rest of the camera features.
+     * Disabling it also drops any viewer currently connected.
+     */
+    @ReactMethod
+    fun updateCameraStreamSettings(configMap: ReadableMap, promise: Promise) {
+        try {
+            val manager = cameraStreamManager
+            if (manager == null) {
+                promise.resolve(false)
+                return
+            }
+
+            val enabled = if (configMap.hasKey("enabled")) configMap.getBoolean("enabled") else false
+            val wasEnabled = manager.enabled
+            manager.enabled = enabled
+            if (configMap.hasKey("camera")) {
+                manager.defaultFacing = configMap.getString("camera") ?: "front"
+            }
+            if (configMap.hasKey("fps")) manager.defaultFps = configMap.getInt("fps")
+            if (configMap.hasKey("quality")) manager.defaultQuality = configMap.getInt("quality")
+            if (configMap.hasKey("width")) manager.defaultWidth = configMap.getInt("width")
+            if (configMap.hasKey("rotate")) {
+                val rotate = configMap.getInt("rotate")
+                manager.defaultRotate = if (rotate < 0) null else rotate
+            }
+
+            if (wasEnabled && !enabled) {
+                Log.i(TAG, "Camera streaming disabled, dropping viewers")
+                manager.stopAll()
+            }
+
+            Log.i(
+                TAG,
+                "Camera stream settings: enabled=$enabled, camera=${manager.defaultFacing}, " +
+                    "fps=${manager.defaultFps}, quality=${manager.defaultQuality}, " +
+                    "width=${manager.defaultWidth}, rotate=${manager.defaultRotate ?: "auto"}"
+            )
+            promise.resolve(true)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to update camera stream settings", e)
+            promise.reject("UPDATE_ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun isCameraStreaming(promise: Promise) {
+        promise.resolve(cameraStreamManager?.isStreaming == true)
+    }
 
     @ReactMethod
     fun updateStatus(statusJson: String) {
@@ -1044,6 +1174,13 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             if (status.has("autoBrightnessEnabled")) jsAutoBrightnessEnabled = status.getBoolean("autoBrightnessEnabled")
             if (status.has("autoBrightnessMin")) jsAutoBrightnessMin = status.getInt("autoBrightnessMin")
             if (status.has("autoBrightnessMax")) jsAutoBrightnessMax = status.getInt("autoBrightnessMax")
+            // Tells the stream manager whether motion detection may be holding the camera,
+            // and how sensitive the stream-based detection should be
+            if (status.has("motionAlwaysOn")) jsMotionAlwaysOn = status.getBoolean("motionAlwaysOn")
+            if (status.has("motionSensitivity")) {
+                jsMotionSensitivity = status.getString("motionSensitivity")
+                cameraStreamManager?.motionThreshold = motionThresholdForSensitivity()
+            }
             Log.d(TAG, "Status updated: url=$jsCurrentUrl, screensaver=$jsScreensaverActive, rotation=$jsRotationEnabled, autoBrightness=$jsAutoBrightnessEnabled")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse status update from JS", e)
@@ -1903,6 +2040,8 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             tts = null
             ttsReady = false
             sensorManager?.unregisterListener(this)
+            cameraStreamManager?.stopAll()
+            cameraStreamManager = null
             cameraPhotoModule = null
             Log.d(TAG, "HttpServerModule cleaned up")
         } catch (e: Exception) {

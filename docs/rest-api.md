@@ -32,7 +32,7 @@ FreeKiosk includes a built-in REST API server for integration with **Home Assist
 |---|---|
 | **Default Port** | 8080 |
 | **Protocol** | HTTP (HTTPS planned) |
-| **Authentication** | Optional API Key (X-Api-Key header) |
+| **Authentication** | Optional API Key (`X-Api-Key` header, or HTTP Basic password) |
 | **Format** | JSON responses |
 
 
@@ -388,6 +388,64 @@ GET /api/camera/photo?camera=front&quality=60
 - Camera permission must be granted (already included in app permissions)
 - Photo resolution is automatically optimized (~1.2MP) for fast HTTP transfer
 - Higher quality values produce larger files
+
+#### `GET /api/camera/stream`
+
+Live **MJPEG** stream of the device camera, so a kiosk tablet can be used as a camera in Home Assistant.
+
+**Opt-in**: enable **Live Camera Stream** in Settings → Advanced → REST API. Until then the endpoint answers `503`.
+
+**Response**: `multipart/x-mixed-replace; boundary=frame` — an endless sequence of JPEG parts, one per frame. The response only ends when the client disconnects.
+
+**Query Parameters:** *(each overrides the configured default for that request)*
+
+
+| Parameter | Default | Description |
+|---|---|---|
+| **camera** | *(setting)* | Camera to use: `front` or `back` |
+| **fps** | *(setting, 10)* | Frames per second, 1-30 |
+| **quality** | *(setting, 60)* | JPEG compression quality, 1-100 |
+| **width** | *(setting, 1280)* | Largest camera resolution to use, 160-3840 |
+| **rotate** | *(setting, auto)* | Clockwise rotation in degrees: `0`, `90`, `180`, `270`. Derived from the sensor when unset |
+
+
+
+**Examples:**
+
+
+```bash
+# Watch with ffplay
+ffplay "http://TABLET_IP:8080/api/camera/stream?camera=front&fps=10"
+
+# In a web page
+<img src="http://TABLET_IP:8080/api/camera/stream" />
+
+# Save 10 seconds of stream
+curl -m 10 "http://TABLET_IP:8080/api/camera/stream?fps=5" -o stream.mjpeg
+```
+
+
+
+**Home Assistant** — the *MJPEG IP Camera* integration (Settings → Devices & Services → Add integration):
+
+
+| Field | Value |
+|---|---|
+| **MJPEG URL** | `http://TABLET_IP:8080/api/camera/stream?camera=front&fps=10` |
+| **Still image URL** | `http://TABLET_IP:8080/api/camera/photo?camera=front` |
+| **Username** | anything (ignored) |
+| **Password** | your API key, if one is set |
+
+
+
+**Notes:**
+- **Motion detection keeps working.** A camera can only have one client, so while the stream runs, movement is measured on the stream's own frames and wakes the screen through the same path as the regular detector. Nothing to configure — the sensitivity you chose still applies.
+  - Measured on a Xiaomi tablet: frames are compared twice a second instead of once, a still scene sits at a 0.005-0.012 changed-pixel ratio against 0.026 for the regular detector, and movement reached 0.16-0.56. Detection to screen wake took 19 ms.
+  - The one thing it does not see: a **colour change at constant brightness**, since only the luma plane is compared. Movement, people and lighting changes are unaffected.
+- The camera is opened when the first viewer connects and released when the last one leaves.
+- Up to **2 concurrent viewers**; further requests get `503`. A second viewer asking for the other camera is refused too — one camera at a time.
+- Measured on a Xiaomi tablet at 1280×960, quality 60, 10 fps: ~8 fps sustained, ~80 KB per frame (~5 Mbit/s), ~66% of one CPU core. Lower `fps` and `quality` for wall-mounted tablets.
+- If the picture comes out sideways, set `rotate` — see the camera orientation note under `/api/camera/photo`.
 
 #### `GET /api/camera/list`
 
@@ -836,6 +894,15 @@ If an API key is configured, include it in requests:
 ```bash
 curl -H "X-Api-Key: your-api-key" http://tablet-ip:8080/api/status
 ```
+
+The key is also accepted as the **password of an HTTP Basic credential** (the username is ignored). This exists for clients that cannot send custom headers — Home Assistant's *MJPEG IP Camera* integration among them:
+
+```bash
+curl -u "freekiosk:your-api-key" http://tablet-ip:8080/api/status
+```
+
+> [!TIP]
+> Prefer the header when you can. A Basic credential travels in every request and, over plain HTTP, is no more protected than the header — but it does keep the key out of URLs, browser history and server logs, unlike a query parameter.
 
 
 ## Home Assistant Integration

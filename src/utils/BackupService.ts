@@ -55,6 +55,13 @@ const BACKUP_KEYS = [
   '@kiosk_rest_api_port',
   // Note: @kiosk_rest_api_key is handled separately via Keychain (secure storage)
   '@kiosk_rest_api_allow_control',
+  // Live MJPEG camera stream
+  '@kiosk_camera_stream_enabled',
+  '@kiosk_camera_stream_camera',
+  '@kiosk_camera_stream_fps',
+  '@kiosk_camera_stream_quality',
+  '@kiosk_camera_stream_width',
+  '@kiosk_camera_stream_rotate',
   '@kiosk_allow_power_button',
   '@kiosk_block_factory_reset',
   '@kiosk_allow_notifications',
