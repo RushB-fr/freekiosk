@@ -93,12 +93,14 @@ class ApiServiceClass {
    * Initialize the API service and start listening for commands
    */
   async initialize(callbacks: ApiCallbacks): Promise<void> {
+    // Always adopt the latest callbacks: KioskScreen remounts (settings reload, navigation)
+    // and the previous instance's closures capture state that is no longer updated.
+    this.callbacks = callbacks;
+
     if (this.isInitialized) {
-      console.log('ApiService: Already initialized');
+      console.log('ApiService: Callbacks refreshed');
       return;
     }
-
-    this.callbacks = callbacks;
 
     if (Platform.OS === 'android' && HttpServerModule) {
       this.eventEmitter = new NativeEventEmitter(HttpServerModule);
