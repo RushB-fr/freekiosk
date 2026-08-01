@@ -40,6 +40,11 @@ export interface ApiCallbacks {
    * camera while a stream is running: only one client can hold the sensor.
    */
   onCameraStreamStateChanged?: (streaming: boolean) => void;
+  /**
+   * Movement seen in the live camera stream. While a stream runs it is the only motion source:
+   * the regular detector cannot open the same sensor.
+   */
+  onCameraStreamMotion?: () => void;
 }
 
 export interface AppStatus {
@@ -61,6 +66,8 @@ export interface AppStatus {
   scheduledSleep?: boolean;
   motionDetected?: boolean;
   motionAlwaysOn?: boolean;
+  /** Sensitivity used by the stream-based motion detection */
+  motionSensitivity?: 'low' | 'medium' | 'high';
 }
 
 class ApiServiceClass {
@@ -68,6 +75,7 @@ class ApiServiceClass {
   private eventEmitter: NativeEventEmitter | null = null;
   private commandSubscription: any = null;
   private cameraStreamSubscription: any = null;
+  private cameraStreamMotionSubscription: any = null;
   private appStatus: AppStatus = {
     currentUrl: '',
     canGoBack: false,
@@ -111,6 +119,14 @@ class ApiServiceClass {
         (event: { streaming: boolean }) => {
           console.log('ApiService: Camera stream state', event.streaming);
           this.callbacks.onCameraStreamStateChanged?.(event.streaming === true);
+        }
+      );
+
+      this.cameraStreamMotionSubscription = this.eventEmitter.addListener(
+        'onCameraStreamMotion',
+        () => {
+          console.log('ApiService: Motion detected in camera stream');
+          this.callbacks.onCameraStreamMotion?.();
         }
       );
 
@@ -400,6 +416,10 @@ class ApiServiceClass {
     if (this.cameraStreamSubscription) {
       this.cameraStreamSubscription.remove();
       this.cameraStreamSubscription = null;
+    }
+    if (this.cameraStreamMotionSubscription) {
+      this.cameraStreamMotionSubscription.remove();
+      this.cameraStreamMotionSubscription = null;
     }
     this.isInitialized = false;
     console.log('ApiService: Destroyed');

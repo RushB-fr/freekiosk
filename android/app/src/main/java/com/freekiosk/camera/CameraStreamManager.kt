@@ -60,6 +60,15 @@ class CameraStreamManager(private val context: Context) {
     /** Called after the camera has been released, so motion detection can resume. */
     var releaseCamera: (() -> Unit)? = null
 
+    /**
+     * Called when movement is seen in the stream. While a stream runs it replaces the regular
+     * motion detection, which cannot open the camera at the same time.
+     */
+    var onMotionDetected: (() -> Unit)? = null
+
+    /** Ratio of changed pixels counting as movement, from the app's sensitivity setting. */
+    var motionThreshold: Double = 0.08
+
     private val clients = CopyOnWriteArrayList<StreamClient>()
     private var source: Camera2MjpegSource? = null
     private var activeParams: StreamParams? = null
@@ -126,6 +135,8 @@ class CameraStreamManager(private val context: Context) {
             )
 
             newSource.onStreamLost = { handleStreamLost() }
+            newSource.motionThreshold = motionThreshold
+            onMotionDetected?.let { callback -> newSource.onMotionDetected = callback }
 
             if (newSource.start { frame -> dispatchFrame(frame) }) {
                 source = newSource

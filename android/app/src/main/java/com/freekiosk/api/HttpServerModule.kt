@@ -83,6 +83,7 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     private var jsBrightness: Int = 50
     private var jsScreensaverActive: Boolean = false
     private var jsMotionAlwaysOn: Boolean = false
+    private var jsMotionSensitivity: String = "medium"
     private var jsKioskMode: Boolean = false
     private var jsRotationEnabled: Boolean = false
     private var jsRotationUrls: List<String> = emptyList()
@@ -262,6 +263,15 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 if (jsMotionActive()) MOTION_RELEASE_WAIT_MS else 0L
             }
             streamManager.releaseCamera = { emitCameraStreamState(false) }
+            // While a stream holds the camera, motion is derived from its own frames: the
+            // regular detector cannot open the sensor at the same time.
+            streamManager.motionThreshold = motionThresholdForSensitivity()
+            // Reported unconditionally: whether movement should wake the screen depends on
+            // settings and screensaver state that JS already arbitrates for the regular
+            // detector. Duplicating that decision here would drift out of sync.
+            streamManager.onMotionDetected = {
+                sendEvent("onCameraStreamMotion", Arguments.createMap())
+            }
 
             server = KioskHttpServer(
                 port = port,
@@ -1055,6 +1065,16 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     private fun jsMotionActive(): Boolean = jsMotionAlwaysOn || jsScreensaverActive
 
     /**
+     * Same thresholds as MotionDetector on the JS side, so switching between the two detection
+     * paths does not change how sensitive the kiosk feels.
+     */
+    private fun motionThresholdForSensitivity(): Double = when (jsMotionSensitivity) {
+        "low" -> 0.15
+        "high" -> 0.04
+        else -> 0.08
+    }
+
+    /**
      * Tell JS that a camera stream started or stopped, so MotionDetector can release the
      * camera and pick it up again afterwards.
      */
@@ -1099,8 +1119,13 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             if (status.has("autoBrightnessEnabled")) jsAutoBrightnessEnabled = status.getBoolean("autoBrightnessEnabled")
             if (status.has("autoBrightnessMin")) jsAutoBrightnessMin = status.getInt("autoBrightnessMin")
             if (status.has("autoBrightnessMax")) jsAutoBrightnessMax = status.getInt("autoBrightnessMax")
-            // Tells the stream manager whether motion detection may be holding the camera
+            // Tells the stream manager whether motion detection may be holding the camera,
+            // and how sensitive the stream-based detection should be
             if (status.has("motionAlwaysOn")) jsMotionAlwaysOn = status.getBoolean("motionAlwaysOn")
+            if (status.has("motionSensitivity")) {
+                jsMotionSensitivity = status.getString("motionSensitivity")
+                cameraStreamManager?.motionThreshold = motionThresholdForSensitivity()
+            }
             Log.d(TAG, "Status updated: url=$jsCurrentUrl, screensaver=$jsScreensaverActive, rotation=$jsRotationEnabled, autoBrightness=$jsAutoBrightnessEnabled")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse status update from JS", e)

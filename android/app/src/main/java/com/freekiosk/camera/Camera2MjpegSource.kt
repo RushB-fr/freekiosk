@@ -48,6 +48,18 @@ class Camera2MjpegSource(
     companion object {
         private const val TAG = "Camera2MjpegSource"
         private const val OPEN_TIMEOUT_SECONDS = 5L
+
+        /** How often frames are compared for movement. */
+        private const val MOTION_ANALYSIS_INTERVAL_MS = 500L
+
+        /** Minimum delay between two motion reports, so one movement wakes the screen once. */
+        private const val MOTION_REPORT_THROTTLE_MS = 2000L
+
+        /** Luma difference above which a sampled pixel counts as changed (0-255). */
+        private const val MOTION_PIXEL_DELTA = 20
+
+        /** Analyse one pixel out of N on each axis — enough to spot a person moving. */
+        private const val MOTION_SAMPLE_STEP = 8
     }
 
     private val frameIntervalMs = 1000L / targetFps.coerceIn(1, 30)
@@ -72,6 +84,21 @@ class Camera2MjpegSource(
      * motion detection). The stream cannot recover on its own and must be torn down.
      */
     var onStreamLost: (() -> Unit)? = null
+
+    /**
+     * Called when movement is seen between two frames. Deriving motion from the stream is what
+     * allows a single sensor to serve both a live feed and wake-on-motion: a second camera
+     * client is impossible, but the frames are already decoded here.
+     *
+     * Set [motionThreshold] to the ratio of changed pixels that counts as movement.
+     */
+    var onMotionDetected: (() -> Unit)? = null
+    var motionThreshold: Double = 0.08
+
+    /** Luma samples of the previous analysed frame. */
+    private var previousLuma: IntArray? = null
+    private var lastMotionAnalysisAt = 0L
+    private var lastMotionReportedAt = 0L
 
     /**
      * Open the camera and start delivering JPEG frames.
@@ -307,6 +334,9 @@ class Camera2MjpegSource(
         var height = image.height
         var nv21 = yuv420ToNv21(image)
 
+        // Movement is measured on the untouched luma plane, before any rotation
+        if (onMotionDetected != null) analyseMotion(nv21, width, height)
+
         when (rotationDegrees) {
             90 -> {
                 nv21 = rotateNv21By90(nv21, width, height)
@@ -326,6 +356,45 @@ class Camera2MjpegSource(
         } else {
             Log.w(TAG, "JPEG compression failed")
             null
+        }
+    }
+
+    /**
+     * Compare the luma plane with the previous analysed frame and report movement when enough
+     * sampled pixels changed. Sampling one pixel out of [MOTION_SAMPLE_STEP] on each axis keeps
+     * this well under a millisecond, next to the ~10 ms the JPEG encoding already costs.
+     */
+    private fun analyseMotion(nv21: ByteArray, width: Int, height: Int) {
+        val now = System.currentTimeMillis()
+        if (now - lastMotionAnalysisAt < MOTION_ANALYSIS_INTERVAL_MS) return
+        lastMotionAnalysisAt = now
+
+        val columns = width / MOTION_SAMPLE_STEP
+        val rows = height / MOTION_SAMPLE_STEP
+        val samples = IntArray(columns * rows)
+        var index = 0
+        for (row in 0 until rows) {
+            val rowOffset = row * MOTION_SAMPLE_STEP * width
+            for (col in 0 until columns) {
+                samples[index++] = nv21[rowOffset + col * MOTION_SAMPLE_STEP].toInt() and 0xFF
+            }
+        }
+
+        val previous = previousLuma
+        previousLuma = samples
+        if (previous == null || previous.size != samples.size) return
+
+        var changed = 0
+        for (i in samples.indices) {
+            if (kotlin.math.abs(samples[i] - previous[i]) > MOTION_PIXEL_DELTA) changed++
+        }
+        val ratio = changed.toDouble() / samples.size
+        Log.d(TAG, "Motion ratio=%.4f (threshold=%.3f, samples=%d)".format(ratio, motionThreshold, samples.size))
+
+        if (ratio >= motionThreshold && now - lastMotionReportedAt >= MOTION_REPORT_THROTTLE_MS) {
+            lastMotionReportedAt = now
+            Log.i(TAG, "Motion detected in stream (ratio=%.3f, threshold=%.3f)".format(ratio, motionThreshold))
+            onMotionDetected?.invoke()
         }
     }
 

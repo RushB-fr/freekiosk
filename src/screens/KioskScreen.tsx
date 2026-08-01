@@ -61,6 +61,12 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [motionAlwaysOn, setMotionAlwaysOn] = useState(false);
   // A live MJPEG stream holds the camera: motion detection must stand down while it runs
   const [cameraStreamActive, setCameraStreamActive] = useState(false);
+  // onMotionDetected is defined further down; the API callbacks are registered on mount and
+  // would otherwise capture a stale closure.
+  const onMotionDetectedRef = useRef<(() => void) | null>(null);
+  // Mirrors MotionDetector's own enabled condition, so movement coming from the camera stream
+  // wakes the screen in exactly the same situations.
+  const streamMotionAllowedRef = useRef(false);
   const [motionCameraPosition, setMotionCameraPosition] = useState<'front' | 'back'>('front');
   const [motionSensitivity, setMotionSensitivity] = useState<'low' | 'medium' | 'high'>('medium');
   const [isPreCheckingMotion, setIsPreCheckingMotion] = useState(false); // Pre-check phase: motion is being monitored before activating the screensaver
@@ -680,6 +686,13 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           console.log('[API] Camera stream active:', streaming);
           setCameraStreamActive(streaming);
         },
+        onCameraStreamMotion: () => {
+          // Same wake path as the regular detector: while a stream holds the camera, movement
+          // is measured on its frames instead.
+          if (!streamMotionAllowedRef.current) return;
+          console.log('[API] Motion detected in camera stream');
+          onMotionDetectedRef.current?.();
+        },
         onSetMotionAlwaysOn: async (value: boolean) => {
           try {
             setMotionAlwaysOn(value);
@@ -869,8 +882,10 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       autoBrightnessMin: autoBrightnessMin,
       autoBrightnessMax: autoBrightnessMax,
       motionAlwaysOn: motionAlwaysOn,
+      // Used by the stream-based motion detection, which takes over while a stream runs
+      motionSensitivity: motionSensitivity,
     });
-  }, [url, defaultBrightness, isScreensaverActive, urlRotationEnabled, urlRotationList, urlRotationInterval, currentUrlIndex, autoBrightnessEnabled, autoBrightnessMin, autoBrightnessMax, motionAlwaysOn]);
+  }, [url, defaultBrightness, isScreensaverActive, urlRotationEnabled, urlRotationList, urlRotationInterval, currentUrlIndex, autoBrightnessEnabled, autoBrightnessMin, autoBrightnessMax, motionAlwaysOn, motionSensitivity]);
 
   // Countdown timer effect (transparent - no UI)
   useEffect(() => {
@@ -2393,6 +2408,19 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       resetTimer();
     }
   }, [defaultBrightness, resetTimer, autoBrightnessEnabled]);
+
+  // Expose the current handler to the API callbacks registered on mount, so motion coming from
+  // the camera stream wakes the screen exactly like the regular detector does.
+  useEffect(() => {
+    onMotionDetectedRef.current = onMotionDetected;
+  }, [onMotionDetected]);
+
+  // Same condition as the MotionDetector `enabled` prop below, minus the stream check: while a
+  // stream runs, its frames are the motion source instead of the detector.
+  useEffect(() => {
+    streamMotionAllowedRef.current =
+      motionAlwaysOn || (motionEnabled && (isPreCheckingMotion || isScreensaverActive));
+  }, [motionAlwaysOn, motionEnabled, isPreCheckingMotion, isScreensaverActive]);
 
   const enableScreensaverEffects = async () => {
     // Content modes (URL/video) keep the current brightness so the user can see the content
