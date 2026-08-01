@@ -102,7 +102,7 @@ camera:
 ```
 
 > [!NOTE]
-> Wake-on-motion keeps working while the stream runs: a camera accepts a single client, so movement is measured on the stream's own frames instead. Nothing to configure.
+> Wake-on-motion keeps working while the stream runs: a camera accepts a single client, so movement is measured on the stream's own frames instead. Nothing to configure, and the sensitivity you chose still applies. The only difference in practice is that a colour change at constant brightness goes unnoticed, since only the luma plane is compared.
 
 > [!TIP]
 > MJPEG is not free: budget ~5 Mbit/s and about two thirds of a CPU core at 1280×960, quality 60, 10 fps. For plain monitoring, 5 fps and quality 50 look nearly identical for half the cost. For still images only, the [MQTT camera entities](MQTT#-images-screenshot--camera) are far cheaper.
