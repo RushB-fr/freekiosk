@@ -118,6 +118,18 @@ class ApiServiceClass {
     }
 
     this.isInitialized = true;
+
+    // A stream may already be running (the kiosk screen remounts on settings reload, losing
+    // its state). Ask the native side for the truth so motion detection stays out of the way.
+    try {
+      const streaming = await httpServer.isCameraStreaming();
+      if (streaming) {
+        console.log('ApiService: A camera stream is already running');
+        this.callbacks.onCameraStreamStateChanged?.(true);
+      }
+    } catch (error) {
+      // Older native module without the method, or server not started yet
+    }
   }
 
   /**

@@ -78,6 +78,18 @@ class HttpServerService {
   }
 
   /**
+   * Whether a live camera stream is currently running natively. Used to resynchronise the
+   * JS state after a remount, so motion detection does not steal the camera from a stream.
+   */
+  async isCameraStreaming(): Promise<boolean> {
+    if (Platform.OS !== 'android' || !HttpServerModule?.isCameraStreaming) {
+      return false;
+    }
+
+    return HttpServerModule.isCameraStreaming();
+  }
+
+  /**
    * Get server info (running status and IP)
    */
   async getServerInfo(): Promise<ServerInfo> {

@@ -1067,6 +1067,16 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
 
     // ==================== JS Interface for Status Updates ====================
 
+    /**
+     * Whether a camera stream is currently running. JS state is lost whenever the kiosk screen
+     * remounts, so it must be able to ask the native side for the truth — otherwise motion
+     * detection restarts and steals the camera from a live stream.
+     */
+    @ReactMethod
+    fun isCameraStreaming(promise: Promise) {
+        promise.resolve(cameraStreamManager?.isStreaming == true)
+    }
+
     @ReactMethod
     fun updateStatus(statusJson: String) {
         // Parse status from JS and update local variables

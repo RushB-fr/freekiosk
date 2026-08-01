@@ -68,6 +68,12 @@ class Camera2MjpegSource(
         private set
 
     /**
+     * Called when the camera is taken away while streaming (another client opened it, e.g.
+     * motion detection). The stream cannot recover on its own and must be torn down.
+     */
+    var onStreamLost: (() -> Unit)? = null
+
+    /**
      * Open the camera and start delivering JPEG frames.
      *
      * @return true when the stream is running, false when the camera could not be opened
@@ -187,14 +193,18 @@ class Camera2MjpegSource(
                 camera.close()
                 openFailed = true
                 openLatch.countDown()
+                // Taken away mid-stream: tell the manager instead of serving a dead stream
+                // until the frame timeout expires.
+                if (running) onStreamLost?.invoke()
             }
 
             override fun onError(camera: CameraDevice, error: Int) {
                 // error 1 = ERROR_CAMERA_IN_USE, typically motion detection holding the sensor
-                Log.e(TAG, "Camera error $error while opening")
+                Log.e(TAG, "Camera error $error")
                 camera.close()
                 openFailed = true
                 openLatch.countDown()
+                if (running) onStreamLost?.invoke()
             }
         }, threadHandler)
 

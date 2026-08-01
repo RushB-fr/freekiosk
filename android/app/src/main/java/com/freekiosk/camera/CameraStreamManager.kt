@@ -125,6 +125,8 @@ class CameraStreamManager(private val context: Context) {
                 rotationOverride = params.rotate
             )
 
+            newSource.onStreamLost = { handleStreamLost() }
+
             if (newSource.start { frame -> dispatchFrame(frame) }) {
                 source = newSource
                 Log.i(TAG, "Camera stream started (${params.facing}, ${params.fps} fps)")
@@ -165,6 +167,28 @@ class CameraStreamManager(private val context: Context) {
                     Log.w(TAG, "releaseCamera failed: ${e.message}")
                 }
                 Log.i(TAG, "No client left, camera released")
+            }
+        }
+    }
+
+    /**
+     * The camera was taken away mid-stream (another client opened it). End every viewer's
+     * response right away and hand the sensor back, rather than letting clients hang until
+     * their frame timeout.
+     */
+    private fun handleStreamLost() {
+        synchronized(lock) {
+            if (source == null) return
+            Log.w(TAG, "Camera lost to another client, ending ${clients.size} stream(s)")
+            clients.forEach { it.markClosed() }
+            clients.clear()
+            source?.stop()
+            source = null
+            activeParams = null
+            try {
+                releaseCamera?.invoke()
+            } catch (e: Exception) {
+                Log.w(TAG, "releaseCamera failed: ${e.message}")
             }
         }
     }
