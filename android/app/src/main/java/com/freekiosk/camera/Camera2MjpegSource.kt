@@ -55,11 +55,27 @@ class Camera2MjpegSource(
         /** Minimum delay between two motion reports, so one movement wakes the screen once. */
         private const val MOTION_REPORT_THROTTLE_MS = 2000L
 
-        /** Luma difference above which a sampled pixel counts as changed (0-255). */
+        /**
+         * Luma difference above which a sampled pixel counts as changed (0-255).
+         *
+         * MotionDetectionModule uses the equivalent of 10, but on photos downscaled by
+         * inSampleSize=4, which averages out sensor noise. Raw stream frames have no such
+         * smoothing: measured on a Xiaomi tablet, a still scene sits at a 0.05-0.083 changed
+         * ratio with 10 — level with the "medium" sensitivity threshold — against 0.008-0.012
+         * with 20, which leaves an 8x margin. Do not "align" this with the JS detector without
+         * measuring the noise floor again.
+         */
         private const val MOTION_PIXEL_DELTA = 20
 
         /** Analyse one pixel out of N on each axis — enough to spot a person moving. */
         private const val MOTION_SAMPLE_STEP = 8
+
+        /**
+         * Analyses skipped after the camera opens, while auto-exposure settles. The regular
+         * detector does the same with its first frames; without it, the exposure ramp reads as
+         * movement.
+         */
+        private const val MOTION_WARMUP_ANALYSES = 2
     }
 
     private val frameIntervalMs = 1000L / targetFps.coerceIn(1, 30)
@@ -99,6 +115,7 @@ class Camera2MjpegSource(
     private var previousLuma: IntArray? = null
     private var lastMotionAnalysisAt = 0L
     private var lastMotionReportedAt = 0L
+    private var warmupAnalysesLeft = MOTION_WARMUP_ANALYSES
 
     /**
      * Open the camera and start delivering JPEG frames.
@@ -383,6 +400,12 @@ class Camera2MjpegSource(
         val previous = previousLuma
         previousLuma = samples
         if (previous == null || previous.size != samples.size) return
+
+        if (warmupAnalysesLeft > 0) {
+            warmupAnalysesLeft--
+            Log.d(TAG, "Motion analysis warming up ($warmupAnalysesLeft left)")
+            return
+        }
 
         var changed = 0
         for (i in samples.indices) {
