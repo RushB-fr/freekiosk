@@ -399,7 +399,7 @@ export const ApiSettingsSection: React.FC<ApiSettingsSectionProps> = ({
             value={streamEnabled}
             onValueChange={handleStreamEnabledChange}
             icon="video"
-            hint="Serve GET /api/camera/stream as MJPEG, for the MJPEG IP Camera integration in Home Assistant. A camera accepts a single client, so while someone is watching, motion detection switches to the stream's own frames: same sensitivity setting, checked twice as often, but colour changes at constant brightness are no longer detected."
+            hint="Serve GET /api/camera/stream as MJPEG, for the MJPEG IP Camera integration in Home Assistant. A camera only accepts one client at a time: while someone is watching the stream, motion detection works from its frames instead. It keeps your sensitivity setting, but does not behave exactly like the usual detection."
           />
 
           {streamEnabled && (

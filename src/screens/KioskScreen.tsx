@@ -689,10 +689,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         onCameraStreamMotion: () => {
           // Same wake path as the regular detector: while a stream holds the camera, movement
           // is measured on its frames instead.
-          if (!streamMotionAllowedRef.current) {
-            console.log('[API] Stream motion ignored — motion wake is not active right now');
-            return;
-          }
+          if (!streamMotionAllowedRef.current) return;
           console.log('[API] Motion detected in camera stream');
           onMotionDetectedRef.current?.();
         },
@@ -2423,11 +2420,6 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   useEffect(() => {
     streamMotionAllowedRef.current =
       motionAlwaysOn || (motionEnabled && (isPreCheckingMotion || isScreensaverActive));
-    console.log(
-      `[Motion] stream wake allowed=${streamMotionAllowedRef.current} ` +
-        `(alwaysOn=${motionAlwaysOn}, enabled=${motionEnabled}, ` +
-        `preCheck=${isPreCheckingMotion}, screensaver=${isScreensaverActive})`
-    );
   }, [motionAlwaysOn, motionEnabled, isPreCheckingMotion, isScreensaverActive]);
 
   const enableScreensaverEffects = async () => {

@@ -403,7 +403,6 @@ class Camera2MjpegSource(
 
         if (warmupAnalysesLeft > 0) {
             warmupAnalysesLeft--
-            Log.d(TAG, "Motion analysis warming up ($warmupAnalysesLeft left)")
             return
         }
 
@@ -412,7 +411,6 @@ class Camera2MjpegSource(
             if (kotlin.math.abs(samples[i] - previous[i]) > MOTION_PIXEL_DELTA) changed++
         }
         val ratio = changed.toDouble() / samples.size
-        Log.d(TAG, "Motion ratio=%.4f (threshold=%.3f, samples=%d)".format(ratio, motionThreshold, samples.size))
 
         if (ratio >= motionThreshold && now - lastMotionReportedAt >= MOTION_REPORT_THROTTLE_MS) {
             lastMotionReportedAt = now
