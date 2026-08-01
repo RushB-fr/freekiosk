@@ -28,6 +28,14 @@ class CameraStreamManager(private val context: Context) {
 
         /** Give up on a stream that received no frame for this long. */
         private const val FRAME_TIMEOUT_MS = 10_000L
+
+        /**
+         * Attempts to open the camera when another component (motion detection) has just been
+         * asked to release it. Retrying is more reliable than guessing a single delay that
+         * would fit every device.
+         */
+        private const val OPEN_ATTEMPTS_WHEN_BUSY = 3
+        private const val RETRY_DELAY_MS = 700L
     }
 
     data class StreamParams(
@@ -96,30 +104,45 @@ class CameraStreamManager(private val context: Context) {
         }
         if (waitMs > 0) {
             Log.d(TAG, "Waiting ${waitMs}ms for the camera to be released")
-            try {
-                Thread.sleep(waitMs)
-            } catch (e: InterruptedException) {
-                Thread.currentThread().interrupt()
+            sleepQuietly(waitMs)
+        }
+
+        // When something else was holding the camera, releasing it is asynchronous: retry a
+        // few times rather than failing on a single unlucky attempt.
+        val attempts = if (waitMs > 0) OPEN_ATTEMPTS_WHEN_BUSY else 1
+        for (attempt in 1..attempts) {
+            if (attempt > 1) {
+                Log.d(TAG, "Camera still busy, retrying ($attempt/$attempts)")
+                sleepQuietly(RETRY_DELAY_MS)
+            }
+
+            val newSource = Camera2MjpegSource(
+                context = context,
+                facing = params.facing,
+                targetFps = params.fps,
+                quality = params.quality,
+                maxWidth = params.maxWidth,
+                rotationOverride = params.rotate
+            )
+
+            if (newSource.start { frame -> dispatchFrame(frame) }) {
+                source = newSource
+                Log.i(TAG, "Camera stream started (${params.facing}, ${params.fps} fps)")
+                return true
             }
         }
 
-        val newSource = Camera2MjpegSource(
-            context = context,
-            facing = params.facing,
-            targetFps = params.fps,
-            quality = params.quality,
-            maxWidth = params.maxWidth,
-            rotationOverride = params.rotate
-        )
+        Log.e(TAG, "Could not open the camera after $attempts attempt(s)")
+        releaseCamera?.invoke()
+        return false
+    }
 
-        if (!newSource.start { frame -> dispatchFrame(frame) }) {
-            releaseCamera?.invoke()
-            return false
+    private fun sleepQuietly(millis: Long) {
+        try {
+            Thread.sleep(millis)
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
         }
-
-        source = newSource
-        Log.i(TAG, "Camera stream started (${params.facing}, ${params.fps} fps)")
-        return true
     }
 
     private fun dispatchFrame(frame: ByteArray) {
