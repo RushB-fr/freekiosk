@@ -69,6 +69,19 @@ class CameraStreamManager(private val context: Context) {
     /** Ratio of changed pixels counting as movement, from the app's sensitivity setting. */
     var motionThreshold: Double = 0.08
 
+    /**
+     * Streaming is opt-in: the endpoint stays refused until the app pushes the setting.
+     * Defaults below are used for any parameter the request does not specify.
+     */
+    @Volatile var enabled: Boolean = false
+    @Volatile var defaultFacing: String = "front"
+    @Volatile var defaultFps: Int = 10
+    @Volatile var defaultQuality: Int = 60
+    @Volatile var defaultWidth: Int = 1280
+
+    /** Extra clockwise rotation, or null to derive it from the sensor. */
+    @Volatile var defaultRotate: Int? = null
+
     private val clients = CopyOnWriteArrayList<StreamClient>()
     private var source: Camera2MjpegSource? = null
     private var activeParams: StreamParams? = null
@@ -80,6 +93,10 @@ class CameraStreamManager(private val context: Context) {
 
     fun openClient(params: StreamParams): StreamResult {
         synchronized(lock) {
+            if (!enabled) {
+                return StreamResult.Error("Camera streaming is disabled in settings")
+            }
+
             if (clients.size >= MAX_CLIENTS) {
                 return StreamResult.Error("Too many stream clients (max $MAX_CLIENTS)")
             }

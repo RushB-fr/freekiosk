@@ -12,6 +12,7 @@ import {
   Alert,
   Clipboard,
   ActivityIndicator,
+  PermissionsAndroid,
 } from 'react-native';
 import SettingsSection from './settings/SettingsSection';
 import SettingsSwitch from './settings/SettingsSwitch';
@@ -34,6 +35,13 @@ export const ApiSettingsSection: React.FC<ApiSettingsSectionProps> = ({
   const [serverRunning, setServerRunning] = useState(false);
   const [localIp, setLocalIp] = useState('0.0.0.0');
   const [isLoading, setIsLoading] = useState(false);
+  // Live MJPEG camera stream
+  const [streamEnabled, setStreamEnabled] = useState(false);
+  const [streamCamera, setStreamCamera] = useState<'front' | 'back'>('front');
+  const [streamFps, setStreamFps] = useState('10');
+  const [streamQuality, setStreamQuality] = useState('60');
+  const [streamWidth, setStreamWidth] = useState('1280');
+  const [streamRotate, setStreamRotate] = useState('-1');
 
   // Load settings on mount
   useEffect(() => {
@@ -57,17 +65,33 @@ export const ApiSettingsSection: React.FC<ApiSettingsSectionProps> = ({
   }, []);
 
   const loadSettings = async () => {
-    const [enabled, port, key, control] = await Promise.all([
+    const [
+      enabled, port, key, control,
+      camStreamEnabled, camStreamCamera, camStreamFps,
+      camStreamQuality, camStreamWidth, camStreamRotate,
+    ] = await Promise.all([
       StorageService.getRestApiEnabled(),
       StorageService.getRestApiPort(),
       StorageService.getRestApiKey(),
       StorageService.getRestApiAllowControl(),
+      StorageService.getCameraStreamEnabled(),
+      StorageService.getCameraStreamCamera(),
+      StorageService.getCameraStreamFps(),
+      StorageService.getCameraStreamQuality(),
+      StorageService.getCameraStreamWidth(),
+      StorageService.getCameraStreamRotate(),
     ]);
 
     setApiEnabled(enabled);
     setApiPort(port.toString());
     setApiKey(key);
     setAllowControl(control);
+    setStreamEnabled(camStreamEnabled);
+    setStreamCamera(camStreamCamera);
+    setStreamFps(camStreamFps.toString());
+    setStreamQuality(camStreamQuality.toString());
+    setStreamWidth(camStreamWidth.toString());
+    setStreamRotate(camStreamRotate.toString());
 
     // Always sync server state with stored settings.
     // If the server is already running (started by KioskScreen) but with a stale config
@@ -171,6 +195,93 @@ export const ApiSettingsSection: React.FC<ApiSettingsSectionProps> = ({
     }
     
     onSettingsChanged?.();
+  };
+
+  /** Push the stored stream settings to the running server (no restart needed). */
+  const pushStreamSettings = async () => {
+    try {
+      await httpServer.updateCameraStreamSettings({
+        enabled: await StorageService.getCameraStreamEnabled(),
+        camera: await StorageService.getCameraStreamCamera(),
+        fps: await StorageService.getCameraStreamFps(),
+        quality: await StorageService.getCameraStreamQuality(),
+        width: await StorageService.getCameraStreamWidth(),
+        rotate: await StorageService.getCameraStreamRotate(),
+      });
+    } catch (error) {
+      console.log('[ApiSettings] Could not push camera stream settings:', error);
+    }
+  };
+
+  const handleStreamEnabledChange = async (value: boolean) => {
+    if (value) {
+      // The stream is served natively via Camera2 and needs the runtime permission
+      try {
+        const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          Alert.alert(
+            'Camera Permission Required',
+            'FreeKiosk needs camera access to serve a live stream.'
+          );
+          return;
+        }
+      } catch (error) {
+        console.error('[ApiSettings] Camera permission request failed:', error);
+        return;
+      }
+    }
+
+    setStreamEnabled(value);
+    await StorageService.saveCameraStreamEnabled(value);
+    await pushStreamSettings();
+    onSettingsChanged?.();
+  };
+
+  const handleStreamCameraChange = async (value: 'front' | 'back') => {
+    setStreamCamera(value);
+    await StorageService.saveCameraStreamCamera(value);
+    await pushStreamSettings();
+    onSettingsChanged?.();
+  };
+
+  const handleStreamFpsChange = async (value: string) => {
+    setStreamFps(value);
+    const fps = parseInt(value, 10);
+    if (!isNaN(fps) && fps >= 1 && fps <= 30) {
+      await StorageService.saveCameraStreamFps(fps);
+      await pushStreamSettings();
+      onSettingsChanged?.();
+    }
+  };
+
+  const handleStreamQualityChange = async (value: string) => {
+    setStreamQuality(value);
+    const quality = parseInt(value, 10);
+    if (!isNaN(quality) && quality >= 1 && quality <= 100) {
+      await StorageService.saveCameraStreamQuality(quality);
+      await pushStreamSettings();
+      onSettingsChanged?.();
+    }
+  };
+
+  const handleStreamWidthChange = async (value: string) => {
+    setStreamWidth(value);
+    const width = parseInt(value, 10);
+    if (!isNaN(width) && width >= 160 && width <= 3840) {
+      await StorageService.saveCameraStreamWidth(width);
+      await pushStreamSettings();
+      onSettingsChanged?.();
+    }
+  };
+
+  const handleStreamRotateChange = async (value: string) => {
+    setStreamRotate(value);
+    const rotate = parseInt(value, 10);
+    if (!isNaN(rotate) && [-1, 0, 90, 180, 270].includes(rotate)) {
+      await StorageService.saveCameraStreamRotate(rotate);
+      await pushStreamSettings();
+      onSettingsChanged?.();
+    }
   };
 
   const generateApiKey = () => {
@@ -282,6 +393,67 @@ export const ApiSettingsSection: React.FC<ApiSettingsSectionProps> = ({
             hint="Enable POST commands (brightness, reload, etc.)"
           />
 
+          {/* Live camera stream */}
+          <SettingsSwitch
+            label="Live Camera Stream"
+            value={streamEnabled}
+            onValueChange={handleStreamEnabledChange}
+            icon="video"
+            hint="Serve GET /api/camera/stream as MJPEG, for the MJPEG IP Camera integration in Home Assistant. While it runs, motion detection uses the stream frames instead of opening the camera itself."
+          />
+
+          {streamEnabled && (
+            <>
+              <SettingsSwitch
+                label="Use Back Camera"
+                value={streamCamera === 'back'}
+                onValueChange={(value) => handleStreamCameraChange(value ? 'back' : 'front')}
+                icon="camera-flip"
+                hint="Default camera for the stream. Overridable per request with ?camera=front|back."
+              />
+
+              <SettingsInput
+                label="Frames per Second"
+                value={streamFps}
+                onChangeText={handleStreamFpsChange}
+                placeholder="10"
+                keyboardType="numeric"
+                icon="speedometer"
+                hint="1-30. Higher values cost CPU and bandwidth; 5-10 is plenty for monitoring."
+              />
+
+              <SettingsInput
+                label="Stream JPEG Quality"
+                value={streamQuality}
+                onChangeText={handleStreamQualityChange}
+                placeholder="60"
+                keyboardType="numeric"
+                icon="quality-high"
+                hint="1-100. Lower values reduce bandwidth."
+              />
+
+              <SettingsInput
+                label="Stream Max Width (px)"
+                value={streamWidth}
+                onChangeText={handleStreamWidthChange}
+                placeholder="1280"
+                keyboardType="numeric"
+                icon="arrow-expand-horizontal"
+                hint="Largest camera resolution to use, 160-3840."
+              />
+
+              <SettingsInput
+                label="Stream Rotation"
+                value={streamRotate}
+                onChangeText={handleStreamRotateChange}
+                placeholder="-1"
+                keyboardType="numeric"
+                icon="rotate-right"
+                hint="-1 derives it from the sensor. Use 0, 90, 180 or 270 if the picture comes out sideways."
+              />
+            </>
+          )}
+
           {/* API Endpoints Info */}
           <View style={styles.endpointsContainer}>
             <Text style={styles.endpointsTitle}>Available Endpoints:</Text>
@@ -299,6 +471,10 @@ export const ApiSettingsSection: React.FC<ApiSettingsSectionProps> = ({
               <Text style={styles.endpoint}>/api/memory - RAM info</Text>
               <Text style={styles.endpoint}>/api/wifi - WiFi status</Text>
               <Text style={styles.endpoint}>/api/screenshot - Capture screen (PNG)</Text>
+              <Text style={styles.endpoint}>/api/camera/photo - Take a photo (JPEG)</Text>
+              {streamEnabled && (
+                <Text style={styles.endpoint}>/api/camera/stream - Live MJPEG stream</Text>
+              )}
             </View>
 
             {allowControl && (

@@ -281,7 +281,16 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 commandHandler = { command, params -> handleCommand(command, params) },
                 screenshotProvider = { captureScreenshot() },
                 cameraPhotoProvider = { camera, quality -> cameraPhotoModule?.capturePhoto(camera, quality) },
-                cameraStreamProvider = { params -> streamManager.openClient(params) }
+                cameraStreamProvider = { params -> streamManager.openClient(params) },
+                cameraStreamDefaults = {
+                    CameraStreamManager.StreamParams(
+                        facing = streamManager.defaultFacing,
+                        fps = streamManager.defaultFps,
+                        quality = streamManager.defaultQuality,
+                        maxWidth = streamManager.defaultWidth,
+                        rotate = streamManager.defaultRotate
+                    )
+                }
             )
 
             server?.start()
@@ -1092,6 +1101,52 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
      * remounts, so it must be able to ask the native side for the truth — otherwise motion
      * detection restarts and steals the camera from a live stream.
      */
+    /**
+     * Apply the live stream settings. Streaming stays refused until this is called with
+     * `enabled: true`, so the endpoint is opt-in like the rest of the camera features.
+     * Disabling it also drops any viewer currently connected.
+     */
+    @ReactMethod
+    fun updateCameraStreamSettings(configMap: ReadableMap, promise: Promise) {
+        try {
+            val manager = cameraStreamManager
+            if (manager == null) {
+                promise.resolve(false)
+                return
+            }
+
+            val enabled = if (configMap.hasKey("enabled")) configMap.getBoolean("enabled") else false
+            val wasEnabled = manager.enabled
+            manager.enabled = enabled
+            if (configMap.hasKey("camera")) {
+                manager.defaultFacing = configMap.getString("camera") ?: "front"
+            }
+            if (configMap.hasKey("fps")) manager.defaultFps = configMap.getInt("fps")
+            if (configMap.hasKey("quality")) manager.defaultQuality = configMap.getInt("quality")
+            if (configMap.hasKey("width")) manager.defaultWidth = configMap.getInt("width")
+            if (configMap.hasKey("rotate")) {
+                val rotate = configMap.getInt("rotate")
+                manager.defaultRotate = if (rotate < 0) null else rotate
+            }
+
+            if (wasEnabled && !enabled) {
+                Log.i(TAG, "Camera streaming disabled, dropping viewers")
+                manager.stopAll()
+            }
+
+            Log.i(
+                TAG,
+                "Camera stream settings: enabled=$enabled, camera=${manager.defaultFacing}, " +
+                    "fps=${manager.defaultFps}, quality=${manager.defaultQuality}, " +
+                    "width=${manager.defaultWidth}, rotate=${manager.defaultRotate ?: "auto"}"
+            )
+            promise.resolve(true)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to update camera stream settings", e)
+            promise.reject("UPDATE_ERROR", e.message)
+        }
+    }
+
     @ReactMethod
     fun isCameraStreaming(promise: Promise) {
         promise.resolve(cameraStreamManager?.isStreaming == true)

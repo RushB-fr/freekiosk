@@ -165,8 +165,29 @@ class ApiServiceClass {
 
       const result = await httpServer.startServer(port, apiKey || null, allowControl);
       console.log(`ApiService: Server started on ${result.ip}:${result.port}`);
+
+      await this.pushCameraStreamSettings();
     } catch (error) {
       console.error('ApiService: Failed to auto-start server', error);
+    }
+  }
+
+  /**
+   * Push the live camera stream settings to the running server. Called on start and whenever
+   * the settings change, so toggling the stream takes effect without restarting the server.
+   */
+  async pushCameraStreamSettings(): Promise<void> {
+    try {
+      await httpServer.updateCameraStreamSettings({
+        enabled: await StorageService.getCameraStreamEnabled(),
+        camera: await StorageService.getCameraStreamCamera(),
+        fps: await StorageService.getCameraStreamFps(),
+        quality: await StorageService.getCameraStreamQuality(),
+        width: await StorageService.getCameraStreamWidth(),
+        rotate: await StorageService.getCameraStreamRotate(),
+      });
+    } catch (error) {
+      console.log('ApiService: Could not push camera stream settings', error);
     }
   }
 

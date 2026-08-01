@@ -19,7 +19,8 @@ class KioskHttpServer(
     private val commandHandler: (String, JSONObject?) -> JSONObject,
     private val screenshotProvider: (() -> java.io.InputStream?)? = null,
     private val cameraPhotoProvider: ((camera: String, quality: Int) -> java.io.InputStream?)? = null,
-    private val cameraStreamProvider: ((params: CameraStreamManager.StreamParams) -> CameraStreamManager.StreamResult)? = null
+    private val cameraStreamProvider: ((params: CameraStreamManager.StreamParams) -> CameraStreamManager.StreamResult)? = null,
+    private val cameraStreamDefaults: (() -> CameraStreamManager.StreamParams)? = null
 ) : NanoHTTPD(port) {
 
     companion object {
@@ -659,13 +660,15 @@ class KioskHttpServer(
         val provider = cameraStreamProvider
             ?: return jsonError(Response.Status.SERVICE_UNAVAILABLE, "Camera streaming not available")
 
+        // Query parameters override the configured defaults, one request at a time
         val params = session.parms ?: emptyMap()
+        val defaults = cameraStreamDefaults?.invoke()
         val streamParams = CameraStreamManager.StreamParams(
-            facing = params["camera"] ?: "back",
-            fps = (params["fps"]?.toIntOrNull() ?: 10).coerceIn(1, 30),
-            quality = (params["quality"]?.toIntOrNull() ?: 60).coerceIn(1, 100),
-            maxWidth = (params["width"]?.toIntOrNull() ?: 1280).coerceIn(160, 3840),
-            rotate = params["rotate"]?.toIntOrNull()?.let { ((it % 360) + 360) % 360 }
+            facing = params["camera"] ?: defaults?.facing ?: "front",
+            fps = (params["fps"]?.toIntOrNull() ?: defaults?.fps ?: 10).coerceIn(1, 30),
+            quality = (params["quality"]?.toIntOrNull() ?: defaults?.quality ?: 60).coerceIn(1, 100),
+            maxWidth = (params["width"]?.toIntOrNull() ?: defaults?.maxWidth ?: 1280).coerceIn(160, 3840),
+            rotate = (params["rotate"]?.toIntOrNull() ?: defaults?.rotate)?.let { ((it % 360) + 360) % 360 }
         )
 
         Log.i(TAG, "Camera stream request: $streamParams")

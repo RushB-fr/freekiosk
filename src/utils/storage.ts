@@ -61,6 +61,13 @@ const KEYS = {
   REST_API_PORT: '@kiosk_rest_api_port',
   REST_API_KEY: '@kiosk_rest_api_key',
   REST_API_ALLOW_CONTROL: '@kiosk_rest_api_allow_control',
+  // Live MJPEG camera stream (GET /api/camera/stream)
+  CAMERA_STREAM_ENABLED: '@kiosk_camera_stream_enabled',
+  CAMERA_STREAM_CAMERA: '@kiosk_camera_stream_camera',
+  CAMERA_STREAM_FPS: '@kiosk_camera_stream_fps',
+  CAMERA_STREAM_QUALITY: '@kiosk_camera_stream_quality',
+  CAMERA_STREAM_WIDTH: '@kiosk_camera_stream_width',
+  CAMERA_STREAM_ROTATE: '@kiosk_camera_stream_rotate',
   // Power Button setting
   ALLOW_POWER_BUTTON: '@kiosk_allow_power_button',
   // Block factory reset in system Settings (Device Owner user restriction) (#201)
@@ -1433,6 +1440,121 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting REST API allow control:', error);
       return true;
+    }
+  },
+
+  // LIVE CAMERA STREAM (MJPEG)
+  saveCameraStreamEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.CAMERA_STREAM_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving camera stream enabled:', error);
+    }
+  },
+
+  getCameraStreamEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.CAMERA_STREAM_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting camera stream enabled:', error);
+      return false;
+    }
+  },
+
+  saveCameraStreamCamera: async (camera: 'front' | 'back'): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.CAMERA_STREAM_CAMERA, camera);
+    } catch (error) {
+      console.error('Error saving camera stream camera:', error);
+    }
+  },
+
+  getCameraStreamCamera: async (): Promise<'front' | 'back'> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.CAMERA_STREAM_CAMERA);
+      return value === 'back' ? 'back' : 'front';
+    } catch (error) {
+      console.error('Error getting camera stream camera:', error);
+      return 'front';
+    }
+  },
+
+  saveCameraStreamFps: async (fps: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.CAMERA_STREAM_FPS, fps.toString());
+    } catch (error) {
+      console.error('Error saving camera stream fps:', error);
+    }
+  },
+
+  getCameraStreamFps: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.CAMERA_STREAM_FPS);
+      const fps = value ? parseInt(value, 10) : 10;
+      return isNaN(fps) ? 10 : Math.min(30, Math.max(1, fps));
+    } catch (error) {
+      console.error('Error getting camera stream fps:', error);
+      return 10;
+    }
+  },
+
+  saveCameraStreamQuality: async (quality: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.CAMERA_STREAM_QUALITY, quality.toString());
+    } catch (error) {
+      console.error('Error saving camera stream quality:', error);
+    }
+  },
+
+  getCameraStreamQuality: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.CAMERA_STREAM_QUALITY);
+      const quality = value ? parseInt(value, 10) : 60;
+      return isNaN(quality) ? 60 : Math.min(100, Math.max(1, quality));
+    } catch (error) {
+      console.error('Error getting camera stream quality:', error);
+      return 60;
+    }
+  },
+
+  saveCameraStreamWidth: async (width: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.CAMERA_STREAM_WIDTH, width.toString());
+    } catch (error) {
+      console.error('Error saving camera stream width:', error);
+    }
+  },
+
+  getCameraStreamWidth: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.CAMERA_STREAM_WIDTH);
+      const width = value ? parseInt(value, 10) : 1280;
+      return isNaN(width) ? 1280 : Math.min(3840, Math.max(160, width));
+    } catch (error) {
+      console.error('Error getting camera stream width:', error);
+      return 1280;
+    }
+  },
+
+  /** Extra clockwise rotation in degrees, or -1 to derive it from the sensor. */
+  saveCameraStreamRotate: async (rotate: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.CAMERA_STREAM_ROTATE, rotate.toString());
+    } catch (error) {
+      console.error('Error saving camera stream rotation:', error);
+    }
+  },
+
+  getCameraStreamRotate: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.CAMERA_STREAM_ROTATE);
+      const rotate = value ? parseInt(value, 10) : -1;
+      if (isNaN(rotate)) return -1;
+      return [0, 90, 180, 270].includes(rotate) ? rotate : -1;
+    } catch (error) {
+      console.error('Error getting camera stream rotation:', error);
+      return -1;
     }
   },
 
