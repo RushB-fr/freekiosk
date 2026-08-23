@@ -1,6 +1,7 @@
 package com.freekiosk
 
 import android.app.ActivityManager
+import android.app.usage.UsageStatsManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -202,17 +203,25 @@ class KioskWatchdogService : Service() {
             return
         }
 
-        // In external app mode, the external app is expected to be in the foreground.
-        // Don't relaunch MainActivity just because it's not the topActivity — check
-        // that either FreeKiosk OR the external app is running. (#106)
-        val externalAppMode = getDisplayMode() == "external_app"
-        val externalPkg = if (externalAppMode) getExternalAppPackage() else null
+        // #197 follow-up: nothing to bring forward while the display is off. Since the
+        // check now reports real foreground state, the process sits at
+        // IMPORTANCE_FOREGROUND_SERVICE whenever the screen is off (this very service keeps
+        // it there), so without this guard the watchdog would fire startActivity every
+        // cooldown for the whole standby, fighting screen_off / the sleep scheduler. The
+        // SCREEN_ON receiver added by #197 runs the check on wake, so nothing is lost.
+        val powerManager = getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+        if (powerManager?.isInteractive == false) return
 
         if (isMainActivityRunning()) return  // FreeKiosk itself is in foreground — fine
 
-        if (externalAppMode && externalPkg != null && isPackageInForeground(externalPkg)) {
-            // External app is in foreground — this is expected, don't relaunch FreeKiosk
-            return
+        // In external app mode, the external app is expected to be in the foreground.
+        // Don't relaunch MainActivity just because it's not the topActivity. (#106)
+        if (getDisplayMode() == "external_app") {
+            val foreground = getForegroundPackage()
+            // Unknown (usage access not granted) means we cannot tell an external app from
+            // the launcher, and relaunching on a guess would hijack the app the user is on.
+            if (foreground == null) return
+            if (foreground in getAllowedForegroundPackages()) return
         }
 
         val now = System.currentTimeMillis()
@@ -284,26 +293,59 @@ class KioskWatchdogService : Service() {
     }
 
     /**
-     * Check if a specific package is currently in the foreground.
-     * Used in external app mode to avoid relaunching MainActivity when the
-     * external app is legitimately in the foreground. (#106)
+     * #197 follow-up: which app is actually in front, via UsageStatsManager.
+     *
+     * The previous check walked ActivityManager.getAppTasks(), which only ever returns
+     * OUR OWN tasks: an external app launched with FLAG_ACTIVITY_NEW_TASK lives in a task
+     * owned by another uid and never appeared there. It always answered "no", which was
+     * harmless only because isMainActivityRunning() returned true first and the caller
+     * never got this far. Now that it reports real foreground state, this had to become
+     * real too, or the watchdog would relaunch FreeKiosk over the external app every cycle.
+     *
+     * Same API AppLauncherModule already uses to confirm a launch. Returns null when usage
+     * access is not granted, and callers must treat null as "unknown, do not relaunch".
      */
-    private fun isPackageInForeground(pkg: String): Boolean {
+    private fun getForegroundPackage(): String? {
         return try {
-            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            val tasks = am.appTasks
-            tasks.any { task ->
-                try {
-                    val info = task.taskInfo
-                    info.topActivity?.packageName == pkg
-                } catch (e: Exception) {
-                    false
+            val usm = getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
+                ?: return null
+            val now = System.currentTimeMillis()
+            val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_BEST, now - 5_000, now)
+            if (stats.isNullOrEmpty()) return null
+            stats.maxByOrNull { it.lastTimeUsed }?.packageName
+        } catch (e: Exception) {
+            DebugLog.d(TAG, "Cannot read foreground package: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * #197 follow-up: packages the kiosk is allowed to be showing instead of MainActivity.
+     * Reads the managed-apps list so multi-app mode is covered, where
+     * @kiosk_external_app_package is empty and the single-app guard does not apply.
+     */
+    private fun getAllowedForegroundPackages(): List<String> {
+        val packages = mutableListOf(packageName)
+        getExternalAppPackage()?.let { packages.add(it) }
+        try {
+            val dbPath = getDatabasePath("RKStorage").absolutePath
+            val db = SQLiteDatabase.openDatabase(dbPath, null, SQLiteDatabase.OPEN_READONLY)
+            val cursor = db.rawQuery(
+                "SELECT value FROM catalystLocalStorage WHERE key = ?",
+                arrayOf("@kiosk_managed_apps"))
+            if (cursor.moveToFirst()) {
+                val apps = org.json.JSONArray(cursor.getString(0) ?: "[]")
+                for (i in 0 until apps.length()) {
+                    apps.optJSONObject(i)?.optString("packageName")?.takeIf { it.isNotEmpty() }
+                        ?.let { packages.add(it) }
                 }
             }
+            cursor.close()
+            db.close()
         } catch (e: Exception) {
-            DebugLog.d(TAG, "Error checking foreground for $pkg: ${e.message}")
-            false
+            DebugLog.d(TAG, "Cannot read managed apps: ${e.message}")
         }
+        return packages.distinct()
     }
 
     // ────────────────────────────────────────────────────────────────────
