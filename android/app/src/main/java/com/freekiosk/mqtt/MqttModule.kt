@@ -4,6 +4,7 @@ import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import com.freekiosk.MainActivity
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -327,6 +328,22 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
                     }
                     "audioBeep" -> {
                         playBeep()
+                    }
+                    "setMode" -> {
+                        // #209: When switching to a foreground mode (webview / media_player),
+                        // bring FreeKiosk to the front from native code so the JS onSetMode
+                        // handler (frozen while backgrounded behind an external app) resumes and
+                        // completes the switch. blockAutoRelaunch first so onResume does not take
+                        // the involuntary-return fast-path and relaunch the app being left. Same
+                        // as the REST /api/mode path; switching TO external_app is unchanged.
+                        val targetMode = params?.optString("mode", "") ?: ""
+                        // Only intervene when backgrounded behind an external app (JS frozen);
+                        // when foreground the JS handler runs normally, so avoid setting a
+                        // blockAutoRelaunch flag that would not be consumed.
+                        if ((targetMode == "webview" || targetMode == "media_player") && !isAppInForeground()) {
+                            MainActivity.blockAutoRelaunch = true
+                            bringAppToFront()
+                        }
                     }
                 }
                 emitCommand(command, params)
@@ -879,6 +896,44 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
             putString("command", command)
             putString("params", params?.toString() ?: "{}")
         })
+    }
+
+    /**
+     * #209: Bring FreeKiosk's MainActivity to the foreground from native code, so a setMode
+     * that switches away from an external app resumes the frozen JS thread and completes.
+     * Same REORDER_TO_FRONT pattern as HttpServerModule / BackgroundAppMonitorService, so the
+     * activity is reused (not recreated) and no WebView state is lost.
+     */
+    private fun bringAppToFront() {
+        try {
+            val intent = Intent(reactContext, MainActivity::class.java).apply {
+                addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP
+                )
+            }
+            reactContext.startActivity(intent)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to bring app to front: ${e.message}")
+        }
+    }
+
+    /**
+     * #209: True when FreeKiosk itself is the current foreground app, used to skip the native
+     * bring-to-front when it is not needed. Returns false on error so we still assist the switch.
+     */
+    private fun isAppInForeground(): Boolean {
+        return try {
+            val am = reactContext.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            @Suppress("DEPRECATION")
+            am.runningAppProcesses?.any {
+                it.processName == reactContext.packageName &&
+                    it.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
+            } ?: false
+        } catch (e: Exception) {
+            false
+        }
     }
 
     /**

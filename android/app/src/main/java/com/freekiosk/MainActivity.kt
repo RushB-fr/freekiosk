@@ -81,6 +81,14 @@ class MainActivity : ReactActivity() {
     // Keep screen always on
     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
+    // Show over the keyguard and turn the screen on when this activity is brought
+    // to the front. This is what makes turnScreenOn() actually wake the display
+    // after a lockNow() screen-off on Android 8.1+ (alarm-screen pattern).
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+      setShowWhenLocked(true)
+      setTurnScreenOn(true)
+    }
+
     // Extend content into display cutout areas to prevent OEM chrome from appearing (#94)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
       window.attributes.layoutInDisplayCutoutMode =
@@ -225,7 +233,20 @@ class MainActivity : ReactActivity() {
 
   private fun requestCameraPermission() {
     if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-        != PackageManager.PERMISSION_GRANTED) {
+        == PackageManager.PERMISSION_GRANTED) return
+
+    // Device Owner can grant silently (consistent with location/bluetooth/wifi
+    // above); otherwise fall back to the runtime prompt.
+    if (devicePolicyManager.isDeviceOwnerApp(packageName)) {
+      try {
+        devicePolicyManager.setPermissionGrantState(
+          adminComponent,
+          packageName,
+          Manifest.permission.CAMERA,
+          DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
+        )
+      } catch (_: Exception) {}
+    } else {
       ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 1002)
     }
   }
@@ -601,10 +622,20 @@ class MainActivity : ReactActivity() {
 
     val kioskEnabled = isKioskEnabled()
 
+    // #220: Honor the "Back Button Behavior" setting in external-app mode. This native
+    // fast-path (added for #106/#203) previously relaunched the external app on EVERY
+    // involuntary return, which silently overrode back_button_mode: Test Mode and Delayed
+    // Return never took effect (the app always restarted instantly). Only 'immediate'
+    // should hard-relaunch here. For 'test' and 'timer' we leave FreeKiosk in the
+    // foreground and let the JS AppState listener apply the correct behavior (stay on
+    // FreeKiosk / show the countdown). JS is not frozen in those modes because FreeKiosk
+    // stays foregrounded, and handleAppReturned/onAppReturned still stops the overlay.
+    val backButtonMode = getAsyncStorageValue("@kiosk_back_button_mode", "test")
+
     // Fix #106: In external app mode, on involuntary returns, do NOT re-enter
     // startLockTask on MainActivity (which would pin FreeKiosk). Instead, immediately
     // relaunch the external app from the native layer to minimize the flash.
-    if (isExternalAppMode && !isVoluntaryReturn && kioskEnabled) {
+    if (isExternalAppMode && !isVoluntaryReturn && kioskEnabled && backButtonMode == "immediate") {
       // Relaunch the external app directly if possible
       val targetPkg = externalAppPackage
       if (targetPkg != null) {

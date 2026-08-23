@@ -40,6 +40,19 @@ class BootLockActivity : Activity() {
 
         /** How often we check whether MainActivity is alive. */
         private const val POLL_INTERVAL_MS = 1_000L  // 1 second
+
+        /**
+         * #222 safety net: how long to sit stuck before deferring to a secure keyguard.
+         * On a device with a secure lock screen, our SHOW_WHEN_LOCKED/DISMISS_KEYGUARD
+         * flags OCCLUDE (do not dismiss) the keyguard, so the user can never enter their
+         * credential, credential-encrypted (CE) storage never unlocks, and MainActivity
+         * (not directBootAware) can never start: the kiosk is stuck on the loading screen
+         * forever. If we are still in that exact state after this delay, we finish() so the
+         * secure keyguard becomes visible; once the user unlocks, BOOT_COMPLETED relaunches
+         * the kiosk normally. Reactive (only fires on a proven stall) and gated on a secure
+         * lock actually being set, so it can never affect the non-secure fast-boot path.
+         */
+        private const val SECURE_LOCK_STALL_MS = 8_000L
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -234,6 +247,18 @@ class BootLockActivity : Activity() {
                 return
             }
 
+            // #222 safety net: if we have been unable to hand off for a while AND the device
+            // has a secure lock screen with the user still locked, we are deadlocked behind
+            // the keyguard we are occluding. Finish so the keyguard is revealed and the user
+            // can unlock; the kiosk then starts at BOOT_COMPLETED. Only fires in the already
+            // broken secure-lock state: a normal boot hands off (isMainActivityReady) first,
+            // and a non-secure device never enters this branch.
+            if (elapsed >= SECURE_LOCK_STALL_MS && isStuckBehindSecureKeyguard()) {
+                DebugLog.errorProduction(TAG, "Deferring to secure keyguard after ${elapsed}ms stall, finishing so the user can unlock (kiosk resumes at BOOT_COMPLETED)")
+                finish()
+                return
+            }
+
             // If the initial launchMainActivity() failed (e.g. CE was locked at
             // LOCKED_BOOT_COMPLETED time), retry every 5 seconds. Once CE unlocks —
             // which happens either automatically (no lock screen) or when BOOT_COMPLETED
@@ -266,6 +291,25 @@ class BootLockActivity : Activity() {
             }
         } catch (e: Exception) {
             false
+        }
+    }
+
+    /**
+     * #222: True when this activity is deadlocked over a secure keyguard, i.e. a secure lock
+     * screen (PIN/pattern/password) is set AND the user is still locked (credential-encrypted
+     * storage is not yet available). In that state our keyguard-occluding flags prevent the
+     * user from unlocking, so CE never becomes available and MainActivity can never launch.
+     * Gated on a real secure lock, so a non-secure device (the normal fast-boot case, where
+     * DISMISS_KEYGUARD works and CE unlocks on its own) is never treated as stuck.
+     */
+    private fun isStuckBehindSecureKeyguard(): Boolean {
+        try {
+            if (!BootReceiver.isDeviceSecure(this)) return false
+            val um = getSystemService(Context.USER_SERVICE) as android.os.UserManager
+            return !um.isUserUnlocked()
+        } catch (e: Exception) {
+            // If we cannot determine the state, do nothing (keep the existing behavior).
+            return false
         }
     }
 

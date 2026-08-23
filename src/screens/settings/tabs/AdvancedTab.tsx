@@ -19,6 +19,7 @@ import AccessibilityModule from '../../../utils/AccessibilityModule';
 import { CloudSyncService } from '../../../utils/CloudSyncService';
 import { CLOUD_ENABLED } from '../../../config/features';
 import QrScannerModal from '../../../components/QrScannerModal';
+import PermissionWizard from '../../../components/PermissionWizard';
 import Icon from '../../../components/Icon';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -91,6 +92,9 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
   const [enrolling, setEnrolling] = useState(false);
   const [unenrolling, setUnenrolling] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
+  // When true, closing the wizard finishes enrollment by returning to the kiosk.
+  const [wizardAfterEnroll, setWizardAfterEnroll] = useState(false);
 
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
@@ -157,9 +161,10 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
               setOrgName(result.organizationName ?? null);
               setCloudUrl('');
               setEnrollToken('');
-              // Settings were wiped to defaults — send the user back to the base
-              // KioskScreen with a fresh mount so the reset config takes effect.
-              navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] });
+              // Guide the user through permissions before returning to the kiosk.
+              // Closing the wizard triggers the navigation reset (see onClose).
+              setWizardAfterEnroll(true);
+              setShowWizard(true);
             } else {
               Alert.alert('Enrollment failed', result.error ?? 'Unknown error');
             }
@@ -258,6 +263,12 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
               </Text>
             </SettingsInfoBox>
             <SettingsButton
+              title="Set up permissions"
+              icon="shield-check"
+              variant="secondary"
+              onPress={() => { setWizardAfterEnroll(false); setShowWizard(true); }}
+            />
+            <SettingsButton
               title={unenrolling ? 'Unenrolling...' : 'Leave Cloud Management'}
               icon="alert-circle"
               variant="danger"
@@ -311,6 +322,19 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
           </>
         )}
       </SettingsSection>}
+
+      <PermissionWizard
+        visible={showWizard}
+        onClose={() => {
+          setShowWizard(false);
+          if (wizardAfterEnroll) {
+            setWizardAfterEnroll(false);
+            // Settings were wiped to defaults at enrollment; return to the base
+            // KioskScreen with a fresh mount so the reset config takes effect.
+            navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] });
+          }
+        }}
+      />
 
       {/* App Updates - Hidden in Play Store builds (compliance: no in-app updates) */}
       {enableSelfUpdate && (

@@ -13,6 +13,8 @@ import com.facebook.react.bridge.UiThreadUtil
 object ScreenController {
 
     private const val TAG = "ScreenController"
+    private const val WAKE_CHANNEL_ID = "freekiosk_wake"
+    private const val WAKE_NOTIF_ID = 0xF00D
     private var wakeLock: PowerManager.WakeLock? = null
 
     fun turnScreenOn(reactContext: ReactApplicationContext) {
@@ -60,6 +62,56 @@ object ScreenController {
                     Log.d(TAG, "Screen turned ON (activity available)")
                 } else {
                     Log.d(TAG, "Screen turned ON via WakeLock only (no activity)")
+                }
+
+                // Reliable wake on modern Android: a full-screen-intent notification
+                // (the alarm / incoming-call pattern). The deprecated
+                // ACQUIRE_CAUSES_WAKEUP wake lock and setTurnScreenOn on an already
+                // created activity no longer turn the display on after lockNow() on
+                // Android 12+/OEMs. A high-importance full-screen-intent notification
+                // makes the system wake the screen and bring MainActivity to the front.
+                // (Touch still cannot wake a truly-off screen; this drives screen_on
+                // command / screensaver / scheduler wake.)
+                try {
+                    val appCtx = reactContext.applicationContext
+                    val nm = appCtx.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        val channel = android.app.NotificationChannel(
+                            WAKE_CHANNEL_ID, "Screen wake", android.app.NotificationManager.IMPORTANCE_HIGH
+                        ).apply {
+                            setSound(null, null)
+                            enableVibration(false)
+                            lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                        }
+                        nm.createNotificationChannel(channel)
+                    }
+                    val fsIntent = android.content.Intent(appCtx, MainActivity::class.java).addFlags(
+                        android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                        android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                        android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                    )
+                    val piFlags = android.app.PendingIntent.FLAG_UPDATE_CURRENT or
+                        android.app.PendingIntent.FLAG_IMMUTABLE
+                    val pi = android.app.PendingIntent.getActivity(appCtx, 0, fsIntent, piFlags)
+                    val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                        android.app.Notification.Builder(appCtx, WAKE_CHANNEL_ID)
+                    else @Suppress("DEPRECATION") android.app.Notification.Builder(appCtx)
+                    val notif = builder
+                        .setSmallIcon(R.mipmap.ic_launcher)
+                        .setContentTitle("FreeKiosk")
+                        .setContentText("Waking screen")
+                        .setCategory(android.app.Notification.CATEGORY_ALARM)
+                        .setFullScreenIntent(pi, true)
+                        .setAutoCancel(true)
+                        .build()
+                    nm.notify(WAKE_NOTIF_ID, notif)
+                    // Belt and suspenders: also bring the activity to the front directly.
+                    reactContext.startActivity(fsIntent)
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        try { nm.cancel(WAKE_NOTIF_ID) } catch (_: Exception) {}
+                    }, 3000)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to wake screen via full-screen intent: ${e.message}")
                 }
 
                 android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({

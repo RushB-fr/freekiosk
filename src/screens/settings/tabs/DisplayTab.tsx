@@ -15,6 +15,7 @@ import {
   SettingsInput,
 } from '../../../components/settings';
 import ScreenScheduleRuleCard from '../../../components/settings/ScreenScheduleRuleCard';
+import ProximityDetectionModule from '../../../utils/ProximityDetectionModule';
 import { Colors, Spacing, Typography } from '../../../theme';
 import { ScreenScheduleRule } from '../../../types/screenScheduler';
 import type { MediaItem } from '../../../types/mediaPlayer';
@@ -112,6 +113,10 @@ interface DisplayTabProps {
   onMotionSensitivityChange: (value: 'low' | 'medium' | 'high') => void;
   motionCameraPosition: 'front' | 'back';
   onMotionCameraPositionChange: (value: 'front' | 'back') => void;
+
+  // Proximity detection (hardware sensor wake trigger)
+  proximityEnabled: boolean;
+  onProximityEnabledChange: (value: boolean) => void;
   availableCameras: Array<{position: 'front' | 'back', id: string}>;
   
   // Screen Sleep Scheduler
@@ -203,6 +208,8 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
   onMotionSensitivityChange,
   motionCameraPosition,
   onMotionCameraPositionChange,
+  proximityEnabled,
+  onProximityEnabledChange,
   availableCameras,
   screenSchedulerEnabled,
   onScreenSchedulerEnabledChange,
@@ -238,6 +245,16 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
 
   // Check whether the selected camera is available on this device
   const selectedCameraAvailable = availableCameras.some(cam => cam.position === motionCameraPosition);
+
+  // Detect whether this device has a hardware proximity sensor (many tablets don't).
+  const [proximityAvailable, setProximityAvailable] = React.useState<boolean | null>(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    ProximityDetectionModule?.isAvailable()
+      .then((available) => { if (!cancelled) setProximityAvailable(available); })
+      .catch(() => { if (!cancelled) setProximityAvailable(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <View>
@@ -630,7 +647,35 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                   </>
                 )}
               </View>
-              
+
+              {/* Proximity Detection (hardware sensor) */}
+              <View style={styles.subSection}>
+                <Text style={styles.subSectionTitle}>Proximity Detection</Text>
+                <SettingsSwitch
+                  label="Enable Proximity Wake"
+                  hint="Wake the screen when a hand or body comes close to the front sensor"
+                  value={proximityEnabled}
+                  onValueChange={onProximityEnabledChange}
+                  disabled={proximityAvailable === false}
+                />
+
+                {proximityAvailable === false && (
+                  <SettingsInfoBox variant="error">
+                    <Text style={styles.infoText}>
+                      No proximity sensor detected on this device
+                    </Text>
+                  </SettingsInfoBox>
+                )}
+
+                {proximityAvailable !== false && (
+                  <SettingsInfoBox variant="info">
+                    <Text style={styles.infoText}>
+                      Short range (a few centimeters): wave a hand right in front of the screen to wake it. Unlike camera motion, it never triggers on lighting changes and uses almost no battery.
+                    </Text>
+                  </SettingsInfoBox>
+                )}
+              </View>
+
               {/* How it works */}
               <View style={styles.subSection}>
                 <Text style={styles.infoTitle}>How It Works</Text>
@@ -644,6 +689,8 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                   • Touch the screen to wake the device{`
 `}
                   {motionEnabled && `• Motion in front of the camera also wakes the screen
+`}
+                  {proximityEnabled && proximityAvailable !== false && `• A hand close to the proximity sensor also wakes the screen
 `}
                   • Normal brightness is restored automatically
                 </Text>

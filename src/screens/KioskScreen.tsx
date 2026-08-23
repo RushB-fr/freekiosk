@@ -8,6 +8,7 @@ import { WebView } from 'react-native-webview';
 import MediaPlayerComponent from '../components/MediaPlayerComponent';
 import StatusBar from '../components/StatusBar';
 import MotionDetector from '../components/MotionDetector';
+import ProximityDetectionModule, { onProximityNear as onProximityNearEvent } from '../utils/ProximityDetectionModule';
 import ExternalAppOverlay from '../components/ExternalAppOverlay';
 import { StorageService } from '../utils/storage';
 import { saveSecurePin, saveSecureMqttPassword, getSecureBasicAuthPassword } from '../utils/secureStorage';
@@ -63,6 +64,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [motionAlwaysOn, setMotionAlwaysOn] = useState(false);
   const [motionCameraPosition, setMotionCameraPosition] = useState<'front' | 'back'>('front');
   const [motionSensitivity, setMotionSensitivity] = useState<'low' | 'medium' | 'high'>('medium');
+  const [proximityEnabled, setProximityEnabled] = useState(false);
   const [isPreCheckingMotion, setIsPreCheckingMotion] = useState(false); // Pre-check phase: motion is being monitored before activating the screensaver
   const preCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [statusBarEnabled, setStatusBarEnabled] = useState(false);
@@ -340,7 +342,12 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       () => currentWebViewUrlRef.current || url,
     );
     if (CLOUD_ENABLED) {
-      CloudSyncService.start();
+      // Auto-enroll first if a Device Owner provisioning QR left us a token,
+      // then start the heartbeat loop.
+      (async () => {
+        await CloudSyncService.consumePendingProvisioningEnrollment();
+        CloudSyncService.start();
+      })();
     }
 
     const onConfigUpdated = CLOUD_ENABLED
@@ -384,7 +391,15 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           console.error('[KioskScreen] Error pausing auto-brightness:', error);
         }
       } else {
-        // Screensaver deactivated: resume auto-brightness
+        // Screensaver deactivated: the dim screensaver forced the brightness to
+        // screensaverBrightness (often 0), which otherwise stays and leaves the
+        // screen dark after the overlay is gone. Restore a visible level first,
+        // then resume auto-brightness so it takes over from there.
+        try {
+          await RNBrightness.setBrightnessLevel(defaultBrightness);
+        } catch (error) {
+          console.error('[KioskScreen] Error restoring brightness after screensaver:', error);
+        }
         try {
           await AutoBrightnessModule.startAutoBrightness(
             autoBrightnessMin,
@@ -400,7 +415,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     };
     
     handleAutoBrightnessForScreensaver();
-  }, [isScreensaverActive, autoBrightnessEnabled, autoBrightnessMin, autoBrightnessMax, autoBrightnessOffset, autoBrightnessInterval, screensaverBrightness, isScheduledSleep, screensaverType, displayMode]);
+  }, [isScreensaverActive, autoBrightnessEnabled, autoBrightnessMin, autoBrightnessMax, autoBrightnessOffset, autoBrightnessInterval, screensaverBrightness, isScheduledSleep, screensaverType, displayMode, defaultBrightness]);
 
   // #135 — Dismiss the soft keyboard whenever the screensaver activates.
   // Keyboard.dismiss() (RN) only closes keyboards owned by RN TextInputs; a keyboard
@@ -1505,7 +1520,12 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       const savedMotionAlwaysOn = bool(K.MQTT_MOTION_ALWAYS_ON, false);
       const savedMotionCameraPosition = (str(K.MOTION_CAMERA_POSITION) ?? 'front') as 'front' | 'back';
       const savedMotionSensitivity = (str(K.SCREENSAVER_MOTION_SENSITIVITY) ?? 'medium') as 'low' | 'medium' | 'high';
-      const savedScreensaverType = (str(K.SCREENSAVER_TYPE) ?? 'dim') as 'dim' | 'url' | 'video';
+      const savedProximityEnabled = bool(K.SCREENSAVER_PROXIMITY_ENABLED, false);
+      // Coerce any unknown/legacy value (e.g. the removed 'off' type) back to
+      // 'dim' so the screensaver still works instead of silently doing nothing.
+      const rawScreensaverType = str(K.SCREENSAVER_TYPE);
+      const savedScreensaverType: 'dim' | 'url' | 'video' =
+        rawScreensaverType === 'url' || rawScreensaverType === 'video' ? rawScreensaverType : 'dim';
       const savedScreensaverUrl = str(K.SCREENSAVER_URL) ?? '';
       const savedScreensaverVideoItems = jsonParse(K.SCREENSAVER_VIDEO_ITEMS, []) as MediaItem[];
       const savedScreensaverVideoLoop = bool(K.SCREENSAVER_VIDEO_LOOP, true);
@@ -1541,6 +1561,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       setMotionAlwaysOn(savedMotionAlwaysOn);
       setMotionCameraPosition(savedMotionCameraPosition);
       setMotionSensitivity(savedMotionSensitivity);
+      setProximityEnabled(savedProximityEnabled);
       setScreensaverType(savedScreensaverType);
       setScreensaverUrl(savedScreensaverUrl);
       setScreensaverVideoItems(savedScreensaverVideoItems);
@@ -1598,7 +1619,11 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       console.log('[KioskScreen] External app mode:', savedExternalAppMode);
       
       // Load return button settings (for WebView mode)
-      const savedReturnButtonVisible = bool(K.OVERLAY_BUTTON_VISIBLE, true);
+      // Default must be false (invisible) to match StorageService.getOverlayButtonVisible()
+      // and the Settings toggle. A `true` default here made the return button reappear in
+      // WebView when the key was never explicitly saved, e.g. after an /api/mode switch from
+      // external_app to webview (#209 tester report) even though Settings showed it as off.
+      const savedReturnButtonVisible = bool(K.OVERLAY_BUTTON_VISIBLE, false);
       const savedReturnTapCount = num(K.RETURN_TAP_COUNT, 5);
       const savedReturnTapTimeout = num(K.RETURN_TAP_TIMEOUT, 1500);
       const savedReturnMode = str(K.RETURN_MODE) ?? 'tap_anywhere';
@@ -2417,6 +2442,56 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       resetTimer();
     }
   }, [defaultBrightness, resetTimer, autoBrightnessEnabled]);
+
+  // Proximity wake: a hand/body moving close to the front sensor. Behaves like motion
+  // (cancels the pre-check or wakes an active screensaver) but is a short-range, binary
+  // hardware signal, so no false positives from lighting/scene changes.
+  const onProximityNear = useCallback(async () => {
+    if (isScheduledSleepRef.current) {
+      console.log('[KioskScreen] Proximity ignored (screen is in scheduled sleep)');
+      return;
+    }
+    // Pre-check phase: someone is present, cancel and reset the full timer.
+    if (isPreCheckingMotionRef.current && !isScreensaverActiveRef.current) {
+      console.log('[KioskScreen] Proximity near during pre-check, restarting full inactivity timer');
+      if (preCheckTimerRef.current) {
+        clearTimeout(preCheckTimerRef.current);
+        preCheckTimerRef.current = null;
+      }
+      setIsPreCheckingMotion(false);
+      resetTimer();
+      return;
+    }
+    // Screensaver active: wake it.
+    if (isScreensaverActiveRef.current) {
+      console.log('[KioskScreen] Proximity near, waking screensaver');
+      setIsScreensaverActive(false);
+      if (brightnessManagementRef.current && !autoBrightnessEnabled) {
+        try {
+          await RNBrightness.setBrightnessLevel(defaultBrightness);
+        } catch (error) {
+          console.error('[KioskScreen] Error restoring brightness on proximity:', error);
+        }
+      }
+      resetTimer();
+    }
+  }, [defaultBrightness, resetTimer, autoBrightnessEnabled]);
+
+  // Start/stop the hardware proximity listener alongside the camera motion detector:
+  // active during the motion pre-check window and while the screensaver is showing.
+  useEffect(() => {
+    const shouldListen =
+      proximityEnabled && isFocused && (isPreCheckingMotion || isScreensaverActive);
+    if (!shouldListen) return;
+
+    const unsubscribe = onProximityNearEvent(() => { onProximityNear(); });
+    ProximityDetectionModule?.start().catch(() => {});
+
+    return () => {
+      unsubscribe();
+      ProximityDetectionModule?.stop().catch(() => {});
+    };
+  }, [proximityEnabled, isFocused, isPreCheckingMotion, isScreensaverActive, onProximityNear]);
 
   const enableScreensaverEffects = async () => {
     // Content modes (URL/video) keep the current brightness so the user can see the content

@@ -28,6 +28,10 @@
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Wake the screen from a locked/off state via a full-screen-intent notification
+         (turnScreenOn / screen_on command). On Android 14 without the special access it
+         is demoted to a heads-up notification, which still wakes the screen. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- Self-update: allows installing downloaded APK updates.
          Removed entirely in Play Store builds via src/playstore overlay (tools:node="remove"). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
@@ -141,8 +145,35 @@
           android:resource="@xml/device_admin" />
         <intent-filter>
           <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+          <!-- Fired after Device Owner provisioning (setup-wizard QR); lets us
+               read the enrollment token from the admin extras bundle. -->
+          <action android:name="android.app.action.PROFILE_PROVISIONING_COMPLETE" />
         </intent-filter>
       </receiver>
+
+      <!-- Device Owner provisioning activities (REQUIRED for QR provisioning on
+           Android 12+/API 31 when targeting SDK 31+). Without these the setup
+           wizard aborts with "Can't set up device". -->
+      <activity
+        android:name=".ProvisioningModeActivity"
+        android:exported="true"
+        android:permission="android.permission.BIND_DEVICE_ADMIN"
+        android:theme="@android:style/Theme.NoDisplay">
+        <intent-filter>
+          <action android:name="android.app.action.GET_PROVISIONING_MODE" />
+          <category android:name="android.intent.category.DEFAULT" />
+        </intent-filter>
+      </activity>
+      <activity
+        android:name=".PolicyComplianceActivity"
+        android:exported="true"
+        android:permission="android.permission.BIND_DEVICE_ADMIN"
+        android:theme="@android:style/Theme.NoDisplay">
+        <intent-filter>
+          <action android:name="android.app.action.ADMIN_POLICY_COMPLIANCE" />
+          <category android:name="android.intent.category.DEFAULT" />
+        </intent-filter>
+      </activity>
 
       <!-- Boot Receiver pour démarrage automatique -->
       <receiver

@@ -1,9 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DeviceEventEmitter } from 'react-native';
+import { DeviceEventEmitter, NativeModules } from 'react-native';
 
 import { StorageService, KEYS } from './storage';
 import DeviceControlService from '../services/DeviceControlService';
 import { CloudCommandService } from './CloudCommandService';
+import { getCapabilities } from './capabilities';
 import KioskModule from './KioskModule';
 import {
   CloudCredentials,
@@ -114,6 +115,9 @@ class CloudSyncServiceClass {
       let telemetry: Record<string, unknown> = {};
       try {
         const status = await DeviceControlService.getStatus();
+        // Refresh the capability list every heartbeat so granting a permission
+        // after enrollment is reflected in the dashboard on the next tick.
+        const capabilities = await getCapabilities().catch(() => [] as string[]);
         telemetry = {
           battery: {
             level: status.battery.level,
@@ -132,6 +136,7 @@ class CloudSyncServiceClass {
             current_url: status.webview.currentUrl,
             kiosk_mode: status.device.kioskMode,
             device_owner: status.device.isDeviceOwner,
+            capabilities,
           },
           system: {
             app_version: status.device.version,
@@ -212,10 +217,13 @@ class CloudSyncServiceClass {
   ): Promise<{ success: boolean; error?: string; organizationName?: string }> {
     const url = cloudUrl.replace(/\/$/, '');
     try {
+      // Declare what this device can do so the dashboard shows only viable
+      // actions from the start (refreshed later on every heartbeat).
+      const capabilities = await getCapabilities().catch(() => [] as string[]);
       const response = await fetch(`${url}/api/v1/devices/enroll/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, device_info: deviceInfo }),
+        body: JSON.stringify({ token, device_info: { ...deviceInfo, capabilities } }),
       });
 
       const data = await response.json();
@@ -253,6 +261,46 @@ class CloudSyncServiceClass {
       return { success: true, organizationName: data.organization_name };
     } catch {
       return { success: false, error: 'Cannot reach server' };
+    }
+  }
+
+  // ─── Zero-touch provisioning ──────────────────────────────────────────────────
+
+  /**
+   * Consume an enrollment handed over by Device Owner provisioning (the
+   * setup-wizard QR). Runs once on startup: if the device isn't already
+   * enrolled and the native layer has a pending token, enroll automatically and
+   * clear it. Best-effort and idempotent.
+   */
+  async consumePendingProvisioningEnrollment(): Promise<void> {
+    try {
+      if (await this.isEnrolled()) return;
+      const pending = await KioskModule.getPendingCloudEnrollment?.();
+      if (!pending?.enroll_token || !pending?.cloud_url) return;
+
+      const PC = (NativeModules as any).PlatformConstants;
+      const result = await this.enroll(pending.cloud_url, pending.enroll_token, {
+        model: PC?.Model ?? '',
+        manufacturer: PC?.Manufacturer ?? '',
+        android_version: PC?.Release ?? '',
+        app_version: PC?.appVersion ?? '',
+        serial_number: '',
+      });
+      if (result.success) {
+        // A device provisioned via the setup-wizard QR is a Device Owner kiosk:
+        // pin FreeKiosk as the persistent Home launcher so the "choose launcher"
+        // prompt never appears and the user can't switch back to the stock one.
+        // Best-effort and DO-only (no-op otherwise); the cloud config can still
+        // override this later. Only on provisioning auto-enroll, not manual enroll.
+        KioskModule.setDefaultLauncherMode(true).catch(() => {/* DO only */});
+      }
+      // Clear on success, or on a definitive rejection, so a bad/used token
+      // doesn't get retried on every launch. Network errors are left pending.
+      if (result.success || result.error !== 'Cannot reach server') {
+        await KioskModule.clearPendingCloudEnrollment?.();
+      }
+    } catch {
+      // Never block startup on provisioning.
     }
   }
 

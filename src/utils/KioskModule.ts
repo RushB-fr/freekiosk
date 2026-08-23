@@ -40,6 +40,9 @@ interface KioskModuleInterface {
   // Pending ADB config (SharedPreferences bridge)
   getPendingAdbConfig(): Promise<Record<string, string> | null>;
   clearPendingAdbConfig(): Promise<boolean>;
+  // Pending cloud enrollment left by Device Owner provisioning (setup-wizard QR)
+  getPendingCloudEnrollment(): Promise<{ enroll_token: string; cloud_url: string; org_id: string } | null>;
+  clearPendingCloudEnrollment(): Promise<boolean>;
   // Open native Android settings
   openAndroidSettings(settingsPage?: string | null): Promise<boolean>;
   // Bring FreeKiosk's activity to foreground (used when screensaver activates in External App mode)

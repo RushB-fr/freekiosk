@@ -1134,6 +1134,52 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     }
 
     /**
+     * Get a pending cloud enrollment left by Device Owner provisioning (the
+     * setup-wizard QR). Returns { enroll_token, cloud_url, org_id } or null.
+     * Consumed by KioskScreen on startup to auto-enroll.
+     */
+    @ReactMethod
+    fun getPendingCloudEnrollment(promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences(
+                DeviceAdminReceiver.PREFS, Context.MODE_PRIVATE
+            )
+            if (!prefs.getBoolean(DeviceAdminReceiver.KEY_HAS_PENDING, false)) {
+                promise.resolve(null)
+                return
+            }
+            val token = prefs.getString(DeviceAdminReceiver.KEY_TOKEN, null)
+            if (token.isNullOrBlank()) {
+                promise.resolve(null)
+                return
+            }
+            val result = com.facebook.react.bridge.Arguments.createMap()
+            result.putString("enroll_token", token)
+            result.putString("cloud_url", prefs.getString(DeviceAdminReceiver.KEY_CLOUD_URL, "") ?: "")
+            result.putString("org_id", prefs.getString(DeviceAdminReceiver.KEY_ORG_ID, "") ?: "")
+            promise.resolve(result)
+        } catch (e: Exception) {
+            promise.reject("ERROR", "Failed to get pending cloud enrollment: ${e.message}")
+        }
+    }
+
+    /**
+     * Clear the pending cloud enrollment after it has been consumed.
+     */
+    @ReactMethod
+    fun clearPendingCloudEnrollment(promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences(
+                DeviceAdminReceiver.PREFS, Context.MODE_PRIVATE
+            )
+            prefs.edit().clear().commit()
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERROR", "Failed to clear pending cloud enrollment: ${e.message}")
+        }
+    }
+
+    /**
      * Broadcast that settings are loaded (called after ADB config restart)
      */
     @ReactMethod

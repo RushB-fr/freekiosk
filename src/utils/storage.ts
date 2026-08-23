@@ -21,6 +21,7 @@ export const KEYS = {
   SCREENSAVER_MOTION_ENABLED: '@screensaver_motion_enabled',
   SCREENSAVER_MOTION_SENSITIVITY: '@screensaver_motion_sensitivity',
   SCREENSAVER_MOTION_DELAY: '@screensaver_motion_delay',
+  SCREENSAVER_PROXIMITY_ENABLED: '@screensaver_proximity_enabled',
   SCREENSAVER_BRIGHTNESS: '@screensaver_brightness',
   SCREENSAVER_TYPE: '@screensaver_type',
   SCREENSAVER_URL: '@screensaver_url',
@@ -734,6 +735,24 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting screensaver motion delay:', error);
       return 30000;
+    }
+  },
+
+  saveScreensaverProximityEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.SCREENSAVER_PROXIMITY_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving screensaver proximity enabled:', error);
+    }
+  },
+
+  getScreensaverProximityEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.SCREENSAVER_PROXIMITY_ENABLED);
+      return value === null ? false : JSON.parse(value);
+    } catch (error) {
+      console.error('Error getting screensaver proximity enabled:', error);
+      return false;
     }
   },
 
@@ -2939,6 +2958,7 @@ export const StorageService = {
           sensitivity: str(KEYS.SCREENSAVER_MOTION_SENSITIVITY, 'medium'),
           cameraPosition: str(KEYS.MOTION_CAMERA_POSITION, 'front'),
           delay: num(KEYS.SCREENSAVER_MOTION_DELAY, 30000),
+          proximityEnabled: bool(KEYS.SCREENSAVER_PROXIMITY_ENABLED),
         },
         screenScheduler: {
           enabled: bool(KEYS.SCREEN_SCHEDULER_ENABLED),
@@ -3154,6 +3174,7 @@ export const StorageService = {
         set(KEYS.MOTION_CAMERA_POSITION, md.cameraPosition);
         set(KEYS.SCREENSAVER_MOTION_DELAY, md.delay);
         set(KEYS.MOTION_DELAY, md.delay);
+        set(KEYS.SCREENSAVER_PROXIMITY_ENABLED, md.proximityEnabled);
       }
       const sch = d.screenScheduler as Record<string, unknown> | undefined;
       if (sch) {
