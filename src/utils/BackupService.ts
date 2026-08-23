@@ -166,6 +166,7 @@ const BACKUP_KEYS = [
   '@screensaver_video_items',
   '@screensaver_video_loop',
   '@kiosk_screen_lock_compat',
+  '@kiosk_allow_remote_screenshot',
   '@kiosk_status_bar_theme',
 ];
 

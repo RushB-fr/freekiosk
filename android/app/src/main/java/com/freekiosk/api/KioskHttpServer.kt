@@ -16,6 +16,7 @@ class KioskHttpServer(
     private val statusProvider: () -> JSONObject,
     private val commandHandler: (String, JSONObject?) -> JSONObject,
     private val screenshotProvider: (() -> java.io.InputStream?)? = null,
+    private val screenshotErrorProvider: (() -> String?)? = null,
     private val cameraPhotoProvider: ((camera: String, quality: Int) -> java.io.InputStream?)? = null
 ) : NanoHTTPD(port) {
 
@@ -581,7 +582,12 @@ class KioskHttpServer(
             val bytes = screenshotData.readBytes()
             newFixedLengthResponse(Response.Status.OK, "image/png", java.io.ByteArrayInputStream(bytes), bytes.size.toLong())
         } else {
-            jsonError(Response.Status.SERVICE_UNAVAILABLE, "Screenshot not available")
+            // #229: say why, so an admin hitting /api/screenshot from behind an external
+            // app learns what to fix instead of getting a bare "not available".
+            jsonError(
+                Response.Status.SERVICE_UNAVAILABLE,
+                screenshotErrorProvider?.invoke() ?: "Screenshot not available",
+            )
         }
     }
 

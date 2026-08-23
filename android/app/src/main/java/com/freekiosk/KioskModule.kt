@@ -66,6 +66,44 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                 android.util.Log.e("KioskModule", "Failed to send event '$eventName': ${e.message}")
             }
         }
+
+        /**
+         * #229 — Is the Device Owner screen-capture policy currently blocking screenshots?
+         *
+         * startLockTask() calls setScreenCaptureDisabled(true) (#172) so end users cannot
+         * grab the screen with Power+Volume Down. That policy is user-wide: it also blacks
+         * out MediaProjection and AccessibilityService.takeScreenshot(), which are the only
+         * ways to capture an external app in multi-app mode. PixelCopy on our own window is
+         * unaffected, which is why the local REST screenshot kept working until now.
+         */
+        fun isScreenCapturePolicyBlocked(context: Context): Boolean {
+            return try {
+                val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+                dpm.isDeviceOwnerApp(context.packageName) && dpm.getScreenCaptureDisabled(null)
+            } catch (e: Exception) {
+                android.util.Log.w("KioskModule", "Could not read screen capture policy: ${e.message}")
+                false
+            }
+        }
+
+        /**
+         * #229 — Toggle the screen-capture policy. Used to lift it for the few hundred
+         * milliseconds a remote screenshot takes, then put it straight back; callers MUST
+         * restore it in a finally block. Returns true when the policy was actually changed.
+         */
+        fun setScreenCapturePolicyBlocked(context: Context, blocked: Boolean): Boolean {
+            return try {
+                val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+                if (!dpm.isDeviceOwnerApp(context.packageName)) return false
+                val adminComponent = ComponentName(context, DeviceAdminReceiver::class.java)
+                dpm.setScreenCaptureDisabled(adminComponent, blocked)
+                android.util.Log.d("KioskModule", "Screen capture policy set to blocked=$blocked")
+                true
+            } catch (e: Exception) {
+                android.util.Log.e("KioskModule", "Could not set screen capture policy: ${e.message}")
+                false
+            }
+        }
     }
 
     init {

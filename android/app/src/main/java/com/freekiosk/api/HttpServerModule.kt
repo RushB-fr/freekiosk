@@ -38,9 +38,11 @@ import android.widget.Toast
 import com.facebook.react.bridge.*
 import com.facebook.react.bridge.UiThreadUtil
 import com.facebook.react.modules.core.DeviceEventManagerModule
+import com.facebook.react.common.LifecycleState
 import android.accessibilityservice.AccessibilityService
 import android.os.Build
 import com.freekiosk.DeviceAdminReceiver
+import com.freekiosk.KioskModule
 import com.freekiosk.MainActivity
 import com.freekiosk.CameraPhotoModule
 import com.freekiosk.FreeKioskAccessibilityService
@@ -61,6 +63,10 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     companion object {
         private const val TAG = "HttpServerModule"
         private const val NAME = "HttpServerModule"
+
+        // #229: time the window manager needs to drop the secure flag from every layer
+        // after the Device Owner screen-capture policy is lifted.
+        private const val POLICY_SETTLE_MS = 300L
     }
 
     private var server: KioskHttpServer? = null
@@ -110,6 +116,16 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     // Camera
     private var cameraPhotoModule: CameraPhotoModule? = null
     
+    // #229: why the last screenshot attempt failed, surfaced to the REST client and the
+    // cloud command result instead of a bare "not available".
+    @Volatile
+    private var lastScreenshotError: String? = null
+
+    // Serializes captures: the two channels (REST + cloud) can fire at once, and the
+    // accessibility path toggles a device-wide policy that must not be restored while
+    // another capture is still running.
+    private val screenshotLock = Any()
+
     // Text-to-Speech
     private var tts: TextToSpeech? = null
     private var ttsReady: Boolean = false
@@ -248,6 +264,7 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 statusProvider = { getDeviceStatus() },
                 commandHandler = { command, params -> handleCommand(command, params) },
                 screenshotProvider = { captureScreenshot() },
+                screenshotErrorProvider = { lastScreenshotError },
                 cameraPhotoProvider = { camera, quality -> cameraPhotoModule?.capturePhoto(camera, quality) }
             )
 
@@ -1920,11 +1937,53 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
 
     // ==================== Screenshot Method ====================
 
-    private fun captureScreenshot(): java.io.InputStream? {
+    /**
+     * Capture the current screen.
+     *
+     * Two capture paths, because neither one covers every case (#229):
+     *
+     * - PixelCopy on our own Activity window. Cheap, not rate-limited, and immune to the
+     *   Device Owner screen-capture policy, but it only works while FreeKiosk is on
+     *   screen. In multi-app mode the external app runs in its own task, our Activity is
+     *   stopped and its ViewRootImpl surface released, so PixelCopy throws
+     *   "Window doesn't have a backing surface!" (and would capture an empty FreeKiosk
+     *   window even if it didn't).
+     * - AccessibilityService.takeScreenshot(). Captures the real display whatever app is
+     *   in front, needs API 30+ and the accessibility service enabled, and is blacked out
+     *   by the Device Owner screen-capture policy unless we lift it around the capture.
+     *
+     * So: PixelCopy while we are in the foreground, accessibility otherwise, each one
+     * falling back to the other.
+     */
+    private fun captureScreenshot(): java.io.InputStream? = synchronized(screenshotLock) {
+        lastScreenshotError = null
+        val foreground = reactContext.lifecycleState == LifecycleState.RESUMED
+
+        if (foreground) {
+            capturePixelCopy()?.let { return it }
+            captureViaAccessibility()?.let { return it }
+        } else {
+            captureViaAccessibility()?.let { return it }
+            capturePixelCopy()?.let { return it }
+        }
+
+        if (lastScreenshotError == null) {
+            lastScreenshotError = "Screenshot capture failed"
+        }
+        Log.e(TAG, "Screenshot unavailable (foreground=$foreground): $lastScreenshotError")
+        return null
+    }
+
+    /**
+     * PixelCopy on the FreeKiosk Activity window. Captures hardware-accelerated layers
+     * (WebView, video, SurfaceView) correctly, unlike the deprecated drawingCache which
+     * rendered them black.
+     */
+    private fun capturePixelCopy(): java.io.InputStream? {
         return try {
             var screenshot: ByteArrayInputStream? = null
             val latch = java.util.concurrent.CountDownLatch(1)
-            
+
             UiThreadUtil.runOnUiThread {
                 try {
                     val activity = reactContext.currentActivity
@@ -1934,10 +1993,8 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                     if (window != null && decorView != null &&
                         decorView.width > 0 && decorView.height > 0
                     ) {
-                        // PixelCopy captures hardware-accelerated layers (WebView, video,
-                        // SurfaceView) correctly, unlike the deprecated drawingCache which
-                        // rendered them black. It is asynchronous, so the latch is released
-                        // from the copy callback (and from every early-out path).
+                        // PixelCopy is asynchronous, so the latch is released from the copy
+                        // callback (and from every early-out path).
                         val bitmap = Bitmap.createBitmap(
                             decorView.width,
                             decorView.height,
@@ -1955,9 +2012,11 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                                         bitmap.compress(Bitmap.CompressFormat.PNG, 90, outputStream)
                                         screenshot = ByteArrayInputStream(outputStream.toByteArray())
                                     } else {
+                                        lastScreenshotError = "PixelCopy failed (result $copyResult)"
                                         Log.e(TAG, "PixelCopy failed with result: $copyResult")
                                     }
                                 } catch (e: Exception) {
+                                    lastScreenshotError = "Failed to encode screenshot: ${e.message}"
                                     Log.e(TAG, "Failed to encode screenshot bitmap", e)
                                 } finally {
                                     bitmap.recycle()
@@ -1968,21 +2027,107 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                             copyHandler,
                         )
                     } else {
+                        lastScreenshotError = "FreeKiosk window is not on screen"
                         Log.e(TAG, "Cannot capture screenshot: no valid window/decorView")
                         latch.countDown()
                     }
                 } catch (e: Exception) {
+                    // IllegalArgumentException("Window doesn't have a backing surface!") when
+                    // our Activity is stopped behind an external app (multi-app mode, #229).
+                    lastScreenshotError = "FreeKiosk window is not on screen (${e.message})"
                     Log.e(TAG, "Failed to capture screenshot on UI thread", e)
                     latch.countDown()
                 }
             }
-            
+
             // Wait for UI thread to complete (max 5 seconds)
             latch.await(5, java.util.concurrent.TimeUnit.SECONDS)
             screenshot
         } catch (e: Exception) {
+            lastScreenshotError = "Screenshot capture error: ${e.message}"
             Log.e(TAG, "Failed to capture screenshot", e)
             null
+        }
+    }
+
+    /**
+     * #229: full-display capture through the accessibility service, the only path that
+     * sees an external app launched in multi-app mode.
+     *
+     * In Device Owner kiosk mode the screen-capture policy set by startLockTask (#172)
+     * blacks out every layer, so it is lifted for the duration of the capture and restored
+     * in the finally block. That brief window is opt-in via the "Allow remote screenshots"
+     * setting, since it also re-enables the Power+Volume Down combo for those few hundred
+     * milliseconds.
+     */
+    private fun captureViaAccessibility(): java.io.InputStream? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            lastScreenshotError = "Full-screen capture requires Android 11+"
+            return null
+        }
+        if (!FreeKioskAccessibilityService.isRunning()) {
+            lastScreenshotError = "Accessibility service is not enabled (required to capture another app)"
+            return null
+        }
+
+        var policyLifted = false
+        return try {
+            if (KioskModule.isScreenCapturePolicyBlocked(reactContext)) {
+                if (!isRemoteScreenshotAllowed()) {
+                    lastScreenshotError = "Screen capture is blocked by the Device Owner policy: " +
+                        "enable 'Allow remote screenshots' in Security settings"
+                    return null
+                }
+                policyLifted = KioskModule.setScreenCapturePolicyBlocked(reactContext, false)
+                if (policyLifted) {
+                    // The window manager needs a beat to drop the secure flag from the
+                    // layers, otherwise the capture still comes back black.
+                    Thread.sleep(POLICY_SETTLE_MS)
+                }
+            }
+
+            val bitmap = FreeKioskAccessibilityService.captureScreen()
+            if (bitmap == null) {
+                lastScreenshotError = "Accessibility screenshot failed (see logcat)"
+                return null
+            }
+            val outputStream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.PNG, 90, outputStream)
+            bitmap.recycle()
+            ByteArrayInputStream(outputStream.toByteArray())
+        } catch (e: Exception) {
+            lastScreenshotError = "Accessibility screenshot error: ${e.message}"
+            Log.e(TAG, "Failed to capture screenshot via accessibility service", e)
+            null
+        } finally {
+            if (policyLifted) {
+                KioskModule.setScreenCapturePolicyBlocked(reactContext, true)
+            }
+        }
+    }
+
+    /**
+     * #229: reads @kiosk_allow_remote_screenshot straight from the AsyncStorage database,
+     * same trick as KioskModule. The capture can run while JS is paused behind an
+     * external app, so we cannot ask the JS side.
+     */
+    private fun isRemoteScreenshotAllowed(): Boolean {
+        return try {
+            val dbPath = reactContext.getDatabasePath("RKStorage").absolutePath
+            val db = android.database.sqlite.SQLiteDatabase.openDatabase(
+                dbPath, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY,
+            )
+            val cursor = db.rawQuery(
+                "SELECT value FROM catalystLocalStorage WHERE key = ?",
+                arrayOf("@kiosk_allow_remote_screenshot"),
+            )
+            val result = if (cursor.moveToFirst()) cursor.getString(0) == "true" else false
+            cursor.close()
+            db.close()
+            result
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not read remote screenshot setting: ${e.message}")
+            false
         }
     }
 
@@ -1997,7 +2142,7 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
         try {
             val stream = captureScreenshot()
             if (stream == null) {
-                promise.reject("CAPTURE_FAILED", "Unable to capture screenshot")
+                promise.reject("CAPTURE_FAILED", lastScreenshotError ?: "Unable to capture screenshot")
                 return
             }
             val bytes = stream.readBytes()

@@ -33,6 +33,10 @@ interface SecurityTabProps {
   // Block factory reset (Device Owner only) (#201)
   blockFactoryReset: boolean;
   onBlockFactoryResetChange: (value: boolean) => void;
+
+  // Allow remote screenshots (Device Owner only) (#229)
+  allowRemoteScreenshot: boolean;
+  onAllowRemoteScreenshotChange: (value: boolean) => void;
   
   // Notifications (NFC support)
   allowNotifications: boolean;
@@ -117,6 +121,8 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
   onAllowPowerButtonChange,
   blockFactoryReset,
   onBlockFactoryResetChange,
+  allowRemoteScreenshot,
+  onAllowRemoteScreenshotChange,
   allowNotifications,
   onAllowNotificationsChange,
   allowSystemInfo,
@@ -263,6 +269,27 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
               value={blockFactoryReset}
               onValueChange={onBlockFactoryResetChange}
             />
+          </>
+        )}
+
+        {/* Allow remote screenshots (#229) - Device Owner only */}
+        {isDeviceOwner && (
+          <>
+            <View style={styles.divider} />
+            <SettingsSwitch
+              label="Allow Remote Screenshots"
+              icon="camera-outline"
+              hint="Lock Mode blocks screen capture device-wide (Power+Volume Down), which also blocks the REST /api/screenshot and cloud screenshot commands from capturing an app other than FreeKiosk (multi-app mode). Enable this to let FreeKiosk lift that block for the fraction of a second a remote capture takes, then restore it. Requires the FreeKiosk accessibility service and Android 11+."
+              value={allowRemoteScreenshot}
+              onValueChange={onAllowRemoteScreenshotChange}
+            />
+            {allowRemoteScreenshot && (
+              <SettingsInfoBox variant="warning">
+                <Text style={styles.infoText}>
+                  While a remote screenshot is being taken, the hardware screenshot combo is briefly available to anyone in front of the device.
+                </Text>
+              </SettingsInfoBox>
+            )}
           </>
         )}
       </SettingsSection>

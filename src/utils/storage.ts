@@ -13,6 +13,7 @@ export const KEYS = {
   KIOSK_ENABLED: '@kiosk_enabled',
   AUTO_LAUNCH: '@kiosk_auto_launch',
   SCREEN_LOCK_COMPAT: '@kiosk_screen_lock_compat',
+  ALLOW_REMOTE_SCREENSHOT: '@kiosk_allow_remote_screenshot',
   DEFAULT_LAUNCHER: '@kiosk_default_launcher',
   INTERCOM_MODE: '@kiosk_intercom_mode',
   SCREENSAVER_ENABLED: '@screensaver_enabled',
@@ -315,6 +316,26 @@ export const StorageService = {
       return value ? JSON.parse(value) : false;
     } catch (error) {
       console.error('Error getting screen lock compatibility:', error);
+      return false;
+    }
+  },
+
+  // REMOTE SCREENSHOT (#229) - opt-in; default false so the Device Owner screen-capture
+  // policy (#172) is never lifted unless the admin asked for it.
+  saveAllowRemoteScreenshot: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.ALLOW_REMOTE_SCREENSHOT, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving allow remote screenshot:', error);
+    }
+  },
+
+  getAllowRemoteScreenshot: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.ALLOW_REMOTE_SCREENSHOT);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting allow remote screenshot:', error);
       return false;
     }
   },

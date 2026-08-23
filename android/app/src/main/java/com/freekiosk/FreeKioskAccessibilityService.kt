@@ -3,6 +3,7 @@ package com.freekiosk
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.accessibilityservice.GestureDescription
+import android.graphics.Bitmap
 import android.graphics.Path
 import android.graphics.Rect
 import android.os.Build
@@ -554,6 +555,100 @@ class FreeKioskAccessibilityService : AccessibilityService() {
                 Log.e(TAG, "Failed to exec input command: ${e.message}")
                 false
             }
+        }
+
+        /**
+         * #229 — Capture the whole screen, including whatever app is currently in the
+         * foreground (multi-app mode launches external apps in their own task, so
+         * FreeKiosk's own window is stopped and PixelCopy on it is useless).
+         *
+         * Requires API 30+ and `android:canTakeScreenshot="true"` in the service config.
+         * Blocking call — never invoke it from the main thread (the callback is
+         * delivered on a dedicated executor, but the caller waits on a latch).
+         *
+         * Note: the platform blacks out secure layers, so this returns a black frame
+         * while the Device Owner screen-capture policy is active. Callers must lift
+         * that policy first (see KioskModule.setScreenCapturePolicyBlocked).
+         */
+        fun captureScreen(timeoutMs: Long = 5000): Bitmap? {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                Log.w(TAG, "takeScreenshot requires API 30+, got ${Build.VERSION.SDK_INT}")
+                return null
+            }
+            val first = captureScreenOnce(timeoutMs)
+            if (first.bitmap != null) return first.bitmap
+            // The platform rate-limits takeScreenshot to one call per second; a screenshot
+            // command arriving right after another one is worth a single retry.
+            if (first.errorCode == AccessibilityService.ERROR_TAKE_SCREENSHOT_INTERVAL_TIME_SHORT) {
+                Log.d(TAG, "takeScreenshot rate-limited, retrying once")
+                try {
+                    Thread.sleep(1100)
+                } catch (e: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    return null
+                }
+                return captureScreenOnce(timeoutMs).bitmap
+            }
+            return null
+        }
+
+        private class ScreenshotAttempt(val bitmap: Bitmap?, val errorCode: Int)
+
+        private fun captureScreenOnce(timeoutMs: Long): ScreenshotAttempt {
+            val service = instance
+            if (service == null) {
+                Log.w(TAG, "Cannot take screenshot: accessibility service not running")
+                return ScreenshotAttempt(null, -1)
+            }
+            // Repeated here so lint sees the guard on the takeScreenshot call itself.
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                return ScreenshotAttempt(null, -1)
+            }
+            val latch = java.util.concurrent.CountDownLatch(1)
+            val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
+            var bitmap: Bitmap? = null
+            var errorCode = -1
+            try {
+                service.takeScreenshot(
+                    android.view.Display.DEFAULT_DISPLAY,
+                    executor,
+                    object : AccessibilityService.TakeScreenshotCallback {
+                        override fun onSuccess(result: AccessibilityService.ScreenshotResult) {
+                            try {
+                                val buffer = result.hardwareBuffer
+                                try {
+                                    // wrapHardwareBuffer yields a HARDWARE bitmap backed by the
+                                    // buffer we must close, so copy it into a software bitmap.
+                                    bitmap = Bitmap.wrapHardwareBuffer(buffer, result.colorSpace)
+                                        ?.copy(Bitmap.Config.ARGB_8888, false)
+                                } finally {
+                                    buffer.close()
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed to decode screenshot buffer: ${e.message}")
+                            } finally {
+                                latch.countDown()
+                            }
+                        }
+
+                        override fun onFailure(error: Int) {
+                            errorCode = error
+                            Log.e(TAG, "takeScreenshot failed with error $error")
+                            latch.countDown()
+                        }
+                    },
+                )
+                if (!latch.await(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                    Log.e(TAG, "takeScreenshot timed out after ${timeoutMs}ms")
+                }
+            } catch (e: Exception) {
+                // SecurityException when the service is enabled without the screenshot
+                // capability (config change not picked up until the service is re-enabled).
+                Log.e(TAG, "takeScreenshot threw: ${e.message}")
+            } finally {
+                executor.shutdown()
+            }
+            return ScreenshotAttempt(bitmap, errorCode)
         }
     }
 

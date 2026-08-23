@@ -133,6 +133,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [keyboardMode, setKeyboardMode] = useState<string>('default');
   const [allowPowerButton, setAllowPowerButton] = useState<boolean>(true);
   const [blockFactoryReset, setBlockFactoryReset] = useState<boolean>(false);
+  const [allowRemoteScreenshot, setAllowRemoteScreenshot] = useState<boolean>(false);
   const [allowNotifications, setAllowNotifications] = useState<boolean>(false);
   const [allowSystemInfo, setAllowSystemInfo] = useState<boolean>(false);
   const [returnMode, setReturnMode] = useState<string>('tap_anywhere');
@@ -508,6 +509,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedKeyboardMode = await StorageService.getKeyboardMode();
     const savedAllowPowerButton = await StorageService.getAllowPowerButton();
     const savedBlockFactoryReset = await StorageService.getBlockFactoryReset();
+    const savedAllowRemoteScreenshot = await StorageService.getAllowRemoteScreenshot();
     const savedAllowNotifications = await StorageService.getAllowNotifications();
     const savedAllowSystemInfo = await StorageService.getAllowSystemInfo();
     const savedReturnMode = await StorageService.getReturnMode();
@@ -578,6 +580,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setKeyboardMode(savedKeyboardMode);
     setAllowPowerButton(savedAllowPowerButton);
     setBlockFactoryReset(savedBlockFactoryReset);
+    setAllowRemoteScreenshot(savedAllowRemoteScreenshot);
     setAllowNotifications(savedAllowNotifications);
     setAllowSystemInfo(savedAllowSystemInfo);
     setReturnMode(savedReturnMode);
@@ -1447,6 +1450,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await saveSecureBasicAuthPassword(basicAuthPassword);
     await StorageService.saveAllowPowerButton(allowPowerButton);
     await StorageService.saveBlockFactoryReset(blockFactoryReset);
+    await StorageService.saveAllowRemoteScreenshot(allowRemoteScreenshot);
     await StorageService.saveAllowNotifications(allowNotifications);
     await StorageService.saveAllowSystemInfo(allowSystemInfo);
     await StorageService.saveReturnMode(returnMode);
@@ -2058,6 +2062,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             onAllowPowerButtonChange={setAllowPowerButton}
             blockFactoryReset={blockFactoryReset}
             onBlockFactoryResetChange={setBlockFactoryReset}
+            allowRemoteScreenshot={allowRemoteScreenshot}
+            onAllowRemoteScreenshotChange={setAllowRemoteScreenshot}
             allowNotifications={allowNotifications}
             onAllowNotificationsChange={setAllowNotifications}
             allowSystemInfo={allowSystemInfo}
