@@ -77,8 +77,17 @@ class ManagedAppInstallerModule(reactContext: ReactApplicationContext) :
                     promise.reject("BAD_URL", "Download URL is empty.")
                     return@Thread
                 }
+                // A silent Device Owner install is a full-privilege operation, so the caller
+                // must declare which package it expects; we verify the downloaded APK against
+                // it below before committing (defends against a swapped/malicious APK).
+                if (expectedPackage.isNullOrEmpty()) {
+                    promise.reject("BAD_PACKAGE", "expectedPackage is required for a silent install.")
+                    return@Thread
+                }
 
                 apkFile = downloadApk(downloadUrl, authToken)
+                // Verify the downloaded APK actually is the expected package before install.
+                verifyApkPackage(apkFile, expectedPackage)
                 // installSilently owns the promise from here (async via receiver).
                 installSilently(apkFile, expectedPackage, promise)
             } catch (e: Exception) {
@@ -90,7 +99,16 @@ class ManagedAppInstallerModule(reactContext: ReactApplicationContext) :
     }
 
     private fun downloadApk(downloadUrl: String, authToken: String?): File {
-        val conn = (URL(downloadUrl).openConnection() as HttpURLConnection).apply {
+        // Enforce HTTPS: this APK is installed silently with Device Owner privileges, so a
+        // cleartext download (which the app otherwise permits) would let a network MITM swap
+        // in a malicious APK. HttpURLConnection does not auto-follow cross-protocol redirects
+        // (https -> http), so validating the initial scheme is sufficient; a downgrade redirect
+        // surfaces as a non-2xx response and is rejected below.
+        val parsed = URL(downloadUrl)
+        if (!parsed.protocol.equals("https", ignoreCase = true)) {
+            throw RuntimeException("Refusing non-HTTPS APK download URL (scheme: ${parsed.protocol}).")
+        }
+        val conn = (parsed.openConnection() as HttpURLConnection).apply {
             connectTimeout = 30_000
             readTimeout = 120_000
             requestMethod = "GET"
@@ -124,6 +142,25 @@ class ManagedAppInstallerModule(reactContext: ReactApplicationContext) :
             return outFile
         } finally {
             conn.disconnect()
+        }
+    }
+
+    /**
+     * Parse the downloaded APK's manifest (without installing it) and reject if its package
+     * name does not match [expectedPackage]. Closes the gap where a MITM/malicious download
+     * could deliver an APK for a different package than the one the cloud asked to install.
+     */
+    private fun verifyApkPackage(apkFile: File, expectedPackage: String?) {
+        if (expectedPackage.isNullOrEmpty()) {
+            throw RuntimeException("expectedPackage is required for a silent install.")
+        }
+        val pm = reactApplicationContext.packageManager
+        val info = pm.getPackageArchiveInfo(apkFile.absolutePath, 0)
+            ?: throw RuntimeException("Downloaded file is not a valid APK (cannot parse manifest).")
+        if (info.packageName != expectedPackage) {
+            throw RuntimeException(
+                "APK package mismatch: downloaded ${info.packageName}, expected $expectedPackage.",
+            )
         }
     }
 
