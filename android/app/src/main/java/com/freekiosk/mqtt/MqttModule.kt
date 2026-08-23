@@ -72,6 +72,26 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
                 client.reconnect()
             }
         }
+
+        /**
+         * #155: publish the current device status right now, from native code.
+         *
+         * The state topic is retained, so between two periodic publishes Home Assistant
+         * keeps showing the pre-command value for up to 30s and its toggle snaps back.
+         * Called from ScreenStateReceiver, which fires on the real ACTION_SCREEN_ON/OFF
+         * broadcast whatever turned the screen on or off (MQTT command, power button,
+         * scheduler, screensaver), and works with the JS thread suspended after lockNow().
+         */
+        fun publishStatusNow() {
+            val module = instance ?: return
+            try {
+                val client = module.mqttClient ?: return
+                if (!client.isConnected()) return
+                client.publishStatus(module.getDeviceStatus())
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to publish immediate status: ${e.message}")
+            }
+        }
     }
 
     init {

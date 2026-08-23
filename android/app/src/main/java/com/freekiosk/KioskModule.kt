@@ -226,6 +226,23 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     // Owner (setApplicationExemptions is a @SystemApi). The permission is stripped from Play
     // builds, so there startActivity throws, is caught, and the wake lock alone is relied upon.
     // No-op once already exempted.
+    // #234: report whether the app is already exempt from Doze/battery optimization.
+    // MQTT holds a PARTIAL_WAKE_LOCK + WifiLock while connected, but Doze still defers its
+    // network once the device is unplugged and idle, so the broker misses the keepalive and
+    // Home Assistant shows the device as unavailable after a couple of hours. Used by the
+    // MQTT settings section to warn about it instead of leaving the user to discover it.
+    @ReactMethod
+    fun isIgnoringBatteryOptimizations(promise: Promise) {
+        try {
+            val ctx = reactApplicationContext
+            val pm = ctx.getSystemService(Context.POWER_SERVICE) as PowerManager
+            promise.resolve(pm.isIgnoringBatteryOptimizations(ctx.packageName))
+        } catch (e: Exception) {
+            android.util.Log.e("KioskModule", "isIgnoringBatteryOptimizations failed: ${e.message}")
+            promise.resolve(false)
+        }
+    }
+
     @ReactMethod
     fun requestIgnoreBatteryOptimizations(promise: Promise) {
         try {

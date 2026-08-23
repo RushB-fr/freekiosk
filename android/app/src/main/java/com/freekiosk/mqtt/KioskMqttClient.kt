@@ -52,6 +52,11 @@ class KioskMqttClient(
 
     companion object {
         private const val TAG = "KioskMqttClient"
+
+        // #155: delay before republishing the state after executing a command, so the
+        // action (brightness applied, screen locked, screensaver shown) has taken effect
+        // before the status is read back.
+        private const val COMMAND_STATE_PUBLISH_DELAY_MS = 600L
     }
 
     /** Device ID derived from Settings.Secure.ANDROID_ID (used for unique HA entity IDs). */
@@ -623,10 +628,34 @@ class KioskMqttClient(
                     commandHandler?.invoke(command, params)
                 } catch (e: Exception) {
                     Log.e(TAG, "Error executing command $command: ${e.message}", e)
+                } finally {
+                    // #155: the state topic is retained, so without this the pre-command
+                    // value stands until the next periodic publish (up to 30s) and Home
+                    // Assistant's toggle snaps back to it.
+                    scheduleStatePublishAfterCommand()
                 }
             }
         } else {
             Log.w(TAG, "Unknown entity: $entity")
+        }
+    }
+
+    /**
+     * #155: republish the state shortly after a command, debounced so a burst of commands
+     * (an HA scene setting brightness and volume at once) results in a single publish.
+     */
+    private fun scheduleStatePublishAfterCommand() {
+        mainHandler.removeCallbacks(commandStatePublishRunnable)
+        mainHandler.postDelayed(commandStatePublishRunnable, COMMAND_STATE_PUBLISH_DELAY_MS)
+    }
+
+    private val commandStatePublishRunnable = Runnable {
+        try {
+            if (_isConnected && !disconnectRequested) {
+                statusProvider?.invoke()?.let { publishStatus(it) }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error publishing status after command: ${e.message}", e)
         }
     }
 

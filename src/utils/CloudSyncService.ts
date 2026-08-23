@@ -68,8 +68,10 @@ class CloudSyncServiceClass {
     // Keep the CPU + WiFi awake so this heartbeat/poll loop survives screen-off; without
     // it the device drops off the cloud and can no longer be woken remotely.
     KioskModule.acquireCloudWakeLock().catch(() => {/* best-effort */});
-    // Also exempt from Doze so it holds up on battery-powered devices (silent in DO, no-op
-    // in Play builds). Best-effort: the wake lock is the primary mechanism.
+    // Also exempt from Doze so it holds up on battery-powered devices. Opens a one-time
+    // system dialog (there is no silent path, even as Device Owner) which the system
+    // suppresses in lock task, and is a no-op once granted or in Play builds. Best-effort:
+    // the wake lock is the primary mechanism.
     KioskModule.requestIgnoreBatteryOptimizations().catch(() => {/* best-effort */});
     await this.sendHeartbeat(creds);
     this.heartbeatTimer = setInterval(

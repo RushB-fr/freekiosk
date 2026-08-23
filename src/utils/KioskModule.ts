@@ -62,6 +62,7 @@ interface KioskModuleInterface {
   // Exempt from Doze/battery optimization (silent on Android 14+ Device Owner, else a
   // one-time system dialog). No-op in Play builds where the permission is stripped.
   requestIgnoreBatteryOptimizations(): Promise<boolean>;
+  isIgnoringBatteryOptimizations(): Promise<boolean>;
 }
 
 const { KioskModule } = NativeModules;

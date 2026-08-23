@@ -155,7 +155,6 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   
   // Keep Screen On setting
   const [keepScreenOn, setKeepScreenOn] = useState<boolean>(true);
-  const keepScreenOnRef = useRef<boolean>(true);
   
   // Inactivity Return to Home states
   const [inactivityReturnEnabled, setInactivityReturnEnabled] = useState<boolean>(false);
@@ -528,14 +527,18 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           }
         },
         onScreensaverOn: async () => {
-          // Don't enable screensaver if keepScreenOn is off (system manages sleep)
-          if (!keepScreenOnRef.current) {
-            console.log('[API] Screensaver ON ignored — keepScreenOn is disabled, system manages sleep');
-            return;
-          }
           setScreensaverEnabled(true);
           await StorageService.saveScreensaverEnabled(true);
-          console.log('[API] Screensaver setting ENABLED');
+          // #232: the Home Assistant switch mirrors screen.screensaverActive, and
+          // screensaverOff deactivates a running screensaver, so ON has to show it now.
+          // Enabling the setting alone only re-armed the inactivity timer, so the screen
+          // went dark after the configured timeout instead of immediately, and the HA
+          // toggle snapped back to OFF in the meantime.
+          // Honoured even when keepScreenOn is off: an explicit remote command is not the
+          // automatic inactivity path that the system's own sleep timer supersedes.
+          Keyboard.dismiss();
+          setIsScreensaverActive(true);
+          console.log('[API] Screensaver ACTIVATED');
         },
         onScreensaverOff: async () => {
           setScreensaverEnabled(false);
@@ -1696,7 +1699,6 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       // Load Keep Screen On setting
       const savedKeepScreenOn = bool(K.KEEP_SCREEN_ON, true);
       setKeepScreenOn(savedKeepScreenOn);
-      keepScreenOnRef.current = savedKeepScreenOn;
       // Apply the flag natively
       try {
         await KioskModule.setKeepScreenOn(savedKeepScreenOn);

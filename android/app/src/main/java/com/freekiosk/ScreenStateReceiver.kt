@@ -34,10 +34,12 @@ class ScreenStateReceiver : BroadcastReceiver() {
             Intent.ACTION_SCREEN_ON -> {
                 Log.d(TAG, "Screen turned ON")
                 isScreenOn = true
+                publishMqttStatus()
             }
             Intent.ACTION_SCREEN_OFF -> {
                 Log.d(TAG, "Screen turned OFF")
                 isScreenOn = false
+                publishMqttStatus()
 
                 // Dismiss the soft keyboard so it doesn't persist after the screen wakes up.
                 // Needed when the user leaves a focused input (e.g. Force Numeric mode) and the
@@ -52,6 +54,23 @@ class ScreenStateReceiver : BroadcastReceiver() {
                     wakeScreen(context)
                 }
             }
+        }
+    }
+
+    /**
+     * #155: push the new screen state to MQTT immediately.
+     *
+     * The state topic is retained and otherwise only refreshed by the 30s timer, so Home
+     * Assistant kept the old value and its Screen Power toggle snapped back to ON a couple
+     * of seconds after being switched off. This is the authoritative moment: the screen has
+     * actually changed state, whoever asked for it, and this runs natively so it also works
+     * once lockNow() has suspended the JS thread.
+     */
+    private fun publishMqttStatus() {
+        try {
+            com.freekiosk.mqtt.MqttModule.publishStatusNow()
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not publish MQTT status on screen change: ${e.message}")
         }
     }
 
