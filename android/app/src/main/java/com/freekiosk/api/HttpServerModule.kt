@@ -67,6 +67,10 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
         // #229: time the window manager needs to drop the secure flag from every layer
         // after the Device Owner screen-capture policy is lifted.
         private const val POLICY_SETTLE_MS = 300L
+
+        // #229: if the first capture still comes back black, the flag had not propagated
+        // to every layer yet, so wait this much longer and retake once.
+        private const val POLICY_SETTLE_RETRY_MS = 700L
     }
 
     private var server: KioskHttpServer? = null
@@ -2069,6 +2073,11 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             lastScreenshotError = "Accessibility service is not enabled (required to capture another app)"
             return null
         }
+        if (!FreeKioskAccessibilityService.canTakeScreenshot()) {
+            lastScreenshotError = "Accessibility service is enabled but has no screenshot capability: " +
+                "disable and re-enable FreeKiosk in Android accessibility settings"
+            return null
+        }
 
         var policyLifted = false
         return try {
@@ -2086,7 +2095,16 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 }
             }
 
-            val bitmap = FreeKioskAccessibilityService.captureScreen()
+            var bitmap = FreeKioskAccessibilityService.captureScreen()
+            if (bitmap != null && policyLifted && isBlankFrame(bitmap)) {
+                // POLICY_SETTLE_MS is a best guess at how long the window manager needs to
+                // drop the secure flag; an all-black frame says it was not enough on this
+                // device, so the wait extends itself rather than returning a black PNG.
+                Log.w(TAG, "Screenshot came back black after lifting the capture policy, retrying")
+                bitmap.recycle()
+                Thread.sleep(POLICY_SETTLE_RETRY_MS)
+                bitmap = FreeKioskAccessibilityService.captureScreen()
+            }
             if (bitmap == null) {
                 lastScreenshotError = "Accessibility screenshot failed (see logcat)"
                 return null
@@ -2104,6 +2122,26 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 KioskModule.setScreenCapturePolicyBlocked(reactContext, true)
             }
         }
+    }
+
+    /**
+     * #229: is every sampled pixel opaque black? That is what a capture blocked by the
+     * screen-capture policy looks like. A genuinely black screen (dim screensaver, video
+     * letterbox) costs one extra capture and is then returned as-is.
+     */
+    private fun isBlankFrame(bitmap: Bitmap): Boolean {
+        val stepX = maxOf(1, bitmap.width / 16)
+        val stepY = maxOf(1, bitmap.height / 16)
+        var y = 0
+        while (y < bitmap.height) {
+            var x = 0
+            while (x < bitmap.width) {
+                if ((bitmap.getPixel(x, y) and 0x00FFFFFF) != 0) return false
+                x += stepX
+            }
+            y += stepY
+        }
+        return true
     }
 
     /**

@@ -558,6 +558,25 @@ class FreeKioskAccessibilityService : AccessibilityService() {
         }
 
         /**
+         * #229 - Is the running service actually allowed to take screenshots? The
+         * capability comes from android:canTakeScreenshot in the service config, and a
+         * service that was enabled before that attribute existed keeps its old
+         * AccessibilityServiceInfo until it is re-enabled. Checked explicitly so the
+         * caller can say so instead of reporting an opaque failure.
+         */
+        fun canTakeScreenshot(): Boolean {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return false
+            val service = instance ?: return false
+            return try {
+                val capabilities = service.serviceInfo?.capabilities ?: 0
+                (capabilities and AccessibilityServiceInfo.CAPABILITY_CAN_TAKE_SCREENSHOT) != 0
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not read accessibility capabilities: ${e.message}")
+                false
+            }
+        }
+
+        /**
          * #229 — Capture the whole screen, including whatever app is currently in the
          * foreground (multi-app mode launches external apps in their own task, so
          * FreeKiosk's own window is stopped and PixelCopy on it is useless).
