@@ -274,15 +274,15 @@ class BootReceiver : BroadcastReceiver() {
      * The service uses START_STICKY so Android restarts it after OOM kills.
      */
     private fun startKioskWatchdogIfNeeded(context: Context) {
-        if (!isKioskEnabled(context)) return
         try {
-            val serviceIntent = Intent(context, KioskWatchdogService::class.java)
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                context.startForegroundService(serviceIntent)
+            if (isKioskEnabled(context)) {
+                KioskWatchdogService.startForKiosk(context)
             } else {
-                context.startService(serviceIntent)
+                // #234: without Lock Mode there is no foreground service at all, so the
+                // process (and the MQTT connection with it) is fair game for the OEM
+                // battery manager. Keep it alive when MQTT is on; no-op otherwise.
+                KioskWatchdogService.startForMqttIfNeeded(context)
             }
-            DebugLog.d("BootReceiver", "KioskWatchdogService started")
         } catch (e: Exception) {
             DebugLog.errorProduction("BootReceiver", "Failed to start KioskWatchdogService: ${e.message}")
         }

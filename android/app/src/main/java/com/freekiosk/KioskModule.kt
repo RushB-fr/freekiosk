@@ -173,6 +173,10 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     @ReactMethod
     fun resumeWebView(tag: Int, promise: Promise) = setWebViewPaused(tag, false, promise)
 
+    // #234: the WifiLock is near-useless and must not be trusted. HIGH_PERF is deprecated
+    // and silently replaced by LOW_LATENCY, which the SDK documents as active only while the
+    // screen is on AND the app is in the foreground. The PARTIAL_WAKE_LOCK is what carries
+    // screen-off operation.
     // Cloud sync must survive screen-off. The heartbeat/command-poll loop runs on the RN
     // JS thread, which the OS freezes once the CPU sleeps (screen off, Device Owner). Holding
     // a PARTIAL_WAKE_LOCK (CPU) + WifiLock (network) keeps that loop alive, so the device
@@ -404,6 +408,10 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
             val nm = reactApplicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
             nm.cancel(2002) // KioskWatchdogService.NOTIFICATION_ID
             android.util.Log.d("KioskModule", "KioskWatchdogService stopped and notification cleared")
+            // #234: the kiosk guard is gone, but an MQTT user still needs the process kept
+            // alive. force=true because @kiosk_enabled stays true across an admin exit, and
+            // keep-alive mode never relaunches, so the admin is not dragged back in.
+            KioskWatchdogService.startForMqttIfNeeded(reactApplicationContext, force = true)
         } catch (e: Exception) {
             android.util.Log.e("KioskModule", "Error stopping KioskWatchdogService: ${e.message}")
         }

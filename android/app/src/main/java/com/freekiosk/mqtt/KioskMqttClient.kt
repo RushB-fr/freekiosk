@@ -102,6 +102,14 @@ class KioskMqttClient(
 
     /**
      * Acquire WifiLock + WakeLock to keep MQTT alive when screen is off.
+     *
+     * Note (#234): the WifiLock does almost nothing here and must not be trusted.
+     * WIFI_MODE_FULL_HIGH_PERF is deprecated and the platform silently replaces it with
+     * WIFI_MODE_FULL_LOW_LATENCY, which per the SDK is "only active when the screen is on"
+     * and "only active when the acquiring app is running in the foreground". Switching the
+     * constant explicitly would change nothing. What actually keeps the connection alive
+     * with the screen off is the PARTIAL_WAKE_LOCK below, the process staying alive
+     * (KioskWatchdogService) and, on battery, the Doze exemption.
      */
     private fun acquireLocks() {
         try {

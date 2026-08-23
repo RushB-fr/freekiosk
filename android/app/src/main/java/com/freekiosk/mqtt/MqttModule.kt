@@ -398,6 +398,12 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
 
             Log.i(TAG, "MQTT client started for broker ${config.brokerUrl}:${config.port}")
 
+            // #234: without Lock Mode nothing holds this process in the foreground, so the
+            // OEM battery manager kills it once the screen goes off and the broker never
+            // sees the device again. No-op when Lock Mode is on (the kiosk guard already
+            // runs) or when the foreground-service start is refused in the background.
+            com.freekiosk.KioskWatchdogService.startForMqttIfNeeded(reactContext.applicationContext)
+
             val result = Arguments.createMap().apply {
                 putBoolean("success", true)
                 putString("brokerUrl", config.brokerUrl)

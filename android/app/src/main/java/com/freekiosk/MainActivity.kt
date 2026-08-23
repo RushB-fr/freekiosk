@@ -1214,16 +1214,15 @@ class MainActivity : ReactActivity() {
    */
   private fun startKioskWatchdogIfNeeded() {
     try {
-      val kioskEnabled = isKioskEnabled()
-      if (!kioskEnabled) return
-
-      val serviceIntent = Intent(this, KioskWatchdogService::class.java)
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        startForegroundService(serviceIntent)
+      // #234: always go through the companion helpers, they persist which mode the
+      // service must come back in after a START_STICKY restart.
+      if (isKioskEnabled()) {
+        KioskWatchdogService.startForKiosk(this)
       } else {
-        startService(serviceIntent)
+        // No Lock Mode: the process is an ordinary background app, so keep it alive when
+        // MQTT is on (no-op otherwise). Never relaunches anything.
+        KioskWatchdogService.startForMqttIfNeeded(this)
       }
-      DebugLog.d("MainActivity", "KioskWatchdogService started")
     } catch (e: Exception) {
       DebugLog.d("MainActivity", "Error starting KioskWatchdogService: ${e.message}")
     }
@@ -1240,6 +1239,8 @@ class MainActivity : ReactActivity() {
       val nm = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
       nm.cancel(2002) // KioskWatchdogService.NOTIFICATION_ID
       DebugLog.d("MainActivity", "KioskWatchdogService stopped and notification cleared")
+      // #234: keep the process alive for MQTT after the guard is stopped (see KioskModule).
+      KioskWatchdogService.startForMqttIfNeeded(this, force = true)
     } catch (e: Exception) {
       DebugLog.d("MainActivity", "Error stopping KioskWatchdogService: ${e.message}")
     }

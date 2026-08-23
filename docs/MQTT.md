@@ -682,6 +682,7 @@ entities:
 | **Doze / battery optimization** | Once the tablet is unplugged and idle, Android defers the app's network and the broker drops the connection despite the wake lock FreeKiosk holds. Exempt FreeKiosk: the MQTT settings section shows a warning with a one-tap button when the exemption is missing |
 | **Lock Mode active** | The system exemption dialog cannot open while the device is in lock task. Exit Lock Mode first, or grant it over ADB: `adb shell dumpsys deviceidle whitelist +com.freekiosk` |
 | **Keep it plugged in** | A tablet on permanent power never enters Doze, which is the usual kiosk setup |
+| **Process killed (no Lock Mode)** | Without Lock Mode, FreeKiosk used to run with no foreground service, so OEM battery managers could kill it and MQTT never came back. From v1.2.20+ a silent keep-alive notification appears when MQTT is enabled without Lock Mode. Do not disable that notification |
 
 
 ### Motion detection not working
