@@ -593,6 +593,8 @@ class KioskMqttClient(
             Log.d(TAG, "Status publishing stopped")
         }
         statusRunnable = null
+        // #155: drop a post-command publish still pending on the handler.
+        mainHandler.removeCallbacks(commandStatePublishRunnable)
     }
 
     // ==================== Incoming message handling ====================
