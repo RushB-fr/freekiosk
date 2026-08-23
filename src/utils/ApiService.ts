@@ -96,12 +96,19 @@ class ApiServiceClass {
    * Initialize the API service and start listening for commands
    */
   async initialize(callbacks: ApiCallbacks): Promise<void> {
-    if (this.isInitialized) {
-      console.log('ApiService: Already initialized');
+    // #231: always adopt the callbacks of the caller, even when already initialized.
+    // The previous early return kept the ones captured on the very first mount, so if
+    // KioskScreen was ever remounted (a new instance mounting before the old one runs its
+    // cleanup), every REST/MQTT command kept driving the dead component tree: the command
+    // was accepted, the state updated somewhere invisible, and nothing happened on screen.
+    this.callbacks = callbacks;
+
+    // Re-subscribe when the listener is gone (destroy() clears it), otherwise keep the
+    // existing one so commands are not delivered twice.
+    if (this.isInitialized && this.commandSubscription) {
+      console.log('ApiService: Already initialized, callbacks refreshed');
       return;
     }
-
-    this.callbacks = callbacks;
 
     if (Platform.OS === 'android' && HttpServerModule) {
       this.eventEmitter = new NativeEventEmitter(HttpServerModule);
@@ -109,6 +116,7 @@ class ApiServiceClass {
       // Listen for API commands from native module
       // Defer to next tick to avoid CalledFromWrongThreadException
       // when react-native-screens manipulates views during commit on native thread
+      this.commandSubscription?.remove();
       this.commandSubscription = this.eventEmitter.addListener(
         'onApiCommand',
         (event: { command: string; params: string }) => {
