@@ -1881,7 +1881,20 @@ class MainActivity : ReactActivity() {
 
   override fun onDestroy() {
     super.onDestroy()
-    disableKioskRestrictions()
+
+    // #237: only lift the kiosk restrictions on a deliberate exit. onDestroy() also fires
+    // when the system destroys this activity while an external app holds the foreground,
+    // which is the normal state in single-app mode (the very case the watchdog check below
+    // already accounts for). Restoring the permissive feature set there hands the user the
+    // status bar, the notification panel, Home and Overview INSIDE lock task, and nothing
+    // puts the restrictive set back until MainActivity is recreated: exactly the reported
+    // "bars stay visible until settings / exit / reboot".
+    //
+    // The deliberate path does not depend on this call: KioskModule.exitKioskMode() calls
+    // disableKioskRestrictions() itself before stopLockTask() and finish().
+    if (blockAutoRelaunch) {
+      disableKioskRestrictions()
+    }
     
     // Stop KioskWatchdogService if kiosk mode was intentionally disabled (#96 fix)
     // This prevents the watchdog from relaunching the app after an intentional exit.
