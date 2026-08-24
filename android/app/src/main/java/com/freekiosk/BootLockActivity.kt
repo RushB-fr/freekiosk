@@ -58,6 +58,22 @@ class BootLockActivity : Activity() {
         private const val WATCHDOG_INTERVAL_MS = 2_000L
 
         /**
+         * #222: the watchdog is a LAST resort, not a peer of the main-thread net. Armed on
+         * the same 8s threshold, the two raced and recovery ran twice a few milliseconds
+         * apart (harmless, but it meant the watchdog fired on healthy runs too). Waiting
+         * longer means the main-thread net gets its chance first, and the watchdog only
+         * speaks when that net is itself broken.
+         */
+        private const val WATCHDOG_STALL_MS = 15_000L
+
+        /**
+         * #222: upper bound on watchdog ticks. Without it, a main thread that never
+         * recovers means logging every 2s forever in release. Past this the watchdog has
+         * said everything it can (its recovery is attempted once) and goes quiet.
+         */
+        private const val WATCHDOG_MAX_TICKS = 45  // ~90s, past MAX_WAIT_MS
+
+        /**
          * #222: below this, a boot is going normally (hand-off happens in a second or two)
          * and nothing is logged. Past it we are in abnormal territory, and every tick is
          * recorded: DebugLog.d is stripped from release builds, so without this a device
@@ -376,8 +392,14 @@ class BootLockActivity : Activity() {
         watchdogHandler = wHandler
 
         wHandler.post(object : Runnable {
+            private var ticks = 0
+
             override fun run() {
                 if (watchdogStopped) return
+                if (++ticks > WATCHDOG_MAX_TICKS) {
+                    DebugLog.errorProduction(TAG, "watchdog: giving up after $ticks ticks, going quiet")
+                    return
+                }
                 val elapsed = System.currentTimeMillis() - startTime
                 val sinceLastPoll = if (lastPollAt == 0L) -1 else System.currentTimeMillis() - lastPollAt
                 val secure = try { BootReceiver.isDeviceSecure(this@BootLockActivity) } catch (e: Exception) { null }
@@ -393,7 +415,7 @@ class BootLockActivity : Activity() {
                     )
                 }
 
-                if (!recoveryAttempted && elapsed >= SECURE_LOCK_STALL_MS && secure == true && unlocked == false) {
+                if (!recoveryAttempted && elapsed >= WATCHDOG_STALL_MS && secure == true && unlocked == false) {
                     recoveryAttempted = true
                     DebugLog.errorProduction(TAG, "watchdog: stuck behind a secure keyguard, recovering")
                     runOnUiThread {
