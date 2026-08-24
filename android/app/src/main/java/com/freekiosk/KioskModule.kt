@@ -43,11 +43,21 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     // running when the screen is off (mirrors HttpServerModule's server locks).
     private var cloudCpuWakeLock: PowerManager.WakeLock? = null
     private var cloudWifiLock: WifiManager.WifiLock? = null
+
+    // #234: state for the temporary lock-task whitelist around the battery dialog.
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var batteryDialogOriginalLockTaskPackages: Array<String>? = null
+    private var batteryDialogRestoreRunnable: Runnable? = null
+    private var batteryDialogLifecycleListener: com.facebook.react.bridge.LifecycleEventListener? = null
     private val emergencyDialAction = "android.intent.action.DIAL_EMERGENCY"
     private val emergencyDialerAction = "com.android.phone.EmergencyDialer.DIAL"
     private val safetyHubPackage = "com.google.android.apps.safetyhub"
 
     companion object {
+        // #234: how long the battery dialog may stay whitelisted if we never see the user
+        // come back (dialog dismissed by the system, activity never resumed).
+        private const val BATTERY_DIALOG_WHITELIST_TIMEOUT_MS = 60_000L
+
         // Store the current instance to allow sending events from MainActivity
         @Volatile
         private var currentInstance: KioskModule? = null
@@ -261,12 +271,107 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                 data = android.net.Uri.parse("package:$pkg")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
+            // #234: without this the dialog silently never appears on a pinned kiosk.
+            allowBatteryDialogInLockTask()
             ctx.startActivity(intent)
+            scheduleBatteryDialogRestore()
             promise.resolve(true)
         } catch (e: Exception) {
+            // Play builds have the permission stripped, so startActivity throws here. Put the
+            // lock task whitelist back rather than leaving it open until the next kiosk start.
+            restoreBatteryDialogLockTaskPackages()
             android.util.Log.e("KioskModule", "requestIgnoreBatteryOptimizations failed: ${e.message}")
             promise.resolve(false)
         }
+    }
+
+    /**
+     * #234: the battery-optimization dialog is a system activity, and lock task blocks any
+     * activity outside the whitelist, so on a pinned kiosk the request simply did nothing
+     * and the only way left was `adb shell dumpsys deviceidle whitelist +com.freekiosk`.
+     *
+     * Same approach WifiControlModule and BluetoothControlModule already use for their own
+     * system dialogs: whitelist the handling package for the few seconds the dialog is up,
+     * then restore. If the process dies in between, the next startLockTask() rebuilds the
+     * whitelist from scratch, so the opening cannot outlive a restart.
+     */
+    private fun allowBatteryDialogInLockTask() {
+        try {
+            val dpm = reactApplicationContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+            val admin = ComponentName(reactApplicationContext, DeviceAdminReceiver::class.java)
+            if (!dpm.isDeviceOwnerApp(reactApplicationContext.packageName)) return
+
+            val currentPackages = dpm.getLockTaskPackages(admin)
+            if (batteryDialogOriginalLockTaskPackages == null) {
+                batteryDialogOriginalLockTaskPackages = currentPackages
+            }
+
+            val updated = (currentPackages.toList() + resolveBatteryDialogPackages()).distinct()
+            if (updated.size != currentPackages.size) {
+                dpm.setLockTaskPackages(admin, updated.toTypedArray())
+                android.util.Log.d("KioskModule", "Temporarily whitelisted battery optimization dialog packages")
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("KioskModule", "Could not update lock task whitelist for battery dialog: ${e.message}")
+        }
+    }
+
+    private fun restoreBatteryDialogLockTaskPackages() {
+        batteryDialogRestoreRunnable?.let { mainHandler.removeCallbacks(it) }
+        batteryDialogRestoreRunnable = null
+        batteryDialogLifecycleListener?.let {
+            try {
+                reactApplicationContext.removeLifecycleEventListener(it)
+            } catch (_: Exception) {}
+        }
+        batteryDialogLifecycleListener = null
+
+        val original = batteryDialogOriginalLockTaskPackages ?: return
+        try {
+            val dpm = reactApplicationContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+            val admin = ComponentName(reactApplicationContext, DeviceAdminReceiver::class.java)
+            if (dpm.isDeviceOwnerApp(reactApplicationContext.packageName)) {
+                dpm.setLockTaskPackages(admin, original)
+                android.util.Log.d("KioskModule", "Restored lock task packages after battery dialog")
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("KioskModule", "Could not restore lock task packages after battery dialog: ${e.message}")
+        } finally {
+            batteryDialogOriginalLockTaskPackages = null
+        }
+    }
+
+    /**
+     * Restore as soon as FreeKiosk is back in the foreground (the user answered or dismissed
+     * the dialog), with a timeout in case that event never comes.
+     */
+    private fun scheduleBatteryDialogRestore() {
+        if (batteryDialogOriginalLockTaskPackages == null) return
+
+        val listener = object : com.facebook.react.bridge.LifecycleEventListener {
+            override fun onHostResume() = restoreBatteryDialogLockTaskPackages()
+            override fun onHostPause() {}
+            override fun onHostDestroy() = restoreBatteryDialogLockTaskPackages()
+        }
+        batteryDialogLifecycleListener = listener
+        reactApplicationContext.addLifecycleEventListener(listener)
+
+        val timeout = Runnable { restoreBatteryDialogLockTaskPackages() }
+        batteryDialogRestoreRunnable = timeout
+        mainHandler.postDelayed(timeout, BATTERY_DIALOG_WHITELIST_TIMEOUT_MS)
+    }
+
+    private fun resolveBatteryDialogPackages(): List<String> {
+        val packages = mutableSetOf("com.android.settings")
+        try {
+            val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = android.net.Uri.parse("package:${reactApplicationContext.packageName}")
+            }
+            reactApplicationContext.packageManager
+                .queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+                .forEach { info -> info.activityInfo?.packageName?.let { packages.add(it) } }
+        } catch (_: Exception) {}
+        return packages.toList()
     }
 
     private fun setWebViewPaused(tag: Int, paused: Boolean, promise: Promise) {

@@ -72,8 +72,8 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
     } catch (error) {
       console.warn('[MqttSettings] Battery exemption request failed:', error);
     }
-    // The system dialog is a separate activity, so re-check when we come back. It never
-    // opens while Lock Mode holds the device in lock task, hence the ADB fallback below.
+    // The system dialog is a separate activity, so re-check when we come back. Lock task
+    // no longer blocks it: KioskModule whitelists the dialog for the few seconds it is up.
     setTimeout(checkBatteryExemption, 1000);
   };
 
@@ -425,8 +425,7 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
                 <Text style={styles.connectButtonText}>Exempt FreeKiosk</Text>
               </TouchableOpacity>
               <Text style={styles.dozeText}>
-                The system dialog cannot open while Lock Mode is active. Either exit Lock Mode
-                first, or grant it over ADB:
+                If the dialog does not appear, grant it over ADB instead:
               </Text>
               <Text style={styles.dozeCommand}>
                 adb shell dumpsys deviceidle whitelist +com.freekiosk
