@@ -1968,7 +1968,15 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             captureViaAccessibility()?.let { return it }
         } else {
             captureViaAccessibility()?.let { return it }
+            // Keep the accessibility reason: it names what to fix (policy, service not
+            // enabled, Android version), whereas PixelCopy's fallback failure would just
+            // overwrite it with "window is not on screen", which is the situation, not the
+            // cause.
+            val accessibilityError = lastScreenshotError
             capturePixelCopy()?.let { return it }
+            if (accessibilityError != null) {
+                lastScreenshotError = accessibilityError
+            }
         }
 
         if (lastScreenshotError == null) {

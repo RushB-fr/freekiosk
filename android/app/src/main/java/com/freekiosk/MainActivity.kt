@@ -35,6 +35,14 @@ import androidx.core.content.ContextCompat
 class MainActivity : ReactActivity() {
 
   companion object {
+    // #222: set as soon as this activity is created, read by BootLockActivity. Its
+    // hand-off check used to infer "MainActivity took over" from BootLockActivity losing
+    // window focus, which is also what happens when a secure keyguard takes focus at boot:
+    // the poll loop then finished itself while MainActivity had never started. Same
+    // process, so a static is enough, and this cannot be true before CE storage unlocks.
+    @Volatile
+    var hasStarted = false
+
     // Flag partagé pour bloquer le relaunch - accessible depuis OverlayService
     @Volatile
     var blockAutoRelaunch = false
@@ -77,6 +85,7 @@ class MainActivity : ReactActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(null)
+    hasStarted = true  // #222: tells BootLockActivity the hand-off really happened
 
     // Keep screen always on
     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -635,7 +644,14 @@ class MainActivity : ReactActivity() {
     // Fix #106: In external app mode, on involuntary returns, do NOT re-enter
     // startLockTask on MainActivity (which would pin FreeKiosk). Instead, immediately
     // relaunch the external app from the native layer to minimize the flash.
-    if (isExternalAppMode && !isVoluntaryReturn && kioskEnabled && backButtonMode == "immediate") {
+    // #220 follow-up: never take this path in multi-app mode. externalAppPackage holds the
+    // SINGLE-app setting, so relaunching it here either brought back an app the user had not
+    // opened, or did nothing at all when the setting is empty. Multi-app always returns to
+    // the FreeKiosk grid instead, which is what the JS side does (KioskScreen: "Multi-app
+    // mode: ALWAYS return to grid, never relaunch any specific app").
+    val isMultiAppMode = getAsyncStorageValue("@kiosk_external_app_mode", "single") == "multi"
+
+    if (isExternalAppMode && !isMultiAppMode && !isVoluntaryReturn && kioskEnabled && backButtonMode == "immediate") {
       // Relaunch the external app directly if possible
       val targetPkg = externalAppPackage
       if (targetPkg != null) {

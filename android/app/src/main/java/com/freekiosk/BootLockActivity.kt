@@ -53,11 +53,29 @@ class BootLockActivity : Activity() {
          * lock actually being set, so it can never affect the non-secure fast-boot path.
          */
         private const val SECURE_LOCK_STALL_MS = 8_000L
+
+        /** #222: how often the off-main-thread watchdog reports and re-checks. */
+        private const val WATCHDOG_INTERVAL_MS = 2_000L
+
+        /**
+         * #222: below this, a boot is going normally (hand-off happens in a second or two)
+         * and nothing is logged. Past it we are in abnormal territory, and every tick is
+         * recorded: DebugLog.d is stripped from release builds, so without this a device
+         * stuck in the field would again leave no trace at all.
+         */
+        private const val DIAGNOSTIC_AFTER_MS = 5_000L
     }
 
     private val handler = Handler(Looper.getMainLooper())
     private var startTime = 0L
     private var mainActivityLaunched = false
+
+    // #222 instrumentation + off-main-thread recovery.
+    private var watchdogThread: android.os.HandlerThread? = null
+    private var watchdogHandler: Handler? = null
+    @Volatile private var watchdogStopped = false
+    @Volatile private var lastPollAt = 0L
+    @Volatile private var recoveryAttempted = false
 
     // ────────────────────────────────────────────────────────────────────
     // Lifecycle
@@ -102,10 +120,14 @@ class BootLockActivity : Activity() {
         // Start polling — once RN is ready the MainActivity will be in the foreground
         // and we can finish().
         handler.postDelayed(pollRunnable, POLL_INTERVAL_MS)
+
+        // #222: independent of the main thread, so a stall cannot silence it.
+        startStallWatchdog()
     }
 
     override fun onDestroy() {
         handler.removeCallbacks(pollRunnable)
+        stopStallWatchdog()
         super.onDestroy()
         DebugLog.d(TAG, "onDestroy")
     }
@@ -232,11 +254,21 @@ class BootLockActivity : Activity() {
         override fun run() {
             val elapsed = System.currentTimeMillis() - startTime
             pollCount++
+            lastPollAt = System.currentTimeMillis()
+            // #222: the only proof, in a release build, that this loop is alive at all.
+            if (elapsed >= DIAGNOSTIC_AFTER_MS && pollCount % 5 == 0) {
+                DebugLog.errorProduction(TAG, "poll alive: elapsed=${elapsed}ms count=$pollCount mainActivityLaunched=$mainActivityLaunched")
+            }
 
             // Safety timeout
+            // #222: keep polling after every finish(). In lock task a finish() can be
+            // absorbed, and returning here is what left the device with no supervision at
+            // all. onDestroy() removes this callback, so a finish() that works still stops
+            // the loop straight away.
             if (elapsed >= MAX_WAIT_MS) {
-                DebugLog.d(TAG, "Timeout reached — finishing BootLockActivity")
+                DebugLog.errorProduction(TAG, "Timeout reached after ${elapsed}ms — finishing BootLockActivity")
                 finish()
+                handler.postDelayed(this, POLL_INTERVAL_MS)
                 return
             }
 
@@ -244,6 +276,7 @@ class BootLockActivity : Activity() {
             if (isMainActivityReady()) {
                 DebugLog.d(TAG, "MainActivity is ready after ${elapsed}ms — finishing")
                 finish()
+                handler.postDelayed(this, POLL_INTERVAL_MS)
                 return
             }
 
@@ -255,6 +288,22 @@ class BootLockActivity : Activity() {
             // and a non-secure device never enters this branch.
             if (elapsed >= SECURE_LOCK_STALL_MS && isStuckBehindSecureKeyguard()) {
                 DebugLog.errorProduction(TAG, "Deferring to secure keyguard after ${elapsed}ms stall, finishing so the user can unlock (kiosk resumes at BOOT_COMPLETED)")
+                // #222 follow-up: finish() alone was not enough and the device stayed stuck.
+                // We are in lock task, and lock task DISABLES the keyguard unless
+                // LOCK_TASK_FEATURE_KEYGUARD is set (same platform behaviour #208 documents in
+                // KioskModule). So the activity went away and still no lock screen appeared for
+                // the user to unlock. Leave lock task first, then finish.
+                //
+                // Safe in this state and only in this state: the branch requires a secure lock
+                // to actually be set, so what the user gets is the system keyguard asking for
+                // their PIN, not an open device. The kiosk re-enters lock task at BOOT_COMPLETED
+                // once they unlock.
+                try {
+                    stopLockTask()
+                    DebugLog.errorProduction(TAG, "Left lock task so the secure keyguard can be shown")
+                } catch (e: Exception) {
+                    DebugLog.errorProduction(TAG, "Could not leave lock task: ${e.message}")
+                }
                 finish()
                 return
             }
@@ -263,7 +312,12 @@ class BootLockActivity : Activity() {
             // LOCKED_BOOT_COMPLETED time), retry every 5 seconds. Once CE unlocks —
             // which happens either automatically (no lock screen) or when BOOT_COMPLETED
             // fires — the retry will succeed and MainActivity will load normally.
-            if (!mainActivityLaunched && pollCount % 5 == 0) {
+            // #222: do NOT gate this on mainActivityLaunched. startActivity() returns a
+            // result code when the system refuses the launch (observed: -92 at
+            // LOCKED_BOOT_COMPLETED) instead of throwing, so the flag was set to true on a
+            // launch that never happened and the retry disarmed itself. The loop already
+            // stops as soon as isMainActivityReady(), so retrying costs nothing once it is up.
+            if (pollCount % 5 == 0) {
                 DebugLog.d(TAG, "Retrying MainActivity launch (CE storage may now be available, elapsed=${elapsed}ms)")
                 launchMainActivity()
             }
@@ -283,7 +337,14 @@ class BootLockActivity : Activity() {
             val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
             // If lock task mode is active and our activity is not the resumed one,
             // it means MainActivity has taken over.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            // #222: losing window focus is NOT proof that MainActivity took over. A secure
+            // keyguard taking focus at boot produces exactly the same signal, and the loop
+            // then declared the hand-off done, called finish() (absorbed by lock task, so the
+            // activity stayed on screen) and stopped polling, leaving the device stuck with
+            // nothing watching. MainActivity now says so itself.
+            if (!MainActivity.hasStarted) {
+                false
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 val lockTaskMode = am.lockTaskModeState
                 lockTaskMode != android.app.ActivityManager.LOCK_TASK_MODE_NONE && !hasWindowFocus()
             } else {
@@ -292,6 +353,72 @@ class BootLockActivity : Activity() {
         } catch (e: Exception) {
             false
         }
+    }
+
+    /**
+     * #222 diagnosis: everything here used to hang off the main-thread handler, and
+     * DebugLog.d is compiled out of release builds, so a release device stuck on this
+     * screen produced no trace at all. This watchdog runs on its own thread and logs with
+     * errorProduction, so one reboot tells us which of the two failures we have:
+     *
+     *  - poll heartbeat missing while the watchdog keeps ticking: the main thread is
+     *    blocked or the poll runnable never ran, and no main-thread recovery can work.
+     *  - both ticking but "stuck" false: the detection is wrong, and the logged values of
+     *    isDeviceSecure / isUserUnlocked say why.
+     *
+     * It also carries the recovery itself, so it no longer depends on the poll loop being
+     * alive to fire.
+     */
+    private fun startStallWatchdog() {
+        val thread = android.os.HandlerThread("BootLockWatchdog").apply { start() }
+        watchdogThread = thread
+        val wHandler = Handler(thread.looper)
+        watchdogHandler = wHandler
+
+        wHandler.post(object : Runnable {
+            override fun run() {
+                if (watchdogStopped) return
+                val elapsed = System.currentTimeMillis() - startTime
+                val sinceLastPoll = if (lastPollAt == 0L) -1 else System.currentTimeMillis() - lastPollAt
+                val secure = try { BootReceiver.isDeviceSecure(this@BootLockActivity) } catch (e: Exception) { null }
+                val unlocked = try {
+                    (getSystemService(Context.USER_SERVICE) as android.os.UserManager).isUserUnlocked()
+                } catch (e: Exception) { null }
+
+                if (elapsed >= DIAGNOSTIC_AFTER_MS) {
+                    DebugLog.errorProduction(
+                        TAG,
+                        "watchdog: elapsed=${elapsed}ms pollAge=${sinceLastPoll}ms " +
+                            "mainActivityLaunched=$mainActivityLaunched deviceSecure=$secure userUnlocked=$unlocked"
+                    )
+                }
+
+                if (!recoveryAttempted && elapsed >= SECURE_LOCK_STALL_MS && secure == true && unlocked == false) {
+                    recoveryAttempted = true
+                    DebugLog.errorProduction(TAG, "watchdog: stuck behind a secure keyguard, recovering")
+                    runOnUiThread {
+                        try {
+                            stopLockTask()
+                            DebugLog.errorProduction(TAG, "watchdog: left lock task")
+                        } catch (e: Exception) {
+                            DebugLog.errorProduction(TAG, "watchdog: stopLockTask failed: ${e.message}")
+                        }
+                        finish()
+                        DebugLog.errorProduction(TAG, "watchdog: finish() called")
+                    }
+                }
+
+                wHandler.postDelayed(this, WATCHDOG_INTERVAL_MS)
+            }
+        })
+    }
+
+    private fun stopStallWatchdog() {
+        watchdogStopped = true
+        watchdogHandler?.removeCallbacksAndMessages(null)
+        watchdogHandler = null
+        watchdogThread?.quitSafely()
+        watchdogThread = null
     }
 
     /**
