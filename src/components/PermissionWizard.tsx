@@ -121,9 +121,10 @@ const ITEMS: PermItem[] = [
     label: 'Ignore battery optimizations',
     description: 'Keeps the cloud heartbeat alive so the device can be woken remotely.',
     icon: 'flash',
-    // No reliable read-back API; treat the request as the action and leave it
-    // as "action available" rather than claiming a definite state.
-    check: () => Promise.resolve(false),
+    // The request is a no-op once the exemption is held, so without reading the state
+    // back the step stayed listed as outstanding for ever and tapping it did nothing
+    // visible. PowerManager does answer this one.
+    check: () => safeBool(KioskModule?.isIgnoringBatteryOptimizations()),
     action: async () => {
       await KioskModule?.requestIgnoreBatteryOptimizations().catch(() => {});
     },

@@ -164,6 +164,9 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [inactivityReturnScrollTop, setInactivityReturnScrollTop] = useState<boolean>(true);
   const inactivityReturnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentWebViewUrlRef = useRef<string>(''); // Track current WebView URL for return logic
+  // Read by the cloud config-sync listener, which is registered once and would otherwise
+  // close over the mode as it was at mount.
+  const displayModeRef = useRef(displayMode);
 
   // Track focus transitions (true→false) to avoid false cleanup triggers
   const prevIsFocusedRef = useRef<boolean>(true);
@@ -335,6 +338,9 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     return () => backHandler.remove();
   }, []);
 
+  // Keep the ref above in step with the state it mirrors.
+  useEffect(() => { displayModeRef.current = displayMode; }, [displayMode]);
+
   // Cloud sync: start heartbeat loop on mount, reload settings on config push
   useEffect(() => {
     DeviceControlService.registerWebViewCallbacks(
@@ -352,7 +358,22 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     }
 
     const onConfigUpdated = CLOUD_ENABLED
-      ? DeviceEventEmitter.addListener(CONFIG_UPDATED_EVENT, () => { loadSettings(); })
+      ? DeviceEventEmitter.addListener(CONFIG_UPDATED_EVENT, async () => {
+          const previousMode = displayModeRef.current;
+          await loadSettings();
+
+          // A pushed config that leaves external_app mode needs us back in front. The
+          // launched app owns the screen and lives in its own task, so loadSettings()
+          // alone only moves our state: the device then reports the new mode to the
+          // cloud while still showing the other app, i.e. the dashboard is told
+          // something that is not true. Same treatment the REST/MQTT setMode path got
+          // in #209, including the guard so onResume does not relaunch what we just left.
+          const nextMode = await StorageService.getDisplayMode();
+          if (previousMode === 'external_app' && nextMode !== 'external_app') {
+            await KioskModule.setBlockAutoRelaunch(true).catch(() => {});
+            await KioskModule.bringToFront().catch(() => {});
+          }
+        })
       : null;
 
     const onForceUnenroll = CLOUD_ENABLED

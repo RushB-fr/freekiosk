@@ -46,6 +46,9 @@ interface KioskModuleInterface {
   // Start the keep-alive foreground service when a feature needs the process to survive
   // being backgrounded (MQTT, or an enrolled device). No-op otherwise.
   ensureKeepAliveWatchdog(): Promise<boolean>;
+  // Whether the app is already exempt from Doze. The request below is a no-op when it is,
+  // so callers need this to tell "granted" from "the dialog did not open".
+  isIgnoringBatteryOptimizations(): Promise<boolean>;
   // Open native Android settings
   openAndroidSettings(settingsPage?: string | null): Promise<boolean>;
   // Bring FreeKiosk's activity to foreground (used when screensaver activates in External App mode)

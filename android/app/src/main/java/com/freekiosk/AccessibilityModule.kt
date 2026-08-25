@@ -3,6 +3,7 @@ package com.freekiosk
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
 import android.provider.Settings
 import android.text.TextUtils
 import android.util.Log
@@ -18,6 +19,13 @@ class AccessibilityModule(private val reactContext: ReactApplicationContext) :
     companion object {
         private const val TAG = "AccessibilityModule"
         const val NAME = "AccessibilityModule"
+
+        /**
+         * Settings.ACTION_ACCESSIBILITY_DETAILS_SETTINGS as a literal: the constant is not
+         * exposed by every compileSdk, and the page is reached by convention anyway.
+         */
+        private const val ACTION_ACCESSIBILITY_DETAILS =
+            "android.settings.ACCESSIBILITY_DETAILS_SETTINGS"
     }
 
     override fun getName(): String = NAME
@@ -53,6 +61,13 @@ class AccessibilityModule(private val reactContext: ReactApplicationContext) :
      */
     @ReactMethod
     fun openAccessibilitySettings(promise: Promise) {
+        // Try to land straight on FreeKiosk's own service page first. The plain
+        // accessibility list buries third-party services under a submenu ("Installed
+        // apps" on One UI), which is where users give up looking for us.
+        if (openServiceDetailsPage()) {
+            promise.resolve(true)
+            return
+        }
         try {
             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
@@ -61,6 +76,35 @@ class AccessibilityModule(private val reactContext: ReactApplicationContext) :
         } catch (e: Exception) {
             Log.e(TAG, "Failed to open accessibility settings: ${e.message}")
             promise.reject("ERROR", "Failed to open accessibility settings: ${e.message}")
+        }
+    }
+
+    /**
+     * Deep-link to this service's own accessibility page.
+     *
+     * ACTION_ACCESSIBILITY_DETAILS_SETTINGS is public from API 31, but the extra that
+     * selects *which* service is not part of the public API: it is the long-standing
+     * ":settings:fragment_args_key" convention that Settings apps honour. Best-effort by
+     * design, hence the boolean return and the plain-list fallback in the caller.
+     */
+    private fun openServiceDetailsPage(): Boolean {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S) return false
+        return try {
+            val component = ComponentName(
+                reactContext, FreeKioskAccessibilityService::class.java
+            ).flattenToString()
+            val args = Bundle().apply { putString(":settings:fragment_args_key", component) }
+            val intent = Intent(ACTION_ACCESSIBILITY_DETAILS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                putExtra(":settings:fragment_args_key", component)
+                putExtra(":settings:show_fragment_args", args)
+            }
+            if (intent.resolveActivity(reactContext.packageManager) == null) return false
+            reactContext.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            Log.d(TAG, "Accessibility details deep-link unavailable: ${e.message}")
+            false
         }
     }
 
