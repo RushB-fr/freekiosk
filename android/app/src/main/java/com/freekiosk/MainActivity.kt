@@ -35,6 +35,14 @@ import androidx.core.content.ContextCompat
 class MainActivity : ReactActivity() {
 
   companion object {
+    /**
+     * #238: how long JS may take to finish starting before we release screen pinning.
+     * Generous on purpose: React Native legitimately takes one to two minutes on the
+     * low-end hardware #96 was written for, and releasing too early would unpin a kiosk
+     * that is merely booting slowly.
+     */
+    private const val JS_READY_GRACE_MS = 90_000L
+
     // #222: set as soon as this activity is created, read by BootLockActivity. Its
     // hand-off check used to infer "MainActivity took over" from BootLockActivity losing
     // window focus, which is also what happens when a secure keyguard takes focus at boot:
@@ -148,6 +156,9 @@ class MainActivity : ReactActivity() {
 
     // Start KioskWatchdogService (#96) — survives OOM kills via START_STICKY
     startKioskWatchdogIfNeeded()
+
+    // #238 — Startup safety valve, screen-pinning (non Device Owner) only.
+    armPinningSafetyValve()
 
     // If started from HomeActivity (External App Mode at boot),
     // move to background so the external app stays in foreground
@@ -305,6 +316,41 @@ class MainActivity : ReactActivity() {
     }
   }
 
+  /**
+   * #238: on a device WITHOUT Device Owner, we pin from onCreate (screen pinning), long
+   * before React Native has started. If JS then never finishes starting, the user is left
+   * with a frozen app pinned on screen and no way out: the reporter's device could only be
+   * recovered with `adb shell am task lock stop`, which no ordinary user has.
+   *
+   * So: if JS has not completed a settings load after the grace period, leave pinning. The
+   * device becomes usable again, and nothing is lost when the app is merely slow, because
+   * KioskScreen calls startLockTask() itself at the end of its own load and re-pins.
+   *
+   * Deliberately NOT applied to Device Owner: there the kiosk must stay locked, lock task is
+   * the security boundary rather than a convenience, and those devices have BootLockActivity
+   * and its own recovery path.
+   */
+  private fun armPinningSafetyValve() {
+    if (devicePolicyManager.isDeviceOwnerApp(packageName)) return
+    if (!isKioskEnabled()) return
+
+    pinningValveRunnable = Runnable {
+      if (KioskModule.jsReachedSettingsLoaded) return@Runnable
+      try {
+        val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+        if (am.lockTaskModeState == android.app.ActivityManager.LOCK_TASK_MODE_NONE) return@Runnable
+        DebugLog.errorProduction(
+          "MainActivity",
+          "JS never finished starting after ${JS_READY_GRACE_MS}ms — leaving screen pinning so the device stays usable"
+        )
+        stopLockTask()
+      } catch (e: Exception) {
+        DebugLog.errorProduction("MainActivity", "Pinning safety valve failed: ${e.message}")
+      }
+    }
+    Handler(Looper.getMainLooper()).postDelayed(pinningValveRunnable!!, JS_READY_GRACE_MS)
+  }
+
   private fun checkAndStartLockTask() {
     val kioskEnabled = isKioskEnabled()
     DebugLog.d("MainActivity", "Kiosk enabled: $kioskEnabled")
@@ -370,6 +416,9 @@ class MainActivity : ReactActivity() {
   // Set when startLockTask() failed because the task was not yet in the foreground.
   // We retry the lock task once the activity actually gains window focus (onWindowFocusChanged).
   private var lockTaskPending = false
+
+  // #238: startup safety valve (screen pinning only).
+  private var pinningValveRunnable: Runnable? = null
 
   /**
    * Calls startLockTask() defensively.
@@ -1881,6 +1930,8 @@ class MainActivity : ReactActivity() {
 
   override fun onDestroy() {
     super.onDestroy()
+    pinningValveRunnable?.let { Handler(Looper.getMainLooper()).removeCallbacks(it) }
+    pinningValveRunnable = null
 
     // #237: only lift the kiosk restrictions on a deliberate exit. onDestroy() also fires
     // when the system destroys this activity while an external app holds the foreground,

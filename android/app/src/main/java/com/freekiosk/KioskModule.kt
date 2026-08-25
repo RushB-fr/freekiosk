@@ -58,6 +58,13 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
         // come back (dialog dismissed by the system, activity never resumed).
         private const val BATTERY_DIALOG_WHITELIST_TIMEOUT_MS = 60_000L
 
+        /**
+         * #238: set once JS has completed a full settings load. Read by MainActivity's
+         * startup safety valve.
+         */
+        @Volatile
+        var jsReachedSettingsLoaded = false
+
         // Store the current instance to allow sending events from MainActivity
         @Volatile
         private var currentInstance: KioskModule? = null
@@ -1353,6 +1360,10 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     @ReactMethod
     fun broadcastSettingsLoaded(promise: Promise) {
         try {
+            // #238: proof that React Native actually finished starting. MainActivity pins the
+            // device from onCreate, long before JS is up, so without this signal a JS startup
+            // that never completes leaves a frozen app pinned on screen.
+            jsReachedSettingsLoaded = true
             val intent = Intent("com.freekiosk.SETTINGS_LOADED")
             reactApplicationContext.sendBroadcast(intent)
             android.util.Log.i("KioskModule", "Broadcasted SETTINGS_LOADED")
