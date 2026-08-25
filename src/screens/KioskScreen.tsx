@@ -577,6 +577,12 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         onSetUrl: async (newUrl: string) => {
           setUrl(newUrl);
           setBaseUrl(newUrl); // Update baseUrl so InactivityReturn uses the new URL as home
+          // #231: in dashboard mode the grid is rendered INSTEAD of the WebView, and
+          // loadSettings() forces the grid back on every focus, including the return from
+          // the PIN screen. A remote URL then updated the state, and Home Assistant showed
+          // it, while nothing on screen could display it: the WebView was not mounted at
+          // all. Leaving the grid is part of honouring the command.
+          setDashboardShowGrid(false);
           setWebViewKey(prev => prev + 1);
           // Persist to storage so Settings shows updated value
           await StorageService.saveUrl(newUrl);
