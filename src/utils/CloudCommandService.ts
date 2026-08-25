@@ -21,9 +21,34 @@ import RNFS from 'react-native-fs';
 
 import { ApiService, ActionResult } from './ApiService';
 import { getCloudCredentials, CloudCredentials } from './secureStorage';
+import { StorageService } from './storage';
 import ManagedAppInstaller from './ManagedAppInstaller';
 
 const { HttpServerModule } = NativeModules;
+
+/** Our own package, so a self-update is recognised as a process-killing command. */
+const OWN_PACKAGE = 'com.freekiosk';
+
+/** Give up on a result the server never accepted rather than retry it forever. */
+const MAX_REPORT_ATTEMPTS = 10;
+
+// Declared as type aliases, not interfaces, so they stay assignable to the
+// Record<string, unknown> the storage layer persists.
+type PendingReport = {
+  commandId: string;
+  status: 'success' | 'error';
+  result: Record<string, unknown> | null;
+  errorMessage: string;
+  attempts: number;
+};
+
+/** A command persisted before dispatch, so it survives the process dying mid-execution. */
+type InflightCommand = {
+  commandId: string;
+  type: string;
+  /** True when the process is expected to die (reboot, self-update): that is the success case. */
+  killsProcess: boolean;
+};
 
 interface CloudCommand {
   id: string;
@@ -86,6 +111,7 @@ class CloudCommandServiceClass {
 
     this.isPolling = true;
     try {
+      await this.settleOutstanding(c);
       // APK updates first — these are the slowest, and ordering doesn't matter.
       await this.pollUpdates(c);
       await this.pollCommands(c);
@@ -119,9 +145,84 @@ class CloudCommandServiceClass {
         continue;
       }
 
+      // Persist before dispatch: `reboot` takes the device down and a self-update
+      // replaces this very process, so without a marker on disk their result could
+      // never be reported and the command stayed 'sent' on the server for good.
+      await StorageService.saveInflightCommand({
+        commandId: cmd.id,
+        type: cmd.type,
+        killsProcess: cmd.type === 'reboot',
+      } satisfies InflightCommand);
+
       const outcome = await this.runCommand(cmd, c);
+      await StorageService.saveInflightCommand(null);
       await this.reportResult(c, cmd.id, outcome);
     }
+  }
+
+  /**
+   * Finish anything a previous run could not: a command interrupted by a restart,
+   * then results the network refused. Called on every poll and once at startup.
+   *
+   * The startup call is the one that matters for an interrupted command: the server
+   * moved it to 'sent' when it handed it over, so it no longer counts as pending and
+   * a heartbeat alone would never trigger a poll to pick the marker back up.
+   */
+  async settleOutstanding(creds?: CloudCredentials): Promise<void> {
+    const c = creds ?? (await getCloudCredentials());
+    if (!c) return;
+    try {
+      await this.reportInflightCommand(c);
+      await this.flushPendingReports(c);
+    } catch (error) {
+      console.error('[CloudCommand] Settle error:', error);
+    }
+  }
+
+  /**
+   * Report a command that was still in flight when the process died. A command
+   * expected to kill the process (reboot, self-update) reached its goal, so it is
+   * reported as a success; anything else was interrupted and says so honestly.
+   */
+  private async reportInflightCommand(c: CloudCredentials): Promise<void> {
+    const raw = await StorageService.getInflightCommand();
+    if (!raw) return;
+    await StorageService.saveInflightCommand(null);
+
+    const inflight = raw as InflightCommand;
+    if (!inflight.commandId) return;
+    this.processed.add(inflight.commandId);
+
+    await this.reportResult(
+      c,
+      inflight.commandId,
+      inflight.killsProcess
+        ? { ok: true, result: { restarted: true } }
+        : { ok: false, error: 'Device restarted before the command result could be reported' },
+    );
+  }
+
+  /** Retry results the network refused earlier. Dropped after MAX_REPORT_ATTEMPTS. */
+  private async flushPendingReports(c: CloudCredentials): Promise<void> {
+    const queue = (await StorageService.getPendingReports()) as PendingReport[];
+    if (queue.length === 0) return;
+
+    const stillPending: PendingReport[] = [];
+    for (const report of queue) {
+      const sent = await this.postResult(c, report);
+      if (!sent && report.attempts + 1 < MAX_REPORT_ATTEMPTS) {
+        stillPending.push({ ...report, attempts: report.attempts + 1 });
+      }
+    }
+    await StorageService.savePendingReports(stillPending);
+  }
+
+  private async enqueueReport(report: PendingReport): Promise<void> {
+    const queue = (await StorageService.getPendingReports()) as PendingReport[];
+    // Guard against the same result piling up if a poll overlaps a retry.
+    const deduped = queue.filter(r => r.commandId !== report.commandId);
+    deduped.push(report);
+    await StorageService.savePendingReports(deduped);
   }
 
   private async runCommand(cmd: CloudCommand, c: CloudCredentials): Promise<ActionResult> {
@@ -136,9 +237,37 @@ class CloudCommandServiceClass {
     }
     try {
       const { command, params } = mapper(cmd.params || {});
+      // Prefer the native handler: it runs whatever the JS thread is doing, which is
+      // what the local REST API has always done. Only commands the native layer cannot
+      // finish on its own fall through to the JS path below.
+      const native = await this.tryNative(command, params);
+      if (native) return native;
       return await ApiService.executeAction(command, params);
     } catch (error: any) {
       return { ok: false, error: error?.message ?? String(error) };
+    }
+  }
+
+  /**
+   * Dispatch through the native command handler. Resolves null when the command needs
+   * the JS thread (or the native build predates this bridge), so the caller falls back.
+   */
+  private async tryNative(
+    command: string,
+    params: Record<string, any>,
+  ): Promise<ActionResult | null> {
+    if (!HttpServerModule?.executeNativeCommand) return null;
+    try {
+      const raw: string = await HttpServerModule.executeNativeCommand(
+        command,
+        JSON.stringify(params ?? {}),
+      );
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (!parsed || parsed.nativelyHandled === false) return null;
+      return { ok: true, result: parsed };
+    } catch {
+      // Never let a native failure swallow the command: let the JS path have its turn.
+      return null;
     }
   }
 
@@ -201,12 +330,21 @@ class CloudCommandServiceClass {
       if (!u.command_id || this.processed.has(u.command_id)) continue;
       this.processed.add(u.command_id);
 
+      // A self-update replaces this process mid-install, so the marker is what
+      // lets the result be reported once the new version comes up.
+      await StorageService.saveInflightCommand({
+        commandId: u.command_id,
+        type: 'install_apk',
+        killsProcess: u.package_name === OWN_PACKAGE,
+      } satisfies InflightCommand);
+
       try {
         const result = await ManagedAppInstaller.installFromUrl(
           u.download_url,
           c.apiKey, // the download endpoint is authenticated with the device API key
           u.package_name ?? null,
         );
+        await StorageService.saveInflightCommand(null);
         await this.reportResult(c, u.command_id, {
           ok: true,
           result: {
@@ -216,6 +354,7 @@ class CloudCommandServiceClass {
           },
         });
       } catch (error: any) {
+        await StorageService.saveInflightCommand(null);
         await this.reportResult(c, u.command_id, {
           ok: false,
           error: error?.message ?? String(error),
@@ -231,21 +370,43 @@ class CloudCommandServiceClass {
     commandId: string,
     outcome: ActionResult,
   ): Promise<void> {
+    const report: PendingReport = {
+      commandId,
+      status: outcome.ok ? 'success' : 'error',
+      result: outcome.result ?? null,
+      errorMessage: outcome.ok ? '' : outcome.error ?? 'Unknown error',
+      attempts: 0,
+    };
+    const sent = await this.postResult(c, report);
+    if (!sent) {
+      // The command did run. Queue the result so the dashboard eventually learns
+      // its outcome instead of showing it as 'sent' with no answer for ever.
+      await this.enqueueReport(report);
+    }
+  }
+
+  /** POST one result. Returns whether the server accepted it. */
+  private async postResult(c: CloudCredentials, report: PendingReport): Promise<boolean> {
     try {
-      await fetch(`${c.cloudUrl}/api/v1/commands/${commandId}/result/`, {
+      const res = await fetch(`${c.cloudUrl}/api/v1/commands/${report.commandId}/result/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${c.apiKey}`,
         },
         body: JSON.stringify({
-          status: outcome.ok ? 'success' : 'error',
-          result: outcome.result ?? null,
-          error_message: outcome.ok ? '' : outcome.error ?? 'Unknown error',
+          status: report.status,
+          result: report.result,
+          error_message: report.errorMessage,
         }),
       });
+      // A 4xx means the server will never accept this result (expired, unknown id),
+      // so treat it as done rather than retrying it until the attempt cap.
+      if (!res.ok && res.status >= 500) return false;
+      return true;
     } catch (error) {
-      console.error('[CloudCommand] Failed to report result for', commandId, error);
+      console.error('[CloudCommand] Failed to report result for', report.commandId, error);
+      return false;
     }
   }
 }

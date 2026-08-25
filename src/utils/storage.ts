@@ -184,6 +184,17 @@ export const KEYS = {
   // version doesn't model yet, so unknown settings survive an export round-trip
   // (prevents an older app from stripping newer settings when it echoes to the cloud).
   RAW_CLOUD_CONFIG: '@cloud_raw_config',
+  // Command results that could not be POSTed back to the cloud (network down at the
+  // moment of reporting). Retried on the next poll: without this the server keeps the
+  // command in 'sent' forever, since it only ever hands out 'pending' ones.
+  CLOUD_PENDING_REPORTS: '@cloud_pending_reports',
+  // The command currently being executed, persisted before dispatch so a command that
+  // kills the process (reboot, self-update) can still be reported after the restart.
+  CLOUD_INFLIGHT_COMMAND: '@cloud_inflight_command',
+  // Mirrors "this device is enrolled" as a plain boolean, because the credentials
+  // themselves live encrypted in the Keychain and KioskWatchdogService reads its flags
+  // straight out of the AsyncStorage SQLite file, with no JS bridge available.
+  CLOUD_ENROLLED: '@cloud_enrolled',
 };
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> =>
@@ -2860,6 +2871,45 @@ export const StorageService = {
         KEYS.LAST_SENT_CONFIG_HASH,
       ]);
     } catch (error) { console.error('Error resetting sync metadata:', error); }
+  },
+
+  /**
+   * Native-readable mirror of the enrolment state. Written as JSON so it matches the
+   * "true"/"false" the watchdog's readFlag() compares against.
+   */
+  saveCloudEnrolled: async (value: boolean): Promise<void> => {
+    try { await AsyncStorage.setItem(KEYS.CLOUD_ENROLLED, JSON.stringify(value)); }
+    catch (error) { console.error('Error saving cloud enrolled flag:', error); }
+  },
+
+  // ============ CLOUD COMMAND DELIVERY ============
+
+  getPendingReports: async (): Promise<unknown[]> => {
+    try {
+      const raw = await AsyncStorage.getItem(KEYS.CLOUD_PENDING_REPORTS);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  },
+
+  savePendingReports: async (reports: unknown[]): Promise<void> => {
+    try { await AsyncStorage.setItem(KEYS.CLOUD_PENDING_REPORTS, JSON.stringify(reports)); }
+    catch (error) { console.error('Error saving pending cloud reports:', error); }
+  },
+
+  getInflightCommand: async (): Promise<Record<string, unknown> | null> => {
+    try {
+      const raw = await AsyncStorage.getItem(KEYS.CLOUD_INFLIGHT_COMMAND);
+      const parsed = raw ? JSON.parse(raw) : null;
+      return isPlainObject(parsed) ? parsed : null;
+    } catch { return null; }
+  },
+
+  saveInflightCommand: async (cmd: Record<string, unknown> | null): Promise<void> => {
+    try {
+      if (cmd === null) await AsyncStorage.removeItem(KEYS.CLOUD_INFLIGHT_COMMAND);
+      else await AsyncStorage.setItem(KEYS.CLOUD_INFLIGHT_COMMAND, JSON.stringify(cmd));
+    } catch (error) { console.error('Error saving in-flight cloud command:', error); }
   },
 
   // ============ CONFIG EXPORT / IMPORT ============

@@ -25,6 +25,13 @@ export const FORCE_UNENROLL_EVENT = 'FREEKIOSK_FORCE_UNENROLL';
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 
+/**
+ * Shortest gap between two heartbeats, whichever clock asked for them. Comfortably below
+ * HEARTBEAT_INTERVAL_MS so a normal tick is never dropped, and above the few seconds that
+ * separate a headless run from the JS timer it wakes up.
+ */
+const MIN_HEARTBEAT_GAP_MS = 20_000;
+
 interface HeartbeatResponse {
   status: string;
   pending_commands: number;
@@ -56,6 +63,7 @@ async function simpleHash(str: string): Promise<string> {
 
 class CloudSyncServiceClass {
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private lastHeartbeatAtMs = 0;
   private isRunning = false;
 
   // ─── Lifecycle ───────────────────────────────────────────────────────────────
@@ -65,6 +73,15 @@ class CloudSyncServiceClass {
     const creds = await getCloudCredentials();
     if (!creds) return;
     this.isRunning = true;
+    // The interval below only runs while the activity is resumed: React Native stops
+    // dispatching JS timers on host pause, so behind a launched external app this loop
+    // stops and the device is reported offline after two minutes while running perfectly.
+    // KioskWatchdogService owns the ticker that covers that case, driving the heartbeat
+    // through a headless task (CloudHeartbeatTaskService). Mirror the enrolment for it,
+    // since it reads AsyncStorage directly with no bridge available, and start it now:
+    // MainActivity's own call already ran before we enrolled.
+    await StorageService.saveCloudEnrolled(true);
+    KioskModule.ensureKeepAliveWatchdog?.().catch(() => {/* best-effort */});
     // Keep the CPU + WiFi awake so this heartbeat/poll loop survives screen-off; without
     // it the device drops off the cloud and can no longer be woken remotely.
     KioskModule.acquireCloudWakeLock().catch(() => {/* best-effort */});
@@ -73,6 +90,10 @@ class CloudSyncServiceClass {
     // suppresses in lock task, and is a no-op once granted or in Play builds. Best-effort:
     // the wake lock is the primary mechanism.
     KioskModule.requestIgnoreBatteryOptimizations().catch(() => {/* best-effort */});
+    // Close out whatever the previous process left open (a reboot we executed, a
+    // result the network refused) before the first heartbeat. Fire-and-forget: it
+    // must never delay the device coming back online.
+    CloudCommandService.settleOutstanding(creds).catch(() => {/* handles its own errors */});
     await this.sendHeartbeat(creds);
     this.heartbeatTimer = setInterval(
       () => getCloudCredentials().then(c => c && this.sendHeartbeat(c)),
@@ -91,9 +112,21 @@ class CloudSyncServiceClass {
 
   // ─── Heartbeat ───────────────────────────────────────────────────────────────
 
-  async sendHeartbeat(creds?: CloudCredentials): Promise<void> {
+  /**
+   * @param options.force bypass the debounce, for an explicit republish (e.g. after the
+   *   permission wizard changes the capability list) rather than a scheduled tick.
+   */
+  async sendHeartbeat(creds?: CloudCredentials, options?: { force?: boolean }): Promise<void> {
     const c = creds ?? await getCloudCredentials();
     if (!c) return;
+
+    // Two clocks drive this: the JS interval in the foreground, and the native ticker
+    // (via CloudHeartbeatTaskService) while backgrounded. Starting a headless task also
+    // re-arms JS timers, so both fire for a moment and the device heartbeats twice per
+    // period. Collapse anything that lands too close to the previous beat.
+    const now = Date.now();
+    if (!options?.force && now - this.lastHeartbeatAtMs < MIN_HEARTBEAT_GAP_MS) return;
+    this.lastHeartbeatAtMs = now;
 
     try {
       const config = await StorageService.exportConfig();

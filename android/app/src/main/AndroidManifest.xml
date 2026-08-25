@@ -186,6 +186,10 @@
           <action android:name="android.intent.action.QUICKBOOT_POWERON" />
           <action android:name="android.intent.action.REBOOT" />
           <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+          <!-- After an update Android only restarts what it still binds (the accessibility
+               service) and never recreates MainActivity, so in External App mode the kiosk
+               is left unsupervised. This is the hook that brings it back. -->
+          <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
           <category android:name="android.intent.category.DEFAULT" />
         </intent-filter>
       </receiver>
@@ -222,6 +226,14 @@
           android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
           android:value="kiosk_watchdog"/>
       </service>
+
+      <!-- Runs one cloud heartbeat while backgrounded: React Native stops dispatching JS
+           timers on host pause, so the heartbeat interval alone cannot keep the device
+           online behind an external app. -->
+      <service
+        android:name=".CloudHeartbeatTaskService"
+        android:enabled="true"
+        android:exported="false"/>
 
       <!-- Receiver for silent installation results (disabled in Play Store builds) -->
       <receiver

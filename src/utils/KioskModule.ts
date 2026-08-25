@@ -43,6 +43,9 @@ interface KioskModuleInterface {
   // Pending cloud enrollment left by Device Owner provisioning (setup-wizard QR)
   getPendingCloudEnrollment(): Promise<{ enroll_token: string; cloud_url: string; org_id: string } | null>;
   clearPendingCloudEnrollment(): Promise<boolean>;
+  // Start the keep-alive foreground service when a feature needs the process to survive
+  // being backgrounded (MQTT, or an enrolled device). No-op otherwise.
+  ensureKeepAliveWatchdog(): Promise<boolean>;
   // Open native Android settings
   openAndroidSettings(settingsPage?: string | null): Promise<boolean>;
   // Bring FreeKiosk's activity to foreground (used when screensaver activates in External App mode)

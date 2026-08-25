@@ -15,6 +15,8 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
+import com.facebook.react.HeadlessJsTaskService
 import androidx.core.app.NotificationCompat
 
 /**
@@ -43,6 +45,9 @@ class KioskWatchdogService : Service() {
         private const val CHECK_INTERVAL_MS = 10_000L  // check every 10 s
         private const val RELAUNCH_COOLDOWN_MS = 15_000L // min 15 s between relaunches
 
+        /** Matches the JS heartbeat interval in CloudSyncService. */
+        private const val CLOUD_HEARTBEAT_INTERVAL_MS = 30_000L
+
         /**
          * #234: the service runs in one of two modes, persisted because START_STICKY
          * restarts it with a null intent.
@@ -60,7 +65,15 @@ class KioskWatchdogService : Service() {
         fun startForKiosk(context: Context) = start(context, keepAliveOnly = false)
 
         /**
-         * #234: start the keep-alive service for MQTT.
+         * #234: start the keep-alive service for the features that need the process to
+         * survive being backgrounded: MQTT, and since the cloud integration, an enrolled
+         * device.
+         *
+         * The cloud case is the #234 rationale, not the timer one: an enrolled device left
+         * as an ordinary background app gets killed by OEM battery managers, and this
+         * service is also what owns the ticker that drives the background heartbeat. It
+         * does *not* by itself keep the heartbeat running: JS timers stop on host pause
+         * whatever the process priority, which is what CloudHeartbeatTaskService fixes.
          *
          * Does nothing when Lock Mode is enabled, since the kiosk guard is already running
          * and holds the process up. [force] is for the admin-exit path, which stops the
@@ -68,11 +81,15 @@ class KioskWatchdogService : Service() {
          * must not fall back to guard mode or the watchdog would drag the admin back into
          * the kiosk.
          */
-        fun startForMqttIfNeeded(context: Context, force: Boolean = false) {
-            if (!readFlag(context, "@kiosk_mqtt_enabled")) return
+        fun startKeepAliveIfNeeded(context: Context, force: Boolean = false) {
+            if (!needsKeepAlive(context)) return
             if (!force && readFlag(context, "@kiosk_enabled")) return
             start(context, keepAliveOnly = true)
         }
+
+        /** True when something in the app needs the process alive while backgrounded. */
+        private fun needsKeepAlive(context: Context): Boolean =
+            readFlag(context, "@kiosk_mqtt_enabled") || readFlag(context, "@cloud_enrolled")
 
         private fun start(context: Context, keepAliveOnly: Boolean) {
             try {
@@ -116,6 +133,7 @@ class KioskWatchdogService : Service() {
     /** #234: true when this instance only holds the process up (no relaunching). */
     private var keepAliveOnly = false
     private var lastRelaunchTime = 0L
+    private var lastCloudHeartbeatMs = 0L
     private var screenOnReceiver: BroadcastReceiver? = null
 
     private val checkRunnable = object : Runnable {
@@ -148,8 +166,8 @@ class KioskWatchdogService : Service() {
 
         if (keepAliveOnly) {
             // #234: nothing to guard, we are only here so the process is not killed.
-            if (!isMqttEnabled()) {
-                DebugLog.d(TAG, "MQTT disabled — stopping keep-alive watchdog")
+            if (!keepAliveStillNeeded()) {
+                DebugLog.d(TAG, "Nothing left to keep alive - stopping keep-alive watchdog")
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -185,12 +203,16 @@ class KioskWatchdogService : Service() {
     // ────────────────────────────────────────────────────────────────────
 
     private fun checkAndRelaunch() {
+        // Runs in both modes: an enrolled device in Lock Mode with an external app in front
+        // is just as backgrounded as one without it, and its heartbeat stops the same way.
+        maybeRunCloudHeartbeat()
+
         // #234: keep-alive mode never relaunches anything. FreeKiosk is a normal app here,
         // the user is free to leave it, and dragging it back to the foreground every 10s
         // would be far worse than the problem this service solves.
         if (keepAliveOnly) {
-            if (!isMqttEnabled()) {
-                DebugLog.d(TAG, "MQTT disabled — stopping keep-alive watchdog")
+            if (!keepAliveStillNeeded()) {
+                DebugLog.d(TAG, "Nothing left to keep alive - stopping keep-alive watchdog")
                 stopSelf()
             }
             return
@@ -252,6 +274,36 @@ class KioskWatchdogService : Service() {
      * We only skip relaunch when the process importance is IMPORTANCE_FOREGROUND,
      * meaning our activity is actually visible to the user.
      */
+    /**
+     * Drive the cloud heartbeat while the app is backgrounded.
+     *
+     * React Native stops dispatching JS timers on host pause (JavaTimerManager.onHostPause
+     * clears the Choreographer callback), so CloudSyncService's 30s interval stops the
+     * moment an external app takes the foreground and the device is reported offline two
+     * minutes later. Starting a headless task re-arms those timers for the duration of the
+     * task, which is enough for one heartbeat and the command poll it triggers.
+     *
+     * Deliberately a no-op in the foreground: the JS interval is running there, and the
+     * task itself refuses to start (allowedInForeground = false).
+     */
+    private fun maybeRunCloudHeartbeat() {
+        if (!readFlag(this, "@cloud_enrolled")) return
+        if (isMainActivityRunning()) return
+
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastCloudHeartbeatMs < CLOUD_HEARTBEAT_INTERVAL_MS) return
+        lastCloudHeartbeatMs = now
+
+        try {
+            startService(Intent(this, CloudHeartbeatTaskService::class.java))
+            // Keeps the CPU up for the hop between here and the task actually starting.
+            HeadlessJsTaskService.acquireWakeLockNow(this)
+        } catch (e: Exception) {
+            // Background-start restrictions, or no React context yet. The next tick retries.
+            DebugLog.errorProduction(TAG, "Cannot start cloud heartbeat task: ${e.message}")
+        }
+    }
+
     private fun isMainActivityRunning(): Boolean {
         return try {
             val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
@@ -386,7 +438,7 @@ class KioskWatchdogService : Service() {
         }
     }
 
-    private fun isMqttEnabled(): Boolean = readFlag(this, "@kiosk_mqtt_enabled")
+    private fun keepAliveStillNeeded(): Boolean = needsKeepAlive(this)
 
     private fun isKioskEnabled(): Boolean {
         return try {
@@ -427,7 +479,9 @@ class KioskWatchdogService : Service() {
     private fun buildNotification(): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("FreeKiosk")
-            .setContentText(if (keepAliveOnly) "MQTT connection active" else "Kiosk mode active")
+            // Keep-alive now covers MQTT and cloud enrolment, so name what it does rather
+            // than one of the two features that ask for it.
+            .setContentText(if (keepAliveOnly) "Staying connected" else "Kiosk mode active")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setOngoing(true)

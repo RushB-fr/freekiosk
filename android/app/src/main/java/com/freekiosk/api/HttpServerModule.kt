@@ -64,6 +64,24 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
         private const val TAG = "HttpServerModule"
         private const val NAME = "HttpServerModule"
 
+        /**
+         * Commands the `when` in handleCommand() finishes on its own, with no help from
+         * the JS thread. Only these may be dispatched by a caller that has no JS available,
+         * which is the cloud command channel whenever the activity is backgrounded (React
+         * Native freezes the JS thread there, so ApiService.executeAction never runs).
+         *
+         * Deliberately excludes the hybrid commands (wake, autoBrightness*, clearCache,
+         * setMode): they do native work *and* notify JS, so running only their native half
+         * would leave the app in a partial state. They stay on the JS path.
+         */
+        private val NATIVELY_COMPLETE = setOf(
+            "audioPlay", "playSound", "audioStop", "audioBeep",
+            "screenOn", "screenOff",
+            "reboot", "tts", "lockDevice", "restartUi",
+            "remoteKey", "keyboardKey", "keyboardCombo", "keyboardText",
+            "getLocation", "cameraList", "getAutoBrightness",
+        )
+
         // #229: time the window manager needs to drop the secure flag from every layer
         // after the Device Owner screen-capture policy is lifted.
         private const val POLICY_SETTLE_MS = 300L
@@ -690,12 +708,31 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
 
     // ==================== Command Handler ====================
 
-    private fun handleCommand(command: String, params: JSONObject?): JSONObject {
+    /**
+     * @param dispatchToJs when false, the caller has no usable JS thread: only the
+     *   natively-complete commands run, and anything else is refused with
+     *   `nativelyHandled: false` so the caller can fall back to its own JS path.
+     *   The REST/MQTT server calls this with the default and is unaffected.
+     */
+    private fun handleCommand(
+        command: String,
+        params: JSONObject?,
+        dispatchToJs: Boolean = true,
+    ): JSONObject {
         Log.d(TAG, "Handling command: $command")
-        
+
+        // Refuse before executing anything, so a command is never half-applied.
+        if (!dispatchToJs && command !in NATIVELY_COMPLETE) {
+            return JSONObject().apply {
+                put("nativelyHandled", false)
+                put("command", command)
+            }
+        }
+
         // Handle audio commands directly (don't need JS)
         when (command) {
-            "audioPlay" -> {
+            // `playSound` is the name ApiService/the cloud channel use for the same action.
+            "audioPlay", "playSound" -> {
                 val url = params?.optString("url", "")
                 val loop = params?.optBoolean("loop", false) ?: false
                 val volume = params?.optInt("volume", 50) ?: 50
@@ -1139,6 +1176,29 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             Log.d(TAG, "Status updated: url=$jsCurrentUrl, screensaver=$jsScreensaverActive, rotation=$jsRotationEnabled, autoBrightness=$jsAutoBrightnessEnabled")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse status update from JS", e)
+        }
+    }
+
+    /**
+     * Run a command through the native handler only, never touching the JS thread.
+     *
+     * This exists for the cloud command channel, which until now dispatched everything
+     * through ApiService.executeAction, i.e. through callbacks registered by KioskScreen.
+     * That made a cloud `reboot` strictly less reliable than the same command over the
+     * local REST API, which has always taken this native path.
+     *
+     * Resolves a JSON string. `nativelyHandled: false` means the command needs JS, and
+     * the caller should fall back to its normal path.
+     */
+    @ReactMethod
+    fun executeNativeCommand(command: String, paramsJson: String?, promise: Promise) {
+        try {
+            val params = if (paramsJson.isNullOrBlank()) JSONObject() else JSONObject(paramsJson)
+            val result = handleCommand(command, params, dispatchToJs = false)
+            promise.resolve(result.toString())
+        } catch (e: Exception) {
+            Log.e(TAG, "executeNativeCommand failed for $command: ${e.message}")
+            promise.reject("NATIVE_COMMAND_FAILED", e.message ?: "Unknown error")
         }
     }
 

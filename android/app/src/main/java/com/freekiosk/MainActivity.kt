@@ -1286,7 +1286,7 @@ class MainActivity : ReactActivity() {
       } else {
         // No Lock Mode: the process is an ordinary background app, so keep it alive when
         // MQTT is on (no-op otherwise). Never relaunches anything.
-        KioskWatchdogService.startForMqttIfNeeded(this)
+        KioskWatchdogService.startKeepAliveIfNeeded(this)
       }
     } catch (e: Exception) {
       DebugLog.d("MainActivity", "Error starting KioskWatchdogService: ${e.message}")
@@ -1305,7 +1305,7 @@ class MainActivity : ReactActivity() {
       nm.cancel(2002) // KioskWatchdogService.NOTIFICATION_ID
       DebugLog.d("MainActivity", "KioskWatchdogService stopped and notification cleared")
       // #234: keep the process alive for MQTT after the guard is stopped (see KioskModule).
-      KioskWatchdogService.startForMqttIfNeeded(this, force = true)
+      KioskWatchdogService.startKeepAliveIfNeeded(this, force = true)
     } catch (e: Exception) {
       DebugLog.d("MainActivity", "Error stopping KioskWatchdogService: ${e.message}")
     }

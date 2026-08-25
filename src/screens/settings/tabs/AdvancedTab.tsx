@@ -296,7 +296,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
             <SettingsInput
               label="Enrollment Token"
               icon="key"
-              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              placeholder="A1B2C3"
               value={enrollToken}
               onChangeText={setEnrollToken}
             />

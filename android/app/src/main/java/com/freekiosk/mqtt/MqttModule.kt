@@ -402,7 +402,7 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
             // OEM battery manager kills it once the screen goes off and the broker never
             // sees the device again. No-op when Lock Mode is on (the kiosk guard already
             // runs) or when the foreground-service start is refused in the background.
-            com.freekiosk.KioskWatchdogService.startForMqttIfNeeded(reactContext.applicationContext)
+            com.freekiosk.KioskWatchdogService.startKeepAliveIfNeeded(reactContext.applicationContext)
 
             val result = Arguments.createMap().apply {
                 putBoolean("success", true)

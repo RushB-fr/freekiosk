@@ -179,7 +179,7 @@ export default function PermissionWizard({ visible, onClose }: Props) {
 
   const handleClose = useCallback(() => {
     // Republish the refreshed capability list to the cloud.
-    CloudSyncService.sendHeartbeat().catch(() => {});
+    CloudSyncService.sendHeartbeat(undefined, { force: true }).catch(() => {});
     onClose();
   }, [onClose]);
 

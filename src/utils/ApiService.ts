@@ -232,6 +232,12 @@ class ApiServiceClass {
    *
    * Note: execution flows through the callbacks registered by KioskScreen, so a
    * meaningful result requires that screen to be mounted (the normal runtime).
+   *
+   * This is the single source of truth for action *names*, not for execution. The
+   * local REST server runs a good part of them natively before ever emitting to JS
+   * (HttpServerModule.handleCommand), and the cloud channel now asks that same native
+   * handler first. MQTT does not: it emits straight to JS, so its commands still
+   * depend on the JS thread being alive. Worth aligning, with its own testing.
    */
   async executeAction(command: string, params: Record<string, any> = {}): Promise<ActionResult> {
     const cb = this.callbacks;

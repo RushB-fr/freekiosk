@@ -512,6 +512,24 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      * Stop the KioskWatchdogService and cancel its notification.
      * Called on intentional kiosk exit to prevent the watchdog from relaunching the app.
      */
+    /**
+     * Start the keep-alive foreground service if something now needs it. Called by the
+     * cloud sync layer right after enrolling or starting: MainActivity already does this
+     * on every launch, but on a first enrolment the flag is written after that point, so
+     * without this the process would stay freezable until the next restart.
+     *
+     * No-op when the flag is not set or when Lock Mode already runs the kiosk guard.
+     */
+    @ReactMethod
+    fun ensureKeepAliveWatchdog(promise: Promise) {
+        try {
+            KioskWatchdogService.startKeepAliveIfNeeded(reactApplicationContext)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("KEEPALIVE_FAILED", e.message ?: "Unknown error")
+        }
+    }
+
     private fun stopKioskWatchdog() {
         try {
             val serviceIntent = Intent(reactApplicationContext, KioskWatchdogService::class.java)
@@ -523,7 +541,7 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
             // #234: the kiosk guard is gone, but an MQTT user still needs the process kept
             // alive. force=true because @kiosk_enabled stays true across an admin exit, and
             // keep-alive mode never relaunches, so the admin is not dragged back in.
-            KioskWatchdogService.startForMqttIfNeeded(reactApplicationContext, force = true)
+            KioskWatchdogService.startKeepAliveIfNeeded(reactApplicationContext, force = true)
         } catch (e: Exception) {
             android.util.Log.e("KioskModule", "Error stopping KioskWatchdogService: ${e.message}")
         }
