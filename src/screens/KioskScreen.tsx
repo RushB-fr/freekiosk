@@ -198,6 +198,8 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [dashboardShowGrid, setDashboardShowGrid] = useState<boolean>(true);
   const [navState, setNavState] = useState<{ canGoBack: boolean; canGoForward: boolean; title: string }>({ canGoBack: false, canGoForward: false, title: '' });
   const [pdfViewerEnabled, setPdfViewerEnabled] = useState<boolean>(false);
+  // #239: last value applied to the WebView, to know when a remount is actually needed.
+  const pdfViewerEnabledRef = useRef<boolean>(false);
   const [printEnabled, setPrintEnabled] = useState<boolean>(false);
   const [printPaperSize, setPrintPaperSize] = useState<string>('A4');
   const [zoomLevel, setZoomLevel] = useState<number>(100);
@@ -1542,6 +1544,23 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       const savedShowTime = bool(K.STATUS_BAR_SHOW_TIME, true);
       const savedStatusBarTheme = (str(K.STATUS_BAR_THEME) === 'light' ? 'light' : 'dark') as 'dark' | 'light';
 
+      // #239: this MUST be applied before the URL. It drives allowFileAccess,
+      // allowFileAccessFromFileURLs, allowUniversalAccessFromFileURLs and the file://*
+      // entry of originWhitelist. It used to be read 200 lines below, past five awaits,
+      // and each await ends a React batch: the WebView therefore mounted with the file://
+      // URL while the flag was still false, Chromium answered ERR_ACCESS_DENIED straight
+      // away, and flipping the prop a few milliseconds later changed nothing since the page
+      // had already failed and webViewKey had not moved.
+      const savedPdfViewerEnabled = bool(K.PDF_VIEWER_ENABLED, false);
+      if (savedPdfViewerEnabled !== pdfViewerEnabledRef.current) {
+        // Those WebView settings only take effect for a page loaded after they are applied,
+        // so a change has to remount it. At startup this runs in the same batch as setUrl
+        // below, so it costs a key value, not a second load.
+        setWebViewKey(k => k + 1);
+      }
+      pdfViewerEnabledRef.current = savedPdfViewerEnabled;
+      setPdfViewerEnabled(savedPdfViewerEnabled);
+
       if (savedUrl) setUrl(savedUrl);
       setAutoReload(savedAutoReload);
       setPauseWebMediaWhenHidden(savedPauseWebMediaWhenHidden);
@@ -1742,9 +1761,6 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       const savedEmergencyEnabled = bool(K.LOCKSCREEN_EMERGENCY_CALL_ENABLED, false);
       setLockscreenEmergencyEnabled(savedEmergencyEnabled);
       
-      // Load PDF Viewer setting
-      const savedPdfViewerEnabled = bool(K.PDF_VIEWER_ENABLED, false);
-      setPdfViewerEnabled(savedPdfViewerEnabled);
       
       // Load Printing setting
       const savedPrintEnabled = bool(K.PRINT_ENABLED, false);
