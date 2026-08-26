@@ -124,6 +124,6 @@ MIT License. See [LICENSE](LICENSE).
   <p>
     <a href="https://freekiosk.app">Website</a> •
     <a href="https://github.com/rushb-fr/freekiosk">GitHub</a> •
-    <a href="mailto:contact@rushb.fr">Contact</a>
+    <a href="mailto:support@freekiosk.app">Contact</a>
   </p>
 </div>
