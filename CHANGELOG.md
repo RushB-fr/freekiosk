@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ***
 
+## [2.0.0-beta.1] - 2026-08-28
+
+- ☁️ **FreeKiosk Cloud is switched on.** The groundwork shipped compiled-but-disabled in 1.2.20-beta.6 (`CLOUD_ENABLED`) is now active, which is what takes this line to 2.0. It remains a **closed beta**: the platform is invitation-only, the app is handed out from the dashboard, and the version reads `2.0.0` with the beta number in the tag. Everything below is either the cloud itself or a defect found while validating it on a device.
+
+### Added
+- ☁️ **Cloud device management** (Settings → Advanced → Cloud Management): enroll a tablet against a [FreeKiosk Cloud](https://cloud.freekiosk.app) instance with a one-time token, or let a factory-reset tablet provision itself from the setup-wizard QR (Device Owner, permissions granted, enrollment consumed, all with nothing typed). Once enrolled the tablet reports every 30 seconds with its battery, network, screen, storage, memory, uptime and capability list, receives its configuration from the dashboard, and executes remote commands. ⚠️ **Enrolling wipes the tablet's local FreeKiosk settings**: its configuration then comes from the cloud. Leaving cloud management wipes them again.
+
+### Fixed
+- 📡 **A cloud-managed tablet went offline two minutes after launching an external app, while running perfectly** : in External App mode the heartbeat stopped completely, so the dashboard reported the device as unreachable and no remote command could arrive. Measured: **zero heartbeats over three minutes**. The cause is not Android's Doze or a killed process, both of which were ruled out (the process stays alive at normal priority, and a foreground service changes nothing): React Native **stops dispatching JS timers when the activity pauses** (`JavaTimerManager.onHostPause` clears the Choreographer callback that drives `setInterval`), and the heartbeat loop is a JS timer. It is now driven from a native ticker in `KioskWatchdogService` through a **headless task** (`CloudHeartbeatTaskService`), which is the supported way to re-arm those timers; a 20 s debounce collapses the duplicate beat the wake-up would otherwise produce. Measured after the fix: **six heartbeats, thirty seconds apart**, with commands and screenshots executing while the external app stays in front. The keep-alive foreground service introduced for MQTT in #234 now also covers an enrolled device, so the process survives OEM battery managers.
+
+- 🔁 **A remote `reboot` (and a self-update) never reported its outcome, staying "sent" for ever**: the server only ever hands out *pending* commands, so nothing redelivered a command whose device died while executing it, and the dashboard could not tell a successful reboot from one that never ran. Commands are now persisted before dispatch and settled on the next start: a command expected to take the device down reports success, anything else reports honestly that it was interrupted. A result the network refused is queued and retried instead of being dropped.
+
+- ⚙️ **A cloud command was less reliable than the same command over the local REST API**: the cloud channel dispatched everything through the JS layer, while the local REST server has always executed a good part of its commands natively. `screen_on`, `screen_off`, `tts`, `reboot`, audio, lock, remote-key and keyboard commands now take that same native path from the cloud, so they work whatever the JS thread is doing. `play_sound` was falling through to JS over a plain name mismatch (`playSound` vs `audioPlay`) and is now aliased.
+
+- 🖥️ **A display-mode change pushed from the dashboard was stored and echoed back, but never applied**: the tablet reported the new mode and its URL to the cloud while still showing the external app, so the dashboard displayed something that was not true. FreeKiosk now returns to the foreground on such a change, with the same `blockAutoRelaunch` guard the REST/MQTT `setMode` path received in #209 so the app just left is not relaunched.
+
+- 📦 **After an update, a kiosk in External App mode was left with no watchdog, no overlay and no heartbeat until someone touched it**: Android restarts the process only for what it still binds (in practice the accessibility service) and never recreates `MainActivity`, and the launched app keeps the foreground, so nothing brought FreeKiosk back. `BootReceiver` now handles `MY_PACKAGE_REPLACED` and restores the services, relaunching the activity only on devices configured to run unattended so an ordinary Play Store update does not yank the app to the front. This is also the path a cloud OTA update takes.
+
+- 🔋 **The permission wizard listed "Ignore battery optimizations" as outstanding for ever, and tapping it did nothing**: the request is a no-op once the exemption is held, and the step never read the state back although the native API for it has existed since #234. It now shows the real state.
+
+- 🧭 **The wizard's accessibility button landed on the plain settings list**, where OEM skins bury third-party services (One UI files them under "Installed apps") and users could not find FreeKiosk. It now opens the service's own page directly, falling back to the old behaviour where a manufacturer does not support that.
+
+***
+
 
 ## [Unreleased]
 
