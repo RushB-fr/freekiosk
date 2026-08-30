@@ -25,6 +25,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../../navigation/AppNavigator';
 import { Colors, Spacing, Typography } from '../../../theme';
+import { useTranslation } from 'react-i18next';
 
 const { KioskModule } = NativeModules;
 
@@ -81,6 +82,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
   kioskEnabled,
   onRestoreComplete,
 }) => {
+  const { t } = useTranslation();
   const [accessibilityEnabled, setAccessibilityEnabled] = useState(false);
   const [accessibilityRunning, setAccessibilityRunning] = useState(false);
 
@@ -134,16 +136,16 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
 
   const handleEnroll = () => {
     if (!cloudUrl.trim() || !enrollToken.trim()) {
-      Alert.alert('Missing fields', 'Please enter both the cloud URL and the enrollment token.');
+      Alert.alert(t('advanced.cloud.missingFieldsTitle'), t('advanced.cloud.missingFieldsMessage'));
       return;
     }
     Alert.alert(
-      'Enroll in Cloud Management',
-      'Enrolling will reset all local FreeKiosk settings. The device will then be configured from the cloud.\n\nContinue?',
+      t('advanced.cloud.enrollConfirmTitle'),
+      t('advanced.cloud.enrollConfirmMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('advanced.cloud.cancel'), style: 'cancel' },
         {
-          text: 'Enroll',
+          text: t('advanced.cloud.enroll'),
           style: 'destructive',
           onPress: async () => {
             setEnrolling(true);
@@ -166,7 +168,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
               setWizardAfterEnroll(true);
               setShowWizard(true);
             } else {
-              Alert.alert('Enrollment failed', result.error ?? 'Unknown error');
+              Alert.alert(t('advanced.cloud.enrollmentFailedTitle'), result.error ?? t('advanced.cloud.unknownError'));
             }
           },
         },
@@ -201,12 +203,12 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
 
   const handleUnenroll = () => {
     Alert.alert(
-      'Leave Cloud Management',
-      'This will disconnect the device from the cloud and wipe all FreeKiosk settings.\n\nContinue?',
+      t('advanced.cloud.leaveConfirmTitle'),
+      t('advanced.cloud.leaveConfirmMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('advanced.cloud.cancel'), style: 'cancel' },
         {
-          text: 'Unenroll',
+          text: t('advanced.cloud.unenroll'),
           style: 'destructive',
           onPress: async () => {
             setUnenrolling(true);
@@ -226,7 +228,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
       // (temporarily exits lock task before launching the settings intent)
       await KioskModule.openAndroidSettings('accessibility');
     } catch {
-      Alert.alert('Error', 'Could not open Accessibility Settings');
+      Alert.alert(t('advanced.accessibility.errorTitle'), t('advanced.accessibility.errorOpenSettings'));
     }
   };
 
@@ -235,41 +237,38 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
       await AccessibilityModule.enableViaDeviceOwner();
       // Re-check status after enabling
       setTimeout(checkAccessibilityStatus, 1000);
-      Alert.alert('Success', 'Accessibility Service has been enabled automatically via Device Owner.');
+      Alert.alert(t('advanced.accessibility.successTitle'), t('advanced.accessibility.successEnabled'));
     } catch (e: any) {
       if (e.code === 'WRITE_SECURE_SETTINGS_REQUIRED') {
         Alert.alert(
-          'Permission Required',
-          'To auto-enable the Accessibility Service, the WRITE_SECURE_SETTINGS permission must be granted via ADB (one-time setup):\n\n' +
-          'adb shell pm grant com.freekiosk android.permission.WRITE_SECURE_SETTINGS\n\n' +
-          'Alternatively, tap "Open Accessibility Settings" below to enable it manually.',
+          t('advanced.accessibility.permissionRequiredTitle'),
+          t('advanced.accessibility.permissionRequiredMessage'),
           [{ text: 'OK' }],
         );
       } else {
-        Alert.alert('Error', e.message || 'Failed to enable via Device Owner');
+        Alert.alert(t('advanced.accessibility.errorTitle'), e.message || t('advanced.accessibility.failedEnable'));
       }
     }
   };
   return (
     <View>
       {/* Cloud Management */}
-      {CLOUD_ENABLED && <SettingsSection title="Cloud Management" icon="sync">
+      {CLOUD_ENABLED && <SettingsSection title={t('advanced.cloud.title')} icon="sync">
         {isEnrolled ? (
           <>
-            <SettingsInfoBox variant="success" icon="cloud-check" title="Cloud-managed">
+            <SettingsInfoBox variant="success" icon="cloud-check" title={t('advanced.cloud.enrolledTitle')}>
               <Text style={styles.infoText}>
-                This device is enrolled{orgName ? ` in ${orgName}` : ''}.{'\n'}
-                Configuration is synced automatically every 30 seconds.
+                {t('advanced.cloud.enrolledInfo', { org: orgName ? t('advanced.cloud.enrolledInOrg', { org: orgName }) : '' })}
               </Text>
             </SettingsInfoBox>
             <SettingsButton
-              title="Set up permissions"
+              title={t('advanced.cloud.setupPermissions')}
               icon="shield-check"
               variant="secondary"
               onPress={() => { setWizardAfterEnroll(false); setShowWizard(true); }}
             />
             <SettingsButton
-              title={unenrolling ? 'Unenrolling...' : 'Leave Cloud Management'}
+              title={unenrolling ? t('advanced.cloud.unenrolling') : t('advanced.cloud.leaveCloud')}
               icon="alert-circle"
               variant="danger"
               onPress={handleUnenroll}
@@ -279,14 +278,13 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
           </>
         ) : (
           <>
-            <SettingsInfoBox variant="info" title="Zero-touch provisioning">
+            <SettingsInfoBox variant="info" title={t('advanced.cloud.zeroTouchTitle')}>
               <Text style={styles.infoText}>
-                Enroll this device in a FreeKiosk Cloud instance to manage its configuration remotely.{'\n\n'}
-                Warning: enrolling will reset all current settings.
+                {t('advanced.cloud.zeroTouchInfo')}
               </Text>
             </SettingsInfoBox>
             <SettingsInput
-              label="Cloud URL"
+              label={t('advanced.cloud.cloudUrl')}
               icon="server"
               placeholder="https://cloud.freekiosk.app"
               value={cloudUrl}
@@ -294,20 +292,20 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
               keyboardType="url"
             />
             <SettingsInput
-              label="Enrollment Token"
+              label={t('advanced.cloud.enrollmentToken')}
               icon="key"
               placeholder="A1B2C3"
               value={enrollToken}
               onChangeText={setEnrollToken}
             />
             <SettingsButton
-              title="Scan QR Code"
+              title={t('advanced.cloud.scanQr')}
               icon="camera"
               variant="secondary"
               onPress={() => setShowScanner(true)}
             />
             <SettingsButton
-              title={enrolling ? 'Enrolling...' : 'Enroll Device'}
+              title={enrolling ? t('advanced.cloud.enrolling') : t('advanced.cloud.enrollDevice')}
               icon="upload"
               variant="primary"
               onPress={handleEnroll}
@@ -338,48 +336,48 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
 
       {/* App Updates - Hidden in Play Store builds (compliance: no in-app updates) */}
       {enableSelfUpdate && (
-      <SettingsSection title="Updates" icon="update">
+      <SettingsSection title={t('advanced.updates.title')} icon="update">
         <View style={styles.versionRow}>
-          <Text style={styles.versionLabel}>Current Version</Text>
+          <Text style={styles.versionLabel}>{t('advanced.updates.currentVersion')}</Text>
           <Text style={styles.versionValue}>{currentVersion}</Text>
         </View>
-        
+
         {updateAvailable && updateInfo && (
-          <SettingsInfoBox variant="success" icon="party-popper" title={`${updateInfo.isPrerelease ? 'Beta ' : ''}Update Available`}>
+          <SettingsInfoBox variant="success" icon="party-popper" title={`${updateInfo.isPrerelease ? t('advanced.updates.betaPrefix') : ''}${t('advanced.updates.updateAvailable')}`}>
             <Text style={styles.infoText}>
-              Version {updateInfo.version} is available!{updateInfo.isPrerelease ? ' (pre-release)' : ''}
+              {t('advanced.updates.versionAvailable', { version: updateInfo.version, prerelease: updateInfo.isPrerelease ? t('advanced.updates.prereleaseSuffix') : '' })}
               {updateInfo.notes && `\n\n${updateInfo.notes.substring(0, 150)}...`}
             </Text>
           </SettingsInfoBox>
         )}
-        
+
         <View style={styles.betaRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.betaLabel}>Beta Updates</Text>
-            <Text style={styles.betaHint}>Receive pre-release versions before stable</Text>
+            <Text style={styles.betaLabel}>{t('advanced.updates.betaUpdates')}</Text>
+            <Text style={styles.betaHint}>{t('advanced.updates.betaUpdatesHint')}</Text>
           </View>
           <TouchableOpacity
             style={[styles.betaToggle, betaUpdatesEnabled && styles.betaToggleActive]}
             onPress={() => onBetaUpdatesChange(!betaUpdatesEnabled)}
           >
             <Text style={[styles.betaToggleText, betaUpdatesEnabled && styles.betaToggleTextActive]}>
-              {betaUpdatesEnabled ? 'ON' : 'OFF'}
+              {betaUpdatesEnabled ? t('advanced.updates.on') : t('advanced.updates.off')}
             </Text>
           </TouchableOpacity>
         </View>
-        
+
         <SettingsButton
-          title={checkingUpdate ? 'Checking...' : downloading ? 'Downloading...' : 'Check for Updates'}
+          title={checkingUpdate ? t('advanced.updates.checking') : downloading ? t('advanced.updates.downloading') : t('advanced.updates.checkForUpdates')}
           icon={checkingUpdate ? 'timer-sand' : downloading ? 'download' : 'magnify'}
           variant="primary"
           onPress={onCheckForUpdates}
           disabled={checkingUpdate || downloading}
           loading={checkingUpdate}
         />
-        
+
         {updateAvailable && updateInfo && (
           <SettingsButton
-            title={downloading ? 'Downloading...' : 'Download & Install'}
+            title={downloading ? t('advanced.updates.downloading') : t('advanced.updates.downloadInstall')}
             icon="download"
             variant="success"
             onPress={onDownloadUpdate}
@@ -387,23 +385,23 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
             loading={downloading}
           />
         )}
-        
+
         <Text style={styles.hint}>
-          {isDeviceOwner ? 'Device Owner mode: Manual updates via GitHub.' : 'Download and install updates from GitHub.'}
+          {isDeviceOwner ? t('advanced.updates.hintOwner') : t('advanced.updates.hintNonOwner')}
         </Text>
       </SettingsSection>
       )}
-      
+
       {/* SSL Certificates - WebView only */}
       {displayMode === 'webview' && (
-        <SettingsSection title="Accepted SSL Certificates" icon="certificate-outline">
+        <SettingsSection title={t('advanced.certificates.title')} icon="certificate-outline">
           <Text style={styles.hint}>
-            Self-signed certificates you've accepted. They expire after 1 year.
+            {t('advanced.certificates.hint')}
           </Text>
-          
+
           {certificates.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No certificates accepted</Text>
+              <Text style={styles.emptyStateText}>{t('advanced.certificates.empty')}</Text>
             </View>
           ) : (
             <View style={styles.certificatesList}>
@@ -417,7 +415,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
                       {cert.fingerprint.substring(0, 24)}...
                     </Text>
                     <Text style={[styles.certificateExpiry, cert.isExpired && styles.certificateExpired]}>
-                      {cert.isExpired ? 'Expired: ' : 'Expires: '}
+                      {cert.isExpired ? t('advanced.certificates.expired') : t('advanced.certificates.expires')}
                       {cert.expiryDate}
                     </Text>
                   </View>
@@ -442,9 +440,9 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
 
       {/* Accessibility Service - Hidden in Play Store builds (BIND_ACCESSIBILITY_SERVICE policy) */}
       {enableSelfUpdate && (
-      <SettingsSection title="Accessibility Service" icon="keyboard-outline">
+      <SettingsSection title={t('advanced.accessibility.title')} icon="keyboard-outline">
         <View style={styles.accessibilityStatusRow}>
-          <Text style={styles.accessibilityStatusLabel}>Status</Text>
+          <Text style={styles.accessibilityStatusLabel}>{t('advanced.accessibility.status')}</Text>
           <View style={[
             styles.accessibilityStatusBadge,
             { backgroundColor: accessibilityRunning ? Colors.successLight : accessibilityEnabled ? Colors.warningLight : Colors.errorLight },
@@ -453,15 +451,14 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
               styles.accessibilityStatusText,
               { color: accessibilityRunning ? Colors.successDark : accessibilityEnabled ? Colors.warningDark : Colors.errorDark },
             ]}>
-              {accessibilityRunning ? '● Active' : accessibilityEnabled ? '● Enabled (not connected)' : '○ Disabled'}
+              {accessibilityRunning ? t('advanced.accessibility.active') : accessibilityEnabled ? t('advanced.accessibility.enabledNotConnected') : t('advanced.accessibility.disabled')}
             </Text>
           </View>
         </View>
 
-        <SettingsInfoBox variant="info" icon="help-circle" title="Why is this needed?">
+        <SettingsInfoBox variant="info" icon="help-circle" title={t('advanced.accessibility.whyTitle')}>
           <Text style={styles.infoText}>
-            The Accessibility Service allows FreeKiosk to send keyboard input (remote control, text input) to external apps.{'\n\n'}
-            Without it, keyboard emulation only works inside FreeKiosk's own WebView.
+            {t('advanced.accessibility.whyInfo')}
           </Text>
         </SettingsInfoBox>
 
@@ -469,37 +466,36 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
           <>
             {isDeviceOwner ? (
               <SettingsButton
-                title="Enable Automatically (Device Owner)"
+                title={t('advanced.accessibility.enableAuto')}
                 icon="shield-check"
                 variant="primary"
                 onPress={handleEnableViaDeviceOwner}
               />
             ) : null}
             <SettingsButton
-              title="Open Accessibility Settings"
+              title={t('advanced.accessibility.openSettings')}
               icon="open-in-new"
               variant="primary"
               onPress={handleOpenAccessibilitySettings}
             />
             <Text style={styles.hint}>
               {isDeviceOwner
-                ? 'Device Owner mode can enable the service automatically if the WRITE_SECURE_SETTINGS permission has been granted via ADB. Otherwise, enable it manually in Android settings.'
-                : 'Enable "FreeKiosk" in Settings → Accessibility → Installed Services.'}
+                ? t('advanced.accessibility.hintOwner')
+                : t('advanced.accessibility.hintNonOwner')}
             </Text>
           </>
         )}
 
         {accessibilityRunning && (
           <Text style={styles.hint}>
-            Keyboard emulation is available for all apps (WebView + External Apps).
+            {t('advanced.accessibility.runningHint')}
           </Text>
         )}
 
         {isDeviceOwner && displayMode === 'external_app' && (
-          <SettingsInfoBox variant="info" icon="cog-outline" title="Managed Apps Accessibility">
+          <SettingsInfoBox variant="info" icon="cog-outline" title={t('advanced.accessibility.managedAppsTitle')}>
             <Text style={styles.infoText}>
-              You can allow other apps' accessibility services in the "Managed Apps" section of the General tab.{'\n'}
-              Toggle "Allow Accessibility" per app to whitelist their accessibility services via Device Owner.
+              {t('advanced.accessibility.managedAppsInfo')}
             </Text>
           </SettingsInfoBox>
         )}
@@ -510,21 +506,19 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
       <BackupRestoreSection onRestoreComplete={onRestoreComplete} />
 
       {/* Android System Settings */}
-      <SettingsSection title="Android System Settings" icon="android">
+      <SettingsSection title={t('advanced.androidSettings.title')} icon="android">
         <Text style={styles.hint}>
-          Open native Android settings to change WiFi, volume, display and more.
-          Useful when your device has no physical navigation buttons.
+          {t('advanced.androidSettings.hint')}
         </Text>
         {kioskEnabled && (
-          <SettingsInfoBox variant="info" icon="lock" title="Kiosk Mode Active">
+          <SettingsInfoBox variant="info" icon="lock" title={t('advanced.androidSettings.kioskActiveTitle')}>
             <Text style={styles.infoText}>
-              Kiosk mode will be temporarily paused to open Android settings.{' '}
-              It will automatically re-engage when you return to FreeKiosk.
+              {t('advanced.androidSettings.kioskActiveInfo')}
             </Text>
           </SettingsInfoBox>
         )}
         <SettingsButton
-          title="Open Android Settings"
+          title={t('advanced.androidSettings.openSettings')}
           icon="cog"
           variant="primary"
           onPress={() => KioskModule.openAndroidSettings(null)}
@@ -535,77 +529,77 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
             onPress={() => KioskModule.openAndroidSettings('wifi')}
           >
             <Icon name="wifi" size={22} color={Colors.primary} style={styles.shortcutIcon} />
-            <Text style={styles.shortcutText}>WiFi</Text>
+            <Text style={styles.shortcutText}>{t('advanced.androidSettings.wifi')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.shortcutButton}
             onPress={() => KioskModule.openAndroidSettings('sound')}
           >
             <Icon name="volume-high" size={22} color={Colors.primary} style={styles.shortcutIcon} />
-            <Text style={styles.shortcutText}>Sound</Text>
+            <Text style={styles.shortcutText}>{t('advanced.androidSettings.sound')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.shortcutButton}
             onPress={() => KioskModule.openAndroidSettings('display')}
           >
             <Icon name="brightness-6" size={22} color={Colors.primary} style={styles.shortcutIcon} />
-            <Text style={styles.shortcutText}>Display</Text>
+            <Text style={styles.shortcutText}>{t('advanced.androidSettings.display')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.shortcutButton}
             onPress={() => KioskModule.openAndroidSettings('bluetooth')}
           >
             <Icon name="bluetooth" size={22} color={Colors.primary} style={styles.shortcutIcon} />
-            <Text style={styles.shortcutText}>Bluetooth</Text>
+            <Text style={styles.shortcutText}>{t('advanced.androidSettings.bluetooth')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.shortcutButton}
             onPress={() => KioskModule.openAndroidSettings('date')}
           >
             <Icon name="calendar-clock" size={22} color={Colors.primary} style={styles.shortcutIcon} />
-            <Text style={styles.shortcutText}>Date & Time</Text>
+            <Text style={styles.shortcutText}>{t('advanced.androidSettings.dateTime')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.shortcutButton}
             onPress={() => KioskModule.openAndroidSettings('apps')}
           >
             <Icon name="apps" size={22} color={Colors.primary} style={styles.shortcutIcon} />
-            <Text style={styles.shortcutText}>Apps</Text>
+            <Text style={styles.shortcutText}>{t('advanced.androidSettings.apps')}</Text>
           </TouchableOpacity>
         </View>
       </SettingsSection>
 
       {/* Actions */}
-      <SettingsSection title="Actions" icon="cog-outline">
+      <SettingsSection title={t('advanced.actions.title')} icon="cog-outline">
         <SettingsButton
-          title="Reset All Settings"
+          title={t('advanced.actions.resetSettings')}
           icon="restart"
           variant="warning"
           onPress={onResetSettings}
         />
-        
+
         {isDeviceOwner && (
           <SettingsButton
-            title="Remove Device Owner"
+            title={t('advanced.actions.removeDeviceOwner')}
             icon="alert"
             variant="danger"
             onPress={onRemoveDeviceOwner}
           />
         )}
-        
+
         {kioskEnabled && (
           <SettingsButton
-            title="Exit Kiosk Mode"
+            title={t('advanced.actions.exitKioskMode')}
             icon="exit-to-app"
             variant="danger"
             onPress={onExitKioskMode}
           />
         )}
       </SettingsSection>
-      
+
       {/* Version footer */}
       <Text style={styles.versionFooter}>
-        FreeKiosk v{currentVersion}
+        {t('advanced.versionFooter', { version: currentVersion })}
       </Text>
     </View>
   );

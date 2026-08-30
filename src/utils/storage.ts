@@ -45,6 +45,7 @@ export const KEYS = {
   STATUS_BAR_SHOW_VOLUME: '@kiosk_status_bar_show_volume',
   STATUS_BAR_SHOW_TIME: '@kiosk_status_bar_show_time',
   STATUS_BAR_THEME: '@kiosk_status_bar_theme',
+  LANGUAGE: '@kiosk_language',
   EXTERNAL_APP_TEST_MODE: '@kiosk_external_app_test_mode',
   BACK_BUTTON_MODE: '@kiosk_back_button_mode',
   BACK_BUTTON_TIMER_DELAY: '@kiosk_back_button_timer_delay',
@@ -1264,6 +1265,23 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting status bar theme:', error);
       return 'dark';
+    }
+  },
+
+  saveLanguage: async (value: string): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.LANGUAGE, value);
+    } catch (error) {
+      console.error('Error saving language:', error);
+    }
+  },
+
+  getLanguage: async (): Promise<string | null> => {
+    try {
+      return await AsyncStorage.getItem(KEYS.LANGUAGE);
+    } catch (error) {
+      console.error('Error getting language:', error);
+      return null;
     }
   },
 

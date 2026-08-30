@@ -32,6 +32,7 @@ import AccessibilityModule from '../utils/AccessibilityModule';
 import OverlayPermissionModule from '../utils/OverlayPermissionModule';
 import { CloudSyncService } from '../utils/CloudSyncService';
 import Icon, { IconName } from './Icon';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   visible: boolean;
@@ -132,6 +133,7 @@ const ITEMS: PermItem[] = [
 ];
 
 export default function PermissionWizard({ visible, onClose }: Props) {
+  const { t } = useTranslation();
   const [isDeviceOwner, setIsDeviceOwner] = useState(false);
   const [statuses, setStatuses] = useState<Record<ItemKey, boolean>>(
     {} as Record<ItemKey, boolean>,
@@ -190,7 +192,7 @@ export default function PermissionWizard({ visible, onClose }: Props) {
     <Modal visible={visible} animationType="slide" onRequestClose={handleClose}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.title}>Set up permissions</Text>
+          <Text style={styles.title}>{t('components.permissionWizard.setupPermissions')}</Text>
           <TouchableOpacity onPress={handleClose} hitSlop={12}>
             <Icon name="close" size={26} color="#fff" />
           </TouchableOpacity>
@@ -200,8 +202,8 @@ export default function PermissionWizard({ visible, onClose }: Props) {
           <Icon name={isDeviceOwner ? 'shield-check' : 'shield'} size={22} color="#fff" />
           <Text style={styles.bannerText}>
             {isDeviceOwner
-              ? 'Managed mode (Device Owner). Permissions are granted automatically; you can finish right away.'
-              : 'Standard mode. Grant the permissions below to unlock every feature. Reboot, silent install and true screen-off need Managed mode (factory reset + provisioning QR).'}
+              ? t('components.permissionWizard.managedModeBanner')
+              : t('components.permissionWizard.standardModeBanner')}
           </Text>
         </View>
 
@@ -212,17 +214,17 @@ export default function PermissionWizard({ visible, onClose }: Props) {
               <View key={item.key} style={styles.row}>
                 <Icon name={item.icon} size={24} color={granted ? '#22c55e' : '#94a3b8'} />
                 <View style={styles.rowText}>
-                  <Text style={styles.rowLabel}>{item.label}</Text>
-                  <Text style={styles.rowDesc}>{item.description}</Text>
+                  <Text style={styles.rowLabel}>{t(`components.permissionWizard.items.${item.key}.label`)}</Text>
+                  <Text style={styles.rowDesc}>{t(`components.permissionWizard.items.${item.key}.description`)}</Text>
                 </View>
                 {granted ? (
                   <View style={styles.grantedChip}>
                     <Icon name="check" size={16} color="#22c55e" />
-                    <Text style={styles.grantedText}>Granted</Text>
+                    <Text style={styles.grantedText}>{t('components.permissionWizard.granted')}</Text>
                   </View>
                 ) : (
                   <TouchableOpacity style={styles.grantBtn} onPress={() => handleAction(item)}>
-                    <Text style={styles.grantBtnText}>Grant</Text>
+                    <Text style={styles.grantBtnText}>{t('components.permissionWizard.grant')}</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -232,10 +234,10 @@ export default function PermissionWizard({ visible, onClose }: Props) {
 
         <View style={styles.footer}>
           <Text style={styles.progress}>
-            {loading ? 'Checking...' : `${grantedCount} / ${ITEMS.length} granted`}
+            {loading ? t('components.permissionWizard.checking') : t('components.permissionWizard.grantedCount', { granted: grantedCount, total: ITEMS.length })}
           </Text>
           <TouchableOpacity style={styles.doneBtn} onPress={handleClose}>
-            <Text style={styles.doneBtnText}>Done</Text>
+            <Text style={styles.doneBtnText}>{t('components.permissionWizard.done')}</Text>
           </TouchableOpacity>
         </View>
       </View>

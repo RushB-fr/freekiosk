@@ -19,6 +19,7 @@ import SettingsInput from './settings/SettingsInput';
 import Icon from './Icon';
 import { StorageService } from '../utils/storage';
 import { httpServer } from '../utils/HttpServerModule';
+import { useTranslation } from 'react-i18next';
 
 interface ApiSettingsSectionProps {
   onSettingsChanged?: () => void;
@@ -27,6 +28,7 @@ interface ApiSettingsSectionProps {
 export const ApiSettingsSection: React.FC<ApiSettingsSectionProps> = ({
   onSettingsChanged,
 }) => {
+  const { t } = useTranslation();
   const [apiEnabled, setApiEnabled] = useState(false);
   const [apiPort, setApiPort] = useState('8080');
   const [apiKey, setApiKey] = useState('');
@@ -94,7 +96,7 @@ export const ApiSettingsSection: React.FC<ApiSettingsSectionProps> = ({
       setLocalIp(result.ip);
     } catch (error: any) {
       console.error('Failed to start server:', error);
-      Alert.alert('Error', `Failed to start API server: ${error.message}`);
+      Alert.alert(t('components.apiSettings.error'), t('components.apiSettings.startFailed', { message: error.message }));
     } finally {
       setIsLoading(false);
     }
@@ -184,7 +186,7 @@ export const ApiSettingsSection: React.FC<ApiSettingsSectionProps> = ({
 
   const copyToClipboard = (text: string, label: string) => {
     Clipboard.setString(text);
-    Alert.alert('Copied', `${label} copied to clipboard`);
+    Alert.alert(t('components.apiSettings.copied'), t('components.apiSettings.copiedMessage', { label }));
   };
 
   const getApiUrl = () => {
@@ -194,11 +196,11 @@ export const ApiSettingsSection: React.FC<ApiSettingsSectionProps> = ({
 
   return (
     <SettingsSection
-      title="REST API"
+      title={t('components.apiSettings.title')}
       icon="api"
     >
       <SettingsSwitch
-        label="Enable REST API"
+        label={t('components.apiSettings.enable')}
         value={apiEnabled}
         onValueChange={handleApiEnabledChange}
         icon="server-network"
@@ -214,7 +216,7 @@ export const ApiSettingsSection: React.FC<ApiSettingsSectionProps> = ({
                 { backgroundColor: serverRunning ? '#4CAF50' : '#F44336' }
               ]} />
               <Text style={styles.statusText}>
-                {isLoading ? 'Starting...' : serverRunning ? 'Server Running' : 'Server Stopped'}
+                {isLoading ? t('components.apiSettings.starting') : serverRunning ? t('components.apiSettings.serverRunning') : t('components.apiSettings.serverStopped')}
               </Text>
               {isLoading && <ActivityIndicator size="small" color="#007AFF" style={styles.loader} />}
             </View>
@@ -222,7 +224,7 @@ export const ApiSettingsSection: React.FC<ApiSettingsSectionProps> = ({
             {serverRunning && (
               <TouchableOpacity
                 style={styles.urlContainer}
-                onPress={() => copyToClipboard(getApiUrl(), 'API URL')}
+                onPress={() => copyToClipboard(getApiUrl(), t('components.apiSettings.apiUrl'))}
               >
                 <Icon name="link" size={16} color="#007AFF" />
                 <Text style={styles.urlText}>{getApiUrl()}</Text>
@@ -233,25 +235,25 @@ export const ApiSettingsSection: React.FC<ApiSettingsSectionProps> = ({
 
           {/* Port Setting */}
           <SettingsInput
-            label="Port"
+            label={t('components.apiSettings.port')}
             value={apiPort}
             onChangeText={handlePortChange}
             placeholder="8080"
             keyboardType="numeric"
             icon="numeric"
-            hint="Port 1024-65535 (default: 8080)"
+            hint={t('components.apiSettings.portHint')}
           />
 
           {/* API Key */}
           <View style={styles.apiKeyContainer}>
             <SettingsInput
-              label="API Key (optional)"
+              label={t('components.apiSettings.apiKey')}
               value={apiKey}
               onChangeText={handleApiKeyChange}
-              placeholder="Leave empty for no authentication"
+              placeholder={t('components.apiSettings.apiKeyPlaceholder')}
               secureTextEntry
               icon="key-variant"
-              hint="Used as X-Api-Key header"
+              hint={t('components.apiSettings.apiKeyHint')}
             />
             <View style={styles.apiKeyButtons}>
               <TouchableOpacity
@@ -259,15 +261,15 @@ export const ApiSettingsSection: React.FC<ApiSettingsSectionProps> = ({
                 onPress={generateApiKey}
               >
                 <Icon name="refresh" size={16} color="#007AFF" />
-                <Text style={styles.smallButtonText}>Generate</Text>
+                <Text style={styles.smallButtonText}>{t('components.apiSettings.generate')}</Text>
               </TouchableOpacity>
               {apiKey ? (
                 <TouchableOpacity
                   style={styles.smallButton}
-                  onPress={() => copyToClipboard(apiKey, 'API Key')}
+                  onPress={() => copyToClipboard(apiKey, t('components.apiSettings.apiKeyLabel'))}
                 >
                   <Icon name="content-copy" size={16} color="#007AFF" />
-                  <Text style={styles.smallButtonText}>Copy</Text>
+                  <Text style={styles.smallButtonText}>{t('components.apiSettings.copy')}</Text>
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -275,68 +277,33 @@ export const ApiSettingsSection: React.FC<ApiSettingsSectionProps> = ({
 
           {/* Allow Control */}
           <SettingsSwitch
-            label="Allow Remote Control"
+            label={t('components.apiSettings.allowControl')}
             value={allowControl}
             onValueChange={handleAllowControlChange}
             icon="remote"
-            hint="Enable POST commands (brightness, reload, etc.)"
+            hint={t('components.apiSettings.allowControlHint')}
           />
 
           {/* API Endpoints Info */}
           <View style={styles.endpointsContainer}>
-            <Text style={styles.endpointsTitle}>Available Endpoints:</Text>
-            
+            <Text style={styles.endpointsTitle}>{t('components.apiSettings.availableEndpoints')}</Text>
+
             <View style={styles.endpointCategory}>
-              <Text style={styles.categoryLabel}>GET (Read-only)</Text>
-              <Text style={styles.endpoint}>/api/status - Full device status</Text>
-              <Text style={styles.endpoint}>/api/battery - Battery info</Text>
-              <Text style={styles.endpoint}>/api/brightness - Current brightness</Text>
-              <Text style={styles.endpoint}>/api/screen - Screen state</Text>
-              <Text style={styles.endpoint}>/api/info - Device info</Text>
-              <Text style={styles.endpoint}>/api/health - Health check</Text>
-              <Text style={styles.endpoint}>/api/sensors - Light, proximity, accelerometer</Text>
-              <Text style={styles.endpoint}>/api/storage - Storage info</Text>
-              <Text style={styles.endpoint}>/api/memory - RAM info</Text>
-              <Text style={styles.endpoint}>/api/wifi - WiFi status</Text>
-              <Text style={styles.endpoint}>/api/screenshot - Capture screen (PNG)</Text>
+              <Text style={styles.categoryLabel}>{t('components.apiSettings.getReadOnly')}</Text>
+              <Text style={styles.endpoint}>{t('components.apiSettings.getEndpoints')}</Text>
             </View>
 
             {allowControl && (
               <View style={styles.endpointCategory}>
-                <Text style={styles.categoryLabel}>POST (Control)</Text>
-                <Text style={styles.endpoint}>/api/brightness - Set brightness</Text>
-                <Text style={styles.endpoint}>/api/screen/on - Turn screen on</Text>
-                <Text style={styles.endpoint}>/api/screen/off - Turn screen off</Text>
-                <Text style={styles.endpoint}>/api/screensaver/on - Enable screensaver</Text>
-                <Text style={styles.endpoint}>/api/screensaver/off - Disable screensaver</Text>
-                <Text style={styles.endpoint}>/api/reload - Reload WebView</Text>
-                <Text style={styles.endpoint}>/api/url - Navigate to URL</Text>
-                <Text style={styles.endpoint}>/api/wake - Wake from screensaver</Text>
-                <Text style={styles.endpoint}>/api/tts - Text to speech</Text>
-                <Text style={styles.endpoint}>/api/volume - Set volume</Text>
-                <Text style={styles.endpoint}>/api/toast - Show toast message</Text>
-                <Text style={styles.endpoint}>/api/js - Execute JavaScript</Text>
-                <Text style={styles.endpoint}>/api/clearCache - Clear WebView cache</Text>
-                <Text style={styles.endpoint}>/api/app/launch - Launch external app</Text>
-                <Text style={styles.endpoint}>/api/reboot - Reboot (Device Owner)</Text>
-                <Text style={styles.endpoint}>/api/audio/play - Play audio URL</Text>
-                <Text style={styles.endpoint}>/api/audio/stop - Stop audio</Text>
-                <Text style={styles.endpoint}>/api/audio/beep - Play beep sound</Text>
+                <Text style={styles.categoryLabel}>{t('components.apiSettings.postControl')}</Text>
+                <Text style={styles.endpoint}>{t('components.apiSettings.postEndpoints')}</Text>
               </View>
             )}
 
             {allowControl && (
               <View style={styles.endpointCategory}>
-                <Text style={styles.categoryLabel}>POST (Remote Control - Android TV)</Text>
-                <Text style={styles.endpoint}>/api/remote/up - D-pad up</Text>
-                <Text style={styles.endpoint}>/api/remote/down - D-pad down</Text>
-                <Text style={styles.endpoint}>/api/remote/left - D-pad left</Text>
-                <Text style={styles.endpoint}>/api/remote/right - D-pad right</Text>
-                <Text style={styles.endpoint}>/api/remote/select - Select/Enter</Text>
-                <Text style={styles.endpoint}>/api/remote/back - Back button</Text>
-                <Text style={styles.endpoint}>/api/remote/home - Home button</Text>
-                <Text style={styles.endpoint}>/api/remote/menu - Menu button</Text>
-                <Text style={styles.endpoint}>/api/remote/playpause - Play/Pause</Text>
+                <Text style={styles.categoryLabel}>{t('components.apiSettings.postRemoteControl')}</Text>
+                <Text style={styles.endpoint}>{t('components.apiSettings.postRemoteEndpoints')}</Text>
               </View>
             )}
           </View>
@@ -345,7 +312,7 @@ export const ApiSettingsSection: React.FC<ApiSettingsSectionProps> = ({
           <View style={styles.hintContainer}>
             <Icon name="home-assistant" size={20} color="#41BDF5" />
             <Text style={styles.hintText}>
-              Use with Home Assistant's RESTful integration. See documentation for configuration examples.
+              {t('components.apiSettings.haHint')}
             </Text>
           </View>
         </>

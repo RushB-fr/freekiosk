@@ -9,6 +9,7 @@ import { Colors, Spacing, Typography } from '../../theme';
 import { ScheduledEvent } from '../../types/planner';
 import ScheduleEventCard from './ScheduleEventCard';
 import Icon from '../Icon';
+import { useTranslation } from 'react-i18next';
 
 interface ScheduleEventListProps {
   events: ScheduledEvent[];
@@ -29,6 +30,7 @@ const ScheduleEventList: React.FC<ScheduleEventListProps> = ({
   disabled = false,
   maxEvents = 20,
 }) => {
+  const { t } = useTranslation();
   const handleToggle = (event: ScheduledEvent) => {
     const updatedEvents = events.map(e => 
       e.id === event.id ? { ...e, enabled: !e.enabled } : e
@@ -38,12 +40,12 @@ const ScheduleEventList: React.FC<ScheduleEventListProps> = ({
 
   const handleDelete = (event: ScheduledEvent) => {
     Alert.alert(
-      'Delete Event',
-      `Are you sure you want to delete "${event.name || 'this event'}"?`,
+      t('components.scheduleEventList.deleteEventTitle'),
+      t('components.scheduleEventList.deleteEventMessage', { name: event.name || t('components.scheduleEventList.thisEvent') }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('components.scheduleEventList.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('components.scheduleEventList.delete'),
           style: 'destructive',
           onPress: () => {
             const updatedEvents = events.filter(e => e.id !== event.id);
@@ -75,7 +77,7 @@ const ScheduleEventList: React.FC<ScheduleEventListProps> = ({
       {events.length > 0 && (
         <View style={styles.statsRow}>
           <Text style={styles.statsText}>
-            {activeCount} active • {recurringCount} recurring • {oneTimeCount} one-time
+            {t('components.scheduleEventList.statsText', { active: activeCount, recurring: recurringCount, oneTime: oneTimeCount })}
           </Text>
         </View>
       )}
@@ -83,9 +85,9 @@ const ScheduleEventList: React.FC<ScheduleEventListProps> = ({
       {sortedEvents.length === 0 ? (
         <View style={styles.emptyState}>
           <Icon name="calendar" size={40} color={Colors.textHint} style={styles.emptyIcon} />
-          <Text style={styles.emptyTitle}>No Scheduled Events</Text>
+          <Text style={styles.emptyTitle}>{t('components.scheduleEventList.noEventsTitle')}</Text>
           <Text style={styles.emptyText}>
-            Add recurring or one-time events to display{'\n'}different URLs at specific times.
+            {t('components.scheduleEventList.noEventsHint')}
           </Text>
         </View>
       ) : (
@@ -117,7 +119,7 @@ const ScheduleEventList: React.FC<ScheduleEventListProps> = ({
             styles.addButtonText,
             (!canAddMore || disabled) && styles.addButtonTextDisabled,
           ]}>
-            Add Recurring Event
+            {t('components.scheduleEventList.addRecurring')}
           </Text>
         </TouchableOpacity>
 
@@ -135,14 +137,14 @@ const ScheduleEventList: React.FC<ScheduleEventListProps> = ({
             styles.addButtonText,
             (!canAddMore || disabled) && styles.addButtonTextDisabled,
           ]}>
-            Add One-Time Event
+            {t('components.scheduleEventList.addOneTime')}
           </Text>
         </TouchableOpacity>
       </View>
 
       {!canAddMore && (
         <Text style={styles.limitText}>
-          Maximum {maxEvents} events reached
+          {t('components.scheduleEventList.limitReached', { max: maxEvents })}
         </Text>
       )}
     </View>

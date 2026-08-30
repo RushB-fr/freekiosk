@@ -11,18 +11,21 @@ import { DashboardTile } from '../../../types/dashboard';
 import { getColorForLabel } from '../../../utils/dashboardColors';
 import { StorageService } from '../../../utils/storage';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useTranslation } from 'react-i18next';
 
 interface DashboardTabProps {
   dashboardModeEnabled: boolean;
 }
 
-const ICON_MODES = [
-  { value: 'favicon' as const, label: 'Favicon' },
-  { value: 'image' as const, label: 'Image URL' },
-  { value: 'letter' as const, label: 'Letter' },
-];
-
 const DashboardTab: React.FC<DashboardTabProps> = ({ dashboardModeEnabled }) => {
+  const { t } = useTranslation();
+
+  const ICON_MODES = [
+    { value: 'favicon' as const, label: t('dashboard.iconModes.favicon') },
+    { value: 'image' as const, label: t('dashboard.iconModes.image') },
+    { value: 'letter' as const, label: t('dashboard.iconModes.letter') },
+  ];
+
   const [tiles, setTiles] = useState<DashboardTile[]>([]);
   const [editingTile, setEditingTile] = useState<DashboardTile | null>(null);
   const [showEditor, setShowEditor] = useState(false);
@@ -68,24 +71,24 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ dashboardModeEnabled }) => 
 
   const handleSaveTile = async () => {
     if (!editLabel.trim()) {
-      Alert.alert('Error', 'Please enter a label');
+      Alert.alert(t('dashboard.errors.error'), t('dashboard.errors.enterLabel'));
       return;
     }
     if (!editUrl.trim()) {
-      Alert.alert('Error', 'Please enter a URL');
+      Alert.alert(t('dashboard.errors.error'), t('dashboard.errors.enterUrl'));
       return;
     }
     let finalUrl = editUrl.trim();
     const urlLower = finalUrl.toLowerCase();
     if (urlLower.startsWith('javascript:') || urlLower.startsWith('data:') || urlLower.startsWith('file://')) {
-      Alert.alert('Security Error', 'This type of URL is not allowed. Use http:// or https://');
+      Alert.alert(t('dashboard.errors.securityError'), t('dashboard.errors.urlNotAllowed'));
       return;
     }
     if (!urlLower.startsWith('http://') && !urlLower.startsWith('https://')) {
       if (finalUrl.includes('.')) {
         finalUrl = 'https://' + finalUrl;
       } else {
-        Alert.alert('Invalid URL', 'Please enter a valid URL');
+        Alert.alert(t('dashboard.errors.invalidUrl'), t('dashboard.errors.enterValidUrl'));
         return;
       }
     }
@@ -114,10 +117,10 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ dashboardModeEnabled }) => 
   };
 
   const handleDeleteTile = (tile: DashboardTile) => {
-    Alert.alert('Delete Tile', `Remove "${tile.label}"?`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('dashboard.deleteTile.title'), t('dashboard.deleteTile.message', { label: tile.label }), [
+      { text: t('dashboard.deleteTile.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('dashboard.deleteTile.delete'),
         style: 'destructive',
         onPress: async () => {
           const filtered = tiles.filter(t => t.id !== tile.id);
@@ -174,7 +177,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ dashboardModeEnabled }) => 
       <View>
         <SettingsInfoBox variant="warning">
           <Text style={styles.infoText}>
-            Enable Dashboard mode in General tab to configure tiles.
+            {t('dashboard.enableDashboardMode')}
           </Text>
         </SettingsInfoBox>
       </View>
@@ -183,7 +186,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ dashboardModeEnabled }) => 
 
   return (
     <View>
-      <SettingsSection title="Dashboard Tiles" icon="view-dashboard">
+      <SettingsSection title={t('dashboard.tilesTitle')} icon="view-dashboard">
         {tiles.map((tile, index) => (
           <View key={tile.id} style={styles.tileRow}>
             {/* Reorder arrows */}
@@ -220,7 +223,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ dashboardModeEnabled }) => 
         ))}
 
         <SettingsButton
-          title="Add Tile"
+          title={t('dashboard.addTile')}
           icon="plus-circle-outline"
           variant="success"
           onPress={openAddEditor}
@@ -228,25 +231,25 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ dashboardModeEnabled }) => 
       </SettingsSection>
 
       {showEditor && (
-        <SettingsSection title={editingTile ? 'Edit Tile' : 'New Tile'} icon="pencil">
+        <SettingsSection title={editingTile ? t('dashboard.editTile') : t('dashboard.newTile')} icon="pencil">
           <SettingsInput
-            label="Label"
+            label={t('dashboard.label')}
             value={editLabel}
             onChangeText={setEditLabel}
-            placeholder="My Dashboard"
+            placeholder={t('dashboard.labelPlaceholder')}
           />
           <View style={styles.editorSpacer} />
           <SettingsInput
-            label="URL"
+            label={t('dashboard.url')}
             value={editUrl}
             onChangeText={setEditUrl}
-            placeholder="https://example.com"
+            placeholder={t('dashboard.urlPlaceholder')}
             keyboardType="url"
           />
           <View style={styles.editorSpacer} />
 
           {/* Icon mode selector */}
-          <Text style={styles.fieldLabel}>Icon Mode</Text>
+          <Text style={styles.fieldLabel}>{t('dashboard.iconMode')}</Text>
           <View style={styles.iconModeRow}>
             {ICON_MODES.map(mode => (
               <TouchableOpacity
@@ -273,10 +276,10 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ dashboardModeEnabled }) => 
             <>
               <View style={styles.editorSpacer} />
               <SettingsInput
-                label="Image URL"
+                label={t('dashboard.imageUrl')}
                 value={editIconValue}
                 onChangeText={setEditIconValue}
-                placeholder="https://example.com/icon.png"
+                placeholder={t('dashboard.imageUrlPlaceholder')}
                 keyboardType="url"
               />
             </>
@@ -285,7 +288,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ dashboardModeEnabled }) => 
           {/* Preview */}
           {editLabel.trim() && (
             <View style={styles.previewRow}>
-              <Text style={styles.fieldLabel}>Preview</Text>
+              <Text style={styles.fieldLabel}>{t('dashboard.preview')}</Text>
               <View style={styles.previewContainer}>
                 {renderTilePreview({
                   id: 'preview',
@@ -303,13 +306,13 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ dashboardModeEnabled }) => 
           <View style={styles.editorSpacer} />
           <View style={styles.editorActions}>
             <SettingsButton
-              title="Cancel"
+              title={t('dashboard.cancel')}
               variant="outline"
               onPress={() => setShowEditor(false)}
             />
             <View style={{ width: Spacing.sm }} />
             <SettingsButton
-              title={editingTile ? 'Update' : 'Add'}
+              title={editingTile ? t('dashboard.update') : t('dashboard.add')}
               variant="success"
               onPress={handleSaveTile}
             />

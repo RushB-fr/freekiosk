@@ -24,6 +24,7 @@ import {
   validateRegion,
   getDisplayModeLabel,
 } from '../../types/blockingOverlay';
+import { useTranslation } from 'react-i18next';
 
 interface BlockingOverlayEditorProps {
   visible: boolean;
@@ -40,6 +41,7 @@ const BlockingOverlayEditor: React.FC<BlockingOverlayEditorProps> = ({
   onDelete,
   onClose,
 }) => {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [enabled, setEnabled] = useState(true);
   const [xStart, setXStart] = useState(0);
@@ -63,7 +65,7 @@ const BlockingOverlayEditor: React.FC<BlockingOverlayEditorProps> = ({
       setTargetPackage(region.targetPackage || '');
     } else {
       // Reset for new region
-      setName('New Region');
+      setName(t('components.blockingOverlayEditor.newRegionDefault'));
       setEnabled(true);
       setXStart(0);
       setYStart(0);
@@ -77,7 +79,7 @@ const BlockingOverlayEditor: React.FC<BlockingOverlayEditorProps> = ({
   const handleSave = () => {
     const updatedRegion: BlockingRegion = {
       id: region?.id || `region_${Date.now()}`,
-      name: name.trim() || 'Unnamed Region',
+      name: name.trim() || t('components.blockingOverlayEditor.unnamedRegionDefault'),
       enabled,
       xStart,
       yStart,
@@ -89,7 +91,7 @@ const BlockingOverlayEditor: React.FC<BlockingOverlayEditorProps> = ({
 
     const validation = validateRegion(updatedRegion);
     if (!validation.valid) {
-      Alert.alert('Invalid Region', validation.error);
+      Alert.alert(t('components.blockingOverlayEditor.invalidRegionTitle'), validation.error);
       return;
     }
 
@@ -100,12 +102,12 @@ const BlockingOverlayEditor: React.FC<BlockingOverlayEditorProps> = ({
   const handleDelete = () => {
     if (region && onDelete) {
       Alert.alert(
-        'Delete Region',
-        `Are you sure you want to delete "${region.name}"?`,
+        t('components.blockingOverlayEditor.deleteRegionTitle'),
+        t('components.blockingOverlayEditor.deleteRegionMessage', { name: region.name }),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('components.blockingOverlayEditor.cancel'), style: 'cancel' },
           {
-            text: 'Delete',
+            text: t('components.blockingOverlayEditor.delete'),
             style: 'destructive',
             onPress: () => {
               onDelete(region.id);
@@ -118,9 +120,9 @@ const BlockingOverlayEditor: React.FC<BlockingOverlayEditorProps> = ({
   };
 
   const displayModes: { value: OverlayDisplayMode; label: string; icon: IconName }[] = [
-    { value: 'transparent', label: 'Transparent', icon: 'eye-off' },
-    { value: 'semi_transparent', label: 'Semi-transparent', icon: 'eye' },
-    { value: 'opaque', label: 'Opaque', icon: 'lock' },
+    { value: 'transparent', label: t('components.blockingOverlayEditor.transparent'), icon: 'eye-off' },
+    { value: 'semi_transparent', label: t('components.blockingOverlayEditor.semiTransparent'), icon: 'eye' },
+    { value: 'opaque', label: t('components.blockingOverlayEditor.opaque'), icon: 'lock' },
   ];
 
   return (
@@ -135,7 +137,7 @@ const BlockingOverlayEditor: React.FC<BlockingOverlayEditorProps> = ({
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>
-              {isNew ? 'Add Region' : 'Edit Region'}
+              {isNew ? t('components.blockingOverlayEditor.addRegion') : t('components.blockingOverlayEditor.editRegion')}
             </Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Icon name="close" size={24} color={Colors.textPrimary} />
@@ -145,22 +147,22 @@ const BlockingOverlayEditor: React.FC<BlockingOverlayEditorProps> = ({
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
             {/* Name Input */}
             <View style={styles.section}>
-              <Text style={styles.label}>Name</Text>
+              <Text style={styles.label}>{t('components.blockingOverlayEditor.name')}</Text>
               <TextInput
                 style={styles.input}
                 value={name}
                 onChangeText={setName}
-                placeholder="Region name"
+                placeholder={t('components.blockingOverlayEditor.namePlaceholder')}
                 placeholderTextColor={Colors.textHint}
               />
             </View>
 
             {/* Horizontal (X-axis) */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Horizontal (X-axis)</Text>
-              
+              <Text style={styles.sectionTitle}>{t('components.blockingOverlayEditor.horizontalAxis')}</Text>
+
               <View style={styles.sliderRow}>
-                <Text style={styles.sliderLabel}>Start: {xStart.toFixed(0)}%</Text>
+                <Text style={styles.sliderLabel}>{t('components.blockingOverlayEditor.start', { value: xStart.toFixed(0) })}</Text>
                 <Slider
                   style={styles.slider}
                   minimumValue={0}
@@ -175,7 +177,7 @@ const BlockingOverlayEditor: React.FC<BlockingOverlayEditorProps> = ({
               </View>
               
               <View style={styles.sliderRow}>
-                <Text style={styles.sliderLabel}>End: {xEnd.toFixed(0)}%</Text>
+                <Text style={styles.sliderLabel}>{t('components.blockingOverlayEditor.end', { value: xEnd.toFixed(0) })}</Text>
                 <Slider
                   style={styles.slider}
                   minimumValue={0}
@@ -192,10 +194,10 @@ const BlockingOverlayEditor: React.FC<BlockingOverlayEditorProps> = ({
 
             {/* Vertical (Y-axis) */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Vertical (Y-axis)</Text>
-              
+              <Text style={styles.sectionTitle}>{t('components.blockingOverlayEditor.verticalAxis')}</Text>
+
               <View style={styles.sliderRow}>
-                <Text style={styles.sliderLabel}>Start: {yStart.toFixed(0)}%</Text>
+                <Text style={styles.sliderLabel}>{t('components.blockingOverlayEditor.start', { value: yStart.toFixed(0) })}</Text>
                 <Slider
                   style={styles.slider}
                   minimumValue={0}
@@ -210,7 +212,7 @@ const BlockingOverlayEditor: React.FC<BlockingOverlayEditorProps> = ({
               </View>
               
               <View style={styles.sliderRow}>
-                <Text style={styles.sliderLabel}>End: {yEnd.toFixed(0)}%</Text>
+                <Text style={styles.sliderLabel}>{t('components.blockingOverlayEditor.end', { value: yEnd.toFixed(0) })}</Text>
                 <Slider
                   style={styles.slider}
                   minimumValue={0}
@@ -227,7 +229,7 @@ const BlockingOverlayEditor: React.FC<BlockingOverlayEditorProps> = ({
 
             {/* Preview Box */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Preview</Text>
+              <Text style={styles.sectionTitle}>{t('components.blockingOverlayEditor.preview')}</Text>
               <View style={styles.previewContainer}>
                 <View style={styles.previewScreen}>
                   <View
@@ -253,7 +255,7 @@ const BlockingOverlayEditor: React.FC<BlockingOverlayEditorProps> = ({
 
             {/* Display Mode */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Display Mode</Text>
+              <Text style={styles.sectionTitle}>{t('components.blockingOverlayEditor.displayMode')}</Text>
               {displayModes.map((mode) => (
                 <TouchableOpacity
                   key={mode.value}
@@ -281,9 +283,9 @@ const BlockingOverlayEditor: React.FC<BlockingOverlayEditorProps> = ({
 
             {/* Target Package */}
             <View style={styles.section}>
-              <Text style={styles.label}>Target App Package (optional)</Text>
+              <Text style={styles.label}>{t('components.blockingOverlayEditor.targetPackage')}</Text>
               <Text style={styles.hint}>
-                Leave empty to always show, or enter a package name (e.g., com.vendor.app)
+                {t('components.blockingOverlayEditor.targetPackageHint')}
               </Text>
               <TextInput
                 style={styles.input}
@@ -306,7 +308,7 @@ const BlockingOverlayEditor: React.FC<BlockingOverlayEditorProps> = ({
                 size={24}
                 color={enabled ? Colors.primary : Colors.textHint}
               />
-              <Text style={styles.toggleLabel}>Enabled</Text>
+              <Text style={styles.toggleLabel}>{t('components.blockingOverlayEditor.enabled')}</Text>
             </TouchableOpacity>
           </ScrollView>
 
@@ -315,15 +317,15 @@ const BlockingOverlayEditor: React.FC<BlockingOverlayEditorProps> = ({
             {!isNew && onDelete && (
               <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
                 <Icon name="delete" size={20} color={Colors.error} />
-                <Text style={styles.deleteButtonText}>Delete</Text>
+                <Text style={styles.deleteButtonText}>{t('components.blockingOverlayEditor.delete')}</Text>
               </TouchableOpacity>
             )}
             <View style={styles.footerSpacer} />
             <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-              <Text style={styles.cancelButtonText}>Cancel</Text>
+              <Text style={styles.cancelButtonText}>{t('components.blockingOverlayEditor.cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-              <Text style={styles.saveButtonText}>Save</Text>
+              <Text style={styles.saveButtonText}>{t('components.blockingOverlayEditor.save')}</Text>
             </TouchableOpacity>
           </View>
         </View>

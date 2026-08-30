@@ -20,6 +20,8 @@ import {
 import CookieManager from '@react-native-cookies/cookies';
 import { Camera } from 'react-native-vision-camera';
 import { StorageService } from '../../utils/storage';
+import { setAppLanguage, resolveSupportedLanguage, SupportedLanguage } from '../../i18n';
+import { useTranslation } from 'react-i18next';
 import { saveSecurePin, hasSecurePin, clearSecurePin, saveSecureBasicAuthPassword, getSecureBasicAuthPassword } from '../../utils/secureStorage';
 import CertificateModuleTyped, { CertificateInfo } from '../../utils/CertificateModule';
 import AppLauncherModule, { AppInfo } from '../../utils/AppLauncherModule';
@@ -70,6 +72,7 @@ const TABS: { id: string; label: string; icon: IconName }[] = [
 ];
 
 const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
+  const { t } = useTranslation();
   // Active tab
   const [activeTab, setActiveTab] = useState('general');
   
@@ -130,6 +133,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [showVolume, setShowVolume] = useState<boolean>(true);
   const [showTime, setShowTime] = useState<boolean>(true);
   const [statusBarTheme, setStatusBarTheme] = useState<'dark' | 'light'>('dark');
+  const [language, setLanguage] = useState<SupportedLanguage>('en');
   const [keyboardMode, setKeyboardMode] = useState<string>('default');
   const [allowPowerButton, setAllowPowerButton] = useState<boolean>(true);
   const [blockFactoryReset, setBlockFactoryReset] = useState<boolean>(false);
@@ -504,6 +508,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedShowVolume = await StorageService.getStatusBarShowVolume();
     const savedShowTime = await StorageService.getStatusBarShowTime();
     const savedStatusBarTheme = await StorageService.getStatusBarTheme();
+    const savedLanguage = resolveSupportedLanguage(await StorageService.getLanguage());
     const savedBackButtonMode = await StorageService.getBackButtonMode();
     const savedBackButtonTimerDelay = await StorageService.getBackButtonTimerDelay();
     const savedKeyboardMode = await StorageService.getKeyboardMode();
@@ -575,6 +580,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setShowVolume(savedShowVolume);
     setShowTime(savedShowTime);
     setStatusBarTheme(savedStatusBarTheme);
+    setLanguage(savedLanguage);
     setBackButtonMode(savedBackButtonMode);
     setBackButtonTimerDelay(String(savedBackButtonTimerDelay));
     setKeyboardMode(savedKeyboardMode);
@@ -782,7 +788,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       setMediaPlayerItems(prev => [...prev, ...newItems]);
     } catch (error: any) {
       if (error?.code !== 'PICKER_CANCELLED') {
-        Alert.alert('Error', `Failed to pick media: ${error?.message || error}`);
+        Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.pickMediaError', { error: error?.message || error }));
       }
     } finally {
       setPickingMedia(false);
@@ -808,7 +814,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       setScreensaverVideoItems(prev => [...prev, ...newItems]);
     } catch (error: any) {
       if (error?.code !== 'PICKER_CANCELLED') {
-        Alert.alert('Error', `Failed to pick media: ${error?.message || error}`);
+        Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.pickMediaError', { error: error?.message || error }));
       }
     } finally {
       setPickingScreensaverMedia(false);
@@ -822,7 +828,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       setInstalledApps(apps);
       setShowAppPicker(true);
     } catch (error) {
-      Alert.alert('Error', `Unable to load apps: ${error}`);
+      Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.unableToLoadApps', { error }));
     } finally {
       setLoadingApps(false);
     }
@@ -901,9 +907,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       // Check if cameras are available (use already detected list)
       if (availableCameras.length === 0) {
         Alert.alert(
-          'No Camera Available',
-          'Your device does not have any cameras available. This could be because:\n\n• Cameras are disabled in your ROM/system\n• Hardware issue\n\nYou can use the REST API with an external motion sensor instead.',
-          [{ text: 'OK' }]
+          t('screens.settingsMain.noCameraTitle'),
+          t('screens.settingsMain.noCameraMessage'),
+          [{ text: t('screens.settingsMain.ok') }]
         );
         return;
       }
@@ -911,11 +917,11 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       const permission = await Camera.requestCameraPermission();
       if (permission === 'denied') {
         Alert.alert(
-          'Camera Permission Required',
-          'Camera access is needed for motion detection.',
+          t('screens.settingsMain.cameraPermissionTitle'),
+          t('screens.settingsMain.cameraPermissionMessage'),
           [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => openSystemSettingsSafely() }
+            { text: t('screens.settingsMain.cancel'), style: 'cancel' },
+            { text: t('screens.settingsMain.openSettings'), onPress: () => openSystemSettingsSafely() }
           ]
         );
         return;
@@ -993,7 +999,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
 
   const handleLockscreenRotationLockEnabledChange = (enabled: boolean) => {
     if (enabled && !lockscreenRotationLockAvailable) {
-      Alert.alert('Rotation lock unavailable', 'This device does not expose the system rotation controls needed for the lock screen rotation toggle.');
+      Alert.alert(t('screens.settingsMain.rotationLockUnavailableTitle'), t('screens.settingsMain.rotationLockUnavailableMessage'));
       setLockscreenRotationLockEnabled(false);
       return;
     }
@@ -1015,25 +1021,25 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       }
 
       Alert.alert(
-        'Disable Safety Hub?',
-        'Safety Hub is enabled. On some devices it can be opened from the Emergency button and may allow escaping kiosk mode. Disable Safety Hub now?',
+        t('screens.settingsMain.disableSafetyHubTitle'),
+        t('screens.settingsMain.disableSafetyHubMessage'),
         [
           {
-            text: 'Keep Enabled',
+            text: t('screens.settingsMain.keepEnabled'),
             style: 'cancel',
             onPress: () => setLockscreenEmergencyCallEnabled(true),
           },
           {
-            text: 'Disable',
+            text: t('screens.settingsMain.disable'),
             style: 'destructive',
             onPress: async () => {
               try {
                 const disabled = Boolean(await KioskModule.disableSafetyHub());
                 if (!disabled) {
-                  Alert.alert('Safety Hub', 'Safety Hub could not be disabled automatically.');
+                  Alert.alert(t('screens.settingsMain.safetyHub'), t('screens.settingsMain.safetyHubFailed'));
                 }
               } catch (error) {
-                Alert.alert('Safety Hub', 'Safety Hub could not be disabled automatically. Device Owner mode is required.');
+                Alert.alert(t('screens.settingsMain.safetyHub'), t('screens.settingsMain.safetyHubFailedDeviceOwner'));
               }
               setLockscreenEmergencyCallEnabled(true);
             },
@@ -1145,20 +1151,24 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
         // Latest version is newer than current
         setUpdateAvailable(true);
         setUpdateInfo(latestUpdate);
-        const betaTag = latestUpdate.isPrerelease ? ' Beta' : '';
+        const betaTag = latestUpdate.isPrerelease ? t('screens.settingsMain.beta') : '';
         Alert.alert(
-          `Update Available${betaTag}`,
-          `New version ${latestVer} available!${latestUpdate.isPrerelease ? ' (pre-release)' : ''}\n\nCurrent: ${currentVer}\n\nDo you want to download and install it?`,
+          t('screens.settingsMain.updateAvailableTitle', { betaTag }),
+          t('screens.settingsMain.updateAvailableMessage', {
+            version: latestVer,
+            prerelease: latestUpdate.isPrerelease ? t('screens.settingsMain.prereleaseSuffix') : '',
+            current: currentVer,
+          }),
           [
-            { text: 'Later', style: 'cancel' },
-            { text: 'Update', onPress: () => handleDownloadUpdate(latestUpdate) }
+            { text: t('screens.settingsMain.later'), style: 'cancel' },
+            { text: t('screens.settingsMain.update'), onPress: () => handleDownloadUpdate(latestUpdate) }
           ]
         );
       } else {
-        Alert.alert('Up to Date', `You are using the latest version (${currentVer})`);
+        Alert.alert(t('screens.settingsMain.upToDateTitle'), t('screens.settingsMain.upToDateMessage', { version: currentVer }));
       }
     } catch (error: any) {
-      Alert.alert('Error', `Unable to check for updates: ${error.message || error.toString()}`);
+      Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.checkUpdateFailed', { error: error.message || error.toString() }));
     } finally {
       setCheckingUpdate(false);
     }
@@ -1169,28 +1179,28 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const updateData = update || updateInfo;
     
     if (!updateData || !updateData.downloadUrl) {
-      Alert.alert('Error', 'Download URL not available.');
+      Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.downloadUrlUnavailable'));
       return;
     }
-    
+
     // Check install permission before downloading
     try {
       const canInstall = await UpdateModule.checkInstallPermission();
       if (!canInstall) {
         Alert.alert(
-          'Permission Required',
-          'FreeKiosk needs permission to install updates.\n\nPlease enable "Allow from this source" on the next screen, then come back and try the update again.',
+          t('screens.settingsMain.permissionRequiredTitle'),
+          t('screens.settingsMain.permissionRequiredMessage'),
           [
-            { text: 'Cancel', style: 'cancel' },
+            { text: t('screens.settingsMain.cancel'), style: 'cancel' },
             {
-              text: 'Open Settings',
+              text: t('screens.settingsMain.openSettings'),
               onPress: async () => {
                 try {
                   await UpdateModule.openInstallPermissionSettings();
                 } catch (error: any) {
                   Alert.alert(
-                    'Settings Unavailable',
-                    'This device does not support enabling app installs from settings.\n\nAlternative: connect via ADB and run:\nadb install -r FreeKiosk-<version>.apk',
+                    t('screens.settingsMain.settingsUnavailableTitle'),
+                    t('screens.settingsMain.settingsUnavailableMessage'),
                   );
                 }
               },
@@ -1210,22 +1220,22 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       await UpdateModule.downloadAndInstall(updateData.downloadUrl, updateData.version);
       setDownloading(false);
       Alert.alert(
-        'Update Ready',
-        'The update has been downloaded successfully. The installation screen should appear shortly.\n\nIf nothing happens:\n• Check notification panel\n• Look for "Package installer"\n• Grant installation permission if prompted',
-        [{ text: 'OK' }]
+        t('screens.settingsMain.updateReadyTitle'),
+        t('screens.settingsMain.updateReadyMessage'),
+        [{ text: t('screens.settingsMain.ok') }]
       );
     } catch (error: any) {
       setDownloading(false);
       const errorMsg = error?.message || error?.toString() || 'Unknown error';
-      
+
       // Provide helpful message for install permission errors
       if (error?.code === 'INSTALL_PERMISSION' || errorMsg.includes('unknown sources')) {
         Alert.alert(
-          'Install Permission Needed',
-          'The update was downloaded but cannot be installed.\n\nPlease enable "Install from unknown sources" for FreeKiosk in your device settings, then try again.\n\nOn restricted devices (e.g. Echo Show), use:\nadb install -r <apk>',
+          t('screens.settingsMain.installPermissionNeededTitle'),
+          t('screens.settingsMain.installPermissionNeededMessage'),
         );
       } else {
-        Alert.alert('Error', `Download failed:\n\n${errorMsg}`);
+        Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.downloadFailed', { error: errorMsg }));
       }
     }
   };
@@ -1235,24 +1245,24 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const handleSave = async (): Promise<void> => {
     // Validation
     if (displayMode === 'webview' && !url && !dashboardModeEnabled) {
-      Alert.alert('Error', 'Please enter a URL');
+      Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.enterUrl'));
       return;
     }
 
     if (displayMode === 'media_player') {
       if (mediaPlayerItems.length === 0) {
-        Alert.alert('Error', 'Please add at least one media item (video or image URL)');
+        Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.addMediaItem'));
         return;
       }
       // Validate all media URLs
       for (const item of mediaPlayerItems) {
         if (!item.url || !item.url.trim()) {
-          Alert.alert('Error', 'All media items must have a valid URL');
+          Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.mediaItemsNeedUrl'));
           return;
         }
         const urlLower = item.url.toLowerCase();
         if (!urlLower.startsWith('http://') && !urlLower.startsWith('https://') && !urlLower.startsWith('file://')) {
-          Alert.alert('Error', `Invalid URL: ${item.url}\nMedia URLs must start with http://, https://, or file://`);
+          Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.invalidMediaUrl', { url: item.url }));
           return;
         }
       }
@@ -1262,30 +1272,30 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       if (externalAppMode === 'single') {
         // Single mode: require a package name (classic behavior)
         if (!externalAppPackage) {
-          Alert.alert('Error', 'Please enter a package name or select an app');
+          Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.enterPackageName'));
           return;
         }
         // Android package names can contain uppercase letters (e.g., com.JoonAppInc.JoonKids)
         const regex = /^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$/;
         if (!regex.test(externalAppPackage)) {
-          Alert.alert('Error', 'Invalid package name format (e.g., com.example.app)');
+          Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.invalidPackageFormat'));
           return;
         }
         try {
           const isInstalled = await AppLauncherModule.isAppInstalled(externalAppPackage);
           if (!isInstalled) {
-            Alert.alert('Error', `App not installed: ${externalAppPackage}`);
+            Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.appNotInstalled', { package: externalAppPackage }));
             return;
           }
         } catch (error) {
-          Alert.alert('Error', `Unable to verify app: ${error}`);
+          Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.unableToVerifyApp', { error }));
           return;
         }
       } else {
         // Multi mode: require at least one managed app with showOnHomeScreen
         const homeScreenApps = managedApps.filter(a => a.showOnHomeScreen);
         if (homeScreenApps.length === 0) {
-          Alert.alert('Error', 'Multi App mode requires at least one app with "Show on Home Screen" enabled');
+          Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.multiAppNeedsHomeScreen'));
           return;
         }
       }
@@ -1296,17 +1306,17 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     if (displayMode === 'webview' && !dashboardModeEnabled) {
       const urlLower = finalUrl.toLowerCase();
       if (urlLower.startsWith('file://') || urlLower.startsWith('javascript:') || urlLower.startsWith('data:')) {
-        Alert.alert('Security Error', 'This type of URL is not allowed. Use http:// or https://');
+        Alert.alert(t('screens.settingsMain.securityErrorTitle'), t('screens.settingsMain.urlNotAllowed'));
         return;
       }
       if (!urlLower.startsWith('http://') && !urlLower.startsWith('https://')) {
         if (finalUrl.includes('.')) {
           finalUrl = 'https://' + finalUrl;
           setUrl(finalUrl);
-          Alert.alert('URL Updated', `https:// added to your URL:\n\n${finalUrl}\n\nClick Save again to confirm.`);
+          Alert.alert(t('screens.settingsMain.urlUpdatedTitle'), t('screens.settingsMain.urlUpdatedMessage', { url: finalUrl }));
           return;
         } else {
-          Alert.alert('Invalid URL', 'Please enter a valid URL (e.g., example.com or https://example.com)');
+          Alert.alert(t('screens.settingsMain.invalidUrlTitle'), t('screens.settingsMain.invalidUrlMessage'));
           return;
         }
       }
@@ -1315,39 +1325,39 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     // PIN validation
     // If mode changed, a new password is REQUIRED
     if (pinModeChanged && !pin) {
-      Alert.alert('Error', 'Password mode changed - you must enter a new password');
+      Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.passwordModeChanged'));
       return;
     }
-    
+
     if (pin && pin.length > 0) {
       if (pin.length < 4) {
-        Alert.alert('Error', 'Password must be at least 4 characters');
+        Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.passwordMinLength'));
         return;
       }
       if (pinMode === 'numeric' && !/^\d+$/.test(pin)) {
-        Alert.alert('Error', 'In numeric PIN mode, only digits (0-9) are allowed. Enable "Advanced Password Mode" to use letters and special characters.');
+        Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.numericPinDigitsOnly'));
         return;
       }
       if (pinMode === 'numeric' && pin.length > 6) {
-        Alert.alert('Error', 'Numeric PIN must be 4-6 digits. Enable "Advanced Password Mode" for longer passwords.');
+        Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.numericPinLength'));
         return;
       }
     } else if (!isPinConfigured && !pin) {
-      Alert.alert('Error', 'Please enter a password');
+      Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.enterPassword'));
       return;
     }
 
     // Inactivity delay validation
     const inactivityDelayNumber = parseInt(inactivityDelay, 10);
     if (isNaN(inactivityDelayNumber) || inactivityDelayNumber <= 0) {
-      Alert.alert('Error', 'Please enter a valid inactivity delay');
+      Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.enterValidInactivityDelay'));
       return;
     }
 
     // PIN max attempts validation
     const pinMaxAttemptsNumber = parseInt(pinMaxAttemptsText, 10);
     if (isNaN(pinMaxAttemptsNumber) || pinMaxAttemptsNumber < 1 || pinMaxAttemptsNumber > 100) {
-      Alert.alert('Error', 'PIN attempts must be between 1 and 100');
+      Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.pinAttemptsRange'));
       return;
     }
     setPinMaxAttempts(pinMaxAttemptsNumber);
@@ -1584,12 +1594,12 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
         console.warn('[Settings] startLockTask error (non-blocking):', error);
       }
       const message = displayMode === 'external_app'
-        ? 'Configuration saved\nLock mode enabled'
+        ? t('screens.settingsMain.savedLockExternalApp')
         : displayMode === 'media_player'
-        ? 'Configuration saved\nMedia player locked'
-        : 'Configuration saved\nScreen pinning enabled';
-      Alert.alert('Success', message, [
-        { text: 'OK', onPress: () => { revokeSettingsAccess(); navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] }); } },
+        ? t('screens.settingsMain.savedLockMediaPlayer')
+        : t('screens.settingsMain.savedLockWebview');
+      Alert.alert(t('screens.settingsMain.success'), message, [
+        { text: t('screens.settingsMain.ok'), onPress: () => { revokeSettingsAccess(); navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] }); } },
       ]);
     } else {
       try {
@@ -1598,12 +1608,12 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
         // Silent fail
       }
       const message = displayMode === 'external_app'
-        ? 'Configuration saved\nExternal app will launch automatically'
+        ? t('screens.settingsMain.savedUnlockExternalApp')
         : displayMode === 'media_player'
-        ? 'Configuration saved\nMedia player will start'
-        : 'Configuration saved\nScreen pinning disabled';
-      Alert.alert('Success', message, [
-        { text: 'OK', onPress: () => { revokeSettingsAccess(); navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] }); } },
+        ? t('screens.settingsMain.savedUnlockMediaPlayer')
+        : t('screens.settingsMain.savedUnlockWebview');
+      Alert.alert(t('screens.settingsMain.success'), message, [
+        { text: t('screens.settingsMain.ok'), onPress: () => { revokeSettingsAccess(); navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] }); } },
       ]);
     }
   };
@@ -1612,12 +1622,12 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
 
   const handleResetSettings = async (): Promise<void> => {
     Alert.alert(
-      'Reset',
-      'This will erase all settings and restart the app with default values.\n\nContinue?',
+      t('screens.settingsMain.resetTitle'),
+      t('screens.settingsMain.resetMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('screens.settingsMain.cancel'), style: 'cancel' },
         {
-          text: 'Reset',
+          text: t('screens.settingsMain.reset'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -1700,11 +1710,11 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
                 await KioskModule.stopLockTask();
               } catch {}
 
-              Alert.alert('Success', 'Settings reset!\nPlease reconfigure the app.', [
-                { text: 'OK', onPress: () => { revokeSettingsAccess(); navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] }); } },
+              Alert.alert(t('screens.settingsMain.success'), t('screens.settingsMain.resetSuccessMessage'), [
+                { text: t('screens.settingsMain.ok'), onPress: () => { revokeSettingsAccess(); navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] }); } },
               ]);
             } catch (error) {
-              Alert.alert('Error', `Reset failed: ${error}`);
+              Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.resetFailed', { error }));
             }
           },
         },
@@ -1714,21 +1724,21 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
 
   const handleExitKioskMode = async (): Promise<void> => {
     Alert.alert(
-      'Exit Kiosk Mode',
-      'Are you sure you want to exit kiosk mode?\n\nThis will close the application.',
+      t('screens.settingsMain.exitKioskModeTitle'),
+      t('screens.settingsMain.exitKioskModeMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('screens.settingsMain.cancel'), style: 'cancel' },
         {
-          text: 'Exit',
+          text: t('screens.settingsMain.exit'),
           style: 'destructive',
           onPress: async () => {
             try {
               const result = await KioskModule.exitKioskMode();
               if (!result) {
-                Alert.alert('Info', 'Kiosk mode disabled');
+                Alert.alert(t('screens.settingsMain.info'), t('screens.settingsMain.kioskModeDisabled'));
               }
             } catch (error) {
-              Alert.alert('Error', `Unable to exit: ${error}`);
+              Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.unableToExit', { error }));
             }
           },
         },
@@ -1738,17 +1748,12 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
 
   const handleRemoveDeviceOwner = async (): Promise<void> => {
     Alert.alert(
-      'Remove Device Owner',
-      'WARNING: This will remove Device Owner privileges.\n\n' +
-      'You will lose:\n' +
-      '• Full kiosk mode\n' +
-      '• Navigation blocking\n' +
-      '• Lock protection\n\n' +
-      'All settings will be reset.\n\nContinue?',
+      t('screens.settingsMain.removeDeviceOwnerTitle'),
+      t('screens.settingsMain.removeDeviceOwnerMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('screens.settingsMain.cancel'), style: 'cancel' },
         {
-          text: 'Remove',
+          text: t('screens.settingsMain.remove'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -1766,12 +1771,12 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
               // Reset all state...
               
               Alert.alert(
-                'Success',
-                'Device Owner removed!\n\nYou can now uninstall FreeKiosk normally.',
-                [{ text: 'OK', onPress: () => { revokeSettingsAccess(); navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] }); } }]
+                t('screens.settingsMain.success'),
+                t('screens.settingsMain.deviceOwnerRemovedMessage'),
+                [{ text: t('screens.settingsMain.ok'), onPress: () => { revokeSettingsAccess(); navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] }); } }]
               );
             } catch (error: any) {
-              Alert.alert('Error', `Failed: ${error.message || error}`);
+              Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.failedMessage', { error: error.message || error }));
             }
           },
         },
@@ -1781,20 +1786,20 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
 
   const handleRemoveCertificate = async (fingerprint: string, url: string): Promise<void> => {
     Alert.alert(
-      'Remove Certificate',
-      `Remove the accepted certificate for:\n\n${url}\n\nYou will need to accept it again on your next visit.`,
+      t('screens.settingsMain.removeCertificateTitle'),
+      t('screens.settingsMain.removeCertificateMessage', { url }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('screens.settingsMain.cancel'), style: 'cancel' },
         {
-          text: 'Remove',
+          text: t('screens.settingsMain.remove'),
           style: 'destructive',
           onPress: async () => {
             try {
               await CertificateModuleTyped.removeCertificate(fingerprint);
               await loadCertificates();
-              Alert.alert('Success', 'Certificate removed');
+              Alert.alert(t('screens.settingsMain.success'), t('screens.settingsMain.certificateRemoved'));
             } catch (error) {
-              Alert.alert('Error', `Failed: ${error}`);
+              Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.failedMessage', { error }));
             }
           },
         },
@@ -1809,6 +1814,11 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       case 'general':
         return (
           <GeneralTab
+            language={language}
+            onLanguageChange={(value) => {
+              setLanguage(value);
+              setAppLanguage(value);
+            }}
             displayMode={displayMode}
             onDisplayModeChange={handleDisplayModeChange}
             url={url}
@@ -2160,12 +2170,12 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       <Modal visible={downloading} transparent animationType="fade" onRequestClose={() => {}}>
         <View style={settingsStyles.modalOverlay}>
           <View style={settingsStyles.modalContent}>
-            <Text style={settingsStyles.modalTitle}>Downloading</Text>
+            <Text style={settingsStyles.modalTitle}>{t('screens.settingsMain.downloading')}</Text>
             <Text style={settingsStyles.modalText}>
-              Please wait while downloading...
+              {t('screens.settingsMain.pleaseWaitDownloading')}
             </Text>
             <Text style={settingsStyles.modalHint}>
-              Do not close the application.
+              {t('screens.settingsMain.doNotCloseApp')}
             </Text>
           </View>
         </View>
@@ -2173,7 +2183,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
 
       {/* Header */}
       <View style={settingsStyles.header}>
-        <Text style={settingsStyles.headerTitle}>Settings</Text>
+        <Text style={settingsStyles.headerTitle}>{t('screens.settingsMain.title')}</Text>
         
         {/* Device Owner Badge */}
         <View style={[
@@ -2191,7 +2201,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             settingsStyles.deviceOwnerBadgeText,
             isDeviceOwner ? settingsStyles.deviceOwnerBadgeTextActive : settingsStyles.deviceOwnerBadgeTextInactive
           ]}>
-            {isDeviceOwner ? 'Device Owner Active' : 'Device Owner Inactive'}
+            {isDeviceOwner ? t('screens.settingsMain.deviceOwnerActive') : t('screens.settingsMain.deviceOwnerInactive')}
           </Text>
         </View>
         
@@ -2213,7 +2223,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
                   settingsStyles.tabLabel,
                   activeTab === tab.id && settingsStyles.tabLabelActive
                 ]}>
-                  {tab.label}
+                  {t(`screens.settingsMain.tabs.${tab.id}`)}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -2233,7 +2243,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
         {activeTab !== 'advanced' && (
           <TouchableOpacity style={[styles.saveButton, styles.saveButtonRow]} onPress={handleSave}>
             <Icon name="content-save" size={20} color={Colors.textOnPrimary} style={styles.saveButtonIcon} />
-            <Text style={styles.saveButtonText}>Save</Text>
+            <Text style={styles.saveButtonText}>{t('screens.settingsMain.save')}</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -2242,7 +2252,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       <Modal visible={showAppPicker} animationType="slide" onRequestClose={() => setShowAppPicker(false)}>
         <View style={settingsStyles.appPickerContainer}>
           <View style={settingsStyles.appPickerHeader}>
-            <Text style={settingsStyles.appPickerTitle}>Select an App</Text>
+            <Text style={settingsStyles.appPickerTitle}>{t('screens.settingsMain.selectAnApp')}</Text>
             <TouchableOpacity
               style={settingsStyles.appPickerCloseButton}
               onPress={() => setShowAppPicker(false)}
