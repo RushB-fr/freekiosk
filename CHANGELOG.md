@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ***
 
+## [Unreleased]
+
+### Fixed
+- 🔓 **A stalled boot could leave a Device Owner device locked on "Starting kiosk…" forever** (#243): `BootLockActivity` has carried a 2-minute safety timeout since it was introduced in #98 (April 2026), meant to hand the device back if `MainActivity` never takes over. It never worked. The timeout called `finish()` on its own, and lock task absorbs a `finish()`, the exact platform behaviour #222 diagnosed and worked around four months later by calling `stopLockTask()` first. That workaround was applied only to the #222 branch, twenty lines below, in the same function: `stopLockTask()` appears exactly once in the file's whole history. So both existing safety nets were gated on `isDeviceSecure() == true && isUserUnlocked() == false`, and a device with **no** secure lock screen armed neither of them, hit the timeout, absorbed it, and kept polling forever with no way out. The only escape was `adb install -r -d` from an already-authorized computer, which is out of reach for anyone who never authorized ADB on that device: the RSA prompt is itself an activity, and lock task blocks it. The timeout now calls `stopLockTask()` before `finish()`, once, and only when `MainActivity.hasStarted` is false. That bound matters: if `MainActivity` never started then React Native never ran, no kiosk configuration was ever applied, and lock task is guarding a black screen rather than a kiosk, so nothing is weakened. Where `MainActivity` has started, the previous behaviour is unchanged. ⚠️ This does relax the #98 guarantee ("a reboot must not dodge the lock") by up to two minutes, but only on a boot that has already failed, on a device where the kiosk never came up. **Not verified on hardware**: the stall could not be reproduced here, the same limitation as #222. The change compiles, and what needs checking on a device is that a healthy boot never reaches the timeout at all (hand-off normally happens in a second or two via `isMainActivityReady()`), so the new branch stays dead code on a normal boot. Reported by e-mail after a user was locked out of a Ulefone phone with ADB unauthorized.
+
+***
+
 ## [2.0.0-beta.1] - 2026-08-28
 
 - ☁️ **FreeKiosk Cloud is switched on.** The groundwork shipped compiled-but-disabled in 1.2.20-beta.6 (`CLOUD_ENABLED`) is now active, which is what takes this line to 2.0. It remains a **closed beta**: the platform is invitation-only and the app is handed out from the dashboard. This entry gathers the whole cloud feature, previously listed as unreleased, together with the defects found while validating it on a device.
