@@ -155,6 +155,30 @@ class FreeKioskAccessibilityService : AccessibilityService() {
         }
         
         /**
+         * Tap at an arbitrary point on screen, in device pixels (same coordinate space as
+         * a screenshot from /api/screenshot). Backs the click-through on the /remote live
+         * view page — the browser scales its click position by the screenshot's natural
+         * size before sending it here, so (x, y) already matches the real screen.
+         */
+        fun sendTap(x: Int, y: Int): Boolean {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return false
+            val service = instance ?: return false
+            try {
+                val path = Path()
+                path.moveTo(x.toFloat(), y.toFloat())
+                val gesture = GestureDescription.Builder()
+                    .addStroke(GestureDescription.StrokeDescription(path, 0, 50))
+                    .build()
+                val ok = service.dispatchGesture(gesture, null, null)
+                Log.d(TAG, "Tap gesture: x=$x, y=$y, ok=$ok")
+                return ok
+            } catch (e: Exception) {
+                Log.w(TAG, "Tap gesture failed: ${e.message}")
+                return false
+            }
+        }
+
+        /**
          * Type text into the focused input field.
          * Strategy: InputMethod.commitText (API 33+) → ACTION_SET_TEXT on focused node (all APIs)
          */
