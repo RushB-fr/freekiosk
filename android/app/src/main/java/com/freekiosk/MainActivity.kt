@@ -1351,7 +1351,8 @@ class MainActivity : ReactActivity() {
       "mqtt_enabled", "mqtt_broker_url", "mqtt_port", "mqtt_username", "mqtt_password",
       "mqtt_client_id", "mqtt_base_topic", "mqtt_discovery_prefix", "mqtt_status_interval",
       "mqtt_allow_control", "mqtt_device_name",
-      "external_app_mode", "managed_apps"
+      "external_app_mode", "managed_apps",
+      "dashboard_mode", "dashboard_tiles"
     )
     if (adbConfigKeys.none { intent.hasExtra(it) }) return false
     
@@ -1596,6 +1597,30 @@ class MainActivity : ReactActivity() {
       }
     }
     
+    // Dashboard mode. The tile grid only exists inside the WebView display mode
+    // (KioskScreen renders DashboardGrid under displayMode === 'webview'), so enabling it
+    // without setting the mode would write a setting the runtime never reads. This mirrors
+    // what lock_package already does for external_app.
+    if (intent.hasExtra("dashboard_mode")) {
+      val dashboardMode = intent.getBooleanExtra("dashboard_mode", false)
+      editor.putString("@kiosk_dashboard_mode_enabled", dashboardMode.toString())
+      if (dashboardMode && lockPackage == null) {
+        editor.putString("@kiosk_display_mode", "webview")
+      }
+      android.util.Log.i("FreeKiosk-ADB", "Dashboard mode: $dashboardMode")
+    }
+
+    // Dashboard tiles: JSON array, one object per tile.
+    // Format: '[{"label":"Main","url":"https://app.example"},{"label":"Docs","url":"..."}]'
+    intent.getStringExtra("dashboard_tiles")?.let { jsonStr ->
+      val normalized = normalizeDashboardTiles(jsonStr)
+      if (normalized != null) {
+        editor.putString("@kiosk_dashboard_tiles", normalized)
+      } else {
+        showAdbToast("❌ ADB Config: Invalid dashboard_tiles JSON")
+      }
+    }
+
     // Mark that there is pending config
     editor.putBoolean("has_pending_config", true)
     
@@ -1736,6 +1761,52 @@ class MainActivity : ReactActivity() {
   /**
    * Apply full JSON configuration to SharedPreferences (pending config)
    */
+  /**
+   * Normalize a dashboard tiles array coming from ADB into the shape DashboardTile
+   * (src/types/dashboard.ts) expects: id, label, url, iconMode, iconValue?, order.
+   *
+   * A provisioning script should not have to invent stable ids or keep an order counter,
+   * so both are filled in when absent, and label falls back to the URL. A tile without a
+   * url is dropped rather than written: the grid would render an entry that navigates
+   * nowhere. Returns null when nothing usable came out, so the caller can say so instead
+   * of silently writing an empty grid.
+   */
+  private fun normalizeDashboardTiles(jsonStr: String): String? {
+    return try {
+      val input = org.json.JSONArray(jsonStr)
+      val out = org.json.JSONArray()
+      for (i in 0 until input.length()) {
+        val tile = input.getJSONObject(i)
+        val url = tile.optString("url", "")
+        if (url.isEmpty()) {
+          android.util.Log.w("FreeKiosk-ADB", "Dashboard tile #$i has no url, skipping")
+          continue
+        }
+        val iconMode = tile.optString("iconMode", "favicon").let {
+          if (it == "favicon" || it == "image" || it == "letter") it else "favicon"
+        }
+        val normalized = org.json.JSONObject()
+        normalized.put("id", tile.optString("id", "").ifEmpty { "adb-$i-${System.currentTimeMillis()}" })
+        normalized.put("label", tile.optString("label", "").ifEmpty { url })
+        normalized.put("url", url)
+        normalized.put("iconMode", iconMode)
+        if (tile.has("iconValue")) normalized.put("iconValue", tile.optString("iconValue"))
+        normalized.put("order", tile.optInt("order", i))
+        out.put(normalized)
+      }
+      if (out.length() == 0) {
+        android.util.Log.w("FreeKiosk-ADB", "No usable dashboard tiles in the provided list")
+        null
+      } else {
+        android.util.Log.i("FreeKiosk-ADB", "Dashboard tiles configured: ${out.length()}")
+        out.toString()
+      }
+    } catch (e: Exception) {
+      android.util.Log.e("FreeKiosk-ADB", "Invalid dashboard tiles JSON: ${e.message}")
+      null
+    }
+  }
+
   private fun applyJsonConfigToPrefs(editor: android.content.SharedPreferences.Editor, config: org.json.JSONObject) {
     // Map of JSON keys to AsyncStorage keys
     val keyMapping = mapOf(
@@ -1771,7 +1842,9 @@ class MainActivity : ReactActivity() {
       "mqtt_allow_control" to "@kiosk_mqtt_allow_control",
       "mqtt_device_name" to "@kiosk_mqtt_device_name",
       // Multi-app
-      "external_app_mode" to "@kiosk_external_app_mode"
+      "external_app_mode" to "@kiosk_external_app_mode",
+      // Dashboard (tiles are normalized separately, below)
+      "dashboard_mode" to "@kiosk_dashboard_mode_enabled"
     )
     
     for ((jsonKey, storageKey) in keyMapping) {
@@ -1825,6 +1898,19 @@ class MainActivity : ReactActivity() {
       } catch (e: Exception) {
         android.util.Log.e("FreeKiosk-ADB", "Invalid managed_apps in JSON config: ${e.message}")
       }
+    }
+
+    // Dashboard tiles: same normalization as the dashboard_tiles extra.
+    if (config.has("dashboard_tiles")) {
+      val normalized = normalizeDashboardTiles(config.getJSONArray("dashboard_tiles").toString())
+      if (normalized != null) {
+        editor.putString("@kiosk_dashboard_tiles", normalized)
+      }
+    }
+
+    // The dashboard grid only exists inside the WebView display mode.
+    if (config.optBoolean("dashboard_mode", false) && !config.has("display_mode")) {
+      editor.putString("@kiosk_display_mode", "webview")
     }
 
     // If external_app_mode is set to multi, ensure display_mode is external_app

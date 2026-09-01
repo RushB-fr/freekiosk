@@ -152,6 +152,34 @@ Each app in the array supports these fields:
 |-----------|------|-------------|
 | `--es url "https://..."` | String | URL to display in kiosk WebView |
 
+### Dashboard Parameters
+
+The dashboard is a grid of tiles, each opening its own URL. It lives inside the WebView
+display mode, so `--ez dashboard_mode true` sets `display_mode` to `webview` on its own
+unless `lock_package` says otherwise.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `--ez dashboard_mode true` | Boolean | Show the tile grid instead of a single URL |
+| `--es dashboard_tiles '[...]'` | String (JSON) | JSON array of tiles (see format below) |
+
+**Tile format:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `url` | String | **required** | URL the tile opens. A tile without one is skipped |
+| `label` | String | the URL | Text shown under the icon |
+| `id` | String | generated | Unique tile id. Let FreeKiosk generate it unless you are updating a specific tile |
+| `iconMode` | String | `favicon` | `favicon`, `image`, or `letter`. An unknown value falls back to `favicon` |
+| `iconValue` | String | - | Image URL, used when `iconMode` is `image` |
+| `order` | Number | list position | Display order in the grid |
+
+```bash
+adb shell am start -n com.freekiosk/.MainActivity   --es pin "1234"   --ez dashboard_mode true   --es dashboard_tiles '[{"label":"Main app","url":"https://myapp.eu"},{"label":"Reports","url":"https://reports.myapp.eu"}]'
+```
+
+The same two keys work inside `--es config` as `dashboard_mode` and `dashboard_tiles`.
+
 ### Kiosk Mode Options
 
 | Parameter | Type | Default | Description |
