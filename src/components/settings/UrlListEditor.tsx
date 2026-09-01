@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Colors, Spacing, Typography } from '../../theme';
 import Icon from '../Icon';
+import { useTranslation } from 'react-i18next';
 
 interface UrlListEditorProps {
   urls: string[];
@@ -35,6 +36,7 @@ const UrlListEditor: React.FC<UrlListEditorProps> = ({
   emptyTitle,
   emptyHint,
 }) => {
+  const { t } = useTranslation();
   const [newUrl, setNewUrl] = useState('');
 
   const validateUrl = (url: string): boolean => {
@@ -79,28 +81,28 @@ const UrlListEditor: React.FC<UrlListEditorProps> = ({
 
   const handleAddUrl = () => {
     if (!newUrl.trim()) {
-      Alert.alert('Error', patternMode ? 'Please enter a pattern' : 'Please enter a URL');
+      Alert.alert(t('components.urlListEditor.error'), patternMode ? t('components.urlListEditor.enterPattern') : t('components.urlListEditor.enterUrl'));
       return;
     }
 
     if (!validateUrl(newUrl)) {
       Alert.alert(
-        patternMode ? 'Invalid Pattern' : 'Invalid URL', 
-        patternMode ? 'Please enter a valid pattern (e.g., *facebook.com*)' : 'Please enter a valid URL (e.g., example.com)'
+        patternMode ? t('components.urlListEditor.invalidPattern') : t('components.urlListEditor.invalidUrl'),
+        patternMode ? t('components.urlListEditor.validPatternHint') : t('components.urlListEditor.validUrlHint')
       );
       return;
     }
 
     if (maxUrls > 0 && urls.length >= maxUrls) {
-      Alert.alert('Limit Reached', `Maximum ${maxUrls} entries allowed`);
+      Alert.alert(t('components.urlListEditor.limitReached'), t('components.urlListEditor.maxEntriesMessage', { max: maxUrls }));
       return;
     }
 
     const normalized = normalizeUrl(newUrl);
-    
+
     // Check for duplicates
     if (urls.includes(normalized)) {
-      Alert.alert('Duplicate', 'This URL is already in the list');
+      Alert.alert(t('components.urlListEditor.duplicate'), t('components.urlListEditor.duplicateMessage'));
       return;
     }
 
@@ -173,8 +175,8 @@ const UrlListEditor: React.FC<UrlListEditorProps> = ({
       ) : (
         <View style={styles.emptyState}>
           <Icon name={patternMode ? 'link-variant' : 'format-list-bulleted'} size={36} color={Colors.textHint} style={styles.emptyStateIcon} />
-          <Text style={styles.emptyStateText}>{emptyTitle || 'No URLs added yet'}</Text>
-          <Text style={styles.emptyStateHint}>{emptyHint || 'Add URLs below to start rotation'}</Text>
+          <Text style={styles.emptyStateText}>{emptyTitle || t('components.urlListEditor.noUrlsYet')}</Text>
+          <Text style={styles.emptyStateHint}>{emptyHint || t('components.urlListEditor.addUrlsHint')}</Text>
         </View>
       )}
 
@@ -185,7 +187,7 @@ const UrlListEditor: React.FC<UrlListEditorProps> = ({
             style={styles.input}
             value={newUrl}
             onChangeText={setNewUrl}
-            placeholder={placeholder || 'https://example.com'}
+            placeholder={placeholder || t('components.urlListEditor.defaultPlaceholder')}
             placeholderTextColor={Colors.textHint}
             keyboardType="url"
             autoCapitalize="none"
@@ -202,7 +204,9 @@ const UrlListEditor: React.FC<UrlListEditorProps> = ({
         </View>
         
         <Text style={styles.countText}>
-          {maxUrls > 0 ? `${urls.length} / ${maxUrls} ${patternMode ? 'patterns' : 'URLs'}` : `${urls.length} ${patternMode ? 'patterns' : 'URLs'}`}
+          {maxUrls > 0
+            ? t('components.urlListEditor.countWithMax', { count: urls.length, max: maxUrls, unit: patternMode ? t('components.urlListEditor.patterns') : t('components.urlListEditor.urls') })
+            : t('components.urlListEditor.countNoMax', { count: urls.length, unit: patternMode ? t('components.urlListEditor.patterns') : t('components.urlListEditor.urls') })}
         </Text>
       </View>
     </View>

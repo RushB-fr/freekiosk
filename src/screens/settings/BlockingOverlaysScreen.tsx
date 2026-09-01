@@ -26,10 +26,12 @@ import {
 } from '../../types/blockingOverlay';
 import { StorageService } from '../../utils/storage';
 import BlockingOverlayModule from '../../utils/BlockingOverlayModule';
+import { useTranslation } from 'react-i18next';
 
 const MAX_REGIONS = MAX_BLOCKING_REGIONS;
 
 const BlockingOverlaysScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { t } = useTranslation();
   const [enabled, setEnabled] = useState(false);
   const [regions, setRegions] = useState<BlockingRegion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,7 +71,7 @@ const BlockingOverlaysScreen: React.FC<{ navigation: any }> = ({ navigation }) =
       // This prevents overlays from appearing in settings screens
     } catch (error) {
       console.error('Failed to save blocking overlays settings:', error);
-      Alert.alert('Error', 'Failed to save settings');
+      Alert.alert(t('screens.blockingOverlays.error'), t('screens.blockingOverlays.saveFailed'));
     }
   }, []);
 
@@ -82,7 +84,7 @@ const BlockingOverlaysScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   // Handle add region
   const handleAddRegion = () => {
     if (regions.length >= MAX_REGIONS) {
-      Alert.alert('Limit Reached', `Maximum ${MAX_REGIONS} regions allowed.`);
+      Alert.alert(t('screens.blockingOverlays.limitReachedTitle'), t('screens.blockingOverlays.limitReachedMessage', { max: MAX_REGIONS }));
       return;
     }
     setEditingRegion(null);
@@ -107,7 +109,7 @@ const BlockingOverlaysScreen: React.FC<{ navigation: any }> = ({ navigation }) =
     } else {
       // Add new
       if (regions.length >= MAX_REGIONS) {
-        Alert.alert('Limit Reached', `Maximum ${MAX_REGIONS} regions allowed.`);
+        Alert.alert(t('screens.blockingOverlays.limitReachedTitle'), t('screens.blockingOverlays.limitReachedMessage', { max: MAX_REGIONS }));
         return;
       }
       newRegions = [...regions, region];
@@ -138,10 +140,10 @@ const BlockingOverlaysScreen: React.FC<{ navigation: any }> = ({ navigation }) =
     try {
       const success = await BlockingOverlayModule.showTouchLogger();
       if (!success) {
-        Alert.alert('Error', 'Failed to show touch logger');
+        Alert.alert(t('screens.blockingOverlays.error'), t('screens.blockingOverlays.touchLoggerFailed'));
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to show touch logger. Make sure overlay permission is granted.');
+      Alert.alert(t('screens.blockingOverlays.error'), t('screens.blockingOverlays.touchLoggerError'));
     }
   };
 
@@ -150,10 +152,10 @@ const BlockingOverlaysScreen: React.FC<{ navigation: any }> = ({ navigation }) =
     try {
       const success = await BlockingOverlayModule.showGridHelper(30);
       if (!success) {
-        Alert.alert('Error', 'Failed to show grid helper');
+        Alert.alert(t('screens.blockingOverlays.error'), t('screens.blockingOverlays.gridHelperFailed'));
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to show grid helper. Make sure overlay permission is granted.');
+      Alert.alert(t('screens.blockingOverlays.error'), t('screens.blockingOverlays.gridHelperError'));
     }
   };
 
@@ -167,7 +169,7 @@ const BlockingOverlaysScreen: React.FC<{ navigation: any }> = ({ navigation }) =
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading...</Text>
+          <Text style={styles.loadingText}>{t('screens.blockingOverlays.loading')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -180,7 +182,7 @@ const BlockingOverlaysScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Icon name="arrow-left" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.title}>Blocking Overlays</Text>
+        <Text style={styles.title}>{t('screens.blockingOverlays.title')}</Text>
       </View>
 
       <ScrollView
@@ -193,8 +195,7 @@ const BlockingOverlaysScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         <View style={styles.descriptionCard}>
           <Icon name="information-outline" size={24} color={Colors.primary} />
           <Text style={styles.descriptionText}>
-            Block touch input on specific areas of external apps. Useful for hiding
-            navigation bars, toolbars, or other interactive elements.
+            {t('screens.blockingOverlays.description')}
           </Text>
         </View>
 
@@ -202,9 +203,9 @@ const BlockingOverlaysScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         <View style={styles.section}>
           <View style={styles.toggleRow}>
             <View style={styles.toggleInfo}>
-              <Text style={styles.toggleLabel}>Enable Blocking Overlays</Text>
+              <Text style={styles.toggleLabel}>{t('screens.blockingOverlays.enableBlockingOverlays')}</Text>
               <Text style={styles.toggleHint}>
-                When enabled, configured regions will block touch input
+                {t('screens.blockingOverlays.enableHint')}
               </Text>
             </View>
             <Switch
@@ -218,14 +219,14 @@ const BlockingOverlaysScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
         {/* Tools Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Setup Tools</Text>
-          
+          <Text style={styles.sectionTitle}>{t('screens.blockingOverlays.setupTools')}</Text>
+
           <TouchableOpacity style={styles.toolButton} onPress={handleShowTouchLogger}>
             <Icon name="gesture-tap" size={24} color={Colors.primary} />
             <View style={styles.toolInfo}>
-              <Text style={styles.toolLabel}>Touch Logger</Text>
+              <Text style={styles.toolLabel}>{t('screens.blockingOverlays.touchLoggerLabel')}</Text>
               <Text style={styles.toolHint}>
-                Shows coordinates when you tap (30s countdown)
+                {t('screens.blockingOverlays.touchLoggerHint')}
               </Text>
             </View>
             <Icon name="chevron-right" size={24} color={Colors.textHint} />
@@ -234,9 +235,9 @@ const BlockingOverlaysScreen: React.FC<{ navigation: any }> = ({ navigation }) =
           <TouchableOpacity style={styles.toolButton} onPress={handleShowGridHelper}>
             <Icon name="grid" size={24} color={Colors.primary} />
             <View style={styles.toolInfo}>
-              <Text style={styles.toolLabel}>Grid Helper</Text>
+              <Text style={styles.toolLabel}>{t('screens.blockingOverlays.gridHelperLabel')}</Text>
               <Text style={styles.toolHint}>
-                Shows a percentage grid overlay (30s countdown)
+                {t('screens.blockingOverlays.gridHelperHint')}
               </Text>
             </View>
             <Icon name="chevron-right" size={24} color={Colors.textHint} />
@@ -247,7 +248,7 @@ const BlockingOverlaysScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>
-              Regions ({regions.length}/{MAX_REGIONS})
+              {t('screens.blockingOverlays.regionsTitle', { current: regions.length, max: MAX_REGIONS })}
             </Text>
             <TouchableOpacity
               style={[
@@ -268,7 +269,7 @@ const BlockingOverlaysScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                   regions.length >= MAX_REGIONS && styles.addButtonTextDisabled,
                 ]}
               >
-                Add
+                {t('screens.blockingOverlays.add')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -276,9 +277,9 @@ const BlockingOverlaysScreen: React.FC<{ navigation: any }> = ({ navigation }) =
           {regions.length === 0 ? (
             <View style={styles.emptyState}>
               <Icon name="rectangle-outline" size={48} color={Colors.textHint} />
-              <Text style={styles.emptyStateText}>No regions configured</Text>
+              <Text style={styles.emptyStateText}>{t('screens.blockingOverlays.noRegions')}</Text>
               <Text style={styles.emptyStateHint}>
-                Tap "Add" to create a blocking region
+                {t('screens.blockingOverlays.noRegionsHint')}
               </Text>
             </View>
           ) : (
@@ -315,7 +316,7 @@ const BlockingOverlaysScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                     </Text>
                     {region.targetPackage && (
                       <Text style={styles.regionPackage}>
-                        App: {region.targetPackage}
+                        {t('screens.blockingOverlays.appLabel', { package: region.targetPackage })}
                       </Text>
                     )}
                   </View>
@@ -328,23 +329,23 @@ const BlockingOverlaysScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
         {/* Tips Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tips</Text>
+          <Text style={styles.sectionTitle}>{t('screens.blockingOverlays.tips')}</Text>
           <View style={styles.tipCard}>
             <Icon name="lightbulb-outline" size={20} color={Colors.warning} />
             <Text style={styles.tipText}>
-              Use the Touch Logger to find exact coordinates of elements you want to block.
+              {t('screens.blockingOverlays.tip1')}
             </Text>
           </View>
           <View style={styles.tipCard}>
             <Icon name="lightbulb-outline" size={20} color={Colors.warning} />
             <Text style={styles.tipText}>
-              Percentage-based coordinates automatically adapt to screen rotation and different device sizes.
+              {t('screens.blockingOverlays.tip2')}
             </Text>
           </View>
           <View style={styles.tipCard}>
             <Icon name="lightbulb-outline" size={20} color={Colors.warning} />
             <Text style={styles.tipText}>
-              Regions can overlap. The return button will always stay accessible above blocking overlays.
+              {t('screens.blockingOverlays.tip3')}
             </Text>
           </View>
         </View>

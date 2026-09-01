@@ -10,6 +10,7 @@ import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { WebView } from 'react-native-webview';
 import Icon from './Icon';
 import type { MediaItem, MediaFitMode } from '../types/mediaPlayer';
+import { useTranslation } from 'react-i18next';
 
 interface MediaPlayerComponentProps {
   items: MediaItem[];
@@ -40,6 +41,7 @@ const MediaPlayerComponent: React.FC<MediaPlayerComponentProps> = ({
   muteVideo,
   onUserInteraction,
 }) => {
+  const { t } = useTranslation();
   const webViewRef = useRef<WebView>(null);
 
   const htmlContent = useMemo(() => {
@@ -76,10 +78,9 @@ const MediaPlayerComponent: React.FC<MediaPlayerComponentProps> = ({
     return (
       <View style={[styles.emptyContainer, { backgroundColor }]}>
         <Icon name="movie-outline" size={56} color="#ffffff" style={styles.emptyIcon} />
-        <Text style={styles.emptyTitle}>Media Player</Text>
+        <Text style={styles.emptyTitle}>{t('components.mediaPlayer.title')}</Text>
         <Text style={styles.emptyText}>
-          No media items configured.{'\n'}
-          Go to Settings → General to add videos and images.
+          {t('components.mediaPlayer.noItemsConfigured')}
         </Text>
       </View>
     );

@@ -21,6 +21,7 @@ import { ManagedApp, createManagedApp, isValidPackageName } from '../../types/ma
 import AppLauncherModule, { AppInfoAll } from '../../utils/AppLauncherModule';
 import { Colors, Spacing, Typography } from '../../theme';
 import Icon from '../Icon';
+import { useTranslation } from 'react-i18next';
 
 interface ManagedAppsSectionProps {
   managedApps: ManagedApp[];
@@ -35,6 +36,7 @@ const ManagedAppsSection: React.FC<ManagedAppsSectionProps> = ({
   isDeviceOwner,
   showHomeScreenToggle = true,
 }) => {
+  const { t } = useTranslation();
   const [showAppPicker, setShowAppPicker] = useState(false);
   const [allApps, setAllApps] = useState<AppInfoAll[]>([]);
   const [showAllPackages, setShowAllPackages] = useState(false);
@@ -51,7 +53,7 @@ const ManagedAppsSection: React.FC<ManagedAppsSectionProps> = ({
       setAllApps(filtered);
       setShowAppPicker(true);
     } catch (error) {
-      Alert.alert('Error', `Unable to load apps: ${error}`);
+      Alert.alert(t('components.managedApps.error'), t('components.managedApps.unableToLoadApps', { error }));
     } finally {
       setLoadingApps(false);
     }
@@ -71,12 +73,12 @@ const ManagedAppsSection: React.FC<ManagedAppsSectionProps> = ({
   const handleRemoveApp = useCallback((packageName: string) => {
     const app = managedApps.find(a => a.packageName === packageName);
     Alert.alert(
-      'Remove App',
-      `Remove "${app?.displayName || packageName}" from managed apps?`,
+      t('components.managedApps.removeAppTitle'),
+      t('components.managedApps.removeAppMessage', { name: app?.displayName || packageName }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('components.managedApps.cancel'), style: 'cancel' },
         {
-          text: 'Remove',
+          text: t('components.managedApps.remove'),
           style: 'destructive',
           onPress: () => {
             onManagedAppsChange(managedApps.filter(a => a.packageName !== packageName));
@@ -127,31 +129,31 @@ const ManagedAppsSection: React.FC<ManagedAppsSectionProps> = ({
         <View style={styles.togglesContainer}>
           {showHomeScreenToggle && (
             <ToggleRow
-              label="Show on Home Screen"
-              hint="Display this app on the kiosk home screen"
+              label={t('components.managedApps.showOnHomeScreen')}
+              hint={t('components.managedApps.showOnHomeScreenHint')}
               icon="monitor"
               value={app.showOnHomeScreen}
               onToggle={() => handleToggle(app.packageName, 'showOnHomeScreen')}
             />
           )}
           <ToggleRow
-            label="Launch on Boot"
-            hint="Start this app automatically when device boots"
+            label={t('components.managedApps.launchOnBoot')}
+            hint={t('components.managedApps.launchOnBootHint')}
             icon="power"
             value={app.launchOnBoot}
             onToggle={() => handleToggle(app.packageName, 'launchOnBoot')}
           />
           <ToggleRow
-            label="Keep Alive"
-            hint="Monitor and restart if the app closes or crashes"
+            label={t('components.managedApps.keepAlive')}
+            hint={t('components.managedApps.keepAliveHint')}
             icon="shield-check"
             value={app.keepAlive}
             onToggle={() => handleToggle(app.packageName, 'keepAlive')}
           />
           {isDeviceOwner && (
             <ToggleRow
-              label="Allow Accessibility"
-              hint="Permit this app's accessibility services"
+              label={t('components.managedApps.allowAccessibility')}
+              hint={t('components.managedApps.allowAccessibilityHint')}
               icon="keyboard-outline"
               value={app.allowAccessibility}
               onToggle={() => handleToggle(app.packageName, 'allowAccessibility')}
@@ -168,7 +170,7 @@ const ManagedAppsSection: React.FC<ManagedAppsSectionProps> = ({
       <View style={styles.sectionInfo}>
         <Icon name="information-outline" size={16} color={Colors.info} style={{ marginRight: 6 }} />
         <Text style={styles.sectionInfoText}>
-          Add apps to manage in multi-app mode. These apps will be whitelisted in lock task mode.
+          {t('components.managedApps.headerInfo')}
         </Text>
       </View>
 
@@ -176,9 +178,9 @@ const ManagedAppsSection: React.FC<ManagedAppsSectionProps> = ({
       {managedApps.length === 0 ? (
         <View style={styles.emptyState}>
           <Icon name="apps" size={40} color={Colors.textDisabled} />
-          <Text style={styles.emptyText}>No managed apps added</Text>
+          <Text style={styles.emptyText}>{t('components.managedApps.noAppsAdded')}</Text>
           <Text style={styles.emptyHint}>
-            Add apps to display them on the home screen, launch on boot, or keep alive in the background.
+            {t('components.managedApps.noAppsHint')}
           </Text>
         </View>
       ) : (
@@ -196,7 +198,7 @@ const ManagedAppsSection: React.FC<ManagedAppsSectionProps> = ({
         ) : (
           <>
             <Icon name="plus-circle-outline" size={20} color={Colors.textOnPrimary} style={{ marginRight: 8 }} />
-            <Text style={styles.addButtonText}>Add Managed App</Text>
+            <Text style={styles.addButtonText}>{t('components.managedApps.addManagedApp')}</Text>
           </>
         )}
       </TouchableOpacity>
@@ -211,14 +213,14 @@ const ManagedAppsSection: React.FC<ManagedAppsSectionProps> = ({
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select an Application</Text>
+              <Text style={styles.modalTitle}>{t('components.managedApps.selectApplication')}</Text>
               <TouchableOpacity onPress={() => setShowAppPicker(false)}>
                 <Icon name="close" size={24} color={Colors.textPrimary} />
               </TouchableOpacity>
             </View>
             <View style={styles.showAllToggle}>
               <Icon name="package-variant" size={16} color={Colors.textSecondary} style={{ marginRight: 6 }} />
-              <Text style={styles.showAllLabel}>Show all packages (services, VPNs…)</Text>
+              <Text style={styles.showAllLabel}>{t('components.managedApps.showAllPackages')}</Text>
               <Switch
                 value={showAllPackages}
                 onValueChange={setShowAllPackages}
@@ -251,7 +253,7 @@ const ManagedAppsSection: React.FC<ManagedAppsSectionProps> = ({
                       <Text style={styles.pickerAppName}>{item.appName}</Text>
                       {!item.hasLauncherActivity && (
                         <View style={styles.serviceBadge}>
-                          <Text style={styles.serviceBadgeText}>service</Text>
+                          <Text style={styles.serviceBadgeText}>{t('components.managedApps.service')}</Text>
                         </View>
                       )}
                     </View>
@@ -262,7 +264,7 @@ const ManagedAppsSection: React.FC<ManagedAppsSectionProps> = ({
               ListEmptyComponent={
                 <View style={styles.emptyState}>
                   <Text style={styles.emptyText}>
-                    {loadingApps ? 'Loading...' : 'All installed apps are already managed'}
+                    {loadingApps ? t('components.managedApps.loading') : t('components.managedApps.allAppsManaged')}
                   </Text>
                 </View>
               }

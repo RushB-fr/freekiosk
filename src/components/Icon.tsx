@@ -20,6 +20,7 @@ export type IconName =
   | 'chevron-up'
   | 'dots-vertical'
   | 'menu'
+  | 'translate'
   // Display & Screen
   | 'monitor'
   | 'cellphone'

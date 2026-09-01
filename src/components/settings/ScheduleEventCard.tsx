@@ -8,6 +8,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Colors, Spacing, Typography } from '../../theme';
 import { ScheduledEvent, getDaysDisplayString, formatDateDisplay, isEventActive } from '../../types/planner';
 import Icon from '../Icon';
+import { useTranslation } from 'react-i18next';
 
 interface ScheduleEventCardProps {
   event: ScheduledEvent;
@@ -22,28 +23,29 @@ const ScheduleEventCard: React.FC<ScheduleEventCardProps> = ({
   onToggle,
   onDelete,
 }) => {
+  const { t } = useTranslation();
   const isActive = isEventActive(event);
-  
+
   const getScheduleText = (): string => {
     if (event.type === 'recurring') {
       const days = getDaysDisplayString(event.days || []);
-      const time = event.startTime && event.endTime 
-        ? `${event.startTime} - ${event.endTime}` 
-        : 'All day';
+      const time = event.startTime && event.endTime
+        ? `${event.startTime} - ${event.endTime}`
+        : t('components.scheduleEventCard.allDay');
       return `${days} • ${time}`;
     }
-    
+
     if (event.type === 'oneTime') {
       const startStr = event.startDate ? formatDateDisplay(event.startDate) : '';
-      const endStr = event.endDate && event.endDate !== event.startDate 
-        ? ` - ${formatDateDisplay(event.endDate)}` 
+      const endStr = event.endDate && event.endDate !== event.startDate
+        ? ` - ${formatDateDisplay(event.endDate)}`
         : '';
-      const timeStr = event.allDay 
-        ? 'All day' 
+      const timeStr = event.allDay
+        ? t('components.scheduleEventCard.allDay')
         : (event.startTime && event.endTime ? `${event.startTime} - ${event.endTime}` : '');
       return `${startStr}${endStr}${timeStr ? ` • ${timeStr}` : ''}`;
     }
-    
+
     return '';
   };
 
@@ -68,13 +70,13 @@ const ScheduleEventCard: React.FC<ScheduleEventCardProps> = ({
               style={styles.typeIcon}
             />
             <Text style={[styles.name, !event.enabled && styles.textDisabled]} numberOfLines={1}>
-              {event.name || 'Unnamed Event'}
+              {event.name || t('components.scheduleEventCard.unnamedEvent')}
             </Text>
           </View>
           {isActive && event.enabled && (
             <View style={styles.activeBadge}>
               <Icon name="check-circle" size={12} color={Colors.success} />
-              <Text style={styles.activeBadgeText}>Active</Text>
+              <Text style={styles.activeBadgeText}>{t('components.scheduleEventCard.active')}</Text>
             </View>
           )}
         </View>

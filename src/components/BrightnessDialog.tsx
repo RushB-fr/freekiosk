@@ -9,6 +9,7 @@ import {
 import Slider from '@react-native-community/slider';
 import BrightnessModule from '../utils/BrightnessModule';
 import { StorageService } from '../utils/storage';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   visible: boolean;
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export default function BrightnessDialog({ visible, onClose }: Props) {
+  const { t } = useTranslation();
   const [brightness, setBrightness] = useState(0.5);
   const lastPersisted = useRef(0.5);
 
@@ -66,7 +68,7 @@ export default function BrightnessDialog({ visible, onClose }: Props) {
     >
       <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
         <TouchableOpacity style={styles.card} activeOpacity={1}>
-          <Text style={styles.title}>Screen Brightness</Text>
+          <Text style={styles.title}>{t('components.brightnessDialog.title')}</Text>
           <Text style={styles.value}>{Math.round(brightness * 100)}%</Text>
 
           <Slider
