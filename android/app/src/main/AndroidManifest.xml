@@ -42,6 +42,11 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
+    <!-- #242: persist the requested brightness to Settings.System.SCREEN_BRIGHTNESS so it
+         survives a wake and a reboot. Only needed without Device Owner, which writes the
+         same setting through DevicePolicyManager.setSystemSetting() and no permission.
+         Play-sensitive: removed in Play Store builds via the src/playstore overlay. -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
 
     <!-- Declare camera and audio as optional features -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />

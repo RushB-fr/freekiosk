@@ -43,6 +43,16 @@ class MainActivity : ReactActivity() {
      */
     private const val JS_READY_GRACE_MS = 90_000L
 
+    /**
+     * #248: upper bound on a re-lock deferred for the power menu. The re-lock normally
+     * happens the moment window focus returns, so this only fires if focus never comes
+     * back, for instance because the user left the power menu open and walked away.
+     * 15s is long enough to read a power menu and act on it, and short enough that a
+     * kiosk cannot be parked in an unlocked state: the old value was 2000ms, which
+     * closed the menu before it could be used.
+     */
+    private const val POWER_MENU_RELOCK_MAX_WAIT_MS = 15_000L
+
     // #222: set as soon as this activity is created, read by BootLockActivity. Its
     // hand-off check used to infer "MainActivity took over" from BootLockActivity losing
     // window focus, which is also what happens when a secure keyguard takes focus at boot:
@@ -181,6 +191,13 @@ class MainActivity : ReactActivity() {
   // on devices where onWindowFocusChanged fires rapidly (e.g. TECNO/HiOS on Android 14)
   private val hideSystemUIHandler = Handler(Looper.getMainLooper())
   private var lastFocusLostTime = 0L
+
+  // #248: a re-lock deferred because the power menu is probably open. Consumed when
+  // window focus comes back, which is the reliable "the menu is gone" signal, the same
+  // one the print-dialog handling below already relies on. The fallback timer exists so
+  // this can never leave the device unlocked indefinitely.
+  private val powerMenuRelockHandler = Handler(Looper.getMainLooper())
+  private var powerMenuRelockPending = false
 
   override fun getMainComponentName(): String = "FreeKiosk"
 
@@ -847,15 +864,31 @@ class MainActivity : ReactActivity() {
         val timeSinceFocusLost = System.currentTimeMillis() - lastFocusLostTime
         
         if (allowPowerButton && timeSinceFocusLost < 2000L) {
-          // Power menu was likely just shown — defer re-lock to avoid focus conflict
+          // #248: the power menu was probably just shown, so defer the re-lock rather
+          // than dismissing it. This used to re-lock on a flat 2s timer, which is less
+          // time than it takes to read the menu and choose "Power off": the menu closed
+          // by itself and the device could not be powered down from the button at all.
+          //
+          // Wait for window focus instead. That fires when the menu is dismissed, so in
+          // the common case we re-lock sooner than the old timer did, and in the slow
+          // case we no longer cut the user off mid-menu. The timer stays as a bound, not
+          // as the mechanism: if focus never comes back (the user walked away with the
+          // menu open) we re-lock anyway, so #98's guarantee is relaxed by at most
+          // POWER_MENU_RELOCK_MAX_WAIT_MS, and only after a deliberate power-button
+          // press on a kiosk whose admin has explicitly allowed the power menu.
           DebugLog.d("MainActivity", "Deferring re-lock: power menu may be active (${timeSinceFocusLost}ms since focus lost)")
-          Handler(Looper.getMainLooper()).postDelayed({
-            if (!isTaskLocked()) {
-              enableKioskRestrictions()
-              startLockTask()
-              DebugLog.d("MainActivity", "Deferred re-lock completed")
+          powerMenuRelockPending = true
+          powerMenuRelockHandler.removeCallbacksAndMessages(null)
+          powerMenuRelockHandler.postDelayed({
+            if (powerMenuRelockPending) {
+              powerMenuRelockPending = false
+              if (!isTaskLocked()) {
+                enableKioskRestrictions()
+                startLockTask()
+                DebugLog.d("MainActivity", "Deferred re-lock completed (fallback timeout)")
+              }
             }
-          }, 2000L)
+          }, POWER_MENU_RELOCK_MAX_WAIT_MS)
         } else {
           enableKioskRestrictions()
           startLockTask()
@@ -955,6 +988,20 @@ class MainActivity : ReactActivity() {
       // reliable signal that the activity is now truly foregrounded.
       if (lockTaskPending) {
         tryStartLockTask("onWindowFocusChanged retry")
+      }
+
+      // #248: focus is back, so the power menu (if that is what took it) is gone. Re-lock
+      // now instead of waiting out the fallback timer.
+      if (powerMenuRelockPending) {
+        powerMenuRelockPending = false
+        powerMenuRelockHandler.removeCallbacksAndMessages(null)
+        // No kioskEnabled check here: the flag is only ever set inside the branch that
+        // already verified it, so reaching this point implies kiosk mode was on.
+        if (devicePolicyManager.isDeviceOwnerApp(packageName) && !isTaskLocked()) {
+          enableKioskRestrictions()
+          startLockTask()
+          DebugLog.d("MainActivity", "Deferred re-lock completed (window focus regained)")
+        }
       }
 
       // If a print dialog was active, reset the flag now that focus has returned

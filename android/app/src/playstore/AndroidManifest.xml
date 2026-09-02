@@ -18,6 +18,11 @@
         android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
         tools:node="remove" />
 
+    <!-- Strip WRITE_SETTINGS (Device settings policy) -->
+    <uses-permission
+        android:name="android.permission.WRITE_SETTINGS"
+        tools:node="remove" />
+
     <!-- Strip READ_MEDIA_* (photo/video policy) -->
     <uses-permission
         android:name="android.permission.READ_MEDIA_VIDEO"

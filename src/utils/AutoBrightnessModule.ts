@@ -28,6 +28,17 @@ export interface LightLevelResult {
   sensorAvailable: boolean;
 }
 
+export interface SetDefaultBrightnessResult {
+  success: boolean;
+  level: number; // 0-1
+  /**
+   * Whether the level also reached Settings.System.SCREEN_BRIGHTNESS, and so will
+   * survive a reboot. false is not a failure: the window override still applies, the
+   * device simply has neither Device Owner nor WRITE_SETTINGS.
+   */
+  systemWrite: boolean;
+}
+
 /**
  * Default configuration for auto-brightness
  */
@@ -154,6 +165,50 @@ const AutoBrightnessModule = {
       return result;
     } catch (error) {
       console.error('[AutoBrightness] Failed to check light sensor:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Set the brightness FreeKiosk should hold across wakes and reboots (#242).
+   *
+   * Use this, not setBrightnessLevel(), for anything the user or an API caller meant
+   * as a lasting choice. setBrightnessLevel() is the transient path shared with the
+   * light sensor and the screensaver, and persisting from there would store the
+   * screensaver's 0 as the chosen default.
+   */
+  setDefaultBrightness: async (level: number): Promise<SetDefaultBrightnessResult> => {
+    try {
+      return await NativeAutoBrightnessModule.setDefaultBrightness(level);
+    } catch (error) {
+      console.error('[AutoBrightness] Failed to set default brightness:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Whether the requested brightness can be written to Settings.System, and so survive
+   * a reboot. True as Device Owner on API 28+, or once WRITE_SETTINGS is granted.
+   */
+  canWriteSystemBrightness: async (): Promise<boolean> => {
+    try {
+      return await NativeAutoBrightnessModule.canWriteSystemBrightness();
+    } catch (error) {
+      console.warn('[AutoBrightness] canWriteSystemBrightness failed:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Open the WRITE_SETTINGS grant screen. Resolves true if access was already held,
+   * false if the system screen was opened (or could not be). Pointless under Device
+   * Owner, and a no-op in Play Store builds where the permission is stripped.
+   */
+  requestWriteSystemBrightnessAccess: async (): Promise<boolean> => {
+    try {
+      return await NativeAutoBrightnessModule.requestWriteSystemBrightnessAccess();
+    } catch (error) {
+      console.warn('[AutoBrightness] requestWriteSystemBrightnessAccess failed:', error);
       return false;
     }
   },

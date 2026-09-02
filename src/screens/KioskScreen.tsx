@@ -53,6 +53,10 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [screensaverEnabled, setScreensaverEnabled] = useState(false);
   const [isScreensaverActive, setIsScreensaverActive] = useState(false);
   const [defaultBrightness, setDefaultBrightness] = useState<number>(0.5);
+  // #242: what the panel is actually running at, as opposed to what we asked for.
+  // Status and MQTT used to report the target, which is exactly what hid the mismatch
+  // the reporter saw (status said 100 while the panel sat at 14/255).
+  const [effectiveBrightness, setEffectiveBrightness] = useState<number>(0.5);
   const [screensaverBrightness, setScreensaverBrightness] = useState<number>(0);
   const [screensaverType, setScreensaverType] = useState<'dim' | 'url' | 'video'>('dim');
   const [screensaverUrl, setScreensaverUrl] = useState<string>('');
@@ -540,11 +544,15 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
             
             // API sends 0-100, RNBrightness needs 0-1
             const normalizedValue = value / 100;
-            await RNBrightness.setBrightnessLevel(normalizedValue);
+            // #242: setDefaultBrightness, not setBrightnessLevel. This is a lasting
+            // choice, so it has to reach the SharedPreferences mirror the wake paths
+            // read and, where possible, Settings.System, or the next wake loses it.
+            const systemWrite = await RNBrightness.setDefaultBrightness(normalizedValue);
             setDefaultBrightness(normalizedValue);
+            setEffectiveBrightness(normalizedValue);
             // Persist to storage so Settings shows updated value
             await StorageService.saveDefaultBrightness(normalizedValue);
-            console.log('[API] Brightness set to', value);
+            console.log('[API] Brightness set to', value, systemWrite ? '(persisted system-wide)' : '(window override only)');
           } catch (error) {
             console.error('[API] Error setting brightness:', error);
           }
@@ -927,7 +935,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   useEffect(() => {
     ApiService.updateStatus({
       currentUrl: url,
-      brightness: Math.round(defaultBrightness * 100),
+      brightness: Math.round(effectiveBrightness * 100),
       screensaverActive: isScreensaverActive,
       kioskMode: true, // Always in kiosk mode when this screen is active
       canGoBack: false,
@@ -941,7 +949,39 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       autoBrightnessMax: autoBrightnessMax,
       motionAlwaysOn: motionAlwaysOn,
     });
-  }, [url, defaultBrightness, isScreensaverActive, urlRotationEnabled, urlRotationList, urlRotationInterval, currentUrlIndex, autoBrightnessEnabled, autoBrightnessMin, autoBrightnessMax, motionAlwaysOn]);
+  }, [url, effectiveBrightness, isScreensaverActive, urlRotationEnabled, urlRotationList, urlRotationInterval, currentUrlIndex, autoBrightnessEnabled, autoBrightnessMin, autoBrightnessMax, motionAlwaysOn]);
+
+  // #242: read back the brightness actually in effect, rather than reporting the target.
+  // getBrightnessLevel() now answers with the window override when one is set and the
+  // real system value otherwise. Refreshed on the transitions that used to produce the
+  // mismatch: a new target, and the screensaver going on or off.
+  //
+  // Bounded on purpose: there is no brightness-changed broadcast on Android, so a change
+  // made outside FreeKiosk between two of these transitions is still not picked up. A
+  // poll would cost a wake-up every few seconds on a battery-powered kiosk for a value
+  // that only moves when something asks it to.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const actual = await RNBrightness.getBrightnessLevel();
+        if (!cancelled) {
+          // Fall back to the target rather than to the 0.5 initialiser: on a device
+          // where the native read fails we would otherwise report a flat 50% where the
+          // old code at least reported what had been asked for.
+          setEffectiveBrightness(typeof actual === 'number' ? actual : defaultBrightness);
+        }
+      } catch (error) {
+        console.warn('[KioskScreen] Could not read effective brightness:', error);
+        if (!cancelled) {
+          setEffectiveBrightness(defaultBrightness);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [defaultBrightness, isScreensaverActive]);
 
   // Countdown timer effect (transparent - no UI)
   useEffect(() => {

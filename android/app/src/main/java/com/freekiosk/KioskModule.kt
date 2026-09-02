@@ -1076,10 +1076,9 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                             activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                         }
                         
-                        // Set screen to normal brightness (-1 = use system default)
-                        val layoutParams = activity.window.attributes
-                        layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-                        activity.window.attributes = layoutParams
+                        // #242: restore the requested brightness rather than the system
+                        // default, which FreeKiosk never wrote.
+                        BrightnessPrefs.applyToWindow(reactApplicationContext, activity.window)
                         
                         android.util.Log.d("KioskModule", "Screen turned ON via WakeLock + activity flags")
                     } catch (e: Exception) {

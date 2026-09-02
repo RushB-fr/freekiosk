@@ -94,10 +94,9 @@ class ScreenSchedulerReceiver : BroadcastReceiver() {
                                     activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                                 }
 
-                                // Restore brightness to system default
-                                val layoutParams = activity.window.attributes
-                                layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-                                activity.window.attributes = layoutParams
+                                // #242: restore the requested brightness, not the system
+                                // default. Screen Scheduler wake goes through here.
+                                BrightnessPrefs.applyToWindow(context, activity.window)
 
                                 Log.d(TAG, "Activity flags restored: KEEP_SCREEN_ON, brightness, keyguard dismissed")
                             } catch (e: Exception) {

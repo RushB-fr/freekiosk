@@ -51,6 +51,10 @@ export default function BrightnessDialog({ visible, onClose }: Props) {
     if (Math.abs(value - lastPersisted.current) < 0.01) return;
     lastPersisted.current = value;
     try {
+      // #242: the drag itself goes through setBrightnessLevel (transient); releasing the
+      // slider is the lasting choice, so it also has to reach the SharedPreferences
+      // mirror the native wake paths read, and Settings.System where allowed.
+      await BrightnessModule.setDefaultBrightness(value);
       await StorageService.saveDefaultBrightness(value);
     } catch (e) {
       console.warn('[BrightnessDialog] saveDefaultBrightness error:', e);

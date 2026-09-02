@@ -153,10 +153,26 @@ class DeviceControlServiceClass {
 
   async getScreenStatus(): Promise<ScreenStatus> {
     const screensaverActive = this.getScreensaverCallback?.() || false;
-    
+
+    // #242: read the brightness actually in effect. This used to report
+    // this.currentBrightness, which only setBrightness() below ever wrote and which
+    // nothing calls, so the value was the 0.5 initialiser for the whole life of the
+    // process. Every cloud heartbeat therefore reported 50% for every device
+    // (CloudSyncService sends status.screen.brightness), regardless of the panel.
+    let brightness = this.currentBrightness;
+    try {
+      const actual = await RNBrightness.getBrightnessLevel();
+      if (typeof actual === 'number') {
+        brightness = actual;
+        this.currentBrightness = actual;
+      }
+    } catch (error) {
+      console.warn('DeviceControlService: getBrightnessLevel error', error);
+    }
+
     return {
       on: !screensaverActive,
-      brightness: Math.round(this.currentBrightness * 100),
+      brightness: Math.round(brightness * 100),
       screensaverActive,
       scheduledSleep: this.scheduledSleep,
     };
@@ -258,7 +274,10 @@ class DeviceControlServiceClass {
       const clamped = Math.max(0, Math.min(100, value));
       const normalized = clamped / 100;
       
-      await RNBrightness.setBrightnessLevel(normalized);
+      // #242: a caller asking this layer for a brightness means it to last, so it
+      // goes through setDefaultBrightness and reaches the native mirror plus
+      // Settings.System, rather than a window override the next wake would drop.
+      await RNBrightness.setDefaultBrightness(normalized);
       this.currentBrightness = normalized;
       
       // Emit event for UI updates

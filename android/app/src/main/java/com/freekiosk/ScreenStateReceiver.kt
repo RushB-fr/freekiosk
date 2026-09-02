@@ -135,10 +135,10 @@ class ScreenStateReceiver : BroadcastReceiver() {
                                     activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                                 }
 
-                                // Restore brightness to system default
-                                val layoutParams = activity.window.attributes
-                                layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-                                activity.window.attributes = layoutParams
+                                // #242: restore the requested brightness, not the system
+                                // default. This is the auto-wake path the reporter hit on every
+                                // charger plug and unplug.
+                                BrightnessPrefs.applyToWindow(context, activity.window)
 
                                 Log.d(TAG, "Auto-wake activity flags restored")
                             } catch (e: Exception) {

@@ -41,9 +41,9 @@ object ScreenController {
                         activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                     }
 
-                    val layoutParams = activity.window.attributes
-                    layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-                    activity.window.attributes = layoutParams
+                    // #242: re-apply the level FreeKiosk was asked to hold. Blanking the
+                    // override here handed the panel back to a system value we never wrote.
+                    BrightnessPrefs.applyToWindow(reactContext, activity.window)
 
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
                         activity.setShowWhenLocked(true)

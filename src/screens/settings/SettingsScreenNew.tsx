@@ -1394,6 +1394,12 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       await StorageService.saveAutoReload(displayMode === 'webview' ? autoReload : false);
       await StorageService.saveKioskEnabled(kioskEnabled);
       await StorageService.saveDefaultBrightness(defaultBrightness);
+      // #242: also mirror it natively, so the wake paths and a reboot keep it.
+      try {
+        await AutoBrightnessModule.setDefaultBrightness(defaultBrightness);
+      } catch (error) {
+        console.warn('[Settings] Could not persist brightness natively:', error);
+      }
       
       // Auto-brightness settings
       await StorageService.saveAutoBrightnessEnabled(autoBrightnessEnabled);
