@@ -234,6 +234,16 @@ class KioskWatchdogService : Service() {
         val powerManager = getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
         if (powerManager?.isInteractive == false) return
 
+        // A print dialog is a system activity in its own right: while it is up, our
+        // process drops to IMPORTANCE_FOREGROUND_SERVICE (this very service keeps it there),
+        // so isMainActivityRunning() below reports false and the watchdog would drag the kiosk
+        // back over the printer selection, dismissing it within CHECK_INTERVAL_MS. Same guard
+        // MainActivity.onResume() and onWindowFocusChanged() already apply.
+        if (PrintModule.isPrintActive) {
+            DebugLog.d(TAG, "Print dialog is active - skipping relaunch check")
+            return
+        }
+
         if (isMainActivityRunning()) return  // FreeKiosk itself is in foreground — fine
 
         // In external app mode, the external app is expected to be in the foreground.
