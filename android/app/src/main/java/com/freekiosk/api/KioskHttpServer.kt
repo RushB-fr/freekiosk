@@ -16,6 +16,7 @@ class KioskHttpServer(
     private val statusProvider: () -> JSONObject,
     private val commandHandler: (String, JSONObject?) -> JSONObject,
     private val screenshotProvider: (() -> java.io.InputStream?)? = null,
+    private val screenshotErrorProvider: (() -> String?)? = null,
     private val cameraPhotoProvider: ((camera: String, quality: Int) -> java.io.InputStream?)? = null
 ) : NanoHTTPD(port) {
 
@@ -581,7 +582,12 @@ class KioskHttpServer(
             val bytes = screenshotData.readBytes()
             newFixedLengthResponse(Response.Status.OK, "image/png", java.io.ByteArrayInputStream(bytes), bytes.size.toLong())
         } else {
-            jsonError(Response.Status.SERVICE_UNAVAILABLE, "Screenshot not available")
+            // #229: say why, so an admin hitting /api/screenshot from behind an external
+            // app learns what to fix instead of getting a bare "not available".
+            jsonError(
+                Response.Status.SERVICE_UNAVAILABLE,
+                screenshotErrorProvider?.invoke() ?: "Screenshot not available",
+            )
         }
     }
 
@@ -641,6 +647,19 @@ class KioskHttpServer(
 
     private fun parseBody(session: IHTTPSession): JSONObject? {
         return try {
+            // #115: NanoHTTPD 2.3.1 decodes the POST body with the charset from the
+            // Content-Type header, defaulting to US-ASCII when the client sends none.
+            // That silently corrupts every multibyte UTF-8 character in the body (Chinese,
+            // Korean, Japanese, Arabic, emoji), so e.g. /api/tts spoke English but stayed
+            // silent on Chinese text. JSON is UTF-8 by spec (RFC 8259), so when the request
+            // did not declare a charset we force UTF-8 before NanoHTTPD reads the body. We
+            // only add a charset and never change the media type, so form-urlencoded /
+            // multipart detection is untouched, and pure-ASCII bodies decode identically
+            // (English is unaffected).
+            val contentType = session.headers["content-type"]
+            if (contentType != null && !contentType.contains("charset", ignoreCase = true)) {
+                session.headers["content-type"] = "$contentType; charset=UTF-8"
+            }
             val files = mutableMapOf<String, String>()
             session.parseBody(files)
             val postData = files["postData"] ?: return null

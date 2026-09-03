@@ -6,13 +6,14 @@ import { ManagedApp } from '../types/managedApps';
 import { MediaItem, MediaFitMode } from '../types/mediaPlayer';
 import { saveSecureApiKey, getSecureApiKey, clearSecureApiKey, clearSecureMqttPassword } from './secureStorage';
 
-const KEYS = {
+export const KEYS = {
   URL: '@kiosk_url',
   PIN: '@kiosk_pin',
   AUTO_RELOAD: '@kiosk_auto_reload',
   KIOSK_ENABLED: '@kiosk_enabled',
   AUTO_LAUNCH: '@kiosk_auto_launch',
   SCREEN_LOCK_COMPAT: '@kiosk_screen_lock_compat',
+  ALLOW_REMOTE_SCREENSHOT: '@kiosk_allow_remote_screenshot',
   DEFAULT_LAUNCHER: '@kiosk_default_launcher',
   INTERCOM_MODE: '@kiosk_intercom_mode',
   SCREENSAVER_ENABLED: '@screensaver_enabled',
@@ -21,6 +22,7 @@ const KEYS = {
   SCREENSAVER_MOTION_ENABLED: '@screensaver_motion_enabled',
   SCREENSAVER_MOTION_SENSITIVITY: '@screensaver_motion_sensitivity',
   SCREENSAVER_MOTION_DELAY: '@screensaver_motion_delay',
+  SCREENSAVER_PROXIMITY_ENABLED: '@screensaver_proximity_enabled',
   SCREENSAVER_BRIGHTNESS: '@screensaver_brightness',
   SCREENSAVER_TYPE: '@screensaver_type',
   SCREENSAVER_URL: '@screensaver_url',
@@ -84,6 +86,9 @@ const KEYS = {
   WEBVIEW_BACK_BUTTON_ENABLED: '@kiosk_webview_back_button_enabled',
   WEBVIEW_BACK_BUTTON_X_PERCENT: '@kiosk_webview_back_button_x_percent',
   WEBVIEW_BACK_BUTTON_Y_PERCENT: '@kiosk_webview_back_button_y_percent',
+  // Restart Button (WebView reload via long-press, top-right)
+  RESTART_BUTTON_ENABLED: '@kiosk_restart_button_enabled',
+  RESTART_BUTTON_LONG_PRESS_SECONDS: '@kiosk_restart_button_long_press_seconds',
   // Auto-Brightness
   AUTO_BRIGHTNESS_ENABLED: '@kiosk_auto_brightness_enabled',
   AUTO_BRIGHTNESS_MIN: '@kiosk_auto_brightness_min',
@@ -184,6 +189,43 @@ const KEYS = {
   LOCKSCREEN_ROTATION_LOCK_ENABLED: '@kiosk_lockscreen_rotation_lock_enabled',
   // HTTP Basic Auth
   HTTP_BASIC_AUTH_USERNAME: '@kiosk_http_basic_auth_username',
+  // Cloud sync metadata (local tracking only, never synced)
+  CONFIG_UPDATED_AT: '@cloud_config_updated_at',
+  CONFIG_VERSION: '@cloud_config_version',
+  LAST_SENT_CONFIG_HASH: '@cloud_last_sent_hash',
+  // Full raw config last received from the cloud. Used to preserve fields this app
+  // version doesn't model yet, so unknown settings survive an export round-trip
+  // (prevents an older app from stripping newer settings when it echoes to the cloud).
+  RAW_CLOUD_CONFIG: '@cloud_raw_config',
+  // Command results that could not be POSTed back to the cloud (network down at the
+  // moment of reporting). Retried on the next poll: without this the server keeps the
+  // command in 'sent' forever, since it only ever hands out 'pending' ones.
+  CLOUD_PENDING_REPORTS: '@cloud_pending_reports',
+  // The command currently being executed, persisted before dispatch so a command that
+  // kills the process (reboot, self-update) can still be reported after the restart.
+  CLOUD_INFLIGHT_COMMAND: '@cloud_inflight_command',
+  // Mirrors "this device is enrolled" as a plain boolean, because the credentials
+  // themselves live encrypted in the Keychain and KioskWatchdogService reads its flags
+  // straight out of the AsyncStorage SQLite file, with no JS bridge available.
+  CLOUD_ENROLLED: '@cloud_enrolled',
+};
+
+const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/**
+ * Deep-merge `overlay` onto `base`. Plain objects merge recursively; arrays and
+ * primitives from `overlay` replace `base`. Keys present only in `base` are kept.
+ * Used so exportConfig can overlay this app's known settings on top of the last raw
+ * config from the cloud, preserving fields this version doesn't understand.
+ */
+const deepMerge = (base: unknown, overlay: unknown): unknown => {
+  if (!isPlainObject(overlay) || !isPlainObject(base)) return overlay;
+  const out: Record<string, unknown> = { ...base };
+  for (const k of Object.keys(overlay)) {
+    out[k] = deepMerge(base[k], overlay[k]);
+  }
+  return out;
 };
 
 export const StorageService = {
@@ -302,6 +344,26 @@ export const StorageService = {
     }
   },
 
+  // REMOTE SCREENSHOT (#229) - opt-in; default false so the Device Owner screen-capture
+  // policy (#172) is never lifted unless the admin asked for it.
+  saveAllowRemoteScreenshot: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.ALLOW_REMOTE_SCREENSHOT, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving allow remote screenshot:', error);
+    }
+  },
+
+  getAllowRemoteScreenshot: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.ALLOW_REMOTE_SCREENSHOT);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting allow remote screenshot:', error);
+      return false;
+    }
+  },
+
   //DEFAULT LAUNCHER (#199) — opt-in, Device Owner only; default false → behavior unchanged
   saveDefaultLauncher: async (value: boolean): Promise<void> => {
     try {
@@ -416,6 +478,9 @@ export const StorageService = {
         KEYS.WEBVIEW_BACK_BUTTON_ENABLED,
         KEYS.WEBVIEW_BACK_BUTTON_X_PERCENT,
         KEYS.WEBVIEW_BACK_BUTTON_Y_PERCENT,
+        // Restart Button
+        KEYS.RESTART_BUTTON_ENABLED,
+        KEYS.RESTART_BUTTON_LONG_PRESS_SECONDS,
         // Auto-Brightness
         KEYS.AUTO_BRIGHTNESS_ENABLED,
         KEYS.AUTO_BRIGHTNESS_MIN,
@@ -718,6 +783,24 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting screensaver motion delay:', error);
       return 30000;
+    }
+  },
+
+  saveScreensaverProximityEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.SCREENSAVER_PROXIMITY_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving screensaver proximity enabled:', error);
+    }
+  },
+
+  getScreensaverProximityEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.SCREENSAVER_PROXIMITY_ENABLED);
+      return value === null ? false : JSON.parse(value);
+    } catch (error) {
+      console.error('Error getting screensaver proximity enabled:', error);
+      return false;
     }
   },
 
@@ -1706,6 +1789,45 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting webview back button Y percent:', error);
       return 10;
+    }
+  },
+
+  // Restart Button (top-right, long-press to reload the WebView)
+  saveRestartButtonEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.RESTART_BUTTON_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving restart button enabled:', error);
+    }
+  },
+
+  getRestartButtonEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.RESTART_BUTTON_ENABLED);
+      // Off by default: it draws a visible control over the kiosk page and lets anyone
+      // standing in front of the screen restart the WebView, so it is opt-in.
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting restart button enabled:', error);
+      return false;
+    }
+  },
+
+  saveRestartButtonLongPressSeconds: async (value: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.RESTART_BUTTON_LONG_PRESS_SECONDS, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving restart button long-press seconds:', error);
+    }
+  },
+
+  getRestartButtonLongPressSeconds: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.RESTART_BUTTON_LONG_PRESS_SECONDS);
+      return value ? JSON.parse(value) : 5; // 5s long-press by default
+    } catch (error) {
+      console.error('Error getting restart button long-press seconds:', error);
+      return 5;
     }
   },
 
@@ -2930,6 +3052,508 @@ export const StorageService = {
 
   /** Expose KEYS for external multiGet consumers */
   KEYS,
+
+  // ============ CLOUD SYNC METADATA ============
+
+  getConfigUpdatedAt: async (): Promise<string | null> => {
+    try { return await AsyncStorage.getItem(KEYS.CONFIG_UPDATED_AT); }
+    catch { return null; }
+  },
+
+  saveConfigUpdatedAt: async (ts: string): Promise<void> => {
+    try { await AsyncStorage.setItem(KEYS.CONFIG_UPDATED_AT, ts); }
+    catch (error) { console.error('Error saving config_updated_at:', error); }
+  },
+
+  getConfigVersion: async (): Promise<number> => {
+    try {
+      const v = await AsyncStorage.getItem(KEYS.CONFIG_VERSION);
+      return v ? parseInt(v, 10) : 0;
+    } catch { return 0; }
+  },
+
+  saveConfigVersion: async (version: number): Promise<void> => {
+    try { await AsyncStorage.setItem(KEYS.CONFIG_VERSION, version.toString()); }
+    catch (error) { console.error('Error saving config version:', error); }
+  },
+
+  getLastSentConfigHash: async (): Promise<string | null> => {
+    try { return await AsyncStorage.getItem(KEYS.LAST_SENT_CONFIG_HASH); }
+    catch { return null; }
+  },
+
+  saveLastSentConfigHash: async (hash: string): Promise<void> => {
+    try { await AsyncStorage.setItem(KEYS.LAST_SENT_CONFIG_HASH, hash); }
+    catch (error) { console.error('Error saving last sent config hash:', error); }
+  },
+
+  resetSyncMetadata: async (): Promise<void> => {
+    try {
+      await AsyncStorage.multiRemove([
+        KEYS.CONFIG_UPDATED_AT,
+        KEYS.CONFIG_VERSION,
+        KEYS.LAST_SENT_CONFIG_HASH,
+      ]);
+    } catch (error) { console.error('Error resetting sync metadata:', error); }
+  },
+
+  /**
+   * Native-readable mirror of the enrolment state. Written as JSON so it matches the
+   * "true"/"false" the watchdog's readFlag() compares against.
+   */
+  saveCloudEnrolled: async (value: boolean): Promise<void> => {
+    try { await AsyncStorage.setItem(KEYS.CLOUD_ENROLLED, JSON.stringify(value)); }
+    catch (error) { console.error('Error saving cloud enrolled flag:', error); }
+  },
+
+  // ============ CLOUD COMMAND DELIVERY ============
+
+  getPendingReports: async (): Promise<unknown[]> => {
+    try {
+      const raw = await AsyncStorage.getItem(KEYS.CLOUD_PENDING_REPORTS);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  },
+
+  savePendingReports: async (reports: unknown[]): Promise<void> => {
+    try { await AsyncStorage.setItem(KEYS.CLOUD_PENDING_REPORTS, JSON.stringify(reports)); }
+    catch (error) { console.error('Error saving pending cloud reports:', error); }
+  },
+
+  getInflightCommand: async (): Promise<Record<string, unknown> | null> => {
+    try {
+      const raw = await AsyncStorage.getItem(KEYS.CLOUD_INFLIGHT_COMMAND);
+      const parsed = raw ? JSON.parse(raw) : null;
+      return isPlainObject(parsed) ? parsed : null;
+    } catch { return null; }
+  },
+
+  saveInflightCommand: async (cmd: Record<string, unknown> | null): Promise<void> => {
+    try {
+      if (cmd === null) await AsyncStorage.removeItem(KEYS.CLOUD_INFLIGHT_COMMAND);
+      else await AsyncStorage.setItem(KEYS.CLOUD_INFLIGHT_COMMAND, JSON.stringify(cmd));
+    } catch (error) { console.error('Error saving in-flight cloud command:', error); }
+  },
+
+  // ============ CONFIG EXPORT / IMPORT ============
+
+  exportConfig: async (): Promise<Record<string, unknown>> => {
+    const s = await StorageService.getAllSettings();
+    const str = (key: string, def = ''): string => (s.get(key) ?? def) as string;
+    const bool = (key: string, def = false): boolean => {
+      const v = s.get(key);
+      return v !== null && v !== undefined ? JSON.parse(v as string) : def;
+    };
+    const num = (key: string, def = 0): number => {
+      const v = s.get(key);
+      return v !== null && v !== undefined ? parseFloat(v as string) || def : def;
+    };
+    const json = (key: string, def: unknown = null): unknown => {
+      const v = s.get(key);
+      if (v === null || v === undefined) return def;
+      try { return JSON.parse(v as string); } catch { return def; }
+    };
+
+    const structured: Record<string, unknown> = {
+      general: {
+        displayMode: str(KEYS.DISPLAY_MODE, 'webview'),
+        url: str(KEYS.URL),
+        autoReload: bool(KEYS.AUTO_RELOAD),
+        pdfViewerEnabled: bool(KEYS.PDF_VIEWER_ENABLED),
+        printEnabled: bool(KEYS.PRINT_ENABLED),
+        printPaperSize: str(KEYS.PRINT_PAPER_SIZE, 'A4'),
+        urlRotation: {
+          enabled: bool(KEYS.URL_ROTATION_ENABLED),
+          list: json(KEYS.URL_ROTATION_LIST, []),
+          interval: num(KEYS.URL_ROTATION_INTERVAL, 30),
+        },
+        urlPlanner: {
+          enabled: bool(KEYS.URL_PLANNER_ENABLED),
+          events: json(KEYS.URL_PLANNER_EVENTS, []),
+        },
+        webviewBackButton: {
+          enabled: bool(KEYS.WEBVIEW_BACK_BUTTON_ENABLED),
+          xPercent: num(KEYS.WEBVIEW_BACK_BUTTON_X_PERCENT, 2),
+          yPercent: num(KEYS.WEBVIEW_BACK_BUTTON_Y_PERCENT, 10),
+        },
+        inactivityReturn: {
+          enabled: bool(KEYS.INACTIVITY_RETURN_ENABLED),
+          delay: num(KEYS.INACTIVITY_RETURN_DELAY, 60),
+          resetOnNav: bool(KEYS.INACTIVITY_RETURN_RESET_ON_NAV, true),
+          clearCache: bool(KEYS.INACTIVITY_RETURN_CLEAR_CACHE),
+          scrollTop: bool(KEYS.INACTIVITY_RETURN_SCROLL_TOP, true),
+        },
+        mediaPlayer: {
+          items: json(KEYS.MEDIA_PLAYER_ITEMS, []),
+          autoPlay: bool(KEYS.MEDIA_PLAYER_AUTOPLAY, true),
+          loop: bool(KEYS.MEDIA_PLAYER_LOOP, true),
+          shuffle: bool(KEYS.MEDIA_PLAYER_SHUFFLE),
+          imageDuration: num(KEYS.MEDIA_PLAYER_IMAGE_DURATION, 10),
+          showControls: bool(KEYS.MEDIA_PLAYER_SHOW_CONTROLS),
+          fitMode: str(KEYS.MEDIA_PLAYER_FIT_MODE, 'contain'),
+          bgColor: str(KEYS.MEDIA_PLAYER_BG_COLOR, '#000000'),
+          transition: bool(KEYS.MEDIA_PLAYER_TRANSITION, true),
+          transitionDuration: num(KEYS.MEDIA_PLAYER_TRANSITION_DURATION, 500),
+          mute: bool(KEYS.MEDIA_PLAYER_MUTE),
+        },
+        httpBasicAuth: { username: str(KEYS.HTTP_BASIC_AUTH_USERNAME) },
+        externalApp: {
+          package: str(KEYS.EXTERNAL_APP_PACKAGE),
+          mode: str(KEYS.EXTERNAL_APP_MODE, 'single'),
+          testMode: bool(KEYS.EXTERNAL_APP_TEST_MODE, true),
+        },
+        managedApps: json(KEYS.MANAGED_APPS, []),
+        dashboardMode: bool(KEYS.DASHBOARD_MODE_ENABLED),
+        dashboardTiles: json(KEYS.DASHBOARD_TILES, []),
+        pauseWebMediaWhenHidden: bool(KEYS.PAUSE_WEB_MEDIA_WHEN_HIDDEN, true),
+        intercomMode: bool(KEYS.INTERCOM_MODE),
+      },
+      display: {
+        brightnessManagement: bool(KEYS.BRIGHTNESS_MANAGEMENT_ENABLED, true),
+        defaultBrightness: num(KEYS.DEFAULT_BRIGHTNESS, 0.5),
+        autoBrightness: {
+          enabled: bool(KEYS.AUTO_BRIGHTNESS_ENABLED),
+          min: num(KEYS.AUTO_BRIGHTNESS_MIN, 0.1),
+          max: num(KEYS.AUTO_BRIGHTNESS_MAX, 1.0),
+          offset: num(KEYS.AUTO_BRIGHTNESS_OFFSET, 0),
+          updateInterval: num(KEYS.AUTO_BRIGHTNESS_UPDATE_INTERVAL, 1000),
+        },
+        statusBar: {
+          enabled: bool(KEYS.STATUS_BAR_ENABLED),
+          onOverlay: bool(KEYS.STATUS_BAR_ON_OVERLAY, true),
+          onReturn: bool(KEYS.STATUS_BAR_ON_RETURN, true),
+          showBattery: bool(KEYS.STATUS_BAR_SHOW_BATTERY, true),
+          showWifi: bool(KEYS.STATUS_BAR_SHOW_WIFI, true),
+          showBluetooth: bool(KEYS.STATUS_BAR_SHOW_BLUETOOTH, true),
+          showVolume: bool(KEYS.STATUS_BAR_SHOW_VOLUME, true),
+          showTime: bool(KEYS.STATUS_BAR_SHOW_TIME, true),
+          theme: str(KEYS.STATUS_BAR_THEME, 'dark'),
+        },
+        keyboardMode: str(KEYS.KEYBOARD_MODE, 'default'),
+        zoom: {
+          level: num(KEYS.WEBVIEW_ZOOM_LEVEL, 100),
+          mode: str(KEYS.WEBVIEW_ZOOM_MODE, 'standard'),
+          disableUserZoom: bool(KEYS.DISABLE_USER_ZOOM),
+        },
+        customUserAgent: str(KEYS.CUSTOM_USER_AGENT),
+        screensaver: {
+          enabled: bool(KEYS.SCREENSAVER_ENABLED),
+          inactivityEnabled: bool(KEYS.SCREENSAVER_INACTIVITY_ENABLED, true),
+          inactivityDelay: num(KEYS.SCREENSAVER_INACTIVITY_DELAY, 600000),
+          delay: num(KEYS.SCREENSAVER_DELAY, 60000),
+          brightness: num(KEYS.SCREENSAVER_BRIGHTNESS, 0),
+          type: str(KEYS.SCREENSAVER_TYPE, 'dim'),
+          url: str(KEYS.SCREENSAVER_URL),
+          videoItems: json(KEYS.SCREENSAVER_VIDEO_ITEMS, []),
+          videoLoop: bool(KEYS.SCREENSAVER_VIDEO_LOOP, true),
+        },
+        motionDetection: {
+          enabled: bool(KEYS.SCREENSAVER_MOTION_ENABLED),
+          sensitivity: str(KEYS.SCREENSAVER_MOTION_SENSITIVITY, 'medium'),
+          cameraPosition: str(KEYS.MOTION_CAMERA_POSITION, 'front'),
+          delay: num(KEYS.SCREENSAVER_MOTION_DELAY, 30000),
+          proximityEnabled: bool(KEYS.SCREENSAVER_PROXIMITY_ENABLED),
+        },
+        screenScheduler: {
+          enabled: bool(KEYS.SCREEN_SCHEDULER_ENABLED),
+          rules: json(KEYS.SCREEN_SCHEDULER_RULES, []),
+          wakeOnTouch: bool(KEYS.SCREEN_SCHEDULER_WAKE_ON_TOUCH, true),
+        },
+        keepScreenOn: bool(KEYS.KEEP_SCREEN_ON, true),
+        autoWakeOnScreenOff: bool(KEYS.AUTO_WAKE_ON_SCREEN_OFF),
+      },
+      security: {
+        kioskEnabled: bool(KEYS.KIOSK_ENABLED),
+        allowPowerButton: bool(KEYS.ALLOW_POWER_BUTTON, true),
+        allowNotifications: bool(KEYS.ALLOW_NOTIFICATIONS),
+        allowSystemInfo: bool(KEYS.ALLOW_SYSTEM_INFO),
+        returnMode: str(KEYS.RETURN_MODE, 'tap_anywhere'),
+        returnTapCount: num(KEYS.RETURN_TAP_COUNT, 5),
+        returnTapTimeout: num(KEYS.RETURN_TAP_TIMEOUT, 1500),
+        returnButtonPosition: str(KEYS.RETURN_BUTTON_POSITION, 'bottom-right'),
+        overlayButtonVisible: bool(KEYS.OVERLAY_BUTTON_VISIBLE),
+        volumeUp5Tap: bool(KEYS.VOLUME_UP_5TAP_ENABLED, true),
+        autoLaunch: bool(KEYS.AUTO_LAUNCH),
+        autoRelaunchApp: bool(KEYS.AUTO_RELAUNCH_APP, true),
+        backButtonMode: str(KEYS.BACK_BUTTON_MODE, 'test'),
+        backButtonTimerDelay: num(KEYS.BACK_BUTTON_TIMER_DELAY, 10),
+        pinMode: str(KEYS.PIN_MODE, 'numeric'),
+        pinMaxAttempts: num(KEYS.PIN_MAX_ATTEMPTS, 5),
+        urlFilter: {
+          enabled: bool(KEYS.URL_FILTER_ENABLED),
+          mode: str(KEYS.URL_FILTER_MODE, 'blacklist'),
+          list: json(KEYS.URL_FILTER_LIST, []),
+          showFeedback: bool(KEYS.URL_FILTER_SHOW_FEEDBACK),
+        },
+        blockingOverlays: {
+          enabled: bool(KEYS.BLOCKING_OVERLAYS_ENABLED),
+          regions: json(KEYS.BLOCKING_OVERLAYS_REGIONS, []),
+        },
+        overlayButtonPosition: str(KEYS.OVERLAY_BUTTON_POSITION, 'bottom-right'),
+        blockFactoryReset: bool(KEYS.BLOCK_FACTORY_RESET),
+        defaultLauncher: bool(KEYS.DEFAULT_LAUNCHER),
+        screenLockCompat: bool(KEYS.SCREEN_LOCK_COMPAT),
+        lockscreen: {
+          enabled: bool(KEYS.LOCKSCREEN_CONTROLS_ENABLED),
+          wifi: bool(KEYS.LOCKSCREEN_WIFI_ENABLED),
+          bluetooth: bool(KEYS.LOCKSCREEN_BLUETOOTH_ENABLED),
+          emergencyCall: bool(KEYS.LOCKSCREEN_EMERGENCY_CALL_ENABLED),
+          audio: bool(KEYS.LOCKSCREEN_AUDIO_ENABLED),
+          flashlight: bool(KEYS.LOCKSCREEN_FLASHLIGHT_ENABLED),
+          brightness: bool(KEYS.LOCKSCREEN_BRIGHTNESS_ENABLED),
+          rotationLock: bool(KEYS.LOCKSCREEN_ROTATION_LOCK_ENABLED),
+        },
+      },
+      advanced: {
+        restApi: {
+          enabled: bool(KEYS.REST_API_ENABLED),
+          port: num(KEYS.REST_API_PORT, 8080),
+          allowControl: bool(KEYS.REST_API_ALLOW_CONTROL, true),
+        },
+        mqtt: {
+          enabled: bool(KEYS.MQTT_ENABLED),
+          brokerUrl: str(KEYS.MQTT_BROKER_URL),
+          port: num(KEYS.MQTT_PORT, 1883),
+          username: str(KEYS.MQTT_USERNAME),
+          clientId: str(KEYS.MQTT_CLIENT_ID),
+          baseTopic: str(KEYS.MQTT_BASE_TOPIC, 'freekiosk'),
+          discoveryPrefix: str(KEYS.MQTT_DISCOVERY_PREFIX, 'homeassistant'),
+          statusInterval: num(KEYS.MQTT_STATUS_INTERVAL, 30),
+          allowControl: bool(KEYS.MQTT_ALLOW_CONTROL, true),
+          deviceName: str(KEYS.MQTT_DEVICE_NAME),
+          motionAlwaysOn: bool(KEYS.MQTT_MOTION_ALWAYS_ON),
+        },
+      },
+    };
+
+    // Preserve fields a newer app/cloud sent that this version doesn't model: overlay the
+    // current (structured) config on top of the last raw config received, so unknown keys
+    // survive the round-trip instead of being dropped and echoed back as a downgrade.
+    const rawStr = s.get(KEYS.RAW_CLOUD_CONFIG) as string | null | undefined;
+    if (rawStr) {
+      try {
+        const raw = JSON.parse(rawStr);
+        if (isPlainObject(raw)) return deepMerge(raw, structured) as Record<string, unknown>;
+      } catch { /* malformed raw: fall through to the structured config */ }
+    }
+    return structured;
+  },
+
+  importConfig: async (config: Record<string, unknown>): Promise<void> => {
+    const pairs: [string, string][] = [];
+    const set = (key: string, value: unknown) => {
+      if (value === undefined || value === null) return;
+      pairs.push([key, typeof value === 'string' ? value : JSON.stringify(value)]);
+    };
+
+    // Remember the full raw config so exportConfig can re-emit any fields this app
+    // version doesn't model (forward-compatible round-trip; see deepMerge).
+    set(KEYS.RAW_CLOUD_CONFIG, config);
+
+    const g = config.general as Record<string, unknown> | undefined;
+    const d = config.display as Record<string, unknown> | undefined;
+    const sec = config.security as Record<string, unknown> | undefined;
+    const adv = config.advanced as Record<string, unknown> | undefined;
+
+    if (g) {
+      set(KEYS.DISPLAY_MODE, g.displayMode);
+      set(KEYS.URL, g.url);
+      set(KEYS.AUTO_RELOAD, g.autoReload);
+      set(KEYS.PDF_VIEWER_ENABLED, g.pdfViewerEnabled);
+      set(KEYS.PRINT_ENABLED, g.printEnabled);
+      set(KEYS.PRINT_PAPER_SIZE, g.printPaperSize);
+      const ur = g.urlRotation as Record<string, unknown> | undefined;
+      if (ur) {
+        set(KEYS.URL_ROTATION_ENABLED, ur.enabled);
+        set(KEYS.URL_ROTATION_LIST, ur.list);
+        set(KEYS.URL_ROTATION_INTERVAL, ur.interval);
+      }
+      const up = g.urlPlanner as Record<string, unknown> | undefined;
+      if (up) {
+        set(KEYS.URL_PLANNER_ENABLED, up.enabled);
+        set(KEYS.URL_PLANNER_EVENTS, up.events);
+      }
+      const wbb = g.webviewBackButton as Record<string, unknown> | undefined;
+      if (wbb) {
+        set(KEYS.WEBVIEW_BACK_BUTTON_ENABLED, wbb.enabled);
+        set(KEYS.WEBVIEW_BACK_BUTTON_X_PERCENT, wbb.xPercent);
+        set(KEYS.WEBVIEW_BACK_BUTTON_Y_PERCENT, wbb.yPercent);
+      }
+      const ir = g.inactivityReturn as Record<string, unknown> | undefined;
+      if (ir) {
+        set(KEYS.INACTIVITY_RETURN_ENABLED, ir.enabled);
+        set(KEYS.INACTIVITY_RETURN_DELAY, ir.delay);
+        set(KEYS.INACTIVITY_RETURN_RESET_ON_NAV, ir.resetOnNav);
+        set(KEYS.INACTIVITY_RETURN_CLEAR_CACHE, ir.clearCache);
+        set(KEYS.INACTIVITY_RETURN_SCROLL_TOP, ir.scrollTop);
+      }
+      const mp = g.mediaPlayer as Record<string, unknown> | undefined;
+      if (mp) {
+        set(KEYS.MEDIA_PLAYER_ITEMS, mp.items);
+        set(KEYS.MEDIA_PLAYER_AUTOPLAY, mp.autoPlay);
+        set(KEYS.MEDIA_PLAYER_LOOP, mp.loop);
+        set(KEYS.MEDIA_PLAYER_SHUFFLE, mp.shuffle);
+        set(KEYS.MEDIA_PLAYER_IMAGE_DURATION, mp.imageDuration);
+        set(KEYS.MEDIA_PLAYER_SHOW_CONTROLS, mp.showControls);
+        set(KEYS.MEDIA_PLAYER_FIT_MODE, mp.fitMode);
+        set(KEYS.MEDIA_PLAYER_BG_COLOR, mp.bgColor);
+        set(KEYS.MEDIA_PLAYER_TRANSITION, mp.transition);
+        set(KEYS.MEDIA_PLAYER_TRANSITION_DURATION, mp.transitionDuration);
+        set(KEYS.MEDIA_PLAYER_MUTE, mp.mute);
+      }
+      const hba = g.httpBasicAuth as Record<string, unknown> | undefined;
+      if (hba) set(KEYS.HTTP_BASIC_AUTH_USERNAME, hba.username);
+      const ea = g.externalApp as Record<string, unknown> | undefined;
+      if (ea) {
+        set(KEYS.EXTERNAL_APP_PACKAGE, ea.package);
+        set(KEYS.EXTERNAL_APP_MODE, ea.mode);
+        if (ea.testMode !== undefined) set(KEYS.EXTERNAL_APP_TEST_MODE, ea.testMode);
+      }
+      set(KEYS.MANAGED_APPS, g.managedApps);
+      set(KEYS.DASHBOARD_MODE_ENABLED, g.dashboardMode);
+      set(KEYS.DASHBOARD_TILES, g.dashboardTiles);
+      set(KEYS.PAUSE_WEB_MEDIA_WHEN_HIDDEN, g.pauseWebMediaWhenHidden);
+      set(KEYS.INTERCOM_MODE, g.intercomMode);
+    }
+
+    if (d) {
+      set(KEYS.BRIGHTNESS_MANAGEMENT_ENABLED, d.brightnessManagement);
+      set(KEYS.DEFAULT_BRIGHTNESS, d.defaultBrightness);
+      const ab = d.autoBrightness as Record<string, unknown> | undefined;
+      if (ab) {
+        set(KEYS.AUTO_BRIGHTNESS_ENABLED, ab.enabled);
+        set(KEYS.AUTO_BRIGHTNESS_MIN, ab.min);
+        set(KEYS.AUTO_BRIGHTNESS_MAX, ab.max);
+        set(KEYS.AUTO_BRIGHTNESS_OFFSET, ab.offset);
+        set(KEYS.AUTO_BRIGHTNESS_UPDATE_INTERVAL, ab.updateInterval);
+      }
+      const sb = d.statusBar as Record<string, unknown> | undefined;
+      if (sb) {
+        set(KEYS.STATUS_BAR_ENABLED, sb.enabled);
+        set(KEYS.STATUS_BAR_ON_OVERLAY, sb.onOverlay);
+        set(KEYS.STATUS_BAR_ON_RETURN, sb.onReturn);
+        set(KEYS.STATUS_BAR_SHOW_BATTERY, sb.showBattery);
+        set(KEYS.STATUS_BAR_SHOW_WIFI, sb.showWifi);
+        set(KEYS.STATUS_BAR_SHOW_BLUETOOTH, sb.showBluetooth);
+        set(KEYS.STATUS_BAR_SHOW_VOLUME, sb.showVolume);
+        set(KEYS.STATUS_BAR_SHOW_TIME, sb.showTime);
+        set(KEYS.STATUS_BAR_THEME, sb.theme);
+      }
+      set(KEYS.KEYBOARD_MODE, d.keyboardMode);
+      const z = d.zoom as Record<string, unknown> | undefined;
+      if (z) {
+        set(KEYS.WEBVIEW_ZOOM_LEVEL, z.level);
+        set(KEYS.WEBVIEW_ZOOM_MODE, z.mode);
+        set(KEYS.DISABLE_USER_ZOOM, z.disableUserZoom);
+      }
+      set(KEYS.CUSTOM_USER_AGENT, d.customUserAgent);
+      const ss = d.screensaver as Record<string, unknown> | undefined;
+      if (ss) {
+        set(KEYS.SCREENSAVER_ENABLED, ss.enabled);
+        set(KEYS.SCREENSAVER_INACTIVITY_ENABLED, ss.inactivityEnabled);
+        set(KEYS.SCREENSAVER_INACTIVITY_DELAY, ss.inactivityDelay);
+        set(KEYS.SCREENSAVER_DELAY, ss.delay);
+        set(KEYS.SCREENSAVER_BRIGHTNESS, ss.brightness);
+        set(KEYS.SCREENSAVER_TYPE, ss.type);
+        set(KEYS.SCREENSAVER_URL, ss.url);
+        set(KEYS.SCREENSAVER_VIDEO_ITEMS, ss.videoItems);
+        set(KEYS.SCREENSAVER_VIDEO_LOOP, ss.videoLoop);
+      }
+      const md = d.motionDetection as Record<string, unknown> | undefined;
+      if (md) {
+        set(KEYS.SCREENSAVER_MOTION_ENABLED, md.enabled);
+        set(KEYS.MOTION_DETECTION_ENABLED, md.enabled);
+        set(KEYS.SCREENSAVER_MOTION_SENSITIVITY, md.sensitivity);
+        set(KEYS.MOTION_SENSITIVITY, md.sensitivity);
+        set(KEYS.MOTION_CAMERA_POSITION, md.cameraPosition);
+        set(KEYS.SCREENSAVER_MOTION_DELAY, md.delay);
+        set(KEYS.MOTION_DELAY, md.delay);
+        set(KEYS.SCREENSAVER_PROXIMITY_ENABLED, md.proximityEnabled);
+      }
+      const sch = d.screenScheduler as Record<string, unknown> | undefined;
+      if (sch) {
+        set(KEYS.SCREEN_SCHEDULER_ENABLED, sch.enabled);
+        set(KEYS.SCREEN_SCHEDULER_RULES, sch.rules);
+        set(KEYS.SCREEN_SCHEDULER_WAKE_ON_TOUCH, sch.wakeOnTouch);
+      }
+      set(KEYS.KEEP_SCREEN_ON, d.keepScreenOn);
+      set(KEYS.AUTO_WAKE_ON_SCREEN_OFF, d.autoWakeOnScreenOff);
+    }
+
+    if (sec) {
+      set(KEYS.KIOSK_ENABLED, sec.kioskEnabled);
+      set(KEYS.ALLOW_POWER_BUTTON, sec.allowPowerButton);
+      set(KEYS.ALLOW_NOTIFICATIONS, sec.allowNotifications);
+      set(KEYS.ALLOW_SYSTEM_INFO, sec.allowSystemInfo);
+      set(KEYS.RETURN_MODE, sec.returnMode);
+      set(KEYS.RETURN_TAP_COUNT, sec.returnTapCount);
+      set(KEYS.RETURN_TAP_TIMEOUT, sec.returnTapTimeout);
+      set(KEYS.RETURN_BUTTON_POSITION, sec.returnButtonPosition);
+      set(KEYS.OVERLAY_BUTTON_VISIBLE, sec.overlayButtonVisible);
+      set(KEYS.VOLUME_UP_5TAP_ENABLED, sec.volumeUp5Tap);
+      set(KEYS.AUTO_LAUNCH, sec.autoLaunch);
+      set(KEYS.AUTO_RELAUNCH_APP, sec.autoRelaunchApp);
+      set(KEYS.BACK_BUTTON_MODE, sec.backButtonMode);
+      set(KEYS.BACK_BUTTON_TIMER_DELAY, sec.backButtonTimerDelay);
+      set(KEYS.PIN_MODE, sec.pinMode);
+      set(KEYS.PIN_MAX_ATTEMPTS, sec.pinMaxAttempts);
+      const uf = sec.urlFilter as Record<string, unknown> | undefined;
+      if (uf) {
+        set(KEYS.URL_FILTER_ENABLED, uf.enabled);
+        set(KEYS.URL_FILTER_MODE, uf.mode);
+        set(KEYS.URL_FILTER_LIST, uf.list);
+        set(KEYS.URL_FILTER_SHOW_FEEDBACK, uf.showFeedback);
+      }
+      const bo = sec.blockingOverlays as Record<string, unknown> | undefined;
+      if (bo) {
+        set(KEYS.BLOCKING_OVERLAYS_ENABLED, bo.enabled);
+        set(KEYS.BLOCKING_OVERLAYS_REGIONS, bo.regions);
+      }
+      set(KEYS.OVERLAY_BUTTON_POSITION, sec.overlayButtonPosition);
+      set(KEYS.BLOCK_FACTORY_RESET, sec.blockFactoryReset);
+      set(KEYS.DEFAULT_LAUNCHER, sec.defaultLauncher);
+      set(KEYS.SCREEN_LOCK_COMPAT, sec.screenLockCompat);
+      const ls = sec.lockscreen as Record<string, unknown> | undefined;
+      if (ls) {
+        set(KEYS.LOCKSCREEN_CONTROLS_ENABLED, ls.enabled);
+        set(KEYS.LOCKSCREEN_WIFI_ENABLED, ls.wifi);
+        set(KEYS.LOCKSCREEN_BLUETOOTH_ENABLED, ls.bluetooth);
+        set(KEYS.LOCKSCREEN_EMERGENCY_CALL_ENABLED, ls.emergencyCall);
+        set(KEYS.LOCKSCREEN_AUDIO_ENABLED, ls.audio);
+        set(KEYS.LOCKSCREEN_FLASHLIGHT_ENABLED, ls.flashlight);
+        set(KEYS.LOCKSCREEN_BRIGHTNESS_ENABLED, ls.brightness);
+        set(KEYS.LOCKSCREEN_ROTATION_LOCK_ENABLED, ls.rotationLock);
+      }
+    }
+
+    if (adv) {
+      const ra = adv.restApi as Record<string, unknown> | undefined;
+      if (ra) {
+        set(KEYS.REST_API_ENABLED, ra.enabled);
+        set(KEYS.REST_API_PORT, ra.port);
+        set(KEYS.REST_API_ALLOW_CONTROL, ra.allowControl);
+      }
+      const mq = adv.mqtt as Record<string, unknown> | undefined;
+      if (mq) {
+        set(KEYS.MQTT_ENABLED, mq.enabled);
+        set(KEYS.MQTT_BROKER_URL, mq.brokerUrl);
+        set(KEYS.MQTT_PORT, mq.port);
+        set(KEYS.MQTT_USERNAME, mq.username);
+        set(KEYS.MQTT_CLIENT_ID, mq.clientId);
+        set(KEYS.MQTT_BASE_TOPIC, mq.baseTopic);
+        set(KEYS.MQTT_DISCOVERY_PREFIX, mq.discoveryPrefix);
+        set(KEYS.MQTT_STATUS_INTERVAL, mq.statusInterval);
+        set(KEYS.MQTT_ALLOW_CONTROL, mq.allowControl);
+        set(KEYS.MQTT_DEVICE_NAME, mq.deviceName);
+        set(KEYS.MQTT_MOTION_ALWAYS_ON, mq.motionAlwaysOn);
+      }
+    }
+
+    if (pairs.length > 0) {
+      await AsyncStorage.multiSet(pairs);
+    }
+  },
 
   // ============ LOCK SCREEN CONTROLS ============
 

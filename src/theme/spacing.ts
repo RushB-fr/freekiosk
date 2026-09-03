@@ -27,16 +27,16 @@ export const Spacing = {
   // Component spacing
   cardPadding: 16,
   cardMargin: 12,
-  cardRadius: 12,
+  cardRadius: 16,
 
   // Input fields
   inputHeight: 50,
   inputPadding: 15,
-  inputRadius: 8,
+  inputRadius: 12,
 
   // Buttons
   buttonPadding: 15,
-  buttonRadius: 10,
+  buttonRadius: 12,
 
   // Tab bar
   tabHeight: 48,

@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import Icon from '../../../components/Icon';
 import {
   SettingsSection,
   SettingsSwitch,
@@ -14,6 +15,7 @@ import {
   SettingsInput,
 } from '../../../components/settings';
 import ScreenScheduleRuleCard from '../../../components/settings/ScreenScheduleRuleCard';
+import ProximityDetectionModule from '../../../utils/ProximityDetectionModule';
 import { Colors, Spacing, Typography } from '../../../theme';
 import { ScreenScheduleRule } from '../../../types/screenScheduler';
 import type { MediaItem } from '../../../types/mediaPlayer';
@@ -111,6 +113,10 @@ interface DisplayTabProps {
   onMotionSensitivityChange: (value: 'low' | 'medium' | 'high') => void;
   motionCameraPosition: 'front' | 'back';
   onMotionCameraPositionChange: (value: 'front' | 'back') => void;
+
+  // Proximity detection (hardware sensor wake trigger)
+  proximityEnabled: boolean;
+  onProximityEnabledChange: (value: boolean) => void;
   availableCameras: Array<{position: 'front' | 'back', id: string}>;
   
   // Screen Sleep Scheduler
@@ -202,6 +208,8 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
   onMotionSensitivityChange,
   motionCameraPosition,
   onMotionCameraPositionChange,
+  proximityEnabled,
+  onProximityEnabledChange,
   availableCameras,
   screenSchedulerEnabled,
   onScreenSchedulerEnabledChange,
@@ -238,6 +246,16 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
   // Check whether the selected camera is available on this device
   const selectedCameraAvailable = availableCameras.some(cam => cam.position === motionCameraPosition);
 
+  // Detect whether this device has a hardware proximity sensor (many tablets don't).
+  const [proximityAvailable, setProximityAvailable] = React.useState<boolean | null>(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    ProximityDetectionModule?.isAvailable()
+      .then((available) => { if (!cancelled) setProximityAvailable(available); })
+      .catch(() => { if (!cancelled) setProximityAvailable(false); });
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <View>
       {/* App Brightness Control toggle - WebView mode only (external app mode doesn't manage brightness) */}
@@ -254,7 +272,7 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
           {!brightnessManagementEnabled && (
             <SettingsInfoBox variant="info">
               <Text style={styles.infoText}>
-                💡 Brightness is managed by the system. External tools like Tasker can control brightness without interference from FreeKiosk.
+                Brightness is managed by the system. External tools like Tasker can control brightness without interference from FreeKiosk.
               </Text>
             </SettingsInfoBox>
           )}
@@ -279,7 +297,7 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
           {autoBrightnessEnabled && (
             <SettingsInfoBox variant="warning">
               <Text style={styles.infoText}>
-                ⚠️ Manual brightness control is disabled while auto-brightness is active
+                Manual brightness control is disabled while auto-brightness is active
               </Text>
             </SettingsInfoBox>
           )}
@@ -300,7 +318,7 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
           {!hasLightSensor && (
             <SettingsInfoBox variant="error">
               <Text style={styles.infoText}>
-                ⚠️ Light sensor not available on this device
+                Light sensor not available on this device
               </Text>
             </SettingsInfoBox>
           )}
@@ -354,7 +372,7 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
               
               <SettingsInfoBox variant="info">
                 <Text style={styles.infoText}>
-                  💡 Current Light Level: {currentLightLevel.toFixed(1)} lux
+                  Current Light Level: {currentLightLevel.toFixed(1)} lux
                 </Text>
               </SettingsInfoBox>
             </>
@@ -376,7 +394,7 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
         {!keepScreenOn && (
           <SettingsInfoBox variant="warning">
             <Text style={styles.infoText}>
-              ⚠️ The device will use its Android display timeout setting to turn the screen off automatically.{`\n`}
+              The device will use its Android display timeout setting to turn the screen off automatically.{`\n`}
               Configure the timeout in Android Settings → Display → Screen Timeout.{`\n`}
               Screensaver is disabled when screen management is left to the system.
             </Text>
@@ -413,7 +431,7 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
           {displayMode === 'external_app' && screensaverEnabled && (
             <SettingsInfoBox variant="info">
               <Text style={styles.infoText}>
-                ℹ️ In External App mode the system manages the screen. For the screensaver to
+                In External App mode the system manages the screen. For the screensaver to
                 appear before the device turns the screen off on its own, set the Android screen
                 timeout to a value greater than or equal to the inactivity delay below — or to
                 "Never" (Android Settings → Display → Screen Timeout).
@@ -452,7 +470,7 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                         return (
                           <SettingsInfoBox variant="error">
                             <Text style={styles.infoText}>
-                              ⚠️ Invalid URL. Enter a full URL starting with https:// or http://
+                              Invalid URL. Enter a full URL starting with https:// or http://
                             </Text>
                           </SettingsInfoBox>
                         );
@@ -465,7 +483,7 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                   <>
                     <SettingsInfoBox variant="info">
                       <Text style={styles.infoText}>
-                        {'🎬 Pick a video or image from your device.\n'}
+                        {'Pick a video or image from your device.\n'}
                         {'Multiple items play as a slideshow.'}
                       </Text>
                     </SettingsInfoBox>
@@ -475,22 +493,28 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                       disabled={pickingScreensaverMedia}
                     >
                       <Text style={styles.ssPickButtonText}>
-                        {pickingScreensaverMedia ? '⏳ Picking…' : '📁 Pick from Device'}
+                        {pickingScreensaverMedia ? 'Picking…' : 'Pick from Device'}
                       </Text>
                     </TouchableOpacity>
 
                     {screensaverVideoItems.map((item, index) => (
                       <View key={item.id} style={styles.ssMediaCard}>
                         <Text style={styles.ssMediaIndex}>{index + 1}</Text>
+                        <Icon
+                          name={item.type === 'video' ? 'video-outline' : 'image-outline'}
+                          size={16}
+                          color={Colors.textSecondary}
+                          style={styles.ssMediaTypeIcon}
+                        />
                         <Text style={styles.ssMediaName} numberOfLines={1}>
-                          {item.type === 'video' ? '🎥 ' : '🖼️ '}{getMediaDisplayName(item)}
+                          {getMediaDisplayName(item)}
                         </Text>
                         <TouchableOpacity
                           onPress={() => {
                             onScreensaverVideoItemsChange(screensaverVideoItems.filter(i => i.id !== item.id));
                           }}
                         >
-                          <Text style={styles.ssMediaDelete}>✗</Text>
+                          <Icon name="close" size={18} color={Colors.error} style={styles.ssMediaDelete} />
                         </TouchableOpacity>
                       </View>
                     ))}
@@ -505,7 +529,7 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                     {screensaverVideoItems.length === 0 && (
                       <SettingsInfoBox variant="warning">
                         <Text style={styles.infoText}>
-                          ⚠️ No media selected. The screensaver will appear blank until you pick at least one item.
+                          No media selected. The screensaver will appear blank until you pick at least one item.
                         </Text>
                       </SettingsInfoBox>
                     )}
@@ -515,7 +539,7 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                 {(screensaverType === 'url' || screensaverType === 'video') && screensaverBrightness < 0.1 && brightnessManagementEnabled && (
                   <SettingsInfoBox variant="warning">
                     <Text style={styles.infoText}>
-                      ⚠️ Screensaver Brightness is below 10%. Raise it (see slider below) so the content is visible, or switch to Dim Only.
+                      Screensaver Brightness is below 10%. Raise it (see slider below) so the content is visible, or switch to Dim Only.
                     </Text>
                   </SettingsInfoBox>
                 )}
@@ -587,7 +611,7 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                     {availableCameras.length === 0 && (
                       <SettingsInfoBox variant="error">
                         <Text style={styles.infoText}>
-                          ⚠️ No camera detected on this device
+                          No camera detected on this device
                         </Text>
                       </SettingsInfoBox>
                     )}
@@ -595,7 +619,7 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                     {availableCameras.length === 1 && (
                       <SettingsInfoBox variant="info">
                         <Text style={styles.infoText}>
-                          📹 Using {availableCameras[0].position === 'front' ? 'Front' : 'Back'} Camera (only camera available)
+                          Using {availableCameras[0].position === 'front' ? 'Front' : 'Back'} Camera (only camera available)
                         </Text>
                       </SettingsInfoBox>
                     )}
@@ -613,7 +637,7 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                         {!selectedCameraAvailable && (
                           <SettingsInfoBox variant="warning">
                             <Text style={styles.infoText}>
-                              ⚠️ Selected camera not available on this device
+                              Selected camera not available on this device
                             </Text>
                           </SettingsInfoBox>
                         )}
@@ -623,10 +647,38 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                   </>
                 )}
               </View>
-              
+
+              {/* Proximity Detection (hardware sensor) */}
+              <View style={styles.subSection}>
+                <Text style={styles.subSectionTitle}>Proximity Detection</Text>
+                <SettingsSwitch
+                  label="Enable Proximity Wake"
+                  hint="Wake the screen when a hand or body comes close to the front sensor"
+                  value={proximityEnabled}
+                  onValueChange={onProximityEnabledChange}
+                  disabled={proximityAvailable === false}
+                />
+
+                {proximityAvailable === false && (
+                  <SettingsInfoBox variant="error">
+                    <Text style={styles.infoText}>
+                      No proximity sensor detected on this device
+                    </Text>
+                  </SettingsInfoBox>
+                )}
+
+                {proximityAvailable !== false && (
+                  <SettingsInfoBox variant="info">
+                    <Text style={styles.infoText}>
+                      Short range (a few centimeters): wave a hand right in front of the screen to wake it. Unlike camera motion, it never triggers on lighting changes and uses almost no battery.
+                    </Text>
+                  </SettingsInfoBox>
+                )}
+              </View>
+
               {/* How it works */}
               <View style={styles.subSection}>
-                <Text style={styles.infoTitle}>ℹ️ How It Works</Text>
+                <Text style={styles.infoTitle}>How It Works</Text>
                 <Text style={styles.infoText}>
                   • After {inactivityDelay || '10'} minute(s) without interaction, the screensaver activates{`
 `}
@@ -637,6 +689,8 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                   • Touch the screen to wake the device{`
 `}
                   {motionEnabled && `• Motion in front of the camera also wakes the screen
+`}
+                  {proximityEnabled && proximityAvailable !== false && `• A hand close to the proximity sensor also wakes the screen
 `}
                   • Normal brightness is restored automatically
                 </Text>
@@ -704,7 +758,7 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
               )}
               
               <TouchableOpacity style={styles.addRuleButton} onPress={onAddScheduleRule}>
-                <Text style={styles.addRuleButtonText}>➕ Add Schedule Rule</Text>
+                <Text style={styles.addRuleButtonText}>Add Schedule Rule</Text>
               </TouchableOpacity>
             </View>
             
@@ -720,7 +774,7 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
               {!screenSchedulerWakeOnTouch && (
                 <SettingsInfoBox variant="warning">
                   <Text style={styles.infoText}>
-                    ⚠️ Touch will not wake the screen during sleep periods. Use the scheduled wake time or REST API to turn screen back on.
+                    Touch will not wake the screen during sleep periods. Use the scheduled wake time or REST API to turn screen back on.
                   </Text>
                 </SettingsInfoBox>
               )}
@@ -728,7 +782,7 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
             
             {/* How it works */}
             <View style={styles.subSection}>
-              <Text style={styles.infoTitle}>ℹ️ How Screen Schedule Works</Text>
+              <Text style={styles.infoTitle}>How Screen Schedule Works</Text>
               <Text style={styles.infoText}>
                 • Screen turns OFF automatically at the scheduled sleep time{`\n`}
                 • Screen turns ON automatically at the scheduled wake time{`\n`}
@@ -739,9 +793,9 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                   : '• Touch wake is disabled during sleep periods\n'
                 }
                 {`\n`}
-                {'📱 Device Owner: screen is truly locked (lockNow) + native alarm for wake\n'}
-                {'📱 Non Device Owner: brightness set to 0 + black overlay\n'}
-                {'⏰ Wake alarm uses Android AlarmManager for reliable timing'}
+                {'Device Owner: screen is truly locked (lockNow) + native alarm for wake\n'}
+                {'Non Device Owner: brightness set to 0 + black overlay\n'}
+                {'Wake alarm uses Android AlarmManager for reliable timing'}
               </Text>
             </View>
           </>
@@ -881,7 +935,7 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
           {zoomMode === 'fit' && (
             <SettingsInfoBox variant="info">
               <Text style={styles.infoText}>
-                🏠 Home Assistant mode zooms the page body (the HADashboard method), so dashboards re-flow and fill the screen instead of cards overflowing. If a non-HA site looks off, switch back to "Standard".
+                Home Assistant mode zooms the page body (the HADashboard method), so dashboards re-flow and fill the screen instead of cards overflowing. If a non-HA site looks off, switch back to "Standard".
               </Text>
             </SettingsInfoBox>
           )}
@@ -904,7 +958,7 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
           {zoomLevel !== 100 && (
             <SettingsInfoBox variant="info">
               <Text style={styles.infoText}>
-                🔍 Zoom is set to {zoomLevel}%. Tap the "100%" preset to reset to default.
+                Zoom is set to {zoomLevel}%. Tap the "100%" preset to reset to default.
               </Text>
             </SettingsInfoBox>
           )}
@@ -932,7 +986,7 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
           {customUserAgent.trim() !== '' && (
             <SettingsInfoBox variant="warning">
               <Text style={styles.infoText}>
-                ⚠️ Custom User Agent is active. Some sites may behave unexpectedly with non-standard UA strings.
+                Custom User Agent is active. Some sites may behave unexpectedly with non-standard UA strings.
               </Text>
             </SettingsInfoBox>
           )}
@@ -949,7 +1003,7 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
             onValueChange={onPauseWebMediaWhenHiddenChange}
           />
           <SettingsSwitch
-            label="🎙️ 2-way audio (intercom) mode"
+            label="2-way audio (intercom) mode"
             hint="Enable for WebRTC 2-way audio / talk-back (e.g. a Home Assistant / go2rtc doorbell intercom card). While the web page is actively using the microphone, FreeKiosk switches the device to communication audio mode so the microphone back-channel transmits, then restores normal audio when you stop talking. Leave off for normal browsing — it only engages while the mic is in use."
             value={intercomModeEnabled}
             onValueChange={onIntercomModeChange}
@@ -1067,15 +1121,15 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     minWidth: 20,
   },
+  ssMediaTypeIcon: {
+    marginRight: Spacing.sm,
+  },
   ssMediaName: {
     flex: 1,
     fontSize: 14,
     color: Colors.textPrimary,
   },
   ssMediaDelete: {
-    color: Colors.error,
-    fontSize: 18,
-    fontWeight: '700',
     paddingHorizontal: Spacing.sm,
   },
 });

@@ -116,7 +116,7 @@ const PinScreen: React.FC<PinScreenProps> = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-        <Text style={styles.backButtonText}>↩️ Back to Kiosk</Text>
+        <Text style={styles.backButtonText}>Back to Kiosk</Text>
       </TouchableOpacity>
 
       <PinInput onSuccess={handleSuccess} storedPin={storedPin} />

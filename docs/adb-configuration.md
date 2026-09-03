@@ -111,6 +111,15 @@ adb shell am start -n com.freekiosk/.MainActivity [OPTIONS]
 
 
 
+> [!TIP]
+> **Types are interchangeable.** `--es kiosk_enabled "true"`, `--ez kiosk_enabled true` and
+> `--ei return_tap_count 5` all work; the value is stored as text either way. This was not
+> true before, and passing a boolean key with `--es` used to be silently ignored.
+>
+> **Unknown keys are reported.** A key FreeKiosk does not recognize is now named in a toast
+> on the device and in logcat (`adb logcat | grep FreeKiosk-ADB`) instead of being dropped in
+> silence. If a setting did not apply, look there first.
+
 ### Required Parameters
 
 | Parameter | Type | Description |
@@ -151,6 +160,118 @@ Each app in the array supports these fields:
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `--es url "https://..."` | String | URL to display in kiosk WebView |
+
+### Dashboard Parameters
+
+The dashboard is a grid of tiles, each opening its own URL. It lives inside the WebView
+display mode, so `--ez dashboard_mode true` sets `display_mode` to `webview` on its own
+unless `lock_package` says otherwise.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `--ez dashboard_mode true` | Boolean | Show the tile grid instead of a single URL |
+| `--es dashboard_tiles '[...]'` | String (JSON) | JSON array of tiles (see format below) |
+
+**Tile format:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `url` | String | **required** | URL the tile opens. A tile without one is skipped |
+| `label` | String | the URL | Text shown under the icon |
+| `id` | String | generated | Unique tile id. Let FreeKiosk generate it unless you are updating a specific tile |
+| `iconMode` | String | `favicon` | `favicon`, `image`, or `letter`. An unknown value falls back to `favicon` |
+| `iconValue` | String | - | Image URL, used when `iconMode` is `image` |
+| `order` | Number | list position | Display order in the grid |
+
+```bash
+adb shell am start -n com.freekiosk/.MainActivity   --es pin "1234"   --ez dashboard_mode true   --es dashboard_tiles '[{"label":"Main app","url":"https://myapp.eu"},{"label":"Reports","url":"https://reports.myapp.eu"}]'
+```
+
+The same two keys work inside `--es config` as `dashboard_mode` and `dashboard_tiles`.
+
+### Additional Settings
+
+Every key below is a straight passthrough: the value you pass is stored as-is.
+
+**Navigation and exit**
+
+| Parameter | Description |
+|-----------|-------------|
+| `--es return_mode "taps"` | How to reach settings: `taps` (hidden tap zone) or `button` (fixed button) |
+| `--es return_button_position "top-left"` | Fixed-button corner: `top-left`, `top-right`, `bottom-left`, `bottom-right` |
+| `--ei return_tap_count 5` | Number of taps to open settings |
+| `--ei return_tap_timeout 1500` | Milliseconds allowed between taps |
+| `--ez volume_up_5tap_enabled true` | Five presses of Volume Up opens settings |
+| `--ez webview_back_button_enabled true` | Show an in-page back button in WebView mode |
+| `--es back_button_timer_delay "10"` | Countdown in seconds when `back_button_mode` is `timer` |
+| `--ez overlay_button_visible true` | Show the floating return button in External App mode |
+| `--es overlay_button_position "bottom-right"` | Corner for that button |
+| `--ei pin_max_attempts 5` | Wrong-PIN attempts before lockout |
+| `--es keyboard_mode "default"` | On-screen keyboard behavior |
+
+**Lockdown**
+
+| Parameter | Description |
+|-----------|-------------|
+| `--ez allow_power_button true` | Allow the power menu in lock task |
+| `--ez allow_notifications false` | Allow the notification shade in lock task |
+| `--ez allow_system_info false` | Allow the status bar system info in lock task |
+| `--ez block_factory_reset false` | Apply the `DISALLOW_FACTORY_RESET` restriction |
+| `--ez keep_screen_on true` | Keep the display awake |
+
+**WebView behavior**
+
+| Parameter | Description |
+|-----------|-------------|
+| `--ez auto_reload true` | Periodically reload the page |
+| `--ez pdf_viewer_enabled true` | Open PDFs in the bundled viewer |
+| `--es webview_zoom_level "100"` | Page zoom, 50 to 200 |
+| `--es webview_zoom_mode "standard"` | `standard` (CSS zoom) or `fit` (reflow) |
+| `--ez disable_user_zoom false` | Block pinch and double-tap zoom |
+| `--ez inactivity_return_enabled false` | Return to the start URL after inactivity |
+| `--es inactivity_return_delay "60"` | That delay, in seconds |
+
+**Multiple URLs**
+
+| Parameter | Description |
+|-----------|-------------|
+| `--ez url_rotation_enabled true` | Cycle through a list of URLs |
+| `--es url_rotation_list '["https://a","https://b"]'` | The list, as a JSON array |
+| `--es url_rotation_interval "30"` | Seconds between changes, minimum 5 |
+| `--ez url_planner_enabled true` | Schedule URLs by day and time |
+| `--es url_planner_events '[...]'` | Planner events, as a JSON array |
+
+**URL filtering**
+
+| Parameter | Description |
+|-----------|-------------|
+| `--ez url_filter_enabled true` | Restrict which URLs may load |
+| `--es url_filter_mode "blacklist"` | `blacklist` or `whitelist` |
+| `--es url_filter_list '[]'` | Patterns, as a JSON array |
+| `--ez url_filter_show_feedback true` | Tell the user when a URL is blocked |
+
+**Screen and brightness**
+
+| Parameter | Description |
+|-----------|-------------|
+| `--ez brightness_management_enabled true` | Let FreeKiosk manage brightness |
+| `--es default_brightness "0.5"` | Brightness from 0 to 1 |
+| `--ez auto_brightness_enabled false` | Follow the ambient light sensor |
+| `--ez screen_scheduler_enabled false` | Turn the screen on and off on a schedule |
+| `--es screen_scheduler_rules '[]'` | Schedule rules, as a JSON array |
+| `--ez screen_scheduler_wake_on_touch true` | Touch wakes the screen outside scheduled hours |
+| `--es screensaver_delay "300"` | Inactivity before the screensaver, in seconds |
+| `--es screensaver_brightness "0"` | Brightness while the screensaver is showing |
+
+**Status bar**
+
+| Parameter | Description |
+|-----------|-------------|
+| `--ez status_bar_enabled true` | Show FreeKiosk's own status bar |
+| `--ez status_bar_show_battery true` | Battery indicator |
+| `--ez status_bar_show_wifi true` | Wi-Fi indicator |
+| `--ez status_bar_show_time true` | Clock |
+| `--es status_bar_theme "dark"` | Status bar theme |
 
 ### Kiosk Mode Options
 

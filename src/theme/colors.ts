@@ -1,72 +1,73 @@
 /**
  * FreeKiosk v1.2 - Color Palette
- * Centralized color system for consistent UI
+ * Centralized color system for consistent UI.
+ * Brand-aligned with FreeKiosk Cloud: primary #2b7fff, navy content, soft blue-tinted surfaces.
  */
 
 export const Colors = {
-  // Primary brand colors
-  primary: '#0066cc',
-  primaryLight: '#e3f2fd',
-  primaryDark: '#004999',
+  // Primary brand colors (FreeKiosk Cloud blue)
+  primary: '#2b7fff',
+  primaryLight: '#e8f1ff',
+  primaryDark: '#1e63d6',
 
   // Secondary accent
-  secondary: '#4CAF50',
-  secondaryLight: '#e8f5e9',
-  secondaryDark: '#2e7d32',
+  secondary: '#22c55e',
+  secondaryLight: '#e7f9ef',
+  secondaryDark: '#15803d',
 
   // Status colors
-  success: '#4CAF50',
-  successLight: '#e8f5e9',
-  successDark: '#2e7d32',
+  success: '#22c55e',
+  successLight: '#e7f9ef',
+  successDark: '#15803d',
 
-  warning: '#ff9800',
-  warningLight: '#fff3e0',
-  warningDark: '#e65100',
+  warning: '#f59e0b',
+  warningLight: '#fff6e0',
+  warningDark: '#b45309',
 
-  error: '#f44336',
-  errorLight: '#ffebee',
-  errorDark: '#c62828',
+  error: '#ef4444',
+  errorLight: '#fee2e2',
+  errorDark: '#b91c1c',
 
-  info: '#2196F3',
-  infoLight: '#e3f2fd',
-  infoDark: '#1565c0',
+  info: '#2b7fff',
+  infoLight: '#e8f1ff',
+  infoDark: '#1e63d6',
 
-  // Neutral colors
-  background: '#f5f5f5',
+  // Neutral colors (soft blue-tinted, echoing cloud light theme)
+  background: '#f3f6ff',
   surface: '#ffffff',
-  surfaceVariant: '#fafafa',
+  surfaceVariant: '#f8faff',
 
-  // Text colors
-  textPrimary: '#333333',
-  textSecondary: '#666666',
-  textHint: '#999999',
-  textDisabled: '#cccccc',
+  // Text colors (navy content, like cloud base-content)
+  textPrimary: '#1b2a4d',
+  textSecondary: '#5a6b8c',
+  textHint: '#8b99b5',
+  textDisabled: '#c2cbdd',
   textOnPrimary: '#ffffff',
 
-  // Border colors
-  border: '#e0e0e0',
-  borderLight: '#eeeeee',
-  divider: '#e1e1e1',
+  // Border colors (blue-tinted, subtle)
+  border: '#e2e8f5',
+  borderLight: '#eef2fb',
+  divider: '#e2e8f5',
 
   // Specific UI elements
-  switchTrackOff: '#767577',
-  switchTrackOn: '#81b0ff',
-  switchThumbOff: '#f4f3f4',
+  switchTrackOff: '#c2cbdd',
+  switchTrackOn: '#9dc2ff',
+  switchThumbOff: '#ffffff',
 
   // Shadows
-  shadow: '#000000',
+  shadow: '#0d1730',
 
   // Tab specific
-  tabActive: '#0066cc',
-  tabInactive: '#999999',
-  tabIndicator: '#0066cc',
+  tabActive: '#2b7fff',
+  tabInactive: '#8b99b5',
+  tabIndicator: '#2b7fff',
 
   // Card backgrounds by type
   cardDefault: '#ffffff',
-  cardInfo: '#e3f2fd',
-  cardWarning: '#fff3e0',
-  cardError: '#ffebee',
-  cardSuccess: '#e8f5e9',
+  cardInfo: '#e8f1ff',
+  cardWarning: '#fff6e0',
+  cardError: '#fee2e2',
+  cardSuccess: '#e7f9ef',
 };
 
 export type ColorKey = keyof typeof Colors;

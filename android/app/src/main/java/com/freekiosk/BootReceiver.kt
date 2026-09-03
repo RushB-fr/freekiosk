@@ -91,6 +91,11 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+            handlePackageReplaced(context)
+            return
+        }
+
         if (intent.action == Intent.ACTION_BOOT_COMPLETED ||
             intent.action == "android.intent.action.QUICKBOOT_POWERON" ||
             intent.action == "android.intent.action.REBOOT" ||
@@ -202,6 +207,70 @@ class BootReceiver : BroadcastReceiver() {
     /**
      * Read kiosk_enabled from AsyncStorage.
      */
+    /**
+     * The app was just updated (sideload, Play Store, or a cloud `install_apk` that
+     * replaces FreeKiosk itself).
+     *
+     * Android restarts the process only for what it still binds, in practice the
+     * accessibility service, and never recreates MainActivity. In External App mode the
+     * launched app keeps the foreground, so nothing brings FreeKiosk back: the device is
+     * left with no watchdog, no overlay and no cloud heartbeat until somebody returns to
+     * it by hand, which on an unattended kiosk means never. Observed on a release build:
+     * after `install -r` the log reads "Start proc for service FreeKioskAccessibilityService"
+     * and MainActivity is simply never created.
+     *
+     * Restart the services, and bring the activity back when the device is configured to
+     * run unattended. A plain user who just updated from the Play Store is left alone:
+     * yanking the app to the foreground unprompted would be worse than the problem.
+     */
+    private fun handlePackageReplaced(context: Context) {
+        DebugLog.d("BootReceiver", "Package replaced - restoring kiosk services")
+        startKioskWatchdogIfNeeded(context)
+
+        if (!shouldRunUnattended(context)) {
+            DebugLog.d("BootReceiver", "Package replaced - not an unattended device, leaving it alone")
+            return
+        }
+
+        try {
+            val launchIntent = Intent(context, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
+            context.startActivity(launchIntent)
+            DebugLog.d("BootReceiver", "Package replaced - MainActivity relaunched")
+        } catch (e: Exception) {
+            DebugLog.errorProduction("BootReceiver", "Failed to relaunch after update: ${e.message}")
+        }
+    }
+
+    /** True when FreeKiosk is expected to keep running without anyone touching the device. */
+    private fun shouldRunUnattended(context: Context): Boolean =
+        isKioskEnabled(context) ||
+            readFlag(context, "@cloud_enrolled") ||
+            readFlag(context, "@kiosk_mqtt_enabled") ||
+            readString(context, "@kiosk_display_mode") == "external_app"
+
+    /** Read a boolean AsyncStorage flag without going through the JS bridge. */
+    private fun readFlag(context: Context, key: String): Boolean =
+        readString(context, key) == "true"
+
+    private fun readString(context: Context, key: String): String? {
+        return try {
+            val dbPath = context.getDatabasePath("RKStorage").absolutePath
+            val db = SQLiteDatabase.openDatabase(dbPath, null, SQLiteDatabase.OPEN_READONLY)
+            val cursor = db.rawQuery(
+                "SELECT value FROM catalystLocalStorage WHERE key = ?", arrayOf(key))
+            val value = if (cursor.moveToFirst()) cursor.getString(0) else null
+            cursor.close()
+            db.close()
+            value
+        } catch (e: Exception) {
+            DebugLog.d("BootReceiver", "Cannot read $key: ${e.message}")
+            null
+        }
+    }
+
     private fun isKioskEnabled(context: Context): Boolean {
         return try {
             val dbPath = context.getDatabasePath("RKStorage").absolutePath
@@ -274,15 +343,15 @@ class BootReceiver : BroadcastReceiver() {
      * The service uses START_STICKY so Android restarts it after OOM kills.
      */
     private fun startKioskWatchdogIfNeeded(context: Context) {
-        if (!isKioskEnabled(context)) return
         try {
-            val serviceIntent = Intent(context, KioskWatchdogService::class.java)
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                context.startForegroundService(serviceIntent)
+            if (isKioskEnabled(context)) {
+                KioskWatchdogService.startForKiosk(context)
             } else {
-                context.startService(serviceIntent)
+                // #234: without Lock Mode there is no foreground service at all, so the
+                // process (and the MQTT connection with it) is fair game for the OEM
+                // battery manager. Keep it alive when MQTT is on; no-op otherwise.
+                KioskWatchdogService.startKeepAliveIfNeeded(context)
             }
-            DebugLog.d("BootReceiver", "KioskWatchdogService started")
         } catch (e: Exception) {
             DebugLog.errorProduction("BootReceiver", "Failed to start KioskWatchdogService: ${e.message}")
         }

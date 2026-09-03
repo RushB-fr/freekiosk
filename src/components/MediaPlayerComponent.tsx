@@ -8,6 +8,7 @@
 import React, { useRef, useMemo, useCallback } from 'react';
 import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { WebView } from 'react-native-webview';
+import Icon from './Icon';
 import type { MediaItem, MediaFitMode } from '../types/mediaPlayer';
 
 interface MediaPlayerComponentProps {
@@ -74,7 +75,7 @@ const MediaPlayerComponent: React.FC<MediaPlayerComponentProps> = ({
   if (!items || items.length === 0) {
     return (
       <View style={[styles.emptyContainer, { backgroundColor }]}>
-        <Text style={styles.emptyIcon}>🎬</Text>
+        <Icon name="movie-outline" size={56} color="#ffffff" style={styles.emptyIcon} />
         <Text style={styles.emptyTitle}>Media Player</Text>
         <Text style={styles.emptyText}>
           No media items configured.{'\n'}

@@ -356,6 +356,18 @@ curl http://TABLET_IP:8080/api/screenshot -o screenshot.png
 
 
 > 💡 The screenshot is captured from the app's root view. It works even when the screensaver overlay is active.
+>
+> **Capturing another app (multi-app / external app mode)** *(v1.2.20+)*: when a managed app is in the
+> foreground, FreeKiosk's own window is off screen and cannot be copied, so the capture goes through the
+> **accessibility service** instead (`Settings > Accessibility > FreeKiosk`, Android 11+ required). In addition,
+> Lock Mode as Device Owner blocks screen capture device-wide (this is what disables the Power+Volume Down
+> combo), which also blacks out that capture: enable **Security > Allow Remote Screenshots** to let FreeKiosk
+> lift the block for the fraction of a second the capture takes. When a capture is not possible the endpoint
+> answers `503` with the reason, for example:
+>
+> ```json
+> {"success": false, "error": "Accessibility service is not enabled (required to capture another app)"}
+> ```
 
 > 💡 Home Assistant users can also get the screenshot as an auto-discovered `image` / `camera` entity over MQTT, without exposing the HTTP server — see [MQTT: Images (Screenshot & Camera)](MQTT#-images-screenshot--camera).
 

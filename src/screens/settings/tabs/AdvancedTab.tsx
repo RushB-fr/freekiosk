@@ -9,12 +9,21 @@ import {
   SettingsSection,
   SettingsButton,
   SettingsInfoBox,
+  SettingsInput,
   BackupRestoreSection,
 } from '../../../components/settings';
 import { ApiSettingsSection } from '../../../components/ApiSettingsSection';
 import { MqttSettingsSection } from '../../../components/MqttSettingsSection';
 import { CertificateInfo } from '../../../utils/CertificateModule';
 import AccessibilityModule from '../../../utils/AccessibilityModule';
+import { CloudSyncService } from '../../../utils/CloudSyncService';
+import { CLOUD_ENABLED } from '../../../config/features';
+import QrScannerModal from '../../../components/QrScannerModal';
+import PermissionWizard from '../../../components/PermissionWizard';
+import Icon from '../../../components/Icon';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../../navigation/AppNavigator';
 import { Colors, Spacing, Typography } from '../../../theme';
 
 const { KioskModule } = NativeModules;
@@ -75,6 +84,20 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
   const [accessibilityEnabled, setAccessibilityEnabled] = useState(false);
   const [accessibilityRunning, setAccessibilityRunning] = useState(false);
 
+  // Cloud management state
+  const [isEnrolled, setIsEnrolled] = useState(false);
+  const [orgName, setOrgName] = useState<string | null>(null);
+  const [cloudUrl, setCloudUrl] = useState('https://cloud.freekiosk.app');
+  const [enrollToken, setEnrollToken] = useState('');
+  const [enrolling, setEnrolling] = useState(false);
+  const [unenrolling, setUnenrolling] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
+  // When true, closing the wizard finishes enrollment by returning to the kiosk.
+  const [wizardAfterEnroll, setWizardAfterEnroll] = useState(false);
+
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
   const checkAccessibilityStatus = useCallback(async () => {
     try {
       const enabled = await AccessibilityModule.isAccessibilityServiceEnabled();
@@ -88,7 +111,6 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
 
   useEffect(() => {
     checkAccessibilityStatus();
-    // Re-check when the app returns from system settings
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         checkAccessibilityStatus();
@@ -97,12 +119,113 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
     return () => subscription.remove();
   }, [checkAccessibilityStatus]);
 
+  useEffect(() => {
+    if (!CLOUD_ENABLED) return;
+    CloudSyncService.getCredentials().then(creds => {
+      if (creds) {
+        setIsEnrolled(true);
+        setOrgName(creds.organizationName ?? null);
+      } else {
+        setIsEnrolled(false);
+        setOrgName(null);
+      }
+    });
+  }, []);
+
+  const handleEnroll = () => {
+    if (!cloudUrl.trim() || !enrollToken.trim()) {
+      Alert.alert('Missing fields', 'Please enter both the cloud URL and the enrollment token.');
+      return;
+    }
+    Alert.alert(
+      'Enroll in Cloud Management',
+      'Enrolling will reset all local FreeKiosk settings. The device will then be configured from the cloud.\n\nContinue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Enroll',
+          style: 'destructive',
+          onPress: async () => {
+            setEnrolling(true);
+            const PC = NativeModules.PlatformConstants as any;
+            const result = await CloudSyncService.enroll(cloudUrl.trim(), enrollToken.trim(), {
+              model: PC?.Model ?? '',
+              manufacturer: PC?.Manufacturer ?? '',
+              android_version: PC?.Release ?? '',
+              app_version: PC?.appVersion ?? '',
+              serial_number: '',
+            });
+            setEnrolling(false);
+            if (result.success) {
+              setIsEnrolled(true);
+              setOrgName(result.organizationName ?? null);
+              setCloudUrl('');
+              setEnrollToken('');
+              // Guide the user through permissions before returning to the kiosk.
+              // Closing the wizard triggers the navigation reset (see onClose).
+              setWizardAfterEnroll(true);
+              setShowWizard(true);
+            } else {
+              Alert.alert('Enrollment failed', result.error ?? 'Unknown error');
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  // Fill the enrollment fields from a scanned QR. The cloud dashboard encodes the bare
+  // token; we also tolerate a structured payload (JSON {url,token} or "url|token") so a
+  // future richer QR can fill the server URL too.
+  const handleScanned = (raw: string) => {
+    setShowScanner(false);
+    const data = raw.trim();
+    let url: string | undefined;
+    let token = data;
+    try {
+      const obj = JSON.parse(data);
+      if (obj && (obj.token || obj.url)) {
+        url = typeof obj.url === 'string' ? obj.url : undefined;
+        token = obj.token != null ? String(obj.token) : '';
+      }
+    } catch {
+      if (data.includes('|')) {
+        const [u, t] = data.split('|');
+        url = u;
+        token = t;
+      }
+    }
+    if (url) setCloudUrl(url);
+    if (token) setEnrollToken(token);
+  };
+
+  const handleUnenroll = () => {
+    Alert.alert(
+      'Leave Cloud Management',
+      'This will disconnect the device from the cloud and wipe all FreeKiosk settings.\n\nContinue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Unenroll',
+          style: 'destructive',
+          onPress: async () => {
+            setUnenrolling(true);
+            await CloudSyncService.unenroll();
+            setUnenrolling(false);
+            setIsEnrolled(false);
+            setOrgName(null);
+          },
+        },
+      ],
+    );
+  };
+
   const handleOpenAccessibilitySettings = async () => {
     try {
       // Use KioskModule.openAndroidSettings which properly handles Lock Task Mode
       // (temporarily exits lock task before launching the settings intent)
       await KioskModule.openAndroidSettings('accessibility');
-    } catch (e: any) {
+    } catch {
       Alert.alert('Error', 'Could not open Accessibility Settings');
     }
   };
@@ -129,6 +252,90 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
   };
   return (
     <View>
+      {/* Cloud Management */}
+      {CLOUD_ENABLED && <SettingsSection title="Cloud Management" icon="sync">
+        {isEnrolled ? (
+          <>
+            <SettingsInfoBox variant="success" icon="cloud-check" title="Cloud-managed">
+              <Text style={styles.infoText}>
+                This device is enrolled{orgName ? ` in ${orgName}` : ''}.{'\n'}
+                Configuration is synced automatically every 30 seconds.
+              </Text>
+            </SettingsInfoBox>
+            <SettingsButton
+              title="Set up permissions"
+              icon="shield-check"
+              variant="secondary"
+              onPress={() => { setWizardAfterEnroll(false); setShowWizard(true); }}
+            />
+            <SettingsButton
+              title={unenrolling ? 'Unenrolling...' : 'Leave Cloud Management'}
+              icon="alert-circle"
+              variant="danger"
+              onPress={handleUnenroll}
+              disabled={unenrolling}
+              loading={unenrolling}
+            />
+          </>
+        ) : (
+          <>
+            <SettingsInfoBox variant="info" title="Zero-touch provisioning">
+              <Text style={styles.infoText}>
+                Enroll this device in a FreeKiosk Cloud instance to manage its configuration remotely.{'\n\n'}
+                Warning: enrolling will reset all current settings.
+              </Text>
+            </SettingsInfoBox>
+            <SettingsInput
+              label="Cloud URL"
+              icon="server"
+              placeholder="https://cloud.freekiosk.app"
+              value={cloudUrl}
+              onChangeText={setCloudUrl}
+              keyboardType="url"
+            />
+            <SettingsInput
+              label="Enrollment Token"
+              icon="key"
+              placeholder="A1B2C3"
+              value={enrollToken}
+              onChangeText={setEnrollToken}
+            />
+            <SettingsButton
+              title="Scan QR Code"
+              icon="camera"
+              variant="secondary"
+              onPress={() => setShowScanner(true)}
+            />
+            <SettingsButton
+              title={enrolling ? 'Enrolling...' : 'Enroll Device'}
+              icon="upload"
+              variant="primary"
+              onPress={handleEnroll}
+              disabled={enrolling}
+              loading={enrolling}
+            />
+            <QrScannerModal
+              visible={showScanner}
+              onClose={() => setShowScanner(false)}
+              onScanned={handleScanned}
+            />
+          </>
+        )}
+      </SettingsSection>}
+
+      <PermissionWizard
+        visible={showWizard}
+        onClose={() => {
+          setShowWizard(false);
+          if (wizardAfterEnroll) {
+            setWizardAfterEnroll(false);
+            // Settings were wiped to defaults at enrollment; return to the base
+            // KioskScreen with a fresh mount so the reset config takes effect.
+            navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] });
+          }
+        }}
+      />
+
       {/* App Updates - Hidden in Play Store builds (compliance: no in-app updates) */}
       {enableSelfUpdate && (
       <SettingsSection title="Updates" icon="update">
@@ -138,7 +345,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
         </View>
         
         {updateAvailable && updateInfo && (
-          <SettingsInfoBox variant="success" title={`🎉 ${updateInfo.isPrerelease ? '🧪 Beta ' : ''}Update Available`}>
+          <SettingsInfoBox variant="success" icon="party-popper" title={`${updateInfo.isPrerelease ? 'Beta ' : ''}Update Available`}>
             <Text style={styles.infoText}>
               Version {updateInfo.version} is available!{updateInfo.isPrerelease ? ' (pre-release)' : ''}
               {updateInfo.notes && `\n\n${updateInfo.notes.substring(0, 150)}...`}
@@ -148,7 +355,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
         
         <View style={styles.betaRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.betaLabel}>🧪 Beta Updates</Text>
+            <Text style={styles.betaLabel}>Beta Updates</Text>
             <Text style={styles.betaHint}>Receive pre-release versions before stable</Text>
           </View>
           <TouchableOpacity
@@ -210,7 +417,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
                       {cert.fingerprint.substring(0, 24)}...
                     </Text>
                     <Text style={[styles.certificateExpiry, cert.isExpired && styles.certificateExpired]}>
-                      {cert.isExpired ? '⚠️ Expired: ' : 'Expires: '}
+                      {cert.isExpired ? 'Expired: ' : 'Expires: '}
                       {cert.expiryDate}
                     </Text>
                   </View>
@@ -218,7 +425,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
                     style={styles.deleteButton}
                     onPress={() => onRemoveCertificate(cert.fingerprint, cert.url)}
                   >
-                    <Text style={styles.deleteButtonText}>🗑️</Text>
+                    <Icon name="delete-outline" size={22} color={Colors.error} />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -251,7 +458,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
           </View>
         </View>
 
-        <SettingsInfoBox variant="info" title="ℹ️ Why is this needed?">
+        <SettingsInfoBox variant="info" icon="help-circle" title="Why is this needed?">
           <Text style={styles.infoText}>
             The Accessibility Service allows FreeKiosk to send keyboard input (remote control, text input) to external apps.{'\n\n'}
             Without it, keyboard emulation only works inside FreeKiosk's own WebView.
@@ -284,12 +491,12 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
 
         {accessibilityRunning && (
           <Text style={styles.hint}>
-            ✅ Keyboard emulation is available for all apps (WebView + External Apps).
+            Keyboard emulation is available for all apps (WebView + External Apps).
           </Text>
         )}
 
         {isDeviceOwner && displayMode === 'external_app' && (
-          <SettingsInfoBox variant="info" title="🔧 Managed Apps Accessibility">
+          <SettingsInfoBox variant="info" icon="cog-outline" title="Managed Apps Accessibility">
             <Text style={styles.infoText}>
               You can allow other apps' accessibility services in the "Managed Apps" section of the General tab.{'\n'}
               Toggle "Allow Accessibility" per app to whitelist their accessibility services via Device Owner.
@@ -309,7 +516,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
           Useful when your device has no physical navigation buttons.
         </Text>
         {kioskEnabled && (
-          <SettingsInfoBox variant="info" title="🔒 Kiosk Mode Active">
+          <SettingsInfoBox variant="info" icon="lock" title="Kiosk Mode Active">
             <Text style={styles.infoText}>
               Kiosk mode will be temporarily paused to open Android settings.{' '}
               It will automatically re-engage when you return to FreeKiosk.
@@ -327,37 +534,43 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
             style={styles.shortcutButton}
             onPress={() => KioskModule.openAndroidSettings('wifi')}
           >
-            <Text style={styles.shortcutText}>📶 WiFi</Text>
+            <Icon name="wifi" size={22} color={Colors.primary} style={styles.shortcutIcon} />
+            <Text style={styles.shortcutText}>WiFi</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.shortcutButton}
             onPress={() => KioskModule.openAndroidSettings('sound')}
           >
-            <Text style={styles.shortcutText}>🔊 Sound</Text>
+            <Icon name="volume-high" size={22} color={Colors.primary} style={styles.shortcutIcon} />
+            <Text style={styles.shortcutText}>Sound</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.shortcutButton}
             onPress={() => KioskModule.openAndroidSettings('display')}
           >
-            <Text style={styles.shortcutText}>🔆 Display</Text>
+            <Icon name="brightness-6" size={22} color={Colors.primary} style={styles.shortcutIcon} />
+            <Text style={styles.shortcutText}>Display</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.shortcutButton}
             onPress={() => KioskModule.openAndroidSettings('bluetooth')}
           >
-            <Text style={styles.shortcutText}>📡 Bluetooth</Text>
+            <Icon name="bluetooth" size={22} color={Colors.primary} style={styles.shortcutIcon} />
+            <Text style={styles.shortcutText}>Bluetooth</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.shortcutButton}
             onPress={() => KioskModule.openAndroidSettings('date')}
           >
-            <Text style={styles.shortcutText}>📅 Date & Time</Text>
+            <Icon name="calendar-clock" size={22} color={Colors.primary} style={styles.shortcutIcon} />
+            <Text style={styles.shortcutText}>Date & Time</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.shortcutButton}
             onPress={() => KioskModule.openAndroidSettings('apps')}
           >
-            <Text style={styles.shortcutText}>📱 Apps</Text>
+            <Icon name="apps" size={22} color={Colors.primary} style={styles.shortcutIcon} />
+            <Text style={styles.shortcutText}>Apps</Text>
           </TouchableOpacity>
         </View>
       </SettingsSection>
@@ -517,6 +730,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.surfaceVariant,
+  },
+  shortcutIcon: {
+    marginBottom: 4,
   },
   shortcutText: {
     ...Typography.label,

@@ -9,6 +9,7 @@ import {
   SettingsSection,
   SettingsInput,
   SettingsSwitch,
+  SettingsSlider,
   SettingsModeSelector,
   SettingsInfoBox,
   SettingsButton,
@@ -18,6 +19,7 @@ import {
   SettingsRadioGroup,
 } from '../../../components/settings';
 import { ManagedApp } from '../../../types/managedApps';
+import Icon from '../../../components/Icon';
 import { Colors, Spacing, Typography } from '../../../theme';
 import AppLauncherModule, { AppInfo } from '../../../utils/AppLauncherModule';
 import { ScheduledEvent } from '../../../types/planner';
@@ -110,7 +112,13 @@ interface GeneralTabProps {
   webViewBackButtonYPercent: string;
   onWebViewBackButtonYPercentChange: (value: string) => void;
   onResetWebViewBackButtonPosition: () => void;
-  
+
+  // Restart Button (webview only): long-press reloads the WebView
+  restartButtonEnabled: boolean;
+  onRestartButtonEnabledChange: (value: boolean) => void;
+  restartButtonLongPressSeconds: number;
+  onRestartButtonLongPressSecondsChange: (value: number) => void;
+
   // Inactivity Return to Home (webview only)
   inactivityReturnEnabled: boolean;
   onInactivityReturnEnabledChange: (value: boolean) => void;
@@ -216,6 +224,10 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
   webViewBackButtonYPercent,
   onWebViewBackButtonYPercentChange,
   onResetWebViewBackButtonPosition,
+  restartButtonEnabled,
+  onRestartButtonEnabledChange,
+  restartButtonLongPressSeconds,
+  onRestartButtonLongPressSecondsChange,
   inactivityReturnEnabled,
   onInactivityReturnEnabledChange,
   inactivityReturnDelay,
@@ -273,7 +285,7 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
         
         {/* Device Owner warning for External App */}
         {displayMode === 'external_app' && !isDeviceOwner && (
-          <SettingsInfoBox variant="error" title="🔒 Device Owner Recommended">
+          <SettingsInfoBox variant="error" icon="shield-alert" title="Device Owner Recommended">
             <Text style={styles.infoText}>
               Without Device Owner:{`
 `}
@@ -289,7 +301,7 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
       
       {/* How to Use */}
       <SettingsSection variant="info">
-        <Text style={styles.infoTitle}>ℹ️ How to Use</Text>
+        <Text style={styles.infoTitle}>How to Use</Text>
         <Text style={styles.infoText}>
           {displayMode === 'media_player' 
             ? '• Add video or image URLs to build a playlist\n• Configure playback options (loop, shuffle, etc.)\n• Set a secure PIN code\n• Enable "Lock Mode" for full kiosk mode\n• Tap 5 times to access settings'
@@ -304,9 +316,9 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
           <SettingsSection title="Media Playlist" icon="play-circle-outline">
             <SettingsInfoBox variant="info">
               <Text style={styles.infoText}>
-                {'🎬 Add media from your device or via URL.\n'}
+                {'Add media from your device or via URL.\n'}
                 {'Supported: MP4, WebM, OGG (video) • JPG, PNG, GIF, WebP, SVG (image)\n\n'}
-                {'📱 Local files are copied to app storage for reliable playback.'}
+                {'Local files are copied to app storage for reliable playback.'}
               </Text>
             </SettingsInfoBox>
             
@@ -317,23 +329,26 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
                 onPress={() => !pickingMedia && onPickMediaFromDevice('any')}
                 disabled={pickingMedia}
               >
-                <Text style={styles.pickButtonText}>
-                  {pickingMedia ? '⏳ Picking...' : '📁 Pick from Device'}
-                </Text>
+                <View style={styles.pickButtonRow}>
+                  <Icon name="folder-open-outline" size={18} color={Colors.textOnPrimary} style={styles.pickButtonIcon} />
+                  <Text style={styles.pickButtonText}>
+                    {pickingMedia ? 'Picking...' : 'Pick from Device'}
+                  </Text>
+                </View>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.pickButtonSmall, { backgroundColor: Colors.info }, pickingMedia && styles.pickButtonDisabled]}
                 onPress={() => !pickingMedia && onPickMediaFromDevice('video')}
                 disabled={pickingMedia}
               >
-                <Text style={styles.pickButtonSmallText}>🎥</Text>
+                <Icon name="video-outline" size={20} color={Colors.textOnPrimary} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.pickButtonSmall, { backgroundColor: Colors.secondary }, pickingMedia && styles.pickButtonDisabled]}
                 onPress={() => !pickingMedia && onPickMediaFromDevice('image')}
                 disabled={pickingMedia}
               >
-                <Text style={styles.pickButtonSmallText}>🖼️</Text>
+                <Icon name="image-outline" size={20} color={Colors.textOnPrimary} />
               </TouchableOpacity>
             </View>
             
@@ -346,12 +361,12 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
                     { backgroundColor: item.type === 'video' ? Colors.info : Colors.secondary }
                   ]}>
                     <Text style={styles.mediaItemTypeText}>
-                      {item.type === 'video' ? '🎥 Video' : '🖼️ Image'}
+                      {item.type === 'video' ? 'Video' : 'Image'}
                     </Text>
                   </View>
                   {item.isLocal && (
                     <View style={styles.localBadge}>
-                      <Text style={styles.localBadgeText}>📱 Local</Text>
+                      <Text style={styles.localBadgeText}>Local</Text>
                     </View>
                   )}
                   <TouchableOpacity
@@ -366,7 +381,7 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
                       onMediaPlayerItemsChange(updated);
                     }}
                   >
-                    <Text style={styles.mediaItemDeleteText}>✗</Text>
+                    <Icon name="close" size={18} color={Colors.error} />
                   </TouchableOpacity>
                 </View>
                 
@@ -431,7 +446,7 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
             {mediaPlayerItems.length === 0 && (
               <SettingsInfoBox variant="warning">
                 <Text style={styles.infoText}>
-                  ⚠️ Add at least one media item to use the Media Player
+                  Add at least one media item to use the Media Player
                 </Text>
               </SettingsInfoBox>
             )}
@@ -560,7 +575,7 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
               {url.trim().toLowerCase().startsWith('http://') && (
                 <SettingsInfoBox variant="warning">
                   <Text style={styles.infoText}>
-                    ⚠️ SECURITY: This URL uses HTTP (unencrypted).{`
+                    SECURITY: This URL uses HTTP (unencrypted).{`
 `}
                     Your data can be intercepted. Use HTTPS instead.
                   </Text>
@@ -641,7 +656,7 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
                   {urlRotationList.length < 2 && (
                     <SettingsInfoBox variant="warning">
                       <Text style={styles.infoText}>
-                        ⚠️ Add at least 2 URLs to enable rotation
+                        Add at least 2 URLs to enable rotation
                       </Text>
                     </SettingsInfoBox>
                   )}
@@ -666,7 +681,7 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
             <>
               <SettingsInfoBox variant="info">
                 <Text style={styles.infoText}>
-                  📌 Scheduled events take priority over URL Rotation.{`
+                  Scheduled events take priority over URL Rotation.{`
 `}
                   One-time events take priority over recurring events.
                 </Text>
@@ -730,7 +745,7 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
             <SettingsSection title="Applications" icon="view-grid">
               <SettingsInfoBox variant="info">
                 <Text style={styles.infoText}>
-                  {'📱 Add apps to display on the home screen grid.\n'}
+                  {'Add apps to display on the home screen grid.\n'}
                   {'Users can choose which app to launch.\n\n'}
                   {'Toggle options per app: show on home screen, launch on boot, keep alive, accessibility.'}
                 </Text>
@@ -748,7 +763,7 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
             <SettingsSection title="Additional Managed Apps" icon="apps">
               <SettingsInfoBox variant="info">
                 <Text style={styles.infoText}>
-                  {'📋 Optional: add extra apps for background monitoring, boot launch, or accessibility whitelist.\n'}
+                  {'Optional: add extra apps for background monitoring, boot launch, or accessibility whitelist.\n'}
                   {'These apps will NOT appear on the home screen in single app mode.'}
                 </Text>
               </SettingsInfoBox>
@@ -767,7 +782,7 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
             <View style={styles.permissionRow}>
               <View style={styles.permissionTextContainer}>
                 <Text style={[styles.permissionTitle, { color: hasOverlayPermission ? Colors.successDark : Colors.warningDark }]}>
-                  {hasOverlayPermission ? '✓ Return Button Enabled' : '⚠️ Overlay Permission Required'}
+                  {hasOverlayPermission ? 'Return Button Enabled' : 'Overlay Permission Required'}
                 </Text>
                 <Text style={styles.permissionHint}>
                   {hasOverlayPermission
@@ -793,7 +808,7 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
             <View style={styles.permissionRow}>
               <View style={styles.permissionTextContainer}>
                 <Text style={[styles.permissionTitle, { color: hasUsageStatsPermission ? Colors.successDark : Colors.warningDark }]}>
-                  {hasUsageStatsPermission ? '✓ Usage Access Granted' : '⚠️ Usage Access Required'}
+                  {hasUsageStatsPermission ? 'Usage Access Granted' : 'Usage Access Required'}
                 </Text>
                 <Text style={styles.permissionHint}>
                   {hasUsageStatsPermission
@@ -832,11 +847,11 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
           secureTextEntry
           maxLength={pinMode === 'alphanumeric' ? undefined : 6}
           autoCapitalize={pinMode === 'alphanumeric' ? 'none' : undefined}
-          error={pinModeChanged && !pin ? '⚠️ New password required after mode change' : undefined}
+          error={pinModeChanged && !pin ? 'New password required after mode change' : undefined}
           hint={pinModeChanged
-            ? '⚠️ Mode changed - You MUST enter a new password'
+            ? 'Mode changed - You MUST enter a new password'
             : isPinConfigured
-              ? '✓ Password configured - Leave empty to keep current password'
+              ? 'Password configured - Leave empty to keep current password'
               : pinMode === 'alphanumeric'
                 ? 'Minimum 4 characters. Can include letters, numbers, and special characters.'
                 : 'Numeric PIN: 4-6 digits (default: 1234)'}
@@ -844,7 +859,8 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
         
         <View style={styles.pinAttemptsContainer}>
           <SettingsInput
-            label="🔒 Max Attempts Before Lockout (15min)"
+            icon="lock"
+            label="Max Attempts Before Lockout (15min)"
             value={pinMaxAttemptsText}
             onChangeText={onPinMaxAttemptsChange}
             onBlur={onPinMaxAttemptsBlur}
@@ -902,7 +918,7 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
               
               <SettingsInfoBox variant="info">
                 <Text style={styles.infoText}>
-                  ℹ️ The timer resets on every touch interaction.{`\n`}
+                  The timer resets on every touch interaction.{`\n`}
                   If already on the start page and scroll-to-top is enabled, the page will scroll up.{`\n`}
                   Disabled during URL Rotation, URL Planner, and Screensaver.
                 </Text>
@@ -937,8 +953,8 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
           {pdfViewerEnabled && (
             <SettingsInfoBox variant="info">
               <Text style={styles.infoText}>
-                {'📄 PDF links will open in a built-in viewer with page navigation and zoom controls.\n\n'}
-                {'⚠️ Enabling this feature allows file access in the WebView for the local PDF renderer. Only enable if your kiosk website links to PDF files.'}
+                {'PDF links will open in a built-in viewer with page navigation and zoom controls.\n\n'}
+                {'Enabling this feature allows file access in the WebView for the local PDF renderer. Only enable if your kiosk website links to PDF files.'}
               </Text>
             </SettingsInfoBox>
           )}
@@ -976,7 +992,7 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
           {printEnabled && (
             <SettingsInfoBox variant="info">
               <Text style={styles.infoText}>
-                {'🖨️ Web pages can trigger the Android print dialog via window.print().\n\n'}
+                {'Web pages can trigger the Android print dialog via window.print().\n\n'}
                 {'In Device Owner (kiosk) mode, the system print spooler is automatically whitelisted to allow the print dialog to appear.\n\n'}
                 {'Supports WiFi, Bluetooth, USB printers, and Save as PDF.'}
               </Text>
@@ -1000,7 +1016,7 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
               <View style={styles.rotationSpacer} />
               <SettingsInfoBox variant="info">
                 <Text style={styles.infoText}>
-                  ℹ️ This button only navigates within the web page history.{`
+                  This button only navigates within the web page history.{`
 `}
                   It will NOT exit the kiosk mode or return to settings.
                 </Text>
@@ -1035,13 +1051,42 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
           )}
         </SettingsSection>
       )}
-      
+
+      {/* Restart Button - WebView only. Top-right grey button, long-press restarts the WebView. */}
+      {displayMode === 'webview' && (
+        <SettingsSection title="Restart Button" icon="refresh">
+          <SettingsSwitch
+            label="Enable Restart Button"
+            hint="Show a grey button in the top-right corner. Long-press it to restart the WebView on the configured URL."
+            value={restartButtonEnabled}
+            onValueChange={onRestartButtonEnabledChange}
+          />
+
+          {restartButtonEnabled && (
+            <>
+              <View style={styles.rotationSpacer} />
+              <SettingsSlider
+                label="Long-press Duration"
+                hint="How long the button must be held before the WebView restarts."
+                icon="refresh"
+                value={restartButtonLongPressSeconds}
+                onValueChange={onRestartButtonLongPressSecondsChange}
+                minimumValue={1}
+                maximumValue={10}
+                step={1}
+                unit="s"
+              />
+            </>
+          )}
+        </SettingsSection>
+      )}
+
       {/* Background Apps - WebView mode only */}
       {displayMode === 'webview' && (
         <SettingsSection title="Background Apps" icon="apps">
           <SettingsInfoBox variant="info">
             <Text style={styles.infoText}>
-              {'📋 Optional: add apps to launch and keep running in the background while the kiosk WebView is displayed.\n\n'}
+              {'Optional: add apps to launch and keep running in the background while the kiosk WebView is displayed.\n\n'}
               {'Example: keep a music or audio receiver app alive alongside your web dashboard.'}
             </Text>
           </SettingsInfoBox>
@@ -1150,9 +1195,16 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  pickButtonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  pickButtonIcon: {
+    marginRight: 8,
   },
   pickButtonDisabled: {
     opacity: 0.5,
@@ -1165,7 +1217,7 @@ const styles = StyleSheet.create({
   pickButtonSmall: {
     width: 48,
     height: 48,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },

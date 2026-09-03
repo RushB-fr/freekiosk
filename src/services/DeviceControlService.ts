@@ -35,6 +35,11 @@ export interface DeviceInfo {
   version: string;
   isDeviceOwner: boolean;
   kioskMode: boolean;
+  freeStorageMb: number;
+  freeMemoryMb: number;
+  model: string;
+  manufacturer: string;
+  androidVersion: string;
 }
 
 export interface WifiStatus {
@@ -148,10 +153,26 @@ class DeviceControlServiceClass {
 
   async getScreenStatus(): Promise<ScreenStatus> {
     const screensaverActive = this.getScreensaverCallback?.() || false;
-    
+
+    // #242: read the brightness actually in effect. This used to report
+    // this.currentBrightness, which only setBrightness() below ever wrote and which
+    // nothing calls, so the value was the 0.5 initialiser for the whole life of the
+    // process. Every cloud heartbeat therefore reported 50% for every device
+    // (CloudSyncService sends status.screen.brightness), regardless of the panel.
+    let brightness = this.currentBrightness;
+    try {
+      const actual = await RNBrightness.getBrightnessLevel();
+      if (typeof actual === 'number') {
+        brightness = actual;
+        this.currentBrightness = actual;
+      }
+    } catch (error) {
+      console.warn('DeviceControlService: getBrightnessLevel error', error);
+    }
+
     return {
       on: !screensaverActive,
-      brightness: Math.round(this.currentBrightness * 100),
+      brightness: Math.round(brightness * 100),
       screensaverActive,
       scheduledSleep: this.scheduledSleep,
     };
@@ -175,16 +196,46 @@ class DeviceControlServiceClass {
       console.warn('DeviceControlService: isDeviceOwner error', error);
     }
 
-    // Get IP from NetworkUtils (will be set externally)
     const ip = await this.getLocalIpAddress();
+
+    let freeStorageMb = 0;
+    let freeMemoryMb = 0;
+    let model = '';
+    let manufacturer = '';
+    let androidVersion = '';
+    let uptime = 0;
+    try {
+      if (KioskModule?.getStorageInfo) {
+        const storage = await KioskModule.getStorageInfo();
+        freeStorageMb = storage.availableMB || 0;
+      }
+      if (KioskModule?.getMemoryInfo) {
+        const memory = await KioskModule.getMemoryInfo();
+        freeMemoryMb = memory.availableMB || 0;
+      }
+      if (KioskModule?.getSystemInfo) {
+        const sys = await KioskModule.getSystemInfo();
+        model = sys.model || '';
+        manufacturer = sys.manufacturer || '';
+        androidVersion = sys.androidVersion || '';
+        uptime = sys.uptimeSeconds || 0;
+      }
+    } catch (error) {
+      console.warn('DeviceControlService: storage/memory/system error', error);
+    }
 
     return {
       ip,
       hostname: 'freekiosk',
-      uptime: 0, // TODO: implement
+      uptime,
       version: this.appVersion,
       isDeviceOwner,
       kioskMode: this.kioskModeEnabled,
+      freeStorageMb,
+      freeMemoryMb,
+      model,
+      manufacturer,
+      androidVersion,
     };
   }
 
@@ -223,7 +274,10 @@ class DeviceControlServiceClass {
       const clamped = Math.max(0, Math.min(100, value));
       const normalized = clamped / 100;
       
-      await RNBrightness.setBrightnessLevel(normalized);
+      // #242: a caller asking this layer for a brightness means it to last, so it
+      // goes through setDefaultBrightness and reaches the native mirror plus
+      // Settings.System, rather than a window override the next wake would drop.
+      await RNBrightness.setDefaultBrightness(normalized);
       this.currentBrightness = normalized;
       
       // Emit event for UI updates

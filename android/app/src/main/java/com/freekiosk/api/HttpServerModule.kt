@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.location.Location
 import android.location.LocationManager
-import android.graphics.Bitmap
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -41,6 +40,7 @@ import com.facebook.react.modules.core.DeviceEventManagerModule
 import android.accessibilityservice.AccessibilityService
 import android.os.Build
 import com.freekiosk.DeviceAdminReceiver
+import com.freekiosk.MainActivity
 import com.freekiosk.CameraPhotoModule
 import com.freekiosk.FreeKioskAccessibilityService
 import com.freekiosk.ScreenCapture
@@ -60,6 +60,24 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     companion object {
         private const val TAG = "HttpServerModule"
         private const val NAME = "HttpServerModule"
+
+        /**
+         * Commands the `when` in handleCommand() finishes on its own, with no help from
+         * the JS thread. Only these may be dispatched by a caller that has no JS available,
+         * which is the cloud command channel whenever the activity is backgrounded (React
+         * Native freezes the JS thread there, so ApiService.executeAction never runs).
+         *
+         * Deliberately excludes the hybrid commands (wake, autoBrightness*, clearCache,
+         * setMode): they do native work *and* notify JS, so running only their native half
+         * would leave the app in a partial state. They stay on the JS path.
+         */
+        private val NATIVELY_COMPLETE = setOf(
+            "audioPlay", "playSound", "audioStop", "audioBeep",
+            "screenOn", "screenOff",
+            "reboot", "tts", "lockDevice", "restartUi",
+            "remoteKey", "keyboardKey", "keyboardCombo", "keyboardText",
+            "getLocation", "cameraList", "getAutoBrightness",
+        )
     }
 
     private var server: KioskHttpServer? = null
@@ -247,6 +265,7 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 statusProvider = { getDeviceStatus() },
                 commandHandler = { command, params -> handleCommand(command, params) },
                 screenshotProvider = { captureScreenshot() },
+                screenshotErrorProvider = { ScreenCapture.lastError },
                 cameraPhotoProvider = { camera, quality -> cameraPhotoModule?.capturePhoto(camera, quality) }
             )
 
@@ -668,12 +687,31 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
 
     // ==================== Command Handler ====================
 
-    private fun handleCommand(command: String, params: JSONObject?): JSONObject {
+    /**
+     * @param dispatchToJs when false, the caller has no usable JS thread: only the
+     *   natively-complete commands run, and anything else is refused with
+     *   `nativelyHandled: false` so the caller can fall back to its own JS path.
+     *   The REST/MQTT server calls this with the default and is unaffected.
+     */
+    private fun handleCommand(
+        command: String,
+        params: JSONObject?,
+        dispatchToJs: Boolean = true,
+    ): JSONObject {
         Log.d(TAG, "Handling command: $command")
-        
+
+        // Refuse before executing anything, so a command is never half-applied.
+        if (!dispatchToJs && command !in NATIVELY_COMPLETE) {
+            return JSONObject().apply {
+                put("nativelyHandled", false)
+                put("command", command)
+            }
+        }
+
         // Handle audio commands directly (don't need JS)
         when (command) {
-            "audioPlay" -> {
+            // `playSound` is the name ApiService/the cloud channel use for the same action.
+            "audioPlay", "playSound" -> {
                 val url = params?.optString("url", "")
                 val loop = params?.optBoolean("loop", false) ?: false
                 val volume = params?.optInt("volume", 50) ?: 50
@@ -1000,8 +1038,39 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             "getLocation" -> {
                 return getLocationInfo()
             }
+            "setMode" -> {
+                // #209: The actual mode switch runs in the JS onSetMode handler, but when
+                // FreeKiosk is backgrounded behind an external app the JS thread is frozen,
+                // so a REST/MQTT setMode returned success while nothing happened on screen
+                // until the user manually brought FreeKiosk forward (home/back). When switching
+                // to a foreground mode (webview / media_player) we bring FreeKiosk to the front
+                // from native code here so the JS thread resumes and completes the switch. We
+                // set blockAutoRelaunch first so MainActivity.onResume does NOT take the
+                // involuntary-return fast-path and relaunch the external app we are leaving
+                // (the "app relaunches after switching to webview" report). The JS AppState
+                // handler consumes and clears the flag. Switching TO external_app is unchanged:
+                // loadSettings() re-launches the app over us as before.
+                val targetMode = params?.optString("mode", "") ?: ""
+                // Only intervene when FreeKiosk is actually backgrounded (behind an external
+                // app): that is the only case where the JS handler is frozen and where an
+                // involuntary-return relaunch could fire. When already in the foreground the JS
+                // handler runs normally and does its own bringToFront, so we do nothing here
+                // (and never leave a stale blockAutoRelaunch flag set).
+                if ((targetMode == "webview" || targetMode == "media_player") && !isAppInForeground()) {
+                    MainActivity.blockAutoRelaunch = true
+                    bringAppToFront()
+                }
+                sendEvent("onApiCommand", Arguments.createMap().apply {
+                    putString("command", command)
+                    putString("params", params?.toString() ?: "{}")
+                })
+                return JSONObject().apply {
+                    put("executed", true)
+                    put("command", command)
+                }
+            }
         }
-        
+
         // Send other commands to JS side
         sendEvent("onApiCommand", Arguments.createMap().apply {
             putString("command", command)
@@ -1018,6 +1087,45 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
         reactContext
             .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
             .emit(eventName, params)
+    }
+
+    /**
+     * #209: Bring FreeKiosk's MainActivity to the foreground from native code. Used when a
+     * REST/MQTT setMode switches away from an external app while the JS thread is frozen in
+     * the background. Same REORDER_TO_FRONT pattern as BackgroundAppMonitorService, so the
+     * activity is reused (not recreated) and no WebView state is lost.
+     */
+    private fun bringAppToFront() {
+        try {
+            val intent = Intent(reactContext, MainActivity::class.java).apply {
+                addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP
+                )
+            }
+            reactContext.startActivity(intent)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to bring app to front: ${e.message}")
+        }
+    }
+
+    /**
+     * #209: True when FreeKiosk itself is the current foreground app. Used to skip the native
+     * bring-to-front (and the blockAutoRelaunch guard) when it is not needed. Returns false on
+     * error so we still perform the switch-assist rather than silently doing nothing.
+     */
+    private fun isAppInForeground(): Boolean {
+        return try {
+            val am = reactContext.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            @Suppress("DEPRECATION")
+            am.runningAppProcesses?.any {
+                it.processName == reactContext.packageName &&
+                    it.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
+            } ?: false
+        } catch (e: Exception) {
+            false
+        }
     }
 
     // ==================== JS Interface for Status Updates ====================
@@ -1047,6 +1155,29 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             Log.d(TAG, "Status updated: url=$jsCurrentUrl, screensaver=$jsScreensaverActive, rotation=$jsRotationEnabled, autoBrightness=$jsAutoBrightnessEnabled")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse status update from JS", e)
+        }
+    }
+
+    /**
+     * Run a command through the native handler only, never touching the JS thread.
+     *
+     * This exists for the cloud command channel, which until now dispatched everything
+     * through ApiService.executeAction, i.e. through callbacks registered by KioskScreen.
+     * That made a cloud `reboot` strictly less reliable than the same command over the
+     * local REST API, which has always taken this native path.
+     *
+     * Resolves a JSON string. `nativelyHandled: false` means the command needs JS, and
+     * the caller should fall back to its normal path.
+     */
+    @ReactMethod
+    fun executeNativeCommand(command: String, paramsJson: String?, promise: Promise) {
+        try {
+            val params = if (paramsJson.isNullOrBlank()) JSONObject() else JSONObject(paramsJson)
+            val result = handleCommand(command, params, dispatchToJs = false)
+            promise.resolve(result.toString())
+        } catch (e: Exception) {
+            Log.e(TAG, "executeNativeCommand failed for $command: ${e.message}")
+            promise.reject("NATIVE_COMMAND_FAILED", e.message ?: "Unknown error")
         }
     }
 
@@ -1849,18 +1980,41 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
 
     // ==================== Screenshot Method ====================
 
+    /**
+     * Screenshot for `GET /api/screenshot` and the cloud `screenshot` command.
+     *
+     * The two capture paths (#229) and the Device Owner policy handling now live in
+     * [ScreenCapture], shared with the MQTT image publisher. PNG at quality 90 and no
+     * downscale keeps this endpoint byte-identical to what it returned before the move.
+     * Called from a NanoHTTPD worker thread, never from the main thread.
+     */
     private fun captureScreenshot(): java.io.InputStream? {
-        // Shared with the MQTT image publisher — see ScreenCapture.
-        // Called from a NanoHTTPD worker thread, never from the main thread.
-        val bytes = ScreenCapture.capture(
-            reactContext,
-            format = Bitmap.CompressFormat.PNG,
-            quality = 90,
-            maxWidth = 0
-        ) ?: return null
+        val bytes = ScreenCapture.capture(reactContext) ?: return null
         return ByteArrayInputStream(bytes)
     }
-    
+
+    /**
+     * JS-callable wrapper around captureScreenshot(): returns the current screen
+     * as a base64-encoded PNG. Used by the cloud command channel (screenshot
+     * command) to capture and upload, reusing the same capture path as the local
+     * REST `/api/screenshot` endpoint.
+     */
+    @ReactMethod
+    fun captureScreenshotBase64(promise: Promise) {
+        try {
+            val stream = captureScreenshot()
+            if (stream == null) {
+                promise.reject("CAPTURE_FAILED", ScreenCapture.lastError ?: "Unable to capture screenshot")
+                return
+            }
+            val bytes = stream.readBytes()
+            val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+            promise.resolve(base64)
+        } catch (e: Exception) {
+            promise.reject("CAPTURE_ERROR", e.message ?: "Screenshot capture error", e)
+        }
+    }
+
     /**
      * Clean up resources when module is destroyed
      */

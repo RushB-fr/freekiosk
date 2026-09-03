@@ -772,9 +772,32 @@ entities:
 
 | Issue | Solution |
 |---|---|
-| **Version Bug** | This is resolved in the latest version. Ensure you're running v1.2.12+ |
-| **State Update** | The tablet immediately publishes updated state after executing screen on/off commands |
+| **Version Bug** | This is resolved in v1.2.20+. The tablet publishes the new state as soon as the screen actually changes (native `ACTION_SCREEN_ON`/`OFF` hook), so Home Assistant no longer keeps the previous value until the next periodic publish |
+| **No Device Owner / Accessibility** | Without either, FreeKiosk cannot power the display off, it only dims it to 0. The state then honestly reports `on`, so the switch returns to ON. Enable Device Owner or the FreeKiosk accessibility service |
 
+
+
+### Screensaver switch does not turn the screensaver on
+
+
+
+| Issue | Solution |
+|---|---|
+| **Version Bug** | Resolved in v1.2.20+. Sending `ON` now shows the screensaver immediately; before, it only re-enabled the feature and the screen went dark after the inactivity timeout |
+| **Entity Meaning** | The switch mirrors `screen.screensaverActive`, i.e. whether the screensaver is showing right now, not whether the feature is enabled in settings |
+
+
+
+### Device becomes unavailable after a few hours
+
+
+
+| Cause | Solution |
+|---|---|
+| **Doze / battery optimization** | Once the tablet is unplugged and idle, Android defers the app's network and the broker drops the connection despite the wake lock FreeKiosk holds. Exempt FreeKiosk: the MQTT settings section shows a warning with a one-tap button when the exemption is missing |
+| **Lock Mode active** | Supported from v1.2.20+: FreeKiosk whitelists the system dialog for the few seconds it is shown, so the in-app button works while pinned. If the dialog still does not appear, grant it over ADB: `adb shell dumpsys deviceidle whitelist +com.freekiosk` |
+| **Keep it plugged in** | A tablet on permanent power never enters Doze, which is the usual kiosk setup |
+| **Process killed (no Lock Mode)** | Without Lock Mode, FreeKiosk used to run with no foreground service, so OEM battery managers could kill it and MQTT never came back. From v1.2.20+ a silent keep-alive notification appears when MQTT is enabled without Lock Mode. Do not disable that notification |
 
 
 ### Motion detection not working

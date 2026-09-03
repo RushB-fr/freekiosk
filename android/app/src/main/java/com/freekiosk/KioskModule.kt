@@ -5,33 +5,66 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.net.wifi.WifiInfo
+import android.net.wifi.WifiManager
+import android.os.BatteryManager
+import android.os.Environment
+import android.os.StatFs
 import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebView
+import com.facebook.react.bridge.Arguments
 import com.facebook.react.uimanager.UIManagerHelper
 import com.facebook.react.uimanager.common.UIManagerType
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.Promise
+import com.facebook.react.bridge.WritableMap
 import android.accessibilityservice.AccessibilityService
 import android.os.Build
 import android.os.PowerManager
 import android.view.WindowManager
 import com.facebook.react.bridge.UiThreadUtil
 import com.facebook.react.modules.core.DeviceEventManagerModule
+import java.net.Inet4Address
+import java.net.NetworkInterface
 
 class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
     private var wakeLock: PowerManager.WakeLock? = null
+    // Cloud sync keep-alive: CPU + WiFi locks so the RN JS heartbeat/poll loop keeps
+    // running when the screen is off (mirrors HttpServerModule's server locks).
+    private var cloudCpuWakeLock: PowerManager.WakeLock? = null
+    private var cloudWifiLock: WifiManager.WifiLock? = null
+
+    // #234: state for the temporary lock-task whitelist around the battery dialog.
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var batteryDialogOriginalLockTaskPackages: Array<String>? = null
+    private var batteryDialogRestoreRunnable: Runnable? = null
+    private var batteryDialogLifecycleListener: com.facebook.react.bridge.LifecycleEventListener? = null
     private val emergencyDialAction = "android.intent.action.DIAL_EMERGENCY"
     private val emergencyDialerAction = "com.android.phone.EmergencyDialer.DIAL"
     private val safetyHubPackage = "com.google.android.apps.safetyhub"
 
     companion object {
+        // #234: how long the battery dialog may stay whitelisted if we never see the user
+        // come back (dialog dismissed by the system, activity never resumed).
+        private const val BATTERY_DIALOG_WHITELIST_TIMEOUT_MS = 60_000L
+
+        /**
+         * #238: set once JS has completed a full settings load. Read by MainActivity's
+         * startup safety valve.
+         */
+        @Volatile
+        var jsReachedSettingsLoaded = false
+
         // Store the current instance to allow sending events from MainActivity
         @Volatile
         private var currentInstance: KioskModule? = null
@@ -50,6 +83,44 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                 android.util.Log.e("KioskModule", "Failed to send event '$eventName': ${e.message}")
             }
         }
+
+        /**
+         * #229 — Is the Device Owner screen-capture policy currently blocking screenshots?
+         *
+         * startLockTask() calls setScreenCaptureDisabled(true) (#172) so end users cannot
+         * grab the screen with Power+Volume Down. That policy is user-wide: it also blacks
+         * out MediaProjection and AccessibilityService.takeScreenshot(), which are the only
+         * ways to capture an external app in multi-app mode. PixelCopy on our own window is
+         * unaffected, which is why the local REST screenshot kept working until now.
+         */
+        fun isScreenCapturePolicyBlocked(context: Context): Boolean {
+            return try {
+                val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+                dpm.isDeviceOwnerApp(context.packageName) && dpm.getScreenCaptureDisabled(null)
+            } catch (e: Exception) {
+                android.util.Log.w("KioskModule", "Could not read screen capture policy: ${e.message}")
+                false
+            }
+        }
+
+        /**
+         * #229 — Toggle the screen-capture policy. Used to lift it for the few hundred
+         * milliseconds a remote screenshot takes, then put it straight back; callers MUST
+         * restore it in a finally block. Returns true when the policy was actually changed.
+         */
+        fun setScreenCapturePolicyBlocked(context: Context, blocked: Boolean): Boolean {
+            return try {
+                val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+                if (!dpm.isDeviceOwnerApp(context.packageName)) return false
+                val adminComponent = ComponentName(context, DeviceAdminReceiver::class.java)
+                dpm.setScreenCaptureDisabled(adminComponent, blocked)
+                android.util.Log.d("KioskModule", "Screen capture policy set to blocked=$blocked")
+                true
+            } catch (e: Exception) {
+                android.util.Log.e("KioskModule", "Could not set screen capture policy: ${e.message}")
+                false
+            }
+        }
     }
 
     init {
@@ -65,6 +136,10 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
         // Release WakeLock when module is destroyed to prevent battery drain
         wakeLock?.release()
         wakeLock = null
+        cloudCpuWakeLock?.let { if (it.isHeld) it.release() }
+        cloudCpuWakeLock = null
+        cloudWifiLock?.let { if (it.isHeld) it.release() }
+        cloudWifiLock = null
         if (currentInstance == this) {
             currentInstance = null
         }
@@ -114,6 +189,197 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
 
     @ReactMethod
     fun resumeWebView(tag: Int, promise: Promise) = setWebViewPaused(tag, false, promise)
+
+    // #234: the WifiLock is near-useless and must not be trusted. HIGH_PERF is deprecated
+    // and silently replaced by LOW_LATENCY, which the SDK documents as active only while the
+    // screen is on AND the app is in the foreground. The PARTIAL_WAKE_LOCK is what carries
+    // screen-off operation.
+    // Cloud sync must survive screen-off. The heartbeat/command-poll loop runs on the RN
+    // JS thread, which the OS freezes once the CPU sleeps (screen off, Device Owner). Holding
+    // a PARTIAL_WAKE_LOCK (CPU) + WifiLock (network) keeps that loop alive, so the device
+    // stays reachable and a `wake`/`screenOn` command can still land to turn the screen back
+    // on. Acquired from CloudSyncService.start(), released on stop(). Idempotent.
+    @ReactMethod
+    fun acquireCloudWakeLock(promise: Promise) {
+        try {
+            if (cloudWifiLock?.isHeld != true) {
+                val wifiManager = reactApplicationContext.applicationContext
+                    .getSystemService(Context.WIFI_SERVICE) as WifiManager
+                cloudWifiLock = wifiManager.createWifiLock(
+                    WifiManager.WIFI_MODE_FULL_HIGH_PERF, "FreeKiosk:CloudSync"
+                ).also { it.acquire() }
+            }
+            if (cloudCpuWakeLock?.isHeld != true) {
+                val powerManager = reactApplicationContext
+                    .getSystemService(Context.POWER_SERVICE) as PowerManager
+                cloudCpuWakeLock = powerManager.newWakeLock(
+                    PowerManager.PARTIAL_WAKE_LOCK, "FreeKiosk:CloudSyncCPU"
+                ).also { it.acquire() }
+            }
+            android.util.Log.d("KioskModule", "Cloud sync wake locks acquired")
+            promise.resolve(true)
+        } catch (e: Exception) {
+            android.util.Log.e("KioskModule", "Failed to acquire cloud wake locks: ${e.message}")
+            promise.resolve(false)
+        }
+    }
+
+    @ReactMethod
+    fun releaseCloudWakeLock(promise: Promise) {
+        try {
+            cloudCpuWakeLock?.let { if (it.isHeld) it.release() }
+            cloudCpuWakeLock = null
+            cloudWifiLock?.let { if (it.isHeld) it.release() }
+            cloudWifiLock = null
+            android.util.Log.d("KioskModule", "Cloud sync wake locks released")
+            promise.resolve(true)
+        } catch (e: Exception) {
+            android.util.Log.e("KioskModule", "Failed to release cloud wake locks: ${e.message}")
+            promise.resolve(false)
+        }
+    }
+
+    // Exempt the app from Doze/battery optimization so the cloud loop holds up on
+    // battery-powered devices (the PARTIAL_WAKE_LOCK keeps the CPU awake, but Doze can still
+    // defer network/wakelocks once the device is unplugged and idle). Uses the public
+    // ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS intent (a one-time system dialog; grant it
+    // during provisioning, before lock task). No public silent path exists even for a Device
+    // Owner (setApplicationExemptions is a @SystemApi). The permission is stripped from Play
+    // builds, so there startActivity throws, is caught, and the wake lock alone is relied upon.
+    // No-op once already exempted.
+    // #234: report whether the app is already exempt from Doze/battery optimization.
+    // MQTT holds a PARTIAL_WAKE_LOCK + WifiLock while connected, but Doze still defers its
+    // network once the device is unplugged and idle, so the broker misses the keepalive and
+    // Home Assistant shows the device as unavailable after a couple of hours. Used by the
+    // MQTT settings section to warn about it instead of leaving the user to discover it.
+    @ReactMethod
+    fun isIgnoringBatteryOptimizations(promise: Promise) {
+        try {
+            val ctx = reactApplicationContext
+            val pm = ctx.getSystemService(Context.POWER_SERVICE) as PowerManager
+            promise.resolve(pm.isIgnoringBatteryOptimizations(ctx.packageName))
+        } catch (e: Exception) {
+            android.util.Log.e("KioskModule", "isIgnoringBatteryOptimizations failed: ${e.message}")
+            promise.resolve(false)
+        }
+    }
+
+    @ReactMethod
+    fun requestIgnoreBatteryOptimizations(promise: Promise) {
+        try {
+            val ctx = reactApplicationContext
+            val pkg = ctx.packageName
+            val pm = ctx.getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (pm.isIgnoringBatteryOptimizations(pkg)) {
+                promise.resolve(true)
+                return
+            }
+            val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = android.net.Uri.parse("package:$pkg")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            // #234: without this the dialog silently never appears on a pinned kiosk.
+            allowBatteryDialogInLockTask()
+            ctx.startActivity(intent)
+            scheduleBatteryDialogRestore()
+            promise.resolve(true)
+        } catch (e: Exception) {
+            // Play builds have the permission stripped, so startActivity throws here. Put the
+            // lock task whitelist back rather than leaving it open until the next kiosk start.
+            restoreBatteryDialogLockTaskPackages()
+            android.util.Log.e("KioskModule", "requestIgnoreBatteryOptimizations failed: ${e.message}")
+            promise.resolve(false)
+        }
+    }
+
+    /**
+     * #234: the battery-optimization dialog is a system activity, and lock task blocks any
+     * activity outside the whitelist, so on a pinned kiosk the request simply did nothing
+     * and the only way left was `adb shell dumpsys deviceidle whitelist +com.freekiosk`.
+     *
+     * Same approach WifiControlModule and BluetoothControlModule already use for their own
+     * system dialogs: whitelist the handling package for the few seconds the dialog is up,
+     * then restore. If the process dies in between, the next startLockTask() rebuilds the
+     * whitelist from scratch, so the opening cannot outlive a restart.
+     */
+    private fun allowBatteryDialogInLockTask() {
+        try {
+            val dpm = reactApplicationContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+            val admin = ComponentName(reactApplicationContext, DeviceAdminReceiver::class.java)
+            if (!dpm.isDeviceOwnerApp(reactApplicationContext.packageName)) return
+
+            val currentPackages = dpm.getLockTaskPackages(admin)
+            if (batteryDialogOriginalLockTaskPackages == null) {
+                batteryDialogOriginalLockTaskPackages = currentPackages
+            }
+
+            val updated = (currentPackages.toList() + resolveBatteryDialogPackages()).distinct()
+            if (updated.size != currentPackages.size) {
+                dpm.setLockTaskPackages(admin, updated.toTypedArray())
+                android.util.Log.d("KioskModule", "Temporarily whitelisted battery optimization dialog packages")
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("KioskModule", "Could not update lock task whitelist for battery dialog: ${e.message}")
+        }
+    }
+
+    private fun restoreBatteryDialogLockTaskPackages() {
+        batteryDialogRestoreRunnable?.let { mainHandler.removeCallbacks(it) }
+        batteryDialogRestoreRunnable = null
+        batteryDialogLifecycleListener?.let {
+            try {
+                reactApplicationContext.removeLifecycleEventListener(it)
+            } catch (_: Exception) {}
+        }
+        batteryDialogLifecycleListener = null
+
+        val original = batteryDialogOriginalLockTaskPackages ?: return
+        try {
+            val dpm = reactApplicationContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+            val admin = ComponentName(reactApplicationContext, DeviceAdminReceiver::class.java)
+            if (dpm.isDeviceOwnerApp(reactApplicationContext.packageName)) {
+                dpm.setLockTaskPackages(admin, original)
+                android.util.Log.d("KioskModule", "Restored lock task packages after battery dialog")
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("KioskModule", "Could not restore lock task packages after battery dialog: ${e.message}")
+        } finally {
+            batteryDialogOriginalLockTaskPackages = null
+        }
+    }
+
+    /**
+     * Restore as soon as FreeKiosk is back in the foreground (the user answered or dismissed
+     * the dialog), with a timeout in case that event never comes.
+     */
+    private fun scheduleBatteryDialogRestore() {
+        if (batteryDialogOriginalLockTaskPackages == null) return
+
+        val listener = object : com.facebook.react.bridge.LifecycleEventListener {
+            override fun onHostResume() = restoreBatteryDialogLockTaskPackages()
+            override fun onHostPause() {}
+            override fun onHostDestroy() = restoreBatteryDialogLockTaskPackages()
+        }
+        batteryDialogLifecycleListener = listener
+        reactApplicationContext.addLifecycleEventListener(listener)
+
+        val timeout = Runnable { restoreBatteryDialogLockTaskPackages() }
+        batteryDialogRestoreRunnable = timeout
+        mainHandler.postDelayed(timeout, BATTERY_DIALOG_WHITELIST_TIMEOUT_MS)
+    }
+
+    private fun resolveBatteryDialogPackages(): List<String> {
+        val packages = mutableSetOf("com.android.settings")
+        try {
+            val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = android.net.Uri.parse("package:${reactApplicationContext.packageName}")
+            }
+            reactApplicationContext.packageManager
+                .queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+                .forEach { info -> info.activityInfo?.packageName?.let { packages.add(it) } }
+        } catch (_: Exception) {}
+        return packages.toList()
+    }
 
     private fun setWebViewPaused(tag: Int, paused: Boolean, promise: Promise) {
         UiThreadUtil.runOnUiThread {
@@ -246,6 +512,24 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      * Stop the KioskWatchdogService and cancel its notification.
      * Called on intentional kiosk exit to prevent the watchdog from relaunching the app.
      */
+    /**
+     * Start the keep-alive foreground service if something now needs it. Called by the
+     * cloud sync layer right after enrolling or starting: MainActivity already does this
+     * on every launch, but on a first enrolment the flag is written after that point, so
+     * without this the process would stay freezable until the next restart.
+     *
+     * No-op when the flag is not set or when Lock Mode already runs the kiosk guard.
+     */
+    @ReactMethod
+    fun ensureKeepAliveWatchdog(promise: Promise) {
+        try {
+            KioskWatchdogService.startKeepAliveIfNeeded(reactApplicationContext)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("KEEPALIVE_FAILED", e.message ?: "Unknown error")
+        }
+    }
+
     private fun stopKioskWatchdog() {
         try {
             val serviceIntent = Intent(reactApplicationContext, KioskWatchdogService::class.java)
@@ -254,6 +538,10 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
             val nm = reactApplicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
             nm.cancel(2002) // KioskWatchdogService.NOTIFICATION_ID
             android.util.Log.d("KioskModule", "KioskWatchdogService stopped and notification cleared")
+            // #234: the kiosk guard is gone, but an MQTT user still needs the process kept
+            // alive. force=true because @kiosk_enabled stays true across an admin exit, and
+            // keep-alive mode never relaunches, so the admin is not dragged back in.
+            KioskWatchdogService.startKeepAliveIfNeeded(reactApplicationContext, force = true)
         } catch (e: Exception) {
             android.util.Log.e("KioskModule", "Error stopping KioskWatchdogService: ${e.message}")
         }
@@ -788,10 +1076,9 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                             activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                         }
                         
-                        // Set screen to normal brightness (-1 = use system default)
-                        val layoutParams = activity.window.attributes
-                        layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-                        activity.window.attributes = layoutParams
+                        // #242: restore the requested brightness rather than the system
+                        // default, which FreeKiosk never wrote.
+                        BrightnessPrefs.applyToWindow(reactApplicationContext, activity.window)
                         
                         android.util.Log.d("KioskModule", "Screen turned ON via WakeLock + activity flags")
                     } catch (e: Exception) {
@@ -1039,11 +1326,61 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     }
 
     /**
+     * Get a pending cloud enrollment left by Device Owner provisioning (the
+     * setup-wizard QR). Returns { enroll_token, cloud_url, org_id } or null.
+     * Consumed by KioskScreen on startup to auto-enroll.
+     */
+    @ReactMethod
+    fun getPendingCloudEnrollment(promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences(
+                DeviceAdminReceiver.PREFS, Context.MODE_PRIVATE
+            )
+            if (!prefs.getBoolean(DeviceAdminReceiver.KEY_HAS_PENDING, false)) {
+                promise.resolve(null)
+                return
+            }
+            val token = prefs.getString(DeviceAdminReceiver.KEY_TOKEN, null)
+            if (token.isNullOrBlank()) {
+                promise.resolve(null)
+                return
+            }
+            val result = com.facebook.react.bridge.Arguments.createMap()
+            result.putString("enroll_token", token)
+            result.putString("cloud_url", prefs.getString(DeviceAdminReceiver.KEY_CLOUD_URL, "") ?: "")
+            result.putString("org_id", prefs.getString(DeviceAdminReceiver.KEY_ORG_ID, "") ?: "")
+            promise.resolve(result)
+        } catch (e: Exception) {
+            promise.reject("ERROR", "Failed to get pending cloud enrollment: ${e.message}")
+        }
+    }
+
+    /**
+     * Clear the pending cloud enrollment after it has been consumed.
+     */
+    @ReactMethod
+    fun clearPendingCloudEnrollment(promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences(
+                DeviceAdminReceiver.PREFS, Context.MODE_PRIVATE
+            )
+            prefs.edit().clear().commit()
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERROR", "Failed to clear pending cloud enrollment: ${e.message}")
+        }
+    }
+
+    /**
      * Broadcast that settings are loaded (called after ADB config restart)
      */
     @ReactMethod
     fun broadcastSettingsLoaded(promise: Promise) {
         try {
+            // #238: proof that React Native actually finished starting. MainActivity pins the
+            // device from onCreate, long before JS is up, so without this signal a JS startup
+            // that never completes leaves a frozen app pinned on screen.
+            jsReachedSettingsLoaded = true
             val intent = Intent("com.freekiosk.SETTINGS_LOADED")
             reactApplicationContext.sendBroadcast(intent)
             android.util.Log.i("KioskModule", "Broadcasted SETTINGS_LOADED")
@@ -1461,6 +1798,160 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
             android.util.Log.w("KioskModule", "Could not read managed apps: ${e.message}")
             emptyList()
         }
+    }
+
+    // ==================== DEVICE STATUS (for Cloud Sync) ====================
+
+    @ReactMethod
+    fun getBatteryStatus(promise: Promise) {
+        try {
+            val intentFilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+            val batteryIntent = reactApplicationContext.registerReceiver(null, intentFilter)
+            val level = batteryIntent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: 0
+            val scale = batteryIntent?.getIntExtra(BatteryManager.EXTRA_SCALE, 100) ?: 100
+            val percentage = (level * 100) / scale
+            val status = batteryIntent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+            val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                             status == BatteryManager.BATTERY_STATUS_FULL
+            val plugged = batteryIntent?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1) ?: -1
+            val pluggedType = when (plugged) {
+                BatteryManager.BATTERY_PLUGGED_USB -> "usb"
+                BatteryManager.BATTERY_PLUGGED_AC -> "ac"
+                BatteryManager.BATTERY_PLUGGED_WIRELESS -> "wireless"
+                else -> "none"
+            }
+            val temperature = (batteryIntent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0) / 10.0
+            val map = Arguments.createMap()
+            map.putInt("level", percentage)
+            map.putBoolean("charging", isCharging)
+            map.putString("plugged", pluggedType)
+            map.putDouble("temperature", temperature)
+            promise.resolve(map)
+        } catch (e: Exception) {
+            val map = Arguments.createMap()
+            map.putInt("level", 0)
+            map.putBoolean("charging", false)
+            map.putString("plugged", "none")
+            map.putDouble("temperature", 0.0)
+            promise.resolve(map)
+        }
+    }
+
+    @ReactMethod
+    fun getWifiInfo(promise: Promise) {
+        try {
+            val connectivityManager = reactApplicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val network = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) connectivityManager.activeNetwork else null
+            val capabilities = if (network != null) connectivityManager.getNetworkCapabilities(network) else null
+            val isConnected = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+            } else {
+                @Suppress("DEPRECATION")
+                connectivityManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI)?.isConnected == true
+            }
+            val wifiInfoObj: WifiInfo? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && capabilities != null) {
+                capabilities.transportInfo as? WifiInfo
+            } else {
+                val wifiManager = reactApplicationContext.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+                @Suppress("DEPRECATION")
+                wifiManager.connectionInfo
+            }
+            val rawSsid = wifiInfoObj?.ssid?.replace("\"", "")?.trim() ?: ""
+            val ssid = if (rawSsid.isNotEmpty() && rawSsid != "<unknown ssid>" && rawSsid != "0x") rawSsid else ""
+            val rssi = wifiInfoObj?.rssi ?: -100
+            val map = Arguments.createMap()
+            map.putString("ssid", ssid)
+            map.putInt("rssi", rssi)
+            map.putBoolean("connected", isConnected)
+            map.putString("ipAddress", getIpAddress())
+            promise.resolve(map)
+        } catch (e: Exception) {
+            val map = Arguments.createMap()
+            map.putString("ssid", "")
+            map.putInt("rssi", 0)
+            map.putBoolean("connected", false)
+            map.putString("ipAddress", "0.0.0.0")
+            promise.resolve(map)
+        }
+    }
+
+    @ReactMethod
+    fun getLocalIpAddress(promise: Promise) {
+        promise.resolve(getIpAddress())
+    }
+
+    @ReactMethod
+    fun getStorageInfo(promise: Promise) {
+        try {
+            val stat = StatFs(Environment.getDataDirectory().path)
+            val blockSize = stat.blockSizeLong
+            val totalMB = (stat.blockCountLong * blockSize / (1024 * 1024)).toInt()
+            val availableMB = (stat.availableBlocksLong * blockSize / (1024 * 1024)).toInt()
+            val map = Arguments.createMap()
+            map.putInt("totalMB", totalMB)
+            map.putInt("availableMB", availableMB)
+            map.putInt("usedMB", totalMB - availableMB)
+            promise.resolve(map)
+        } catch (e: Exception) {
+            val map = Arguments.createMap()
+            map.putInt("totalMB", 0)
+            map.putInt("availableMB", 0)
+            map.putInt("usedMB", 0)
+            promise.resolve(map)
+        }
+    }
+
+    @ReactMethod
+    fun getMemoryInfo(promise: Promise) {
+        try {
+            val am = reactApplicationContext.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val memInfo = ActivityManager.MemoryInfo()
+            am.getMemoryInfo(memInfo)
+            val totalMB = (memInfo.totalMem / (1024 * 1024)).toInt()
+            val availableMB = (memInfo.availMem / (1024 * 1024)).toInt()
+            val map = Arguments.createMap()
+            map.putInt("totalMB", totalMB)
+            map.putInt("availableMB", availableMB)
+            map.putInt("usedMB", totalMB - availableMB)
+            promise.resolve(map)
+        } catch (e: Exception) {
+            val map = Arguments.createMap()
+            map.putInt("totalMB", 0)
+            map.putInt("availableMB", 0)
+            map.putInt("usedMB", 0)
+            promise.resolve(map)
+        }
+    }
+
+    @ReactMethod
+    fun getSystemInfo(promise: Promise) {
+        val map = Arguments.createMap()
+        map.putString("model", android.os.Build.MODEL ?: "")
+        map.putString("manufacturer", android.os.Build.MANUFACTURER ?: "")
+        map.putString("androidVersion", android.os.Build.VERSION.RELEASE ?: "")
+        map.putString("serial", if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) "unknown" else
+            @Suppress("DEPRECATION") (android.os.Build.SERIAL ?: ""))
+        map.putLong("uptimeSeconds", android.os.SystemClock.elapsedRealtime() / 1000)
+        promise.resolve(map)
+    }
+
+    private fun getIpAddress(): String {
+        try {
+            val interfaces = NetworkInterface.getNetworkInterfaces()
+            while (interfaces.hasMoreElements()) {
+                val iface = interfaces.nextElement()
+                val addresses = iface.inetAddresses
+                while (addresses.hasMoreElements()) {
+                    val addr = addresses.nextElement()
+                    if (!addr.isLoopbackAddress && addr is Inet4Address) {
+                        return addr.hostAddress ?: "0.0.0.0"
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("KioskModule", "Failed to get IP: ${e.message}")
+        }
+        return "0.0.0.0"
     }
 
     @ReactMethod

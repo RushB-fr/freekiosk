@@ -15,6 +15,7 @@ import {
   Alert,
 } from 'react-native';
 import { Colors, Spacing, Typography } from '../../theme';
+import Icon from '../Icon';
 import DaySelector from './DaySelector';
 import TimeInput from './TimeInput';
 import {
@@ -110,10 +111,10 @@ const ScreenScheduleRuleEditor: React.FC<ScreenScheduleRuleEditorProps> = ({
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>
-            {rule ? '✏️ Edit Schedule Rule' : '➕ New Schedule Rule'}
+            {rule ? 'Edit Schedule Rule' : 'New Schedule Rule'}
           </Text>
           <TouchableOpacity onPress={onCancel} style={styles.closeButton}>
-            <Text style={styles.closeText}>✕</Text>
+            <Icon name="close" size={22} color={Colors.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -142,7 +143,7 @@ const ScreenScheduleRuleEditor: React.FC<ScreenScheduleRuleEditorProps> = ({
           {/* Sleep Time (screen OFF) */}
           <View style={styles.field}>
             <TimeInput
-              label="🌙 Screen OFF at"
+              label="Screen OFF at"
               value={sleepTime}
               onChange={setSleepTime}
               placeholder="22:00"
@@ -152,7 +153,7 @@ const ScreenScheduleRuleEditor: React.FC<ScreenScheduleRuleEditorProps> = ({
           {/* Wake Time (screen ON) */}
           <View style={styles.field}>
             <TimeInput
-              label="☀️ Screen ON at"
+              label="Screen ON at"
               value={wakeTime}
               onChange={setWakeTime}
               placeholder="07:00"
@@ -163,7 +164,7 @@ const ScreenScheduleRuleEditor: React.FC<ScreenScheduleRuleEditorProps> = ({
           {crossesMidnight && (
             <View style={styles.infoBox}>
               <Text style={styles.infoText}>
-                🌙 This rule crosses midnight. The screen will turn off at {sleepTime} and back on at {wakeTime} the next day.
+                This rule crosses midnight. The screen will turn off at {sleepTime} and back on at {wakeTime} the next day.
               </Text>
             </View>
           )}
@@ -171,7 +172,7 @@ const ScreenScheduleRuleEditor: React.FC<ScreenScheduleRuleEditorProps> = ({
           {/* Preview */}
           {isValidTime(sleepTime) && isValidTime(wakeTime) && days.length > 0 && (
             <View style={styles.previewBox}>
-              <Text style={styles.previewTitle}>📋 Preview</Text>
+              <Text style={styles.previewTitle}>Preview</Text>
               <Text style={styles.previewText}>
                 Screen OFF: {sleepTime} → Screen ON: {wakeTime}
               </Text>
@@ -193,7 +194,7 @@ const ScreenScheduleRuleEditor: React.FC<ScreenScheduleRuleEditorProps> = ({
           </TouchableOpacity>
           <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
             <Text style={styles.saveButtonText}>
-              {rule ? '💾 Update' : '➕ Add Rule'}
+              {rule ? 'Update' : 'Add Rule'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -274,7 +275,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: Spacing.md,
     borderLeftWidth: 4,
-    borderLeftColor: Colors.info || '#2196F3',
+    borderLeftColor: Colors.info || '#2b7fff',
   },
   previewTitle: {
     ...Typography.label,

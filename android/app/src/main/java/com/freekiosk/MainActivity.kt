@@ -35,6 +35,32 @@ import androidx.core.content.ContextCompat
 class MainActivity : ReactActivity() {
 
   companion object {
+    /**
+     * #238: how long JS may take to finish starting before we release screen pinning.
+     * Generous on purpose: React Native legitimately takes one to two minutes on the
+     * low-end hardware #96 was written for, and releasing too early would unpin a kiosk
+     * that is merely booting slowly.
+     */
+    private const val JS_READY_GRACE_MS = 90_000L
+
+    /**
+     * #248: upper bound on a re-lock deferred for the power menu. The re-lock normally
+     * happens the moment window focus returns, so this only fires if focus never comes
+     * back, for instance because the user left the power menu open and walked away.
+     * 15s is long enough to read a power menu and act on it, and short enough that a
+     * kiosk cannot be parked in an unlocked state: the old value was 2000ms, which
+     * closed the menu before it could be used.
+     */
+    private const val POWER_MENU_RELOCK_MAX_WAIT_MS = 15_000L
+
+    // #222: set as soon as this activity is created, read by BootLockActivity. Its
+    // hand-off check used to infer "MainActivity took over" from BootLockActivity losing
+    // window focus, which is also what happens when a secure keyguard takes focus at boot:
+    // the poll loop then finished itself while MainActivity had never started. Same
+    // process, so a static is enough, and this cannot be true before CE storage unlocks.
+    @Volatile
+    var hasStarted = false
+
     // Flag partagé pour bloquer le relaunch - accessible depuis OverlayService
     @Volatile
     var blockAutoRelaunch = false
@@ -47,6 +73,110 @@ class MainActivity : ReactActivity() {
     // Flag to prevent processing the same ADB config intent twice
     @Volatile
     var lastProcessedAdbIntent: Long = 0
+
+    /**
+     * Every ADB config key whose handling is "write the value through to this storage key",
+     * with no validation or side effect. Both the direct `--e* key value` extras and the
+     * `--es config '{...}'` JSON read this same map, and the list of recognized keys is
+     * derived from it, so there is one place to add a setting instead of three that used to
+     * drift apart (#193 already had to warn about keeping them in sync).
+     *
+     * Keys needing more than a passthrough stay out of this map and keep their own block
+     * below: pin, url, lock_package, config, managed_apps, dashboard_tiles, mqtt_password,
+     * auto_start/auto_launch, test_mode, back_button_mode, pin_mode, external_app_mode.
+     */
+    val ADB_SIMPLE_KEYS = mapOf(
+      "display_mode" to "@kiosk_display_mode",
+      "auto_reload" to "@kiosk_auto_reload",
+      "auto_relaunch" to "@kiosk_auto_relaunch_app",
+      "auto_relaunch_app" to "@kiosk_auto_relaunch_app",
+      "keep_screen_on" to "@kiosk_keep_screen_on",
+      "keyboard_mode" to "@kiosk_keyboard_mode",
+      "pin_max_attempts" to "@kiosk_pin_max_attempts",
+      "back_button_timer_delay" to "@kiosk_back_button_timer_delay",
+      "status_bar_enabled" to "@kiosk_status_bar_enabled",
+      "status_bar_show_battery" to "@kiosk_status_bar_show_battery",
+      "status_bar_show_wifi" to "@kiosk_status_bar_show_wifi",
+      "status_bar_show_time" to "@kiosk_status_bar_show_time",
+      "status_bar_theme" to "@kiosk_status_bar_theme",
+      "overlay_button_visible" to "@kiosk_overlay_button_visible",
+      "overlay_button_position" to "@kiosk_overlay_button_position",
+      "return_mode" to "@kiosk_return_mode",
+      "return_button_position" to "@kiosk_return_button_position",
+      "return_tap_count" to "@kiosk_return_tap_count",
+      "return_tap_timeout" to "@kiosk_return_tap_timeout",
+      "volume_up_5tap_enabled" to "@kiosk_volume_up_5tap_enabled",
+      "webview_back_button_enabled" to "@kiosk_webview_back_button_enabled",
+      "allow_power_button" to "@kiosk_allow_power_button",
+      "allow_notifications" to "@kiosk_allow_notifications",
+      "allow_system_info" to "@kiosk_allow_system_info",
+      "block_factory_reset" to "@kiosk_block_factory_reset",
+      "url_rotation_enabled" to "@kiosk_url_rotation_enabled",
+      "url_rotation_list" to "@kiosk_url_rotation_list",
+      "url_rotation_interval" to "@kiosk_url_rotation_interval",
+      "url_planner_enabled" to "@kiosk_url_planner_enabled",
+      "url_planner_events" to "@kiosk_url_planner_events",
+      "url_filter_enabled" to "@kiosk_url_filter_enabled",
+      "url_filter_mode" to "@kiosk_url_filter_mode",
+      "url_filter_list" to "@kiosk_url_filter_list",
+      "url_filter_show_feedback" to "@kiosk_url_filter_show_feedback",
+      "inactivity_return_enabled" to "@kiosk_inactivity_return_enabled",
+      "inactivity_return_delay" to "@kiosk_inactivity_return_delay",
+      "screen_scheduler_enabled" to "@kiosk_screen_scheduler_enabled",
+      "screen_scheduler_rules" to "@kiosk_screen_scheduler_rules",
+      "screen_scheduler_wake_on_touch" to "@kiosk_screen_scheduler_wake_on_touch",
+      "brightness_management_enabled" to "@brightness_management_enabled",
+      "auto_brightness_enabled" to "@kiosk_auto_brightness_enabled",
+      "default_brightness" to "@default_brightness",
+      "pdf_viewer_enabled" to "@kiosk_pdf_viewer_enabled",
+      "webview_zoom_level" to "@kiosk_webview_zoom_level",
+      "webview_zoom_mode" to "@kiosk_webview_zoom_mode",
+      "disable_user_zoom" to "@kiosk_disable_user_zoom",
+      "screensaver_enabled" to "@screensaver_enabled",
+      "screensaver_delay" to "@screensaver_inactivity_delay",
+      "screensaver_brightness" to "@screensaver_brightness",
+      "rest_api_enabled" to "@kiosk_rest_api_enabled",
+      "rest_api_port" to "@kiosk_rest_api_port",
+      "rest_api_key" to "@kiosk_rest_api_key",
+      "mqtt_enabled" to "@kiosk_mqtt_enabled",
+      "mqtt_broker_url" to "@kiosk_mqtt_broker_url",
+      "mqtt_port" to "@kiosk_mqtt_port",
+      "mqtt_username" to "@kiosk_mqtt_username",
+      "mqtt_client_id" to "@kiosk_mqtt_client_id",
+      "mqtt_base_topic" to "@kiosk_mqtt_base_topic",
+      "mqtt_discovery_prefix" to "@kiosk_mqtt_discovery_prefix",
+      "mqtt_status_interval" to "@kiosk_mqtt_status_interval",
+      "mqtt_allow_control" to "@kiosk_mqtt_allow_control",
+      "mqtt_device_name" to "@kiosk_mqtt_device_name",
+      "dashboard_mode" to "@kiosk_dashboard_mode_enabled",
+      "kiosk_enabled" to "@kiosk_enabled"
+    )
+
+    /** Keys handled by their own block, so they are recognized without being in the map. */
+    val ADB_SPECIAL_KEYS = setOf(
+      "pin", "url", "lock_package", "config", "managed_apps", "dashboard_tiles",
+      "mqtt_password", "auto_start", "auto_launch", "test_mode", "back_button_mode",
+      "pin_mode", "external_app_mode", "status_bar",
+      // Cloud enrollment over ADB. The dashboard's "Headless install (ADB)" snippet
+      // has advertised --es cloud_token since the cloud shipped, but nothing read it.
+      "cloud_token", "cloud_url"
+    )
+
+    /** Where a cloud_token enrolls when the command does not say. */
+    const val DEFAULT_CLOUD_URL = "https://cloud.freekiosk.app"
+
+    /** Never log these values: they are credentials, not settings. */
+    val ADB_SENSITIVE_KEYS = setOf(
+      "pin", "rest_api_key", "mqtt_password", "mqtt_username", "cloud_token"
+    )
+
+    /** Extras Android or FreeKiosk itself puts on the intent; never a config mistake. */
+    private val ADB_INTERNAL_EXTRAS = setOf("from_boot_lock", "profile")
+
+    /** True when this extra is neither a config key nor an internal one. */
+    fun isUnknownAdbExtra(key: String): Boolean =
+      key !in ADB_SIMPLE_KEYS && key !in ADB_SPECIAL_KEYS &&
+        key !in ADB_INTERNAL_EXTRAS && !key.startsWith("android.")
   }
 
   private lateinit var devicePolicyManager: DevicePolicyManager
@@ -70,6 +200,13 @@ class MainActivity : ReactActivity() {
   private val hideSystemUIHandler = Handler(Looper.getMainLooper())
   private var lastFocusLostTime = 0L
 
+  // #248: a re-lock deferred because the power menu is probably open. Consumed when
+  // window focus comes back, which is the reliable "the menu is gone" signal, the same
+  // one the print-dialog handling below already relies on. The fallback timer exists so
+  // this can never leave the device unlocked indefinitely.
+  private val powerMenuRelockHandler = Handler(Looper.getMainLooper())
+  private var powerMenuRelockPending = false
+
   override fun getMainComponentName(): String = "FreeKiosk"
 
   override fun createReactActivityDelegate(): ReactActivityDelegate =
@@ -77,9 +214,18 @@ class MainActivity : ReactActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(null)
+    hasStarted = true  // #222: tells BootLockActivity the hand-off really happened
 
     // Keep screen always on
     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+    // Show over the keyguard and turn the screen on when this activity is brought
+    // to the front. This is what makes turnScreenOn() actually wake the display
+    // after a lockNow() screen-off on Android 8.1+ (alarm-screen pattern).
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+      setShowWhenLocked(true)
+      setTurnScreenOn(true)
+    }
 
     // Extend content into display cutout areas to prevent OEM chrome from appearing (#94)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -131,6 +277,9 @@ class MainActivity : ReactActivity() {
 
     // Start KioskWatchdogService (#96) — survives OOM kills via START_STICKY
     startKioskWatchdogIfNeeded()
+
+    // #238 — Startup safety valve, screen-pinning (non Device Owner) only.
+    armPinningSafetyValve()
 
     // If started from HomeActivity (External App Mode at boot),
     // move to background so the external app stays in foreground
@@ -225,7 +374,20 @@ class MainActivity : ReactActivity() {
 
   private fun requestCameraPermission() {
     if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-        != PackageManager.PERMISSION_GRANTED) {
+        == PackageManager.PERMISSION_GRANTED) return
+
+    // Device Owner can grant silently (consistent with location/bluetooth/wifi
+    // above); otherwise fall back to the runtime prompt.
+    if (devicePolicyManager.isDeviceOwnerApp(packageName)) {
+      try {
+        devicePolicyManager.setPermissionGrantState(
+          adminComponent,
+          packageName,
+          Manifest.permission.CAMERA,
+          DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
+        )
+      } catch (_: Exception) {}
+    } else {
       ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 1002)
     }
   }
@@ -273,6 +435,41 @@ class MainActivity : ReactActivity() {
     } else {
       ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.NEARBY_WIFI_DEVICES), 1004)
     }
+  }
+
+  /**
+   * #238: on a device WITHOUT Device Owner, we pin from onCreate (screen pinning), long
+   * before React Native has started. If JS then never finishes starting, the user is left
+   * with a frozen app pinned on screen and no way out: the reporter's device could only be
+   * recovered with `adb shell am task lock stop`, which no ordinary user has.
+   *
+   * So: if JS has not completed a settings load after the grace period, leave pinning. The
+   * device becomes usable again, and nothing is lost when the app is merely slow, because
+   * KioskScreen calls startLockTask() itself at the end of its own load and re-pins.
+   *
+   * Deliberately NOT applied to Device Owner: there the kiosk must stay locked, lock task is
+   * the security boundary rather than a convenience, and those devices have BootLockActivity
+   * and its own recovery path.
+   */
+  private fun armPinningSafetyValve() {
+    if (devicePolicyManager.isDeviceOwnerApp(packageName)) return
+    if (!isKioskEnabled()) return
+
+    pinningValveRunnable = Runnable {
+      if (KioskModule.jsReachedSettingsLoaded) return@Runnable
+      try {
+        val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+        if (am.lockTaskModeState == android.app.ActivityManager.LOCK_TASK_MODE_NONE) return@Runnable
+        DebugLog.errorProduction(
+          "MainActivity",
+          "JS never finished starting after ${JS_READY_GRACE_MS}ms — leaving screen pinning so the device stays usable"
+        )
+        stopLockTask()
+      } catch (e: Exception) {
+        DebugLog.errorProduction("MainActivity", "Pinning safety valve failed: ${e.message}")
+      }
+    }
+    Handler(Looper.getMainLooper()).postDelayed(pinningValveRunnable!!, JS_READY_GRACE_MS)
   }
 
   private fun checkAndStartLockTask() {
@@ -340,6 +537,9 @@ class MainActivity : ReactActivity() {
   // Set when startLockTask() failed because the task was not yet in the foreground.
   // We retry the lock task once the activity actually gains window focus (onWindowFocusChanged).
   private var lockTaskPending = false
+
+  // #238: startup safety valve (screen pinning only).
+  private var pinningValveRunnable: Runnable? = null
 
   /**
    * Calls startLockTask() defensively.
@@ -601,10 +801,27 @@ class MainActivity : ReactActivity() {
 
     val kioskEnabled = isKioskEnabled()
 
+    // #220: Honor the "Back Button Behavior" setting in external-app mode. This native
+    // fast-path (added for #106/#203) previously relaunched the external app on EVERY
+    // involuntary return, which silently overrode back_button_mode: Test Mode and Delayed
+    // Return never took effect (the app always restarted instantly). Only 'immediate'
+    // should hard-relaunch here. For 'test' and 'timer' we leave FreeKiosk in the
+    // foreground and let the JS AppState listener apply the correct behavior (stay on
+    // FreeKiosk / show the countdown). JS is not frozen in those modes because FreeKiosk
+    // stays foregrounded, and handleAppReturned/onAppReturned still stops the overlay.
+    val backButtonMode = getAsyncStorageValue("@kiosk_back_button_mode", "test")
+
     // Fix #106: In external app mode, on involuntary returns, do NOT re-enter
     // startLockTask on MainActivity (which would pin FreeKiosk). Instead, immediately
     // relaunch the external app from the native layer to minimize the flash.
-    if (isExternalAppMode && !isVoluntaryReturn && kioskEnabled) {
+    // #220 follow-up: never take this path in multi-app mode. externalAppPackage holds the
+    // SINGLE-app setting, so relaunching it here either brought back an app the user had not
+    // opened, or did nothing at all when the setting is empty. Multi-app always returns to
+    // the FreeKiosk grid instead, which is what the JS side does (KioskScreen: "Multi-app
+    // mode: ALWAYS return to grid, never relaunch any specific app").
+    val isMultiAppMode = getAsyncStorageValue("@kiosk_external_app_mode", "single") == "multi"
+
+    if (isExternalAppMode && !isMultiAppMode && !isVoluntaryReturn && kioskEnabled && backButtonMode == "immediate") {
       // Relaunch the external app directly if possible
       val targetPkg = externalAppPackage
       if (targetPkg != null) {
@@ -655,15 +872,31 @@ class MainActivity : ReactActivity() {
         val timeSinceFocusLost = System.currentTimeMillis() - lastFocusLostTime
         
         if (allowPowerButton && timeSinceFocusLost < 2000L) {
-          // Power menu was likely just shown — defer re-lock to avoid focus conflict
+          // #248: the power menu was probably just shown, so defer the re-lock rather
+          // than dismissing it. This used to re-lock on a flat 2s timer, which is less
+          // time than it takes to read the menu and choose "Power off": the menu closed
+          // by itself and the device could not be powered down from the button at all.
+          //
+          // Wait for window focus instead. That fires when the menu is dismissed, so in
+          // the common case we re-lock sooner than the old timer did, and in the slow
+          // case we no longer cut the user off mid-menu. The timer stays as a bound, not
+          // as the mechanism: if focus never comes back (the user walked away with the
+          // menu open) we re-lock anyway, so #98's guarantee is relaxed by at most
+          // POWER_MENU_RELOCK_MAX_WAIT_MS, and only after a deliberate power-button
+          // press on a kiosk whose admin has explicitly allowed the power menu.
           DebugLog.d("MainActivity", "Deferring re-lock: power menu may be active (${timeSinceFocusLost}ms since focus lost)")
-          Handler(Looper.getMainLooper()).postDelayed({
-            if (!isTaskLocked()) {
-              enableKioskRestrictions()
-              startLockTask()
-              DebugLog.d("MainActivity", "Deferred re-lock completed")
+          powerMenuRelockPending = true
+          powerMenuRelockHandler.removeCallbacksAndMessages(null)
+          powerMenuRelockHandler.postDelayed({
+            if (powerMenuRelockPending) {
+              powerMenuRelockPending = false
+              if (!isTaskLocked()) {
+                enableKioskRestrictions()
+                startLockTask()
+                DebugLog.d("MainActivity", "Deferred re-lock completed (fallback timeout)")
+              }
             }
-          }, 2000L)
+          }, POWER_MENU_RELOCK_MAX_WAIT_MS)
         } else {
           enableKioskRestrictions()
           startLockTask()
@@ -763,6 +996,20 @@ class MainActivity : ReactActivity() {
       // reliable signal that the activity is now truly foregrounded.
       if (lockTaskPending) {
         tryStartLockTask("onWindowFocusChanged retry")
+      }
+
+      // #248: focus is back, so the power menu (if that is what took it) is gone. Re-lock
+      // now instead of waiting out the fallback timer.
+      if (powerMenuRelockPending) {
+        powerMenuRelockPending = false
+        powerMenuRelockHandler.removeCallbacksAndMessages(null)
+        // No kioskEnabled check here: the flag is only ever set inside the branch that
+        // already verified it, so reaching this point implies kiosk mode was on.
+        if (devicePolicyManager.isDeviceOwnerApp(packageName) && !isTaskLocked()) {
+          enableKioskRestrictions()
+          startLockTask()
+          DebugLog.d("MainActivity", "Deferred re-lock completed (window focus regained)")
+        }
       }
 
       // If a print dialog was active, reset the flag now that focus has returned
@@ -1183,16 +1430,15 @@ class MainActivity : ReactActivity() {
    */
   private fun startKioskWatchdogIfNeeded() {
     try {
-      val kioskEnabled = isKioskEnabled()
-      if (!kioskEnabled) return
-
-      val serviceIntent = Intent(this, KioskWatchdogService::class.java)
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        startForegroundService(serviceIntent)
+      // #234: always go through the companion helpers, they persist which mode the
+      // service must come back in after a START_STICKY restart.
+      if (isKioskEnabled()) {
+        KioskWatchdogService.startForKiosk(this)
       } else {
-        startService(serviceIntent)
+        // No Lock Mode: the process is an ordinary background app, so keep it alive when
+        // MQTT is on (no-op otherwise). Never relaunches anything.
+        KioskWatchdogService.startKeepAliveIfNeeded(this)
       }
-      DebugLog.d("MainActivity", "KioskWatchdogService started")
     } catch (e: Exception) {
       DebugLog.d("MainActivity", "Error starting KioskWatchdogService: ${e.message}")
     }
@@ -1209,6 +1455,8 @@ class MainActivity : ReactActivity() {
       val nm = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
       nm.cancel(2002) // KioskWatchdogService.NOTIFICATION_ID
       DebugLog.d("MainActivity", "KioskWatchdogService stopped and notification cleared")
+      // #234: keep the process alive for MQTT after the guard is stopped (see KioskModule).
+      KioskWatchdogService.startKeepAliveIfNeeded(this, force = true)
     } catch (e: Exception) {
       DebugLog.d("MainActivity", "Error stopping KioskWatchdogService: ${e.message}")
     }
@@ -1241,22 +1489,10 @@ class MainActivity : ReactActivity() {
     val configJson = intent.getStringExtra("config") // Full JSON config
     val mqttBroker = intent.getStringExtra("mqtt_broker_url")
 
-    // Skip if no config parameters.
-    // Treat the intent as an ADB config command if ANY recognized extra is present — not
-    // just the "content" keys (lock_package / url / config / mqtt_broker_url). Previously an
-    // intent that set only e.g. REST API or MQTT options (plus the required pin) bailed out
-    // here and was silently ignored (#193). Keep this list in sync with the extras read below.
-    val adbConfigKeys = arrayOf(
-      "lock_package", "url", "pin", "config",
-      "kiosk_enabled", "auto_launch", "auto_start", "screensaver_enabled", "auto_relaunch",
-      "test_mode", "back_button_mode", "status_bar", "pin_mode",
-      "rest_api_enabled", "rest_api_port", "rest_api_key",
-      "mqtt_enabled", "mqtt_broker_url", "mqtt_port", "mqtt_username", "mqtt_password",
-      "mqtt_client_id", "mqtt_base_topic", "mqtt_discovery_prefix", "mqtt_status_interval",
-      "mqtt_allow_control", "mqtt_device_name",
-      "external_app_mode", "managed_apps"
-    )
-    if (adbConfigKeys.none { intent.hasExtra(it) }) return false
+    // Skip if no config parameters. Recognized keys are derived from ADB_SIMPLE_KEYS plus
+    // the ones with their own handling, so adding a setting to the map is enough and this
+    // list can no longer drift out of sync with what is actually read (#193).
+    if ((ADB_SIMPLE_KEYS.keys + ADB_SPECIAL_KEYS).none { intent.hasExtra(it) }) return false
     
     android.util.Log.i("FreeKiosk-ADB", "ADB config received: lock_package=$lockPackage, url=$url, config=${configJson != null}")
     
@@ -1317,6 +1553,27 @@ class MainActivity : ReactActivity() {
         }
       }
     
+    // Every passthrough key, whatever type it was passed as. This is the other half of
+    // #240: kiosk_enabled was read with getBooleanExtra, so "--es kiosk_enabled true" handed
+    // it a String, getBooleanExtra fell back to its default of false, and the command turned
+    // Lock Mode off instead of on without a word. Reading the raw extra and stringifying it
+    // means --es, --ez and --ei all work, for every key in the map.
+    for ((extraKey, storageKey) in ADB_SIMPLE_KEYS) {
+      val raw = intent.extras?.get(extraKey) ?: continue
+      editor.putString(storageKey, raw.toString())
+      val shown = if (extraKey in ADB_SENSITIVE_KEYS) "***" else raw.toString()
+      android.util.Log.i("FreeKiosk-ADB", "Set $extraKey -> $storageKey = $shown")
+    }
+
+    // Say which keys were not understood. A mistyped or unsupported key used to be dropped
+    // without a word, so the command looked like it had worked and the operator only found
+    // out by checking every screen by hand (#240).
+    val unknownExtras = intent.extras?.keySet()?.filter { isUnknownAdbExtra(it) } ?: emptyList()
+    if (unknownExtras.isNotEmpty()) {
+      android.util.Log.w("FreeKiosk-ADB", "Ignored unknown config keys: ${unknownExtras.joinToString(", ")}")
+      showAdbToast("⚠️ ADB Config: ignored ${unknownExtras.size} unknown key(s): ${unknownExtras.take(3).joinToString(", ")}")
+    }
+
     // Handle individual parameters (override JSON if both provided)
     // Always include PIN in pending config so it's visible in Settings UI
     if (pin != null) {
@@ -1339,33 +1596,19 @@ class MainActivity : ReactActivity() {
     if (url != null) {
       editor.putString("@kiosk_url", url)
       // Only set display_mode to webview if lock_package was NOT provided
-      // lock_package takes priority over url for display_mode
-      if (lockPackage == null) {
+      // lock_package takes priority over url for display_mode. An explicit display_mode
+      // wins over both: passing one and having it silently overwritten was part of #240.
+      if (lockPackage == null && !intent.hasExtra("display_mode")) {
         editor.putString("@kiosk_display_mode", "webview")
       }
-    }
-    
-    // Handle additional options - only set if explicitly provided
-    if (intent.hasExtra("kiosk_enabled")) {
-      val kioskEnabled = intent.getBooleanExtra("kiosk_enabled", false)
-      editor.putString("@kiosk_enabled", kioskEnabled.toString())
     }
     
     // Handle auto_launch as string or auto_start as boolean
     intent.getStringExtra("auto_launch")?.let {
       editor.putString("@kiosk_auto_launch", it)
     }
-    if (intent.hasExtra("auto_start")) {
-      val autoStart = intent.getBooleanExtra("auto_start", false)
-      editor.putString("@kiosk_auto_launch", autoStart.toString())
-    }
-    
-    intent.getStringExtra("screensaver_enabled")?.let {
-      editor.putString("@screensaver_enabled", it)
-    }
-    
-    intent.getStringExtra("auto_relaunch")?.let {
-      editor.putString("@kiosk_auto_relaunch_app", it)
+    intent.extras?.get("auto_start")?.let {
+      editor.putString("@kiosk_auto_launch", it.toString())
     }
     
     // test_mode: "true" = show return button with timer, "false" = immediate return (production)
@@ -1388,18 +1631,6 @@ class MainActivity : ReactActivity() {
       editor.putString("@kiosk_status_bar_enabled", it)
     }
     
-    intent.getStringExtra("rest_api_enabled")?.let {
-      editor.putString("@kiosk_rest_api_enabled", it)
-    }
-    
-    intent.getStringExtra("rest_api_port")?.let {
-      editor.putString("@kiosk_rest_api_port", it)
-    }
-    
-    intent.getStringExtra("rest_api_key")?.let {
-      editor.putString("@kiosk_rest_api_key", it)
-    }
-    
     intent.getStringExtra("pin_mode")?.let {
       // Only accept valid values: "numeric" or "alphanumeric"
       if (it == "numeric" || it == "alphanumeric") {
@@ -1407,41 +1638,10 @@ class MainActivity : ReactActivity() {
       }
     }
 
-    // MQTT configuration
-    intent.getStringExtra("mqtt_enabled")?.let {
-      editor.putString("@kiosk_mqtt_enabled", it)
-    }
-    intent.getStringExtra("mqtt_broker_url")?.let {
-      editor.putString("@kiosk_mqtt_broker_url", it)
-    }
-    intent.getStringExtra("mqtt_port")?.let {
-      editor.putString("@kiosk_mqtt_port", it)
-    }
-    intent.getStringExtra("mqtt_username")?.let {
-      editor.putString("@kiosk_mqtt_username", it)
-    }
     intent.getStringExtra("mqtt_password")?.let {
       // MQTT password goes to secure Keychain, not AsyncStorage
       // Use a special pending key that KioskScreen will handle
       editor.putString("@mqtt_password_pending", it)
-    }
-    intent.getStringExtra("mqtt_client_id")?.let {
-      editor.putString("@kiosk_mqtt_client_id", it)
-    }
-    intent.getStringExtra("mqtt_base_topic")?.let {
-      editor.putString("@kiosk_mqtt_base_topic", it)
-    }
-    intent.getStringExtra("mqtt_discovery_prefix")?.let {
-      editor.putString("@kiosk_mqtt_discovery_prefix", it)
-    }
-    intent.getStringExtra("mqtt_status_interval")?.let {
-      editor.putString("@kiosk_mqtt_status_interval", it)
-    }
-    intent.getStringExtra("mqtt_allow_control")?.let {
-      editor.putString("@kiosk_mqtt_allow_control", it)
-    }
-    intent.getStringExtra("mqtt_device_name")?.let {
-      editor.putString("@kiosk_mqtt_device_name", it)
     }
 
     // Multi-app mode configuration
@@ -1499,6 +1699,48 @@ class MainActivity : ReactActivity() {
       }
     }
     
+    // Dashboard mode. The tile grid only exists inside the WebView display mode
+    // (KioskScreen renders DashboardGrid under displayMode === 'webview'), so enabling it
+    // without setting the mode would write a setting the runtime never reads. This mirrors
+    // what lock_package already does for external_app.
+    if (intent.extras?.get("dashboard_mode")?.toString() == "true" &&
+        lockPackage == null && !intent.hasExtra("display_mode")) {
+      editor.putString("@kiosk_display_mode", "webview")
+    }
+
+    // Dashboard tiles: JSON array, one object per tile.
+    // Format: '[{"label":"Main","url":"https://app.example"},{"label":"Docs","url":"..."}]'
+    intent.getStringExtra("dashboard_tiles")?.let { jsonStr ->
+      val normalized = normalizeDashboardTiles(jsonStr)
+      if (normalized != null) {
+        editor.putString("@kiosk_dashboard_tiles", normalized)
+      } else {
+        showAdbToast("❌ ADB Config: Invalid dashboard_tiles JSON")
+      }
+    }
+
+    // Cloud enrollment token: written to the *enrollment* store, not to the pending
+    // config, so it is consumed by the same code the setup-wizard QR feeds
+    // (CloudSyncService.consumePendingProvisioningEnrollment, via
+    // KioskModule.getPendingCloudEnrollment). Nothing to add on the JS side.
+    //
+    // cloud_url matters: the consumer bails out when it is empty, so a token on its
+    // own would silently do nothing. The snippet on the Add Device page only passes
+    // cloud_token, hence the default; --es cloud_url covers a self-hosted instance.
+    intent.getStringExtra("cloud_token")?.takeIf { it.isNotBlank() }?.let { token ->
+      val cloudUrl = intent.getStringExtra("cloud_url")
+        ?.takeIf { it.isNotBlank() }
+        ?.trimEnd('/')
+        ?: DEFAULT_CLOUD_URL
+      getSharedPreferences(DeviceAdminReceiver.PREFS, Context.MODE_PRIVATE).edit()
+        .putBoolean(DeviceAdminReceiver.KEY_HAS_PENDING, true)
+        .putString(DeviceAdminReceiver.KEY_TOKEN, token)
+        .putString(DeviceAdminReceiver.KEY_CLOUD_URL, cloudUrl)
+        .putString(DeviceAdminReceiver.KEY_ORG_ID, "")
+        .commit()
+      android.util.Log.i("FreeKiosk-ADB", "Cloud enrollment queued for $cloudUrl")
+    }
+
     // Mark that there is pending config
     editor.putBoolean("has_pending_config", true)
     
@@ -1639,41 +1881,62 @@ class MainActivity : ReactActivity() {
   /**
    * Apply full JSON configuration to SharedPreferences (pending config)
    */
+  /**
+   * Normalize a dashboard tiles array coming from ADB into the shape DashboardTile
+   * (src/types/dashboard.ts) expects: id, label, url, iconMode, iconValue?, order.
+   *
+   * A provisioning script should not have to invent stable ids or keep an order counter,
+   * so both are filled in when absent, and label falls back to the URL. A tile without a
+   * url is dropped rather than written: the grid would render an entry that navigates
+   * nowhere. Returns null when nothing usable came out, so the caller can say so instead
+   * of silently writing an empty grid.
+   */
+  private fun normalizeDashboardTiles(jsonStr: String): String? {
+    return try {
+      val input = org.json.JSONArray(jsonStr)
+      val out = org.json.JSONArray()
+      for (i in 0 until input.length()) {
+        val tile = input.getJSONObject(i)
+        val url = tile.optString("url", "")
+        if (url.isEmpty()) {
+          android.util.Log.w("FreeKiosk-ADB", "Dashboard tile #$i has no url, skipping")
+          continue
+        }
+        val iconMode = tile.optString("iconMode", "favicon").let {
+          if (it == "favicon" || it == "image" || it == "letter") it else "favicon"
+        }
+        val normalized = org.json.JSONObject()
+        normalized.put("id", tile.optString("id", "").ifEmpty { "adb-$i-${System.currentTimeMillis()}" })
+        normalized.put("label", tile.optString("label", "").ifEmpty { url })
+        normalized.put("url", url)
+        normalized.put("iconMode", iconMode)
+        if (tile.has("iconValue")) normalized.put("iconValue", tile.optString("iconValue"))
+        normalized.put("order", tile.optInt("order", i))
+        out.put(normalized)
+      }
+      if (out.length() == 0) {
+        android.util.Log.w("FreeKiosk-ADB", "No usable dashboard tiles in the provided list")
+        null
+      } else {
+        android.util.Log.i("FreeKiosk-ADB", "Dashboard tiles configured: ${out.length()}")
+        out.toString()
+      }
+    } catch (e: Exception) {
+      android.util.Log.e("FreeKiosk-ADB", "Invalid dashboard tiles JSON: ${e.message}")
+      null
+    }
+  }
+
   private fun applyJsonConfigToPrefs(editor: android.content.SharedPreferences.Editor, config: org.json.JSONObject) {
-    // Map of JSON keys to AsyncStorage keys
-    val keyMapping = mapOf(
+    // Map of JSON keys to AsyncStorage keys. The bulk of it is ADB_SIMPLE_KEYS, shared with
+    // the direct extras so the two can never support different sets of settings; only the
+    // keys that exist under a different name here are added on top.
+    val keyMapping = ADB_SIMPLE_KEYS + mapOf(
       "url" to "@kiosk_url",
       "lock_package" to "@kiosk_external_app_package",
-      "display_mode" to "@kiosk_display_mode",
-      "kiosk_enabled" to "@kiosk_enabled",
       "auto_launch" to "@kiosk_auto_launch",
-      "auto_relaunch" to "@kiosk_auto_relaunch_app",
-      "screensaver_enabled" to "@screensaver_enabled",
-      "screensaver_delay" to "@screensaver_inactivity_delay",
-      "screensaver_brightness" to "@screensaver_brightness",
-      "status_bar_enabled" to "@kiosk_status_bar_enabled",
-      "status_bar_show_battery" to "@kiosk_status_bar_show_battery",
-      "status_bar_show_wifi" to "@kiosk_status_bar_show_wifi",
-      "status_bar_show_time" to "@kiosk_status_bar_show_time",
-      "rest_api_enabled" to "@kiosk_rest_api_enabled",
-      "rest_api_port" to "@kiosk_rest_api_port",
-      "rest_api_key" to "@kiosk_rest_api_key",
-      "allow_power_button" to "@kiosk_allow_power_button",
       "back_button_mode" to "@kiosk_back_button_mode",
-      "default_brightness" to "@default_brightness",
       "pin_mode" to "@kiosk_pin_mode",
-      // MQTT
-      "mqtt_enabled" to "@kiosk_mqtt_enabled",
-      "mqtt_broker_url" to "@kiosk_mqtt_broker_url",
-      "mqtt_port" to "@kiosk_mqtt_port",
-      "mqtt_username" to "@kiosk_mqtt_username",
-      "mqtt_client_id" to "@kiosk_mqtt_client_id",
-      "mqtt_base_topic" to "@kiosk_mqtt_base_topic",
-      "mqtt_discovery_prefix" to "@kiosk_mqtt_discovery_prefix",
-      "mqtt_status_interval" to "@kiosk_mqtt_status_interval",
-      "mqtt_allow_control" to "@kiosk_mqtt_allow_control",
-      "mqtt_device_name" to "@kiosk_mqtt_device_name",
-      // Multi-app
       "external_app_mode" to "@kiosk_external_app_mode"
     )
     
@@ -1728,6 +1991,19 @@ class MainActivity : ReactActivity() {
       } catch (e: Exception) {
         android.util.Log.e("FreeKiosk-ADB", "Invalid managed_apps in JSON config: ${e.message}")
       }
+    }
+
+    // Dashboard tiles: same normalization as the dashboard_tiles extra.
+    if (config.has("dashboard_tiles")) {
+      val normalized = normalizeDashboardTiles(config.getJSONArray("dashboard_tiles").toString())
+      if (normalized != null) {
+        editor.putString("@kiosk_dashboard_tiles", normalized)
+      }
+    }
+
+    // The dashboard grid only exists inside the WebView display mode.
+    if (config.optBoolean("dashboard_mode", false) && !config.has("display_mode")) {
+      editor.putString("@kiosk_display_mode", "webview")
     }
 
     // If external_app_mode is set to multi, ensure display_mode is external_app
@@ -1833,7 +2109,22 @@ class MainActivity : ReactActivity() {
 
   override fun onDestroy() {
     super.onDestroy()
-    disableKioskRestrictions()
+    pinningValveRunnable?.let { Handler(Looper.getMainLooper()).removeCallbacks(it) }
+    pinningValveRunnable = null
+
+    // #237: only lift the kiosk restrictions on a deliberate exit. onDestroy() also fires
+    // when the system destroys this activity while an external app holds the foreground,
+    // which is the normal state in single-app mode (the very case the watchdog check below
+    // already accounts for). Restoring the permissive feature set there hands the user the
+    // status bar, the notification panel, Home and Overview INSIDE lock task, and nothing
+    // puts the restrictive set back until MainActivity is recreated: exactly the reported
+    // "bars stay visible until settings / exit / reboot".
+    //
+    // The deliberate path does not depend on this call: KioskModule.exitKioskMode() calls
+    // disableKioskRestrictions() itself before stopLockTask() and finish().
+    if (blockAutoRelaunch) {
+      disableKioskRestrictions()
+    }
     
     // Stop KioskWatchdogService if kiosk mode was intentionally disabled (#96 fix)
     // This prevents the watchdog from relaunching the app after an intentional exit.

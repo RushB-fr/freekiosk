@@ -22,6 +22,7 @@ import { StorageService } from '../utils/storage';
 import { mqttClient } from '../utils/MqttModule';
 import { getSecureMqttPassword, saveSecureMqttPassword } from '../utils/secureStorage';
 import { ApiService } from '../utils/ApiService';
+import KioskModule from '../utils/KioskModule';
 
 interface MqttSettingsSectionProps {
   onSettingsChanged?: () => void;
@@ -56,11 +57,36 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const connectionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // #234: null while unknown, false when Android may doze the app off the broker.
+  const [batteryExempt, setBatteryExempt] = useState<boolean | null>(null);
 
   // Load settings on mount
   useEffect(() => {
     loadSettings();
+    checkBatteryExemption();
   }, []);
+
+  // #234: Doze defers MQTT's network once the device is idle, despite the wake lock the
+  // client holds, and the broker then drops it (unavailable in Home Assistant after a
+  // couple of hours). The exemption is the only reliable fix, so surface its state.
+  const checkBatteryExemption = async () => {
+    try {
+      setBatteryExempt(await KioskModule.isIgnoringBatteryOptimizations());
+    } catch {
+      setBatteryExempt(null);
+    }
+  };
+
+  const handleRequestBatteryExemption = async () => {
+    try {
+      await KioskModule.requestIgnoreBatteryOptimizations();
+    } catch (error) {
+      console.warn('[MqttSettings] Battery exemption request failed:', error);
+    }
+    // The system dialog is a separate activity, so re-check when we come back. Lock task
+    // no longer blocks it: KioskModule whitelists the dialog for the few seconds it is up.
+    setTimeout(checkBatteryExemption, 1000);
+  };
 
   // Check connection status periodically
   useEffect(() => {
@@ -229,6 +255,15 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
   const handleMqttEnabledChange = async (enabled: boolean) => {
     setMqttEnabled(enabled);
     await StorageService.saveMqttEnabled(enabled);
+
+    // #234: ask for the Doze exemption at the moment the user turns MQTT on, which is the
+    // only point where the system dialog is expected. Best-effort, and a no-op when the
+    // exemption is already granted.
+    if (enabled) {
+      KioskModule.requestIgnoreBatteryOptimizations()
+        .catch(() => {/* best-effort */})
+        .finally(() => setTimeout(checkBatteryExemption, 1000));
+    }
 
     if (!enabled && isConnected) {
       setIsLoading(true);
@@ -550,6 +585,31 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
             )}
           </View>
 
+          {/* #234: Doze warning */}
+          {batteryExempt === false && (
+            <View style={styles.dozeWarning}>
+              <View style={styles.dozeHeader}>
+                <Icon name="power-sleep" size={18} color="#E65100" />
+                <Text style={styles.dozeTitle}>Battery optimization is active</Text>
+              </View>
+              <Text style={styles.dozeText}>
+                Android may suspend FreeKiosk's network once the tablet has been idle for a
+                while, so the broker drops the connection and Home Assistant shows the device
+                as unavailable after a couple of hours. Exempting FreeKiosk keeps MQTT alive.
+              </Text>
+              <TouchableOpacity style={styles.dozeButton} onPress={handleRequestBatteryExemption}>
+                <Icon name="shield-check" size={16} color="#FFF" />
+                <Text style={styles.connectButtonText}>Exempt FreeKiosk</Text>
+              </TouchableOpacity>
+              <Text style={styles.dozeText}>
+                If the dialog does not appear, grant it over ADB instead:
+              </Text>
+              <Text style={styles.dozeCommand}>
+                adb shell dumpsys deviceidle whitelist +com.freekiosk
+              </Text>
+            </View>
+          )}
+
           {/* Broker URL */}
           <SettingsInput
             label="Broker URL"
@@ -818,6 +878,45 @@ const styles = StyleSheet.create({
     color: '#999',
     fontStyle: 'italic',
   },
+  dozeWarning: {
+    backgroundColor: '#FFF3E0',
+    borderRadius: 8,
+    padding: 12,
+    marginVertical: 8,
+  },
+  dozeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dozeTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#E65100',
+  },
+  dozeText: {
+    fontSize: 13,
+    color: '#5D4037',
+    marginTop: 6,
+  },
+  dozeCommand: {
+    fontSize: 12,
+    color: '#5D4037',
+    fontFamily: 'monospace',
+    marginTop: 2,
+  },
+  dozeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#E65100',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginTop: 10,
+    alignSelf: 'flex-start',
+  },
   errorText: {
     fontSize: 13,
     color: '#F44336',
@@ -835,7 +934,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
     fontSize: 13,
-    color: '#1565C0',
+    color: '#1e63d6',
     lineHeight: 18,
   },
 });

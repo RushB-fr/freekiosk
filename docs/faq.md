@@ -56,7 +56,12 @@
 - **A:** Perfectly! Many users deploy FreeKiosk for Home Assistant dashboards.
 
 **Q: Can I display local HTML files?**
-- **A:** Currently only HTTP/HTTPS URLs. Local file support coming in v1.1.
+- **A:** Yes. Enter a `file://` URL in Website mode, for example
+  `file:///storage/emulated/0/Android/data/com.freekiosk/files/dashboard/index.html`.
+  You must enable **Advanced > PDF Viewer** for it to work: that setting is what grants the
+  WebView file access (`allowFileAccess`, `allowFileAccessFromFileURLs`,
+  `allowUniversalAccessFromFileURLs` and the `file://` origin). Without it the page fails
+  with `net::ERR_ACCESS_DENIED`.
 
 **Q: How do I change the URL?**
 - **A:** Tap 5 times bottom-right → Enter PIN → Settings → Change URL.

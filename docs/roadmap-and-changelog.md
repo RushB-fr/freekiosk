@@ -74,31 +74,63 @@
 
 ## Product Roadmap
 
-### v1.3.x - Operational Excellence
+> [!NOTE]
+> There is no `v1.3.x`. The reliability and deployment work planned under that
+> heading landed across the `v1.2.20` betas, and enabling the cloud took the next
+> release to `2.0.0`. The items below carry forward whatever is still open.
+
+### v1.2.x - Operational excellence (shipped)
 
 
 
-| Focus Area | Planned Features |
+| Focus Area | State |
 |---|---|
-| **Reliability** | Enhanced kiosk stability and error recovery |
-| **Deployment** | Expanded remote control and provisioning tools |
-| **Media Workflows** | Improved media player and dashboard integration |
-| **Monitoring** | Advanced device health and performance metrics |
-| **Configuration** | Simplified setup and management interfaces |
+| **Reliability** | Kiosk stability and error recovery, hardened across the 1.2.20 betas |
+| **Deployment** | Remote control and provisioning tools expanded |
+| **Media Workflows** | Media player and dashboard integration improved |
+| **Monitoring** | Device health metrics, now also reported to the cloud |
+| **Configuration** | Setup and management interfaces simplified |
 
 
 
-### v2.x - Cloud & Enterprise
+### v2.0.0-beta.x - Cloud, in closed beta
 
 
 
-| Focus Area | Planned Features |
+Shipped and in daily use, but **invitation only** while it is proven on real
+fleets. The app remains free, MIT and fully usable without any cloud account.
+
+| Area | State |
 |---|---|
-| **Cloud Management** | MDM-style fleet management capabilities |
-| **Integrations** | Expanded platform support and localizations |
-| **Enterprise Tools** | Advanced configuration and deployment tooling |
+| **Enrollment** | Token from the dashboard, or zero-touch from a setup-wizard QR (Device Owner) |
+| **Telemetry** | Battery, network, screen, storage, memory, uptime and capabilities, every 30 s |
+| **Configuration** | Two-way sync, pushed per device or per group, applied without a restart |
+| **Commands** | Reload, screensaver, TTS, audio, toast, JS, app launch, reboot, screenshot |
+| **App updates** | Signed OTA install, silent as Device Owner |
+
+Not yet proven, and the reason 2.0.0 is still a pre-release: the OTA update
+path, the real provisioning QR, and Lock Mode behaviour have had little
+exposure to varied hardware.
+
+### v2.0.0 - Cloud out of beta
+
+
+
+| Focus Area | Planned |
+|---|---|
+| **Validation** | OTA updates, QR provisioning and Lock Mode proven across real fleets |
+| **API** | A documented REST API so a customer's own systems can drive their fleet |
 | **Analytics** | Usage insights and performance monitoring |
 | **Security** | Enhanced authentication and access control |
+
+### Later - Self-hosting
+
+
+
+The management server is intended to be **released as open source so it can be
+self-hosted**. A kiosk platform you cannot host yourself is only half free, so
+this is the end state rather than an afterthought. It is being held back until
+it is stable and feature-complete, and **no date is set**.
 
 
 
@@ -148,20 +180,20 @@
 
 
 
-### Upcoming Features (v1.3.x)
+### Feature status
 
 
 
 | Feature | Status | Description |
 |---|---|---|
-| **Multi-language** | In Progress | FR, DE, ES support |
-| **URL Rotation** | In Progress | Multiple URL cycling |
-| **Enhanced Media** | Planned | Advanced playback controls |
-| **Auto-brightness** | Planned | Sensor-based adjustment |
-| **Advanced Analytics** | Planned | Usage metrics |
-| **Remote Configuration** | Planned | Web-based setup |
-| **Content Filtering** | Planned | URL whitelist/blacklist |
-| **App Management** | Planned | External app control |
+| **URL Rotation** | Shipped | Cycles through a list of URLs |
+| **Enhanced Media** | Shipped | Media player with playlists and playback controls |
+| **Auto-brightness** | Shipped | Sensor-based adjustment |
+| **App Management** | Shipped | External app control, single and multi-app modes |
+| **Remote Configuration** | Shipped (closed beta) | Pushed from FreeKiosk Cloud, per device or group |
+| **Multi-language** | Planned | The app UI is English only; the cloud dashboard is already EN/FR |
+| **Content Filtering** | Planned | URL allow and block lists |
+| **Advanced Analytics** | Planned | Usage metrics beyond the current live telemetry |
 | **Enhanced Notifications** | Planned | Custom alerts |
 | **Network Monitoring** | Planned | Advanced network stats |
 | **Enhanced Security** | Planned | Access controls |

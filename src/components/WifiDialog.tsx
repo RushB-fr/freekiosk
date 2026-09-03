@@ -32,6 +32,7 @@ import {
   getSecureWifiPassword,
   saveSecureWifiPassword,
 } from '../utils/secureStorage';
+import Icon, { IconName } from './Icon';
 
 const { WifiControlModule } = NativeModules;
 
@@ -56,7 +57,7 @@ interface Props {
   onClose: () => void;
 }
 
-const SIGNAL_ICONS = ['▂___', '▂▄__', '▂▄▆_', '▂▄▆█'];
+const SIGNAL_ICONS: IconName[] = ['wifi-strength-1', 'wifi-strength-2', 'wifi-strength-3', 'wifi-strength-4'];
 
 export default function WifiDialog({ visible, onClose }: Props) {
   const [wifiInfo, setWifiInfo] = useState<WifiInfo | null>(null);
@@ -289,9 +290,12 @@ export default function WifiDialog({ visible, onClose }: Props) {
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>📶  Wi-Fi</Text>
+          <View style={styles.headerTitleRow}>
+            <Icon name="wifi" size={22} color="#fff" style={styles.headerIcon} />
+            <Text style={styles.headerTitle}>Wi-Fi</Text>
+          </View>
           <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-            <Text style={styles.closeBtnText}>✕</Text>
+            <Icon name="close" size={22} color="#fff" />
           </TouchableOpacity>
         </View>
 
@@ -312,10 +316,11 @@ export default function WifiDialog({ visible, onClose }: Props) {
             {/* Current connection */}
             {wifiInfo.isConnected && (
               <View style={styles.connectedBanner}>
-                <Text style={styles.connectedText}>
-                  ✓ Connected: {wifiInfo.ssid}{'  '}
-                  {signalIcon(wifiInfo.signalLevel)}
-                </Text>
+                <View style={styles.connectedTextRow}>
+                  <Icon name="check" size={16} color="#2e7d32" style={styles.connectedCheck} />
+                  <Text style={styles.connectedText} numberOfLines={1}>Connected: {wifiInfo.ssid}</Text>
+                  <Icon name={signalIcon(wifiInfo.signalLevel)} size={16} color="#2e7d32" style={styles.connectedSignal} />
+                </View>
                 <TouchableOpacity
                   style={[styles.disconnectBtn, disconnectingWifi && styles.disconnectBtnDisabled]}
                   onPress={handleDisconnect}
@@ -339,7 +344,10 @@ export default function WifiDialog({ visible, onClose }: Props) {
               {scanning ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <Text style={styles.scanBtnText}>🔍  Scan for networks</Text>
+                <View style={styles.scanBtnRow}>
+                  <Icon name="magnify" size={18} color="#fff" style={styles.scanBtnIcon} />
+                  <Text style={styles.scanBtnText}>Scan for networks</Text>
+                </View>
               )}
             </TouchableOpacity>
 
@@ -361,12 +369,13 @@ export default function WifiDialog({ visible, onClose }: Props) {
                       <Text style={styles.networkSsid} numberOfLines={1}>
                         {item.ssid}
                       </Text>
-                      <Text style={styles.networkMeta}>
-                        {item.secured ? '🔒' : '🔓'}{'  '}{signalIcon(item.signalLevel)}
-                      </Text>
+                      <View style={styles.networkMeta}>
+                        <Icon name={item.secured ? 'lock' : 'lock-open-variant'} size={13} color="#666" style={styles.networkMetaIcon} />
+                        <Icon name={signalIcon(item.signalLevel)} size={15} color="#666" />
+                      </View>
                     </View>
                     {isConnecting ? (
-                      <ActivityIndicator color="#0066cc" size="small" />
+                      <ActivityIndicator color="#2b7fff" size="small" />
                     ) : isCurrentNetwork ? (
                       <Text style={styles.connectedBadge}>Connected</Text>
                     ) : (
@@ -418,7 +427,7 @@ export default function WifiDialog({ visible, onClose }: Props) {
                   style={styles.eyeBtn}
                   onPress={() => setShowPassword((v) => !v)}
                 >
-                  <Text style={styles.eyeBtnText}>{showPassword ? '🙈' : '👁️'}</Text>
+                  <Icon name={showPassword ? 'eye-off-outline' : 'eye'} size={22} color="#666" />
                 </TouchableOpacity>
               </View>
 
@@ -454,10 +463,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#0066cc',
+    backgroundColor: '#2b7fff',
     paddingTop: 48,
     paddingBottom: 16,
     paddingHorizontal: 20,
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerIcon: {
+    marginRight: 10,
   },
   headerTitle: {
     fontSize: 22,
@@ -497,12 +513,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#c8e6c9',
   },
+  connectedTextRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 12,
+  },
+  connectedCheck: {
+    marginRight: 6,
+  },
+  connectedSignal: {
+    marginLeft: 6,
+  },
   connectedText: {
     color: '#2e7d32',
     fontSize: 15,
     fontWeight: '600',
-    flex: 1,
-    marginRight: 12,
+    flexShrink: 1,
   },
   disconnectBtn: {
     minWidth: 104,
@@ -523,15 +550,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   scanBtn: {
-    backgroundColor: '#0066cc',
+    backgroundColor: '#2b7fff',
     marginHorizontal: 16,
     marginVertical: 12,
     paddingVertical: 14,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
   },
   scanBtnDisabled: {
     backgroundColor: '#999',
+  },
+  scanBtnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  scanBtnIcon: {
+    marginRight: 8,
   },
   scanBtnText: {
     color: '#fff',
@@ -554,7 +588,7 @@ const styles = StyleSheet.create({
   },
   networkRowActive: {
     borderWidth: 2,
-    borderColor: '#0066cc',
+    borderColor: '#2b7fff',
   },
   networkInfo: {
     flex: 1,
@@ -565,14 +599,16 @@ const styles = StyleSheet.create({
     color: '#222',
   },
   networkMeta: {
-    fontSize: 13,
-    color: '#666',
-    marginTop: 2,
-    letterSpacing: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  networkMetaIcon: {
+    marginRight: 6,
   },
   connectedBadge: {
     fontSize: 13,
-    color: '#0066cc',
+    color: '#2b7fff',
     fontWeight: '700',
   },
   connectArrow: {
@@ -622,7 +658,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#0066cc',
+    borderColor: '#2b7fff',
     borderRadius: 8,
     marginBottom: 20,
   },
@@ -660,7 +696,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 14,
     borderRadius: 8,
-    backgroundColor: '#0066cc',
+    backgroundColor: '#2b7fff',
     alignItems: 'center',
   },
   pwdConnectDisabled: {
