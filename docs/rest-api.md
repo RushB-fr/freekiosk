@@ -422,6 +422,117 @@ List available cameras on the device. **(v1.2.5+)**
 
 
 
+### Live Screen View (GET)
+
+#### `GET /remote`
+
+An auto-refreshing live view of the tablet screen, open directly in a desktop or phone browser —
+the same idea as Fully Kiosk's Remote Admin screen view. Polls `GET /api/screenshot` client-side
+every 1.5s and swaps the `<img>` in place; no video streaming, no extra native code.
+
+```bash
+open http://TABLET_IP:8080/remote
+```
+
+> [!NOTE]
+> This page loads without the `X-Api-Key` check (it carries no device data by itself), but every
+> screenshot it fetches goes through the same auth as `/api/screenshot` — if an API key is
+> configured, the page prompts for it and keeps it in the browser's `sessionStorage` only (cleared
+> when the tab closes, never sent anywhere but this tablet).
+
+### File Transfer (GET/POST)
+
+Upload, list, download, and delete files in the device's **shared Downloads folder** (the same
+one visible in the device's own Files app, and where Fully Kiosk's Remote Admin drops files) —
+the same kind of feature as Fully Kiosk's Remote Admin file manager. Protected by the same
+`X-Api-Key` as the rest of the API. Requires **Allow Control Commands** enabled for
+upload/delete (list/download are read-only, like the other GET endpoints).
+
+> 💡 Backed by Android's MediaStore (Downloads collection, API 29+), not plain file I/O — this
+> app targets a modern SDK where scoped storage blocks direct `java.io.File` access to a folder
+> other apps also write to. Flat namespace by file name, no sub-folders. Files another app wrote
+> directly (not through MediaStore/DownloadManager) only appear once Android's media scanner has
+> indexed them — usually already the case for files that have existed a while.
+>
+> Deleting a file **another** app created (e.g. one Fully Kiosk pushed) can fail on Android 10
+> with `"Cannot delete: this file was not created by FreeKiosk"` — deleting someone else's
+> MediaStore entry needs a user-consent prompt (`RecoverableSecurityException`) that a REST call
+> has no UI to show. Deleting a file FreeKiosk itself uploaded through this endpoint always works.
+
+#### `GET /api/files/list`
+
+List every file in the shared Downloads folder.
+
+```bash
+curl -H "X-Api-Key: your-api-key" "http://TABLET_IP:8080/api/files/list"
+```
+
+```json
+{
+  "success": true,
+  "data": {
+    "dir": "Download",
+    "entries": [
+      { "name": "app-release.apk", "isDirectory": false, "size": 26012345, "modified": 1704672000 }
+    ]
+  }
+}
+```
+
+#### `POST /api/files/upload`
+
+Upload a file. The request body is the **raw file content** (not multipart) — send it with
+`--data-binary`, never `-F`/`--form`, or the byte count sent won't match `Content-Length` and
+the server will read the wrong number of bytes. Uploading a name that already exists overwrites it.
+
+**Query Parameters:**
+
+| Parameter | Required | Description |
+|---|---|---|
+| **name** | yes | File name to save as — a plain name, no `/` |
+
+```bash
+curl -X POST -H "X-Api-Key: your-api-key" \
+  --data-binary @app-release.apk \
+  "http://TABLET_IP:8080/api/files/upload?name=app-release.apk"
+```
+
+```json
+{
+  "success": true,
+  "data": { "name": "app-release.apk", "size": 26012345 }
+}
+```
+
+Max upload size: **200 MB**.
+
+#### `GET /api/files/download`
+
+Download a file from the shared Downloads folder.
+
+**Query Parameters:**
+
+| Parameter | Required | Description |
+|---|---|---|
+| **path** | yes | The file's name in Downloads (despite the parameter name, this is a plain file name, no sub-folder) |
+
+```bash
+curl -H "X-Api-Key: your-api-key" \
+  "http://TABLET_IP:8080/api/files/download?path=app-release.apk" -o app-release.apk
+```
+
+**Response**: the raw file, with `Content-Disposition: attachment` so a browser saves it directly.
+
+#### `POST /api/files/delete`
+
+Delete a file from the shared Downloads folder.
+
+```bash
+curl -X POST -H "X-Api-Key: your-api-key" -H "Content-Type: application/json" \
+  -d '{"path": "app-release.apk"}' \
+  "http://TABLET_IP:8080/api/files/delete"
+```
+
 ### Control Commands (POST)
 
 #### `POST /api/brightness`

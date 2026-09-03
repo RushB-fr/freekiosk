@@ -1,9 +1,13 @@
 package com.freekiosk.api
 
 import android.app.ActivityManager
+import android.content.ContentUris
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
+import android.provider.MediaStore
 import android.location.Location
 import android.location.LocationManager
 import android.graphics.Bitmap
@@ -50,6 +54,7 @@ import com.freekiosk.ScreenController
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.Locale
@@ -78,7 +83,7 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             "audioPlay", "playSound", "audioStop", "audioBeep",
             "screenOn", "screenOff",
             "reboot", "tts", "lockDevice", "restartUi",
-            "remoteKey", "keyboardKey", "keyboardCombo", "keyboardText",
+            "remoteKey", "remoteTap", "keyboardKey", "keyboardCombo", "keyboardText",
             "getLocation", "cameraList", "getAutoBrightness",
         )
 
@@ -287,7 +292,11 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 commandHandler = { command, params -> handleCommand(command, params) },
                 screenshotProvider = { captureScreenshot() },
                 screenshotErrorProvider = { lastScreenshotError },
-                cameraPhotoProvider = { camera, quality -> cameraPhotoModule?.capturePhoto(camera, quality) }
+                cameraPhotoProvider = { camera, quality -> cameraPhotoModule?.capturePhoto(camera, quality) },
+                filesListProvider = { mediaStoreListDownloads() },
+                filesUploadProvider = { name, mimeType, bytes -> mediaStoreUpload(name, mimeType, bytes) },
+                filesDownloadProvider = { name -> mediaStoreDownload(name) },
+                filesDeleteProvider = { name -> mediaStoreDelete(name) }
             )
 
             server?.start()
@@ -387,6 +396,141 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     @ReactMethod
     fun getLocalIp(promise: Promise) {
         promise.resolve(getLocalIpAddress())
+    }
+
+    /**
+     * Backs the /api/files endpoints with the SHARED public Downloads folder (visible in
+     * the device's own Files app, same place Fully Kiosk's Remote Admin was used to push
+     * the FR-translated APK) instead of an app-private directory. Requires MediaStore
+     * (Downloads collection, API 29+) because this app targets a modern SDK where scoped
+     * storage blocks direct java.io.File access to a shared folder other apps also write
+     * to. Flat namespace by DISPLAY_NAME — no sub-folders, matching how Download is used
+     * in practice here.
+     *
+     * Known limitation, accepted deliberately (2026-08-31): files another app wrote to
+     * Download via plain java.io.File (not through MediaStore/DownloadManager) only show
+     * up here once Android's media scanner has indexed them — usually already true for
+     * files that have existed a while, but not guaranteed immediately after they land.
+     */
+    @ReactMethod
+    fun getTransferDirPath(promise: Promise) {
+        promise.resolve("Download (" + Environment.DIRECTORY_DOWNLOADS + ")")
+    }
+
+    private fun downloadsSelection(): Pair<String, Array<String>> {
+        return Pair(
+            "${MediaStore.MediaColumns.RELATIVE_PATH} = ?",
+            arrayOf("${Environment.DIRECTORY_DOWNLOADS}/")
+        )
+    }
+
+    private fun mediaStoreFindUri(name: String): Uri? {
+        val resolver = reactContext.applicationContext.contentResolver
+        val (baseSelection, baseArgs) = downloadsSelection()
+        val selection = "$baseSelection AND ${MediaStore.MediaColumns.DISPLAY_NAME} = ?"
+        val args = baseArgs + name
+        resolver.query(
+            MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+            arrayOf(MediaStore.MediaColumns._ID),
+            selection, args, null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID))
+                return ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI, id)
+            }
+        }
+        return null
+    }
+
+    fun mediaStoreListDownloads(): JSONObject {
+        val resolver = reactContext.applicationContext.contentResolver
+        val entries = org.json.JSONArray()
+        val (selection, args) = downloadsSelection()
+        val projection = arrayOf(
+            MediaStore.MediaColumns.DISPLAY_NAME,
+            MediaStore.MediaColumns.SIZE,
+            MediaStore.MediaColumns.DATE_MODIFIED
+        )
+        try {
+            resolver.query(
+                MediaStore.Downloads.EXTERNAL_CONTENT_URI, projection,
+                selection, args, "${MediaStore.MediaColumns.DISPLAY_NAME} ASC"
+            )?.use { cursor ->
+                val nameIdx = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
+                val sizeIdx = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
+                val dateIdx = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_MODIFIED)
+                while (cursor.moveToNext()) {
+                    entries.put(JSONObject().apply {
+                        put("name", cursor.getString(nameIdx))
+                        put("isDirectory", false)
+                        put("size", cursor.getLong(sizeIdx))
+                        put("modified", cursor.getLong(dateIdx))
+                    })
+                }
+            }
+            return JSONObject().apply { put("success", true); put("entries", entries) }
+        } catch (e: Exception) {
+            Log.e(TAG, "mediaStoreListDownloads failed", e)
+            return JSONObject().apply { put("success", false); put("error", e.message ?: "list failed") }
+        }
+    }
+
+    fun mediaStoreUpload(name: String, mimeType: String, bytes: ByteArray): JSONObject {
+        return try {
+            val resolver = reactContext.applicationContext.contentResolver
+            mediaStoreFindUri(name)?.let { resolver.delete(it, null, null) }
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+                put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+            }
+            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: return JSONObject().apply { put("success", false); put("error", "insert failed") }
+            resolver.openOutputStream(uri)?.use { it.write(bytes) }
+                ?: return JSONObject().apply { put("success", false); put("error", "could not open output stream") }
+            Log.i(TAG, "Uploaded to Downloads: $name (${bytes.size} bytes)")
+            JSONObject().apply { put("success", true); put("name", name); put("size", bytes.size) }
+        } catch (e: Exception) {
+            Log.e(TAG, "mediaStoreUpload failed", e)
+            JSONObject().apply { put("success", false); put("error", e.message ?: "upload failed") }
+        }
+    }
+
+    fun mediaStoreDownload(name: String): ByteArray? {
+        return try {
+            val uri = mediaStoreFindUri(name) ?: return null
+            reactContext.applicationContext.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+        } catch (e: Exception) {
+            Log.e(TAG, "mediaStoreDownload failed", e)
+            null
+        }
+    }
+
+    fun mediaStoreDelete(name: String): JSONObject {
+        return try {
+            val uri = mediaStoreFindUri(name)
+                ?: return JSONObject().apply { put("success", false); put("error", "not found") }
+            val rows = reactContext.applicationContext.contentResolver.delete(uri, null, null)
+            if (rows > 0) {
+                JSONObject().apply { put("success", true) }
+            } else {
+                JSONObject().apply { put("success", false); put("error", "delete failed") }
+            }
+        } catch (e: SecurityException) {
+            // #Download: API 29 requires user consent (RecoverableSecurityException) to delete
+            // a file this app did not create in MediaStore — e.g. one Fully Kiosk wrote directly.
+            // No UI channel to surface that consent prompt from a REST call, so this is a real,
+            // accepted limitation rather than a bug: delete only reliably works on files FreeKiosk
+            // itself uploaded through this same endpoint.
+            Log.w(TAG, "mediaStoreDelete needs user consent (not this app's file): ${e.message}")
+            JSONObject().apply {
+                put("success", false)
+                put("error", "Cannot delete: this file was not created by FreeKiosk (Android requires manual consent for files from other apps)")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "mediaStoreDelete failed", e)
+            JSONObject().apply { put("success", false); put("error", e.message ?: "delete failed") }
+        }
     }
 
     /**
@@ -1007,6 +1151,31 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                     put("command", command)
                     put("key", key)
                     put("keyCode", keyCode)
+                }
+            }
+            "remoteTap" -> {
+                val x = params?.optInt("x", -1) ?: -1
+                val y = params?.optInt("y", -1) ?: -1
+                if (x < 0 || y < 0) {
+                    return JSONObject().apply {
+                        put("executed", false)
+                        put("command", command)
+                        put("error", "x and y (device pixel coordinates) are required")
+                    }
+                }
+                if (!FreeKioskAccessibilityService.isRunning()) {
+                    return JSONObject().apply {
+                        put("executed", false)
+                        put("command", command)
+                        put("error", "Accessibility Service is not enabled (required for remote tap) - Settings > Advanced > Accessibility Service")
+                    }
+                }
+                val ok = FreeKioskAccessibilityService.sendTap(x, y)
+                return JSONObject().apply {
+                    put("executed", ok)
+                    put("command", command)
+                    put("x", x)
+                    put("y", y)
                 }
             }
             "keyboardKey" -> {
