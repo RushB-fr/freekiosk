@@ -728,7 +728,7 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
             value={screenshotEnabled}
             onValueChange={handleScreenshotEnabledChange}
             icon="monitor-screenshot"
-            hint="Expose the kiosk screen in Home Assistant as an image/camera entity, with a capture button."
+            hint="Expose the kiosk screen in Home Assistant as an image/camera entity, with a capture button. The screen is published to the broker, in clear text unless the port is 8883, and anyone who can read the topic can see it."
           />
 
           {screenshotEnabled && (
@@ -779,7 +779,7 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
             value={cameraEnabled}
             onValueChange={handleCameraEnabledChange}
             icon="camera"
-            hint="Expose each device camera in Home Assistant as an image/camera entity. Snapshots fail while motion detection is using the camera."
+            hint="Expose each device camera in Home Assistant as an image/camera entity. Photos are published to the broker, in clear text unless the port is 8883, and anyone who can read the topic can see whoever is in front of the device. Snapshots fail while motion detection is using the camera."
           />
 
           {cameraEnabled && (

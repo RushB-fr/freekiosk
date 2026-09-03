@@ -349,6 +349,23 @@ They share the same topic, so both show the same picture.
 > Disabling a stream clears both its discovery config and its retained image, so nothing stale
 > is left on the broker.
 
+> [!CAUTION]
+> **Anyone who can read the broker can see these pictures, and anyone who can write to the
+> command topic can take one.** That is the point of the feature, but it is worth stating:
+> a screenshot shows whatever the kiosk displays, including a form somebody is filling in,
+> and a camera snapshot shows whoever is standing in front of it.
+>
+> Three consequences to plan for:
+> - **The connection is only encrypted on port 8883.** FreeKiosk enables TLS when the port
+>   is 8883 and not otherwise, so on the default 1883 the JPEG crosses the network in clear.
+> - **Images are retained**, which is what lets Home Assistant restore them after a restart,
+>   but it also means the last picture stays on the broker until something overwrites it.
+>   A device that is simply switched off leaves its last snapshot there indefinitely.
+>   Disabling the stream and reconnecting clears it (see the note above).
+> - **Restrict the topics with a broker ACL.** On Mosquitto, limit who can subscribe to
+>   `{baseTopic}/+/image/#` and who can publish to `{baseTopic}/+/set/#`. Turning off
+>   "Allow Remote Control" removes the capture commands but not the periodic publishing.
+
 > [!IMPORTANT]
 > These are still images, not a video stream. A capture takes ~1-2 s for the camera
 > (sensor warm-up), so intervals below 5 s are rejected and repeated requests within 2 s are ignored.
@@ -822,7 +839,7 @@ entities:
 | **Stream Disabled** | Enable "Publish Screenshot" / "Publish Camera Snapshots" in Settings > MQTT — both are off by default |
 | **Entities Missing** | The entity set is published on connect: reconnect MQTT after enabling a stream |
 | **Camera Busy** | Motion detection holds the camera: the snapshot gives up after ~10 s (`Camera capture failed … nothing published`), the previous image is kept and motion detection recovers on its own. Turn off always-on motion detection, or capture while the screensaver is idle |
-| **Screen Off** | Screenshots need a visible window: they fail while the screen is off (camera snapshots still work) |
+| **Screen Off** | *Expected, not measured:* screenshots need a window on screen, so they should fail while the screen is off, and camera snapshots should keep working since their path is fully native. Not yet verified on a device |
 | **Camera Permission** | Grant camera permission (requested when enabling the camera stream) |
 | **Payload Too Large** | Some brokers cap message size (Mosquitto `message_size_limit`). Lower the JPEG quality / max width; a warning is logged above 1 MB |
 | **Repeated Requests** | Two captures of the same stream within 2 seconds are throttled — the second is ignored |
@@ -867,7 +884,7 @@ entities:
 | **Thread Safety** | MQTT callbacks are dispatched to the main thread via `Handler(Looper.getMainLooper())` |
 | **Password Storage** | Encrypted in Android Keychain (same as REST API key) |
 | **TTS & Toast** | Handled natively in the MQTT module (no JS round-trip) |
-| **Image Publishing** | Captured and published natively (works with the screen off), JPEG payloads on `.../image/*`, QoS 0, retained |
+| **Image Publishing** | Off by default. Captured and published natively, JPEG payloads on `.../image/*`, QoS 0, **retained**. Readable by anyone with subscribe rights on the topic, and in clear text unless the broker port is 8883 (see the caution in [Images](#-images-screenshot--camera)) |
 
 
 
