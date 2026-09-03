@@ -1794,10 +1794,12 @@ export const StorageService = {
   getRestartButtonEnabled: async (): Promise<boolean> => {
     try {
       const value = await AsyncStorage.getItem(KEYS.RESTART_BUTTON_ENABLED);
-      return value ? JSON.parse(value) : true; // Enabled by default (always-present button)
+      // Off by default: it draws a visible control over the kiosk page and lets anyone
+      // standing in front of the screen restart the WebView, so it is opt-in.
+      return value ? JSON.parse(value) : false;
     } catch (error) {
       console.error('Error getting restart button enabled:', error);
-      return true;
+      return false;
     }
   },
 

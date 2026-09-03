@@ -195,7 +195,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [canGoBack, setCanGoBack] = useState<boolean>(false);
 
   // Restart Button (top-right overlay, long-press reloads the WebView)
-  const [restartButtonEnabled, setRestartButtonEnabled] = useState<boolean>(true);
+  const [restartButtonEnabled, setRestartButtonEnabled] = useState<boolean>(false);
   const [restartButtonLongPressSeconds, setRestartButtonLongPressSeconds] = useState<number>(5);
 
   // URL Filtering states
@@ -1762,7 +1762,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       setWebViewBackButtonXPercent(savedWebViewBackButtonXPercent);
       setWebViewBackButtonYPercent(savedWebViewBackButtonYPercent);
 
-      const savedRestartButtonEnabled = bool(K.RESTART_BUTTON_ENABLED, true);
+      const savedRestartButtonEnabled = bool(K.RESTART_BUTTON_ENABLED, false);
       const savedRestartButtonLongPressSeconds = num(K.RESTART_BUTTON_LONG_PRESS_SECONDS, 5);
       setRestartButtonEnabled(savedRestartButtonEnabled);
       setRestartButtonLongPressSeconds(savedRestartButtonLongPressSeconds);
@@ -2909,10 +2909,12 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         </View>
       )}
 
-      {/* Restart button - always present over WebView content. Long-press reloads the
-          WebView (remount via webViewKey). Top-right, red, circular reload arrow. A short
-          tap does nothing (no onPress) so it can't be triggered accidentally. Hidden on the
-          dashboard grid, where no WebView is mounted to reload. */}
+      {/* Restart button - opt-in overlay over WebView content. Long-press remounts the
+          WebView (via webViewKey), which restarts it on the configured URL rather than
+          reloading whatever page the user navigated to: a remount also recovers a hung
+          render process, which is the case this was asked for. Top-right, grey, circular
+          reload arrow. A short tap does nothing (no onPress) so it can't be triggered
+          accidentally. Hidden on the dashboard grid, where no WebView is mounted. */}
       {restartButtonEnabled && displayMode === 'webview' && !(dashboardModeEnabled && dashboardShowGrid) && (
         <RestartButton
           longPressSeconds={restartButtonLongPressSeconds}

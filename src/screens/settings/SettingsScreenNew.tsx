@@ -158,7 +158,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [webViewBackButtonEnabled, setWebViewBackButtonEnabled] = useState<boolean>(false);
   const [webViewBackButtonXPercent, setWebViewBackButtonXPercent] = useState<string>('2');
   const [webViewBackButtonYPercent, setWebViewBackButtonYPercent] = useState<string>('10');
-  const [restartButtonEnabled, setRestartButtonEnabled] = useState<boolean>(true);
+  const [restartButtonEnabled, setRestartButtonEnabled] = useState<boolean>(false);
   const [restartButtonLongPressSeconds, setRestartButtonLongPressSeconds] = useState<number>(5);
 
   // Auto-Brightness states

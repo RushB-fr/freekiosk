@@ -1052,12 +1052,12 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
         </SettingsSection>
       )}
 
-      {/* Restart Button - WebView only. Top-right red button, long-press reloads the page. */}
+      {/* Restart Button - WebView only. Top-right grey button, long-press restarts the WebView. */}
       {displayMode === 'webview' && (
         <SettingsSection title="Restart Button" icon="refresh">
           <SettingsSwitch
             label="Enable Restart Button"
-            hint="Show a red button in the top-right corner. Long-press it to reload the current web page."
+            hint="Show a grey button in the top-right corner. Long-press it to restart the WebView on the configured URL."
             value={restartButtonEnabled}
             onValueChange={onRestartButtonEnabledChange}
           />
@@ -1067,7 +1067,7 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
               <View style={styles.rotationSpacer} />
               <SettingsSlider
                 label="Long-press Duration"
-                hint="How long the button must be held before the page reloads."
+                hint="How long the button must be held before the WebView restarts."
                 icon="refresh"
                 value={restartButtonLongPressSeconds}
                 onValueChange={onRestartButtonLongPressSecondsChange}
