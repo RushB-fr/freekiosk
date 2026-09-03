@@ -9,6 +9,7 @@ import {
   SettingsSection,
   SettingsInput,
   SettingsSwitch,
+  SettingsSlider,
   SettingsModeSelector,
   SettingsInfoBox,
   SettingsButton,
@@ -111,7 +112,13 @@ interface GeneralTabProps {
   webViewBackButtonYPercent: string;
   onWebViewBackButtonYPercentChange: (value: string) => void;
   onResetWebViewBackButtonPosition: () => void;
-  
+
+  // Restart Button (webview only): long-press reloads the WebView
+  restartButtonEnabled: boolean;
+  onRestartButtonEnabledChange: (value: boolean) => void;
+  restartButtonLongPressSeconds: number;
+  onRestartButtonLongPressSecondsChange: (value: number) => void;
+
   // Inactivity Return to Home (webview only)
   inactivityReturnEnabled: boolean;
   onInactivityReturnEnabledChange: (value: boolean) => void;
@@ -217,6 +224,10 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
   webViewBackButtonYPercent,
   onWebViewBackButtonYPercentChange,
   onResetWebViewBackButtonPosition,
+  restartButtonEnabled,
+  onRestartButtonEnabledChange,
+  restartButtonLongPressSeconds,
+  onRestartButtonLongPressSecondsChange,
   inactivityReturnEnabled,
   onInactivityReturnEnabledChange,
   inactivityReturnDelay,
@@ -1040,7 +1051,36 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
           )}
         </SettingsSection>
       )}
-      
+
+      {/* Restart Button - WebView only. Top-right red button, long-press reloads the page. */}
+      {displayMode === 'webview' && (
+        <SettingsSection title="Restart Button" icon="refresh">
+          <SettingsSwitch
+            label="Enable Restart Button"
+            hint="Show a red button in the top-right corner. Long-press it to reload the current web page."
+            value={restartButtonEnabled}
+            onValueChange={onRestartButtonEnabledChange}
+          />
+
+          {restartButtonEnabled && (
+            <>
+              <View style={styles.rotationSpacer} />
+              <SettingsSlider
+                label="Long-press Duration"
+                hint="How long the button must be held before the page reloads."
+                icon="refresh"
+                value={restartButtonLongPressSeconds}
+                onValueChange={onRestartButtonLongPressSecondsChange}
+                minimumValue={1}
+                maximumValue={10}
+                step={1}
+                unit="s"
+              />
+            </>
+          )}
+        </SettingsSection>
+      )}
+
       {/* Background Apps - WebView mode only */}
       {displayMode === 'webview' && (
         <SettingsSection title="Background Apps" icon="apps">

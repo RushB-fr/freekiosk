@@ -86,6 +86,9 @@ export const KEYS = {
   WEBVIEW_BACK_BUTTON_ENABLED: '@kiosk_webview_back_button_enabled',
   WEBVIEW_BACK_BUTTON_X_PERCENT: '@kiosk_webview_back_button_x_percent',
   WEBVIEW_BACK_BUTTON_Y_PERCENT: '@kiosk_webview_back_button_y_percent',
+  // Restart Button (WebView reload via long-press, top-right)
+  RESTART_BUTTON_ENABLED: '@kiosk_restart_button_enabled',
+  RESTART_BUTTON_LONG_PRESS_SECONDS: '@kiosk_restart_button_long_press_seconds',
   // Auto-Brightness
   AUTO_BRIGHTNESS_ENABLED: '@kiosk_auto_brightness_enabled',
   AUTO_BRIGHTNESS_MIN: '@kiosk_auto_brightness_min',
@@ -465,6 +468,9 @@ export const StorageService = {
         KEYS.WEBVIEW_BACK_BUTTON_ENABLED,
         KEYS.WEBVIEW_BACK_BUTTON_X_PERCENT,
         KEYS.WEBVIEW_BACK_BUTTON_Y_PERCENT,
+        // Restart Button
+        KEYS.RESTART_BUTTON_ENABLED,
+        KEYS.RESTART_BUTTON_LONG_PRESS_SECONDS,
         // Auto-Brightness
         KEYS.AUTO_BRIGHTNESS_ENABLED,
         KEYS.AUTO_BRIGHTNESS_MIN,
@@ -1773,6 +1779,43 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting webview back button Y percent:', error);
       return 10;
+    }
+  },
+
+  // Restart Button (top-right, long-press to reload the WebView)
+  saveRestartButtonEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.RESTART_BUTTON_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving restart button enabled:', error);
+    }
+  },
+
+  getRestartButtonEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.RESTART_BUTTON_ENABLED);
+      return value ? JSON.parse(value) : true; // Enabled by default (always-present button)
+    } catch (error) {
+      console.error('Error getting restart button enabled:', error);
+      return true;
+    }
+  },
+
+  saveRestartButtonLongPressSeconds: async (value: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.RESTART_BUTTON_LONG_PRESS_SECONDS, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving restart button long-press seconds:', error);
+    }
+  },
+
+  getRestartButtonLongPressSeconds: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.RESTART_BUTTON_LONG_PRESS_SECONDS);
+      return value ? JSON.parse(value) : 5; // 5s long-press by default
+    } catch (error) {
+      console.error('Error getting restart button long-press seconds:', error);
+      return 5;
     }
   },
 
