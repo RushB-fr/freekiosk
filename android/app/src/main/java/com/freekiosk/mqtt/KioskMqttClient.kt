@@ -801,20 +801,29 @@ class KioskMqttClient(
                 .put("value", payload.uppercase() == "ON")
 
             // Home Assistant sends integers for integer steps, but tolerate "30.0" too
-            "screenshot_interval" -> "setImageInterval" to JSONObject()
-                .put("stream", "screenshot")
-                .put("seconds", parseSeconds(payload))
-            "camera_interval" -> "setImageInterval" to JSONObject()
-                .put("stream", "camera")
-                .put("seconds", parseSeconds(payload))
+            "screenshot_interval" -> imageIntervalCommand("screenshot", payload)
+            "camera_interval" -> imageIntervalCommand("camera", payload)
 
             else -> null to null
         }
     }
 
-    /** Parse an interval payload in seconds, accepting both "30" and "30.0". */
-    private fun parseSeconds(payload: String): Int =
-        payload.toIntOrNull() ?: payload.toDoubleOrNull()?.toInt() ?: 0
+    /**
+     * Interval command for an image stream. Home Assistant sends integers for integer
+     * steps, but "30.0" is tolerated too. An unparseable payload yields no command at
+     * all: returning 0 would have been clamped up to the 5s minimum, so a typo on the
+     * topic put the device on the fastest possible capture loop instead of being ignored.
+     */
+    private fun imageIntervalCommand(stream: String, payload: String): Pair<String?, JSONObject?> {
+        val seconds = payload.toIntOrNull() ?: payload.toDoubleOrNull()?.toInt()
+        if (seconds == null) {
+            Log.w(TAG, "Ignoring $stream interval command: '$payload' is not a number")
+            return null to null
+        }
+        return "setImageInterval" to JSONObject()
+            .put("stream", stream)
+            .put("seconds", seconds)
+    }
 
     // ==================== State queries ====================
 

@@ -76,8 +76,6 @@ class MqttImagePublisher(
     }
     private val timerThread = HandlerThread("MqttImageTimer").apply { start() }
     private val timerHandler = Handler(timerThread.looper)
-    private var screenshotRunnable: Runnable? = null
-    private var cameraRunnable: Runnable? = null
 
     private val lastCaptureAt = mutableMapOf<String, Long>()
     private val cameraModule by lazy { CameraPhotoModule(reactContext.applicationContext) }
@@ -106,13 +104,18 @@ class MqttImagePublisher(
     /**
      * Stop timers and release threads. Never blocks: this can be called from the main thread
      * (MQTT disconnect) while a capture is still running.
+     *
+     * shutdown() rather than shutdownNow(): the latter interrupts the capture thread, and
+     * CameraPhotoModule closes its CameraDevice, session and ImageReader only *after* the
+     * latch it waits on. An interrupt there escapes as InterruptedException, skips that
+     * cleanup and leaves the camera held by this process, which then breaks motion
+     * detection and every later snapshot. shutdown() lets the capture in flight finish
+     * and clean up, and is just as non-blocking since we never awaitTermination.
      */
     fun stop() {
         timerHandler.removeCallbacksAndMessages(null)
-        screenshotRunnable = null
-        cameraRunnable = null
         timerThread.quitSafely()
-        captureExecutor.shutdownNow()
+        captureExecutor.shutdown()
         Log.d(TAG, "Image publisher stopped")
     }
 
@@ -311,10 +314,15 @@ class MqttImagePublisher(
         return true
     }
 
+    /**
+     * Synchronized because it is called from two threads: applySettings() from the JS
+     * bridge and setAutoPublish()/setInterval() from the MQTT command dispatch. The
+     * runnables re-post themselves, so two interleaved calls (remove, remove, post, post)
+     * would leave two timer chains publishing the same stream for good.
+     */
+    @Synchronized
     private fun restartTimers() {
         timerHandler.removeCallbacksAndMessages(null)
-        screenshotRunnable = null
-        cameraRunnable = null
 
         if (screenshotEnabled && screenshotAuto) {
             val runnable = object : Runnable {
@@ -323,7 +331,6 @@ class MqttImagePublisher(
                     timerHandler.postDelayed(this, screenshotIntervalMs)
                 }
             }
-            screenshotRunnable = runnable
             timerHandler.postDelayed(runnable, screenshotIntervalMs)
             Log.d(TAG, "Screenshot auto-publish armed (${screenshotIntervalMs}ms)")
         }
@@ -335,7 +342,6 @@ class MqttImagePublisher(
                     timerHandler.postDelayed(this, cameraIntervalMs)
                 }
             }
-            cameraRunnable = runnable
             timerHandler.postDelayed(runnable, cameraIntervalMs)
             Log.d(TAG, "Camera auto-publish armed (${cameraIntervalMs}ms)")
         }
