@@ -39,6 +39,8 @@ export interface ApiCallbacks {
   onAutoBrightnessDisable?: () => void;
   onSetMotionAlwaysOn?: (value: boolean) => void;
   onSetMode?: (mode: 'webview' | 'external_app' | 'media_player', target?: string) => void;
+  onSetMqttImageAuto?: (stream: MqttImageStream, value: boolean) => void;
+  onSetMqttImageInterval?: (stream: MqttImageStream, seconds: number) => void;
 }
 
 /**
@@ -50,6 +52,9 @@ export interface ActionResult {
   result?: Record<string, unknown>;
   error?: string;
 }
+
+/** Image streams that can be published over MQTT. */
+export type MqttImageStream = 'screenshot' | 'camera';
 
 export interface AppStatus {
   currentUrl: string;
@@ -74,6 +79,10 @@ export interface AppStatus {
 
 const ok = (result?: Record<string, unknown>): ActionResult => ({ ok: true, result });
 const fail = (error: string): ActionResult => ({ ok: false, error });
+
+function isMqttImageStream(value: unknown): value is MqttImageStream {
+  return value === 'screenshot' || value === 'camera';
+}
 
 class ApiServiceClass {
   private callbacks: ApiCallbacks = {};
@@ -176,6 +185,17 @@ class ApiServiceClass {
     const allowControl = await StorageService.getMqttAllowControl();
     const deviceName = await StorageService.getMqttDeviceName();
 
+    // Image publishing (screenshot / camera snapshots) — all opt-in
+    const screenshotEnabled = await StorageService.getMqttScreenshotEnabled();
+    const screenshotAuto = await StorageService.getMqttScreenshotAuto();
+    const screenshotInterval = await StorageService.getMqttScreenshotInterval();
+    const screenshotQuality = await StorageService.getMqttScreenshotQuality();
+    const screenshotMaxWidth = await StorageService.getMqttScreenshotMaxWidth();
+    const cameraEnabled = await StorageService.getMqttCameraEnabled();
+    const cameraAuto = await StorageService.getMqttCameraAuto();
+    const cameraInterval = await StorageService.getMqttCameraInterval();
+    const cameraQuality = await StorageService.getMqttCameraQuality();
+
     await mqttClient.start({
       brokerUrl,
       port,
@@ -188,6 +208,15 @@ class ApiServiceClass {
       allowControl,
       deviceName: deviceName || undefined,
       useTls: port === 8883,
+      screenshotEnabled,
+      screenshotAuto,
+      screenshotInterval,
+      screenshotQuality,
+      screenshotMaxWidth,
+      cameraEnabled,
+      cameraAuto,
+      cameraInterval,
+      cameraQuality,
     });
 
     console.log(`ApiService: MQTT client started for ${brokerUrl}:${port}`);
@@ -359,6 +388,26 @@ class ApiServiceClass {
       case 'setMotionAlwaysOn':
         if (!cb.onSetMotionAlwaysOn) return fail('Handler unavailable');
         cb.onSetMotionAlwaysOn(p.value === true);
+        return ok();
+
+      // Image publishing (MQTT). The capture runs natively, so these only persist the
+      // setting changed from Home Assistant — same pattern as setMotionAlwaysOn.
+      case 'setImageAutoPublish':
+        if (!isMqttImageStream(p.stream)) return fail('Invalid image stream');
+        if (!cb.onSetMqttImageAuto) return fail('Handler unavailable');
+        cb.onSetMqttImageAuto(p.stream, p.value === true);
+        return ok();
+
+      case 'setImageInterval':
+        if (!isMqttImageStream(p.stream)) return fail('Invalid image stream');
+        if (typeof p.seconds !== 'number') return fail('Missing interval seconds');
+        if (!cb.onSetMqttImageInterval) return fail('Handler unavailable');
+        cb.onSetMqttImageInterval(p.stream, p.seconds);
+        return ok();
+
+      // Captured and published natively by MqttImagePublisher, nothing to do here.
+      case 'publishScreenshot':
+      case 'publishCameraPhoto':
         return ok();
 
       case 'setMode':

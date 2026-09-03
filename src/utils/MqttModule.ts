@@ -19,6 +19,21 @@ export interface MqttConfig {
   allowControl: boolean;
   deviceName?: string;
   useTls?: boolean;
+  // Image publishing (screenshot / camera snapshots over MQTT)
+  screenshotEnabled?: boolean;
+  screenshotAuto?: boolean;
+  /** Seconds between two automatic screenshot publishes (5-3600) */
+  screenshotInterval?: number;
+  /** JPEG quality 1-100 */
+  screenshotQuality?: number;
+  /** Downscale width in px, 0 keeps the native resolution */
+  screenshotMaxWidth?: number;
+  cameraEnabled?: boolean;
+  cameraAuto?: boolean;
+  /** Seconds between two automatic camera publishes (5-3600) */
+  cameraInterval?: number;
+  /** JPEG quality 1-100 */
+  cameraQuality?: number;
 }
 
 class MqttClientService {
@@ -72,6 +87,30 @@ class MqttClientService {
     }
 
     return MqttModule.isMqttConnected();
+  }
+
+  /**
+   * Apply image publishing settings (auto-publish, interval, quality) to a running MQTT
+   * client, without reconnecting. Returns false when MQTT is not running — the settings are
+   * then read from storage on the next start.
+   *
+   * Note: enabling/disabling a stream is not applied here, it changes the Home Assistant
+   * discovery entities and therefore needs a reconnect.
+   */
+  async updateImageSettings(settings: {
+    screenshotAuto: boolean;
+    screenshotInterval: number;
+    screenshotQuality: number;
+    screenshotMaxWidth: number;
+    cameraAuto: boolean;
+    cameraInterval: number;
+    cameraQuality: number;
+  }): Promise<boolean> {
+    if (Platform.OS !== 'android' || !MqttModule) {
+      return false;
+    }
+
+    return MqttModule.updateImageSettings(settings);
   }
 
   /**

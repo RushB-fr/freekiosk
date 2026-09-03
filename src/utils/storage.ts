@@ -144,6 +144,16 @@ export const KEYS = {
   MQTT_ALLOW_CONTROL: '@kiosk_mqtt_allow_control',
   MQTT_DEVICE_NAME: '@kiosk_mqtt_device_name',
   MQTT_MOTION_ALWAYS_ON: '@kiosk_mqtt_motion_always_on',
+  // MQTT image publishing (screenshot / camera snapshots)
+  MQTT_SCREENSHOT_ENABLED: '@kiosk_mqtt_screenshot_enabled',
+  MQTT_SCREENSHOT_AUTO: '@kiosk_mqtt_screenshot_auto',
+  MQTT_SCREENSHOT_INTERVAL: '@kiosk_mqtt_screenshot_interval',
+  MQTT_SCREENSHOT_QUALITY: '@kiosk_mqtt_screenshot_quality',
+  MQTT_SCREENSHOT_MAX_WIDTH: '@kiosk_mqtt_screenshot_max_width',
+  MQTT_CAMERA_ENABLED: '@kiosk_mqtt_camera_enabled',
+  MQTT_CAMERA_AUTO: '@kiosk_mqtt_camera_auto',
+  MQTT_CAMERA_INTERVAL: '@kiosk_mqtt_camera_interval',
+  MQTT_CAMERA_QUALITY: '@kiosk_mqtt_camera_quality',
   // Beta Updates
   BETA_UPDATES_ENABLED: '@kiosk_beta_updates_enabled',
   // Managed Apps (multi-app mode, background apps, accessibility whitelist)
@@ -520,6 +530,16 @@ export const StorageService = {
         KEYS.MQTT_ALLOW_CONTROL,
         KEYS.MQTT_DEVICE_NAME,
         KEYS.MQTT_MOTION_ALWAYS_ON,
+        // MQTT image publishing
+        KEYS.MQTT_SCREENSHOT_ENABLED,
+        KEYS.MQTT_SCREENSHOT_AUTO,
+        KEYS.MQTT_SCREENSHOT_INTERVAL,
+        KEYS.MQTT_SCREENSHOT_QUALITY,
+        KEYS.MQTT_SCREENSHOT_MAX_WIDTH,
+        KEYS.MQTT_CAMERA_ENABLED,
+        KEYS.MQTT_CAMERA_AUTO,
+        KEYS.MQTT_CAMERA_INTERVAL,
+        KEYS.MQTT_CAMERA_QUALITY,
         // Dashboard
         KEYS.DASHBOARD_MODE_ENABLED,
         KEYS.DASHBOARD_TILES,
@@ -2573,6 +2593,175 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting MQTT motion always on:', error);
       return false;
+    }
+  },
+
+  // MQTT IMAGE PUBLISHING (screenshot / camera snapshots)
+  saveMqttScreenshotEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_SCREENSHOT_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving MQTT screenshot enabled:', error);
+    }
+  },
+
+  getMqttScreenshotEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_SCREENSHOT_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting MQTT screenshot enabled:', error);
+      return false;
+    }
+  },
+
+  saveMqttScreenshotAuto: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_SCREENSHOT_AUTO, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving MQTT screenshot auto-publish:', error);
+    }
+  },
+
+  getMqttScreenshotAuto: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_SCREENSHOT_AUTO);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting MQTT screenshot auto-publish:', error);
+      return false;
+    }
+  },
+
+  saveMqttScreenshotInterval: async (seconds: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_SCREENSHOT_INTERVAL, seconds.toString());
+    } catch (error) {
+      console.error('Error saving MQTT screenshot interval:', error);
+    }
+  },
+
+  getMqttScreenshotInterval: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_SCREENSHOT_INTERVAL);
+      const interval = value ? parseInt(value, 10) : 60;
+      return isNaN(interval) ? 60 : Math.min(3600, Math.max(5, interval));
+    } catch (error) {
+      console.error('Error getting MQTT screenshot interval:', error);
+      return 60;
+    }
+  },
+
+  saveMqttScreenshotQuality: async (quality: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_SCREENSHOT_QUALITY, quality.toString());
+    } catch (error) {
+      console.error('Error saving MQTT screenshot quality:', error);
+    }
+  },
+
+  getMqttScreenshotQuality: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_SCREENSHOT_QUALITY);
+      const quality = value ? parseInt(value, 10) : 70;
+      return isNaN(quality) ? 70 : Math.min(100, Math.max(1, quality));
+    } catch (error) {
+      console.error('Error getting MQTT screenshot quality:', error);
+      return 70;
+    }
+  },
+
+  saveMqttScreenshotMaxWidth: async (width: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_SCREENSHOT_MAX_WIDTH, width.toString());
+    } catch (error) {
+      console.error('Error saving MQTT screenshot max width:', error);
+    }
+  },
+
+  getMqttScreenshotMaxWidth: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_SCREENSHOT_MAX_WIDTH);
+      const width = value ? parseInt(value, 10) : 1280;
+      // 0 means "keep native resolution"
+      return isNaN(width) ? 1280 : Math.max(0, width);
+    } catch (error) {
+      console.error('Error getting MQTT screenshot max width:', error);
+      return 1280;
+    }
+  },
+
+  saveMqttCameraEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_CAMERA_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving MQTT camera enabled:', error);
+    }
+  },
+
+  getMqttCameraEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_CAMERA_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting MQTT camera enabled:', error);
+      return false;
+    }
+  },
+
+  saveMqttCameraAuto: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_CAMERA_AUTO, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving MQTT camera auto-publish:', error);
+    }
+  },
+
+  getMqttCameraAuto: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_CAMERA_AUTO);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting MQTT camera auto-publish:', error);
+      return false;
+    }
+  },
+
+  saveMqttCameraInterval: async (seconds: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_CAMERA_INTERVAL, seconds.toString());
+    } catch (error) {
+      console.error('Error saving MQTT camera interval:', error);
+    }
+  },
+
+  getMqttCameraInterval: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_CAMERA_INTERVAL);
+      const interval = value ? parseInt(value, 10) : 300;
+      return isNaN(interval) ? 300 : Math.min(3600, Math.max(5, interval));
+    } catch (error) {
+      console.error('Error getting MQTT camera interval:', error);
+      return 300;
+    }
+  },
+
+  saveMqttCameraQuality: async (quality: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_CAMERA_QUALITY, quality.toString());
+    } catch (error) {
+      console.error('Error saving MQTT camera quality:', error);
+    }
+  },
+
+  getMqttCameraQuality: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_CAMERA_QUALITY);
+      const quality = value ? parseInt(value, 10) : 70;
+      return isNaN(quality) ? 70 : Math.min(100, Math.max(1, quality));
+    } catch (error) {
+      console.error('Error getting MQTT camera quality:', error);
+      return 70;
     }
   },
 

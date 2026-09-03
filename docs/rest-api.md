@@ -369,6 +369,8 @@ curl http://TABLET_IP:8080/api/screenshot -o screenshot.png
 > {"success": false, "error": "Accessibility service is not enabled (required to capture another app)"}
 > ```
 
+> 💡 Home Assistant users can also get the screenshot as an auto-discovered `image` / `camera` entity over MQTT, without exposing the HTTP server — see [MQTT: Images (Screenshot & Camera)](MQTT#-images-screenshot--camera).
+
 #### `GET /api/camera/photo`
 
 Take a photo using the device camera. **(v1.2.5+)**
@@ -400,6 +402,9 @@ GET /api/camera/photo?camera=front&quality=60
 - Camera permission must be granted (already included in app permissions)
 - Photo resolution is automatically optimized (~1.2MP) for fast HTTP transfer
 - Higher quality values produce larger files
+- Capture fails while motion detection is using the camera
+
+> 💡 Camera snapshots can also be published over MQTT as auto-discovered `image` / `camera` entities (one per camera) with a capture button in Home Assistant — see [MQTT: Images (Screenshot & Camera)](MQTT#-images-screenshot--camera).
 
 #### `GET /api/camera/list`
 
