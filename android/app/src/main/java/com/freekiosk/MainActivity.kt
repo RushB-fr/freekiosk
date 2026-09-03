@@ -156,11 +156,19 @@ class MainActivity : ReactActivity() {
     val ADB_SPECIAL_KEYS = setOf(
       "pin", "url", "lock_package", "config", "managed_apps", "dashboard_tiles",
       "mqtt_password", "auto_start", "auto_launch", "test_mode", "back_button_mode",
-      "pin_mode", "external_app_mode", "status_bar"
+      "pin_mode", "external_app_mode", "status_bar",
+      // Cloud enrollment over ADB. The dashboard's "Headless install (ADB)" snippet
+      // has advertised --es cloud_token since the cloud shipped, but nothing read it.
+      "cloud_token", "cloud_url"
     )
 
+    /** Where a cloud_token enrolls when the command does not say. */
+    const val DEFAULT_CLOUD_URL = "https://cloud.freekiosk.app"
+
     /** Never log these values: they are credentials, not settings. */
-    val ADB_SENSITIVE_KEYS = setOf("pin", "rest_api_key", "mqtt_password", "mqtt_username")
+    val ADB_SENSITIVE_KEYS = setOf(
+      "pin", "rest_api_key", "mqtt_password", "mqtt_username", "cloud_token"
+    )
 
     /** Extras Android or FreeKiosk itself puts on the intent; never a config mistake. */
     private val ADB_INTERNAL_EXTRAS = setOf("from_boot_lock", "profile")
@@ -1709,6 +1717,28 @@ class MainActivity : ReactActivity() {
       } else {
         showAdbToast("❌ ADB Config: Invalid dashboard_tiles JSON")
       }
+    }
+
+    // Cloud enrollment token: written to the *enrollment* store, not to the pending
+    // config, so it is consumed by the same code the setup-wizard QR feeds
+    // (CloudSyncService.consumePendingProvisioningEnrollment, via
+    // KioskModule.getPendingCloudEnrollment). Nothing to add on the JS side.
+    //
+    // cloud_url matters: the consumer bails out when it is empty, so a token on its
+    // own would silently do nothing. The snippet on the Add Device page only passes
+    // cloud_token, hence the default; --es cloud_url covers a self-hosted instance.
+    intent.getStringExtra("cloud_token")?.takeIf { it.isNotBlank() }?.let { token ->
+      val cloudUrl = intent.getStringExtra("cloud_url")
+        ?.takeIf { it.isNotBlank() }
+        ?.trimEnd('/')
+        ?: DEFAULT_CLOUD_URL
+      getSharedPreferences(DeviceAdminReceiver.PREFS, Context.MODE_PRIVATE).edit()
+        .putBoolean(DeviceAdminReceiver.KEY_HAS_PENDING, true)
+        .putString(DeviceAdminReceiver.KEY_TOKEN, token)
+        .putString(DeviceAdminReceiver.KEY_CLOUD_URL, cloudUrl)
+        .putString(DeviceAdminReceiver.KEY_ORG_ID, "")
+        .commit()
+      android.util.Log.i("FreeKiosk-ADB", "Cloud enrollment queued for $cloudUrl")
     }
 
     // Mark that there is pending config
