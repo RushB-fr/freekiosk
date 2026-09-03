@@ -11,10 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-***
-
-## [2.0.0-beta.3] - 2026-09-03
-
 ### Fixed
 - 📌 **A QR-provisioned device landed on the stock launcher, so FreeKiosk never started**: the wizard completed and the enrollment token was stored, but Home pinning threw and the tablet booted to the system launcher with FreeKiosk installed and idle, which costs the zero-touch enrollment its trigger. `DeviceAdminReceiver.kt` carried `import android.app.admin.DeviceAdminReceiver` alongside its own `class DeviceAdminReceiver`. **In Kotlin an explicit import outranks a same-package declaration**, so every `DeviceAdminReceiver::class.java` *in that one file* resolved to the framework class, and `pinHomeLauncher` handed `DevicePolicyManager` a component named `com.freekiosk/android.app.admin.DeviceAdminReceiver`, which it rejected: `SecurityException: Admin ComponentInfo{...} does not exist or is not owned by uid`. `KioskModule` builds the same component and always worked, because no other file in the project carries that import, which is why pinning succeeded as soon as the app was opened by hand. The supertype is now spelled out inline instead of imported, so the name resolves locally; verified in the bytecode, where the class literal is `com/freekiosk/DeviceAdminReceiver` rather than the framework one.
 
