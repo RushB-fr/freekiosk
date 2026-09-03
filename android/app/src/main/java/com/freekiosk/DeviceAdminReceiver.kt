@@ -1,6 +1,5 @@
 package com.freekiosk
 
-import android.app.admin.DeviceAdminReceiver
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
@@ -18,7 +17,15 @@ import android.util.Log
  * auto-enroll on first launch (see KioskModule.getPendingCloudEnrollment and
  * KioskScreen startup).
  */
-class DeviceAdminReceiver : DeviceAdminReceiver() {
+// The supertype is spelled out rather than imported on purpose. An explicit
+// import outranks a same-package declaration in Kotlin, so
+// `import android.app.admin.DeviceAdminReceiver` made every
+// `DeviceAdminReceiver::class.java` in this file resolve to the *framework*
+// class: pinHomeLauncher then handed DevicePolicyManager
+// com.freekiosk/android.app.admin.DeviceAdminReceiver, which it rejected with
+// "does not exist or is not owned by uid". The same call from KioskModule always
+// worked, because no other file carries that import.
+class DeviceAdminReceiver : android.app.admin.DeviceAdminReceiver() {
 
     companion object {
         private const val TAG = "FKDeviceAdmin"
