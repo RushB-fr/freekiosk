@@ -200,7 +200,7 @@ export default function PermissionWizard({ visible, onClose }: Props) {
           <Icon name={isDeviceOwner ? 'shield-check' : 'shield'} size={22} color="#fff" />
           <Text style={styles.bannerText}>
             {isDeviceOwner
-              ? 'Managed mode (Device Owner). Permissions are granted automatically; you can finish right away.'
+              ? 'Managed mode (Device Owner). Runtime permissions are granted automatically, but "Display over other apps" and "Usage access" are not: Android gives no way for a Device Owner to grant those two itself, so they still need a tap each below.'
               : 'Standard mode. Grant the permissions below to unlock every feature. Reboot, silent install and true screen-off need Managed mode (factory reset + provisioning QR).'}
           </Text>
         </View>
