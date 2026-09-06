@@ -171,7 +171,7 @@ adb shell am start -n com.freekiosk/.MainActivity \
 
 ## Next Steps
 
-- **Installation:** [Complete setup guide](Installation)
+- **Installation:** [Complete setup guide](Installation) - link broken
 - **Integrations:** [REST API and MQTT](Integrations)
 - **ADB Provisioning:** [Headless deployment](ADB-Configuration)
 - **FAQ:** [Common questions](FAQ)
