@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+***
+
+## [2.0.0-beta.3] - 2026-09-07
+
 ### Added
 - 🖧 **`--es cloud_token` now enrols a device from the ADB command line.** The cloud's "Headless install (ADB)" snippet on the Add Device page has advertised `--es cloud_token "TOKEN"` since the cloud shipped, but no build ever read the extra: the intent only stored the PIN, so a scripted enrolment silently did nothing and the operator had no way to tell. The extra is now recognised and written to the **same store the setup-wizard QR feeds** (`FreeKioskCloudEnrollment`), so it is consumed by the existing `CloudSyncService.consumePendingProvisioningEnrollment` on first launch with nothing added on the JS side.
 
