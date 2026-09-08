@@ -1,0 +1,50 @@
+name: Build release APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'fix/**'
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages pinned by android/build.gradle
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;27.1.12297006"
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Build release APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Report APK details
+        run: |
+          ls -lh android/app/build/outputs/apk/release/
+          sha256sum android/app/build/outputs/apk/release/*.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: freekiosk-release-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
