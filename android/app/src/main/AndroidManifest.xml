@@ -55,6 +55,9 @@
 
     <!-- Permissions pour la Status Bar -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+  <!-- Cellular generation (5G/4G) and signal strength for the status bar and the
+       cloud dashboard. Stripped from Play Store builds by src/playstore. -->
+  <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />

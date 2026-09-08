@@ -162,6 +162,14 @@ class CloudSyncServiceClass {
             wifi_ssid: status.wifi.ssid,
             wifi_signal_dbm: status.wifi.signalStrength,
             ip_address: status.device.ip,
+            // Cellular, reported next to WiFi so a tablet on mobile data is not a
+            // blank row in the dashboard. network_type and signal_dbm are empty
+            // without READ_PHONE_STATE, which Play Store builds do not carry.
+            cellular_connected: status.cellular.connected,
+            cellular_carrier: status.cellular.carrier,
+            cellular_network_type: status.cellular.networkType,
+            cellular_signal_dbm: status.cellular.signalDbm,
+            airplane_mode: status.cellular.airplaneMode,
           },
           display: {
             screen_on: status.screen.on,

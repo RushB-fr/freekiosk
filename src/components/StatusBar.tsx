@@ -12,6 +12,13 @@ interface SystemInfo {
   wifi: {
     isConnected: boolean;
   };
+  cellular?: {
+    isConnected: boolean;
+    carrier: string;
+    networkType: string;
+    signalDbm: number | null;
+    airplaneMode: boolean;
+  };
   bluetooth: {
     isEnabled: boolean;
     connectedDevices: number;
@@ -113,6 +120,15 @@ const StatusBar: React.FC<StatusBarProps> = ({
   const batteryLevel = systemInfo?.battery?.level ?? 0;
   const isCharging = systemInfo?.battery?.isCharging ?? false;
   const wifiConnected = systemInfo?.wifi?.isConnected ?? false;
+  const cellularConnected = systemInfo?.cellular?.isConnected ?? false;
+  const airplaneMode = systemInfo?.cellular?.airplaneMode ?? false;
+  // networkType is '' on any build without READ_PHONE_STATE (every Play Store build),
+  // so the icon falls back to a plain signal bar rather than showing nothing.
+  const cellularType = systemInfo?.cellular?.networkType ?? '';
+  // No dedicated toggle: the item appears only on a device that actually has cellular
+  // in play, so a WiFi-only kiosk is unchanged and no new setting had to cross the app
+  // and the cloud to ship this.
+  const cellularPresent = cellularConnected || airplaneMode;
   const bluetoothEnabled = systemInfo?.bluetooth?.isEnabled ?? false;
   const bluetoothDevices = systemInfo?.bluetooth?.connectedDevices ?? 0;
   const audioVolume = systemInfo?.audio?.volume ?? 0;
@@ -181,6 +197,33 @@ const StatusBar: React.FC<StatusBarProps> = ({
           style={styles.iconMaterial}
         />
         <Text style={[styles.text, { color: colors.text }]}>{batteryLevel}%</Text>
+      </View>
+    );
+  }
+
+  // Cellular - left side, next to WiFi
+  //
+  // Airplane mode wins the display when it is on: it is the state that made a tester's
+  // tablet hang on startup with nothing anywhere saying why, so it is worth more than
+  // the generation on screen.
+  if (cellularPresent) {
+    leftItems.push(
+      <View key="cellular" style={styles.item}>
+        <MaterialCommunityIcons
+          name={airplaneMode ? 'airplane' : 'signal'}
+          size={14}
+          color={airplaneMode ? colors.disconnected : colors.icon}
+          style={styles.iconMaterial}
+        />
+        {cellularType ? (
+          <Text style={[styles.text, { color: colors.text }]}>{cellularType}</Text>
+        ) : (
+          <MaterialCommunityIcons
+            name={cellularConnected ? 'check-circle' : 'close-circle'}
+            size={13}
+            color={cellularConnected ? colors.connected : colors.disconnected}
+          />
+        )}
       </View>
     );
   }

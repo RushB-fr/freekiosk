@@ -18,6 +18,14 @@
         android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
         tools:node="remove" />
 
+    <!-- Strip READ_PHONE_STATE: the cellular generation and signal are a convenience,
+         and a phone-state permission on a kiosk browser is exactly the kind of thing
+         that costs a Play Store review. Cellular connected/disconnected and airplane
+         mode need no permission, so a Play build keeps those. -->
+    <uses-permission
+        android:name="android.permission.READ_PHONE_STATE"
+        tools:node="remove" />
+
     <!-- Strip WRITE_SETTINGS (Device settings policy) -->
     <uses-permission
         android:name="android.permission.WRITE_SETTINGS"

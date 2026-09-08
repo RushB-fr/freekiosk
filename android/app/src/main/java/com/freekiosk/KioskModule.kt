@@ -578,6 +578,50 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
         }
     }
 
+    /**
+     * Block (or unblock) airplane mode via a Device Owner user restriction (#130).
+     *
+     * A beta tester had a tablet hang on startup after someone enabled airplane mode:
+     * the kiosk sat on a URL it could not load. He asked for airplane mode to be turned
+     * off at boot, and DISALLOW_AIRPLANE_MODE is better than that, because it stops the
+     * user reaching the toggle at all rather than undoing the damage one reboot later.
+     * Persistent across reboots, like DISALLOW_FACTORY_RESET above.
+     *
+     * Device Owner only, and there is no fallback: switching airplane mode from a
+     * third-party app has been closed off since Android 4.2, the broadcast is the
+     * system's. No-op (resolves false) when not Device Owner or below API 28.
+     */
+    @ReactMethod
+    fun setAirplaneModeBlocked(blocked: Boolean, promise: Promise) {
+        try {
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.P) {
+                android.util.Log.d("KioskModule", "setAirplaneModeBlocked: needs API 28, no-op")
+                promise.resolve(false)
+                return
+            }
+
+            val dpm = reactApplicationContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+            val adminComponent = ComponentName(reactApplicationContext, DeviceAdminReceiver::class.java)
+
+            if (!dpm.isDeviceOwnerApp(reactApplicationContext.packageName)) {
+                android.util.Log.d("KioskModule", "setAirplaneModeBlocked: not Device Owner, no-op")
+                promise.resolve(false)
+                return
+            }
+
+            if (blocked) {
+                dpm.addUserRestriction(adminComponent, android.os.UserManager.DISALLOW_AIRPLANE_MODE)
+            } else {
+                dpm.clearUserRestriction(adminComponent, android.os.UserManager.DISALLOW_AIRPLANE_MODE)
+            }
+            android.util.Log.d("KioskModule", "Airplane mode restriction ${if (blocked) "applied" else "cleared"}")
+            promise.resolve(true)
+        } catch (e: Exception) {
+            android.util.Log.e("KioskModule", "setAirplaneModeBlocked error: ${e.message}")
+            promise.resolve(false)
+        }
+    }
+
     @ReactMethod
     fun startLockTask(externalAppPackage: String?, allowPowerButton: Boolean, allowNotifications: Boolean, allowSystemInfo: Boolean, allowEmergencyCall: Boolean, promise: Promise) {
         try {
