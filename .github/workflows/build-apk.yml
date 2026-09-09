@@ -32,14 +32,27 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
+      # android/gradle.properties is gitignored, so a fresh clone has neither the
+      # heap settings (Gradle falls back to 512 MiB and the daemon dies GC-thrashing)
+      # nor android.useAndroidX (AGP refuses the release classpath without it).
+      # Recreate the React Native defaults instead of committing an ignored file.
+      - name: Write android/gradle.properties
+        run: |
+          cat > android/gradle.properties <<'PROPS'
+          org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1536m
+          org.gradle.parallel=true
+          android.useAndroidX=true
+          reactNativeArchitectures=armeabi-v7a,arm64-v8a
+          newArchEnabled=true
+          hermesEnabled=true
+          PROPS
+          cat android/gradle.properties
+
       - name: Build release APK
         working-directory: android
         run: |
           chmod +x gradlew
-          # The repo ships no android/gradle.properties, so Gradle falls back to a
-          # 512 MiB heap and the daemon dies GC-thrashing before it reaches the
-          # Kotlin compile tasks. Give it room to use the runner's 16 GB.
-          ./gradlew assembleRelease --no-daemon --stacktrace             -Dorg.gradle.jvmargs="-Xmx6g -XX:MaxMetaspaceSize=1536m"
+          ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Report APK details
         run: |
