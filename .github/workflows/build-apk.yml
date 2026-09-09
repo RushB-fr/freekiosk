@@ -36,7 +36,10 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          # The repo ships no android/gradle.properties, so Gradle falls back to a
+          # 512 MiB heap and the daemon dies GC-thrashing before it reaches the
+          # Kotlin compile tasks. Give it room to use the runner's 16 GB.
+          ./gradlew assembleRelease --no-daemon --stacktrace             -Dorg.gradle.jvmargs="-Xmx6g -XX:MaxMetaspaceSize=1536m"
 
       - name: Report APK details
         run: |
