@@ -18,10 +18,31 @@ npm run lint                        # ESLint
 npm test                            # Jest unit tests
 npm test -- --testPathPattern=foo   # Run a single test file
 
-# Android build
-cd android && ./gradlew assembleRelease   # Release APK
-cd android && ./gradlew assembleBundle   # Release AAB (Play Store)
+# Android build - three variants, selected by a -P flag
+cd android && ./gradlew assembleRelease                 # APK for the GitHub release
+cd android && ./gradlew assembleRelease -Pcloudprovi    # APK uploaded to the cloud
+cd android && ./gradlew bundleRelease   -Pplaystore     # AAB for the Play Store
 ```
+
+| Build | Goes where | Self-update | AccessibilityService |
+|-------|-----------|-------------|----------------------|
+| `assembleRelease` | GitHub release, website download | yes | yes |
+| `assembleRelease -Pcloudprovi` | uploaded as the cloud's beta APK | yes | **stripped** |
+| `bundleRelease -Pplaystore` | Play Store | **no** | **stripped** |
+
+**A release needs two APK builds, not one.** The cloud serves its uploaded APK through two
+routes - the public `dpc-apk-download` the Android setup wizard fetches during QR
+provisioning, and the dashboard download a signed-in tester uses - so that one has to be the
+`-Pcloudprovi` build. Play Protect blocks a sideloaded install outright when the app declares
+an accessibility service ("App blocked to protect your device"), which kills QR provisioning
+mid-wizard with no way past it. The GitHub APK keeps the service, so anyone provisioning over
+ADB still gets it, and ADB is the only way to grant the `WRITE_SECURE_SETTINGS` it needs to
+turn on anyway.
+
+The two flags are mutually exclusive and the build fails if both are set. Each strips its
+service with `tools:node="remove"` in `android/app/src/<flag>/AndroidManifest.xml`, which
+removes the declaration rather than disabling it - Play Protect reads the manifest, so
+`android:enabled="false"` would not help.
 
 Output APK: `android/app/build/outputs/apk/release/app-release.apk`
 

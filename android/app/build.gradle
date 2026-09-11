@@ -67,12 +67,27 @@ react {
 def enableProguardInReleaseBuilds = true
 
 /**
- * Play Store compliance: disable in-app self-update when building with -Pplaystore.
- * Usage:
- *   APK  (self-update ON):  ./gradlew assembleRelease
- *   AAB  (self-update OFF): ./gradlew bundleRelease -Pplaystore
+ * Build variants, both driven by a -P flag rather than a product flavor so that the
+ * default build stays exactly what it was.
+ *
+ *   ./gradlew assembleRelease                  ADB provisioning / manual install: everything on
+ *   ./gradlew bundleRelease -Pplaystore        Play Store: no self-update, no accessibility
+ *   ./gradlew assembleRelease -Pcloudprovi     QR provisioning: self-update kept, accessibility stripped
+ *
+ * -Pcloudprovi exists because Play Protect blocks a sideloaded install outright when the
+ * app declares an accessibility service, which is how the setup wizard installs the DPC
+ * during QR provisioning. It strips that service and nothing else - a provisioning APK
+ * still needs REQUEST_INSTALL_PACKAGES. See src/cloudprovi/AndroidManifest.xml.
  */
+if (project.hasProperty('playstore') && project.hasProperty('cloudprovi')) {
+    throw new GradleException(
+        "-Pplaystore and -Pcloudprovi are mutually exclusive: they select different " +
+        "manifest overlays. Play Store builds strip self-update, provisioning builds need it."
+    )
+}
+
 def enableSelfUpdate = !project.hasProperty('playstore')
+def enableAccessibilityService = !project.hasProperty('playstore') && !project.hasProperty('cloudprovi')
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
@@ -107,19 +122,14 @@ android {
         // Play Store compliance: when -Pplaystore is set, replace REQUEST_INSTALL_PACKAGES
         // with INTERNET (already declared → deduplicated by manifest merger → effectively removed)
         // and disable UpdateInstallReceiver.
-        if (enableSelfUpdate) {
-            manifestPlaceholders = [
-                usesCleartextTraffic: "true",
-                updateReceiverEnabled: "true",
-                accessibilityServiceEnabled: "true"
-            ]
-        } else {
-            manifestPlaceholders = [
-                usesCleartextTraffic: "true",
-                updateReceiverEnabled: "false",
-                accessibilityServiceEnabled: "false"
-            ]
-        }
+        //
+        // The two flags move independently: -Pcloudprovi keeps self-update and drops only
+        // the accessibility service, so these cannot share one if/else.
+        manifestPlaceholders = [
+            usesCleartextTraffic: "true",
+            updateReceiverEnabled: "${enableSelfUpdate}",
+            accessibilityServiceEnabled: "${enableAccessibilityService}"
+        ]
     }
     
     signingConfigs {
@@ -172,6 +182,12 @@ android {
         sourceSets {
             release {
                 manifest.srcFile 'src/playstore/AndroidManifest.xml'
+            }
+        }
+    } else if (project.hasProperty('cloudprovi')) {
+        sourceSets {
+            release {
+                manifest.srcFile 'src/cloudprovi/AndroidManifest.xml'
             }
         }
     }
