@@ -677,6 +677,146 @@ Write-Host "✅ Device provisioned!"
 
 ## Troubleshooting
 
+### Error: "Can't set package ... as device owner"
+
+```
+java.lang.RuntimeException: Can't set package ComponentInfo{com.freekiosk/com.freekiosk.DeviceAdminReceiver} as device owner.
+        at com.android.commands.dpm.Dpm.runSetDeviceOwner(Dpm.java:177)
+```
+
+`dpm` reports every provisioning failure with this same message, so it never tells
+you which precondition failed. Run the diagnostic script instead — it checks each
+one separately and names the blocker:
+
+```powershell
+# Windows
+.\scripts\set-device-owner.ps1
+```
+
+The preconditions it checks, and how to clear each:
+
+| Blocker | Fix |
+| --- | --- |
+| FreeKiosk not installed | `adb install app-release.apk` |
+| A device owner is already set | Factory reset. `-Remove` / `dpm remove-active-admin` only works if the APK was built `android:testOnly="true"` |
+| Secondary users exist | `adb shell pm remove-user <id>` |
+| Any account is on the device | Remove every account under Settings → Accounts, then retry |
+| `android.software.device_admin` missing | See below — the ROM has no device policy support |
+
+> [!WARNING]
+> `adb shell dpm set-active-admin` prints `Success:` even when it did nothing —
+> the tool never checks the return value. Confirm with
+> `adb shell dumpsys device_policy`, which lists the admin only if it really
+> was registered.
+
+#### ROM does not declare `android.software.device_admin`
+
+Many cheap Android TV boxes (MXQ, X96, H96 and similar) ship AOSP TV builds with
+the device admin feature stripped out. Check with:
+
+```bash
+adb shell pm list features | grep device_admin
+```
+
+If that prints nothing, `DevicePolicyManagerService` is running with
+`mHasFeature = false`: `setDeviceOwner()` returns `false` unconditionally and
+`setActiveAdmin()` is a no-op. **No change to FreeKiosk can work around this** —
+the feature has to be declared in the system image.
+
+On a `userdebug` or `eng` build that grants `adb root` (check with
+`adb shell getprop ro.build.type`), the script can declare it for you:
+
+```powershell
+.\scripts\set-device-owner.ps1 -Fix    # writes to /system, then REBOOTS the device
+```
+
+Equivalent manual steps:
+
+```bash
+adb root && adb remount
+adb shell 'cat > /system/etc/permissions/android.software.device_admin.xml <<EOF
+<permissions>
+    <feature name="android.software.device_admin" />
+</permissions>
+EOF'
+adb shell chmod 644 /system/etc/permissions/android.software.device_admin.xml
+adb shell restorecon /system/etc/permissions/android.software.device_admin.xml
+adb reboot                       # the feature list is only parsed at boot
+adb shell dpm set-device-owner com.freekiosk/.DeviceAdminReceiver
+```
+
+Notes:
+
+- The change survives reboots, but **not** a factory reset or an OTA that
+  rewrites `/system`. Reapply it after either.
+- On a `user` build without `adb root`, `/system` cannot be modified. Such a box
+  cannot be provisioned as Device Owner without reflashing it, so run FreeKiosk
+  in its non-Device-Owner mode instead (grant "Display over other apps" and
+  "Usage Access" by hand — see the sections below).
+- `android.software.managed_users` is usually missing on the same ROMs. Device
+  Owner and lock task do not need it; work profiles and secondary users do.
+
+### FreeKiosk does not start after a reboot
+
+First confirm it is really the boot path that is broken, not the app:
+
+```bash
+adb logcat -d | grep -E 'Start proc .*freekiosk|E/BootReceiver'
+```
+
+`BootReceiver` logs an error about `WRITE_SECURE_SETTINGS` on every `BOOT_COMPLETED`
+run (harmless in itself). **If that line is absent after a reboot, the receiver never
+received `BOOT_COMPLETED`** — the ROM dropped the broadcast, and no FreeKiosk setting
+can fix it. Verify the receiver itself still works by delivering an equivalent
+broadcast by hand:
+
+```bash
+adb root
+adb shell am broadcast -a android.intent.action.QUICKBOOT_POWERON -n com.freekiosk/.BootReceiver
+# FreeKiosk should appear ~4 s later
+```
+
+> [!NOTE]
+> `am broadcast -a android.intent.action.BOOT_COMPLETED` is silently dropped even as
+> root — it is a protected broadcast. It prints `Broadcast completed: result=0` and
+> starts nothing, which looks like a FreeKiosk bug but is not. Use
+> `QUICKBOOT_POWERON`, which `BootReceiver` also handles.
+
+Two ROM behaviours have been observed to break boot launch, both on Android TV boxes
+(Droidlogic/MXQ, Android 9):
+
+1. **`BOOT_COMPLETED` is never delivered to third-party manifest receivers**, so
+   "Launch on Boot" never fires.
+2. **The Home intent is resolved while user 0 is still locked.** `MainActivity` is not
+   `directBootAware`, so it is filtered out of that query and the OEM launcher wins
+   Home — the Device Owner default-launcher policy is registered correctly but is
+   never consulted. Android does not re-resolve Home after unlock, so the OEM launcher
+   keeps the screen for the rest of the session. `pm disable-user` on the OEM launcher
+   does not help: the ROM re-enables it at boot.
+
+Confirm (2) with:
+
+```bash
+adb shell pm resolve-activity -a android.intent.action.MAIN -c android.intent.category.HOME
+```
+
+If that returns `com.freekiosk.MainActivity` while the OEM launcher is nonetheless on
+screen after a reboot, the Home intent was resolved before FreeKiosk was eligible.
+
+**Workaround** (needs a `userdebug`/`eng` ROM that grants `adb root`):
+
+```powershell
+.\scripts\install-boot-autostart.ps1     # installs, reboots, verifies
+```
+
+It installs `/system/bin/freekiosk-autostart.sh` and an init `.rc` that runs it on
+`sys.boot_completed=1`; the script waits for user 0 to unlock, then starts
+`MainActivity`, retrying up to three times. Verified over three consecutive reboots on
+the MXQ box. Undo with `.\scripts\install-boot-autostart.ps1 -Uninstall` and a reboot.
+
+Like the `device_admin` patch above, this lives in `/system` and does not survive a
+factory reset or an OTA that rewrites `/system`.
+
 ### Error: "PIN required for first setup"
 
 **Cause**: Device has no PIN configured, but none was provided.

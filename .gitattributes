@@ -5,3 +5,7 @@
 # On Windows, autocrlf would otherwise check them out as CRLF, which
 # patch-package 8 fails to parse ("Failed to apply patch ...") — see #184.
 *.patch text eol=lf
+
+# Files pushed to an Android device must keep LF. A CRLF shebang ("#!/system/bin/sh\r")
+# is not a valid interpreter path, and init refuses to parse a CRLF .rc file.
+scripts/device/* text eol=lf
