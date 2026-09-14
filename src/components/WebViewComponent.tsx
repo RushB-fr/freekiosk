@@ -1126,8 +1126,14 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
         sharedCookiesEnabled={true}
         thirdPartyCookiesEnabled={true}
         
-        // Storage settings for Pinia/Nuxt compatibility
-        cacheMode="LOAD_DEFAULT"
+        // Storage settings for Pinia/Nuxt compatibility.
+        // LOAD_NO_CACHE (not LOAD_DEFAULT): kiosk pages are long-lived and reload
+        // on a timer, so a cached subresource with a generous max-age (a logo, a
+        // stylesheet) keeps being served after the site has been updated. The
+        // document revalidates on reload but its subresources do not, which shows
+        // up as a new page rendered with old assets. Always hitting the network
+        // costs bandwidth but keeps the displayed content truthful.
+        cacheMode="LOAD_NO_CACHE"
         
         // Allow popups/new windows - required for some login flows
         // Instead of opening a new window, we redirect in the same WebView
