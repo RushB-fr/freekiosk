@@ -209,8 +209,13 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [pdfViewerEnabled, setPdfViewerEnabled] = useState<boolean>(false);
   
   // Printing state
-  const [printEnabled, setPrintEnabled] = useState<boolean>(false);
+  const [windowPrintEnabled, setWindowPrintEnabled] = useState<boolean>(false);
   const [printPaperSize, setPrintPaperSize] = useState<string>('A4');
+  const [silentPrintEnabled, setSilentPrintEnabled] = useState<boolean>(false);
+  const [escPosWidthDots, setEscPosWidthDots] = useState<number>(384);
+  const [escPosCut, setEscPosCut] = useState<boolean>(false);
+  const [escPosFeedLines, setEscPosFeedLines] = useState<number>(0);
+  const [printOrigins, setPrintOrigins] = useState<string[] | null>(null);
   
   // WebView Zoom Level
   const [zoomLevel, setZoomLevel] = useState<number>(100);
@@ -669,10 +674,15 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setPdfViewerEnabled(savedPdfViewerEnabled);
 
     // Printing setting
-    const savedPrintEnabled = await StorageService.getPrintEnabled();
-    setPrintEnabled(savedPrintEnabled);
+    const savedWindowPrintEnabled = await StorageService.getWindowPrintEnabled();
+    setWindowPrintEnabled(savedWindowPrintEnabled);
     const savedPrintPaperSize = await StorageService.getPrintPaperSize();
     setPrintPaperSize(savedPrintPaperSize);
+    setSilentPrintEnabled(await StorageService.getSilentPrintEnabled());
+    setEscPosWidthDots(await StorageService.getEscPosWidthDots());
+    setEscPosCut(await StorageService.getEscPosCut());
+    setEscPosFeedLines(await StorageService.getEscPosFeedLines());
+    setPrintOrigins(await StorageService.getPrintOrigins());
 
     // Dashboard settings
     const savedDashboardModeEnabled = await StorageService.getDashboardModeEnabled();
@@ -1525,8 +1535,13 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.savePdfViewerEnabled(pdfViewerEnabled);
 
     // Save Printing setting
-    await StorageService.savePrintEnabled(printEnabled);
+    await StorageService.saveWindowPrintEnabled(windowPrintEnabled);
     await StorageService.savePrintPaperSize(printPaperSize);
+    await StorageService.saveSilentPrintEnabled(silentPrintEnabled);
+    await StorageService.saveEscPosWidthDots(escPosWidthDots);
+    await StorageService.saveEscPosCut(escPosCut);
+    await StorageService.saveEscPosFeedLines(escPosFeedLines);
+    await StorageService.savePrintOrigins(printOrigins);
 
     // Save Media Player settings
     if (displayMode === 'media_player') {
@@ -1872,10 +1887,20 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             onAutoReloadChange={setAutoReload}
             pdfViewerEnabled={pdfViewerEnabled}
             onPdfViewerEnabledChange={setPdfViewerEnabled}
-            printEnabled={printEnabled}
-            onPrintEnabledChange={setPrintEnabled}
+            windowPrintEnabled={windowPrintEnabled}
+            onWindowPrintEnabledChange={setWindowPrintEnabled}
             printPaperSize={printPaperSize}
             onPrintPaperSizeChange={setPrintPaperSize}
+            silentPrintEnabled={silentPrintEnabled}
+            onSilentPrintEnabledChange={setSilentPrintEnabled}
+            escPosWidthDots={escPosWidthDots}
+            onEscPosWidthDotsChange={setEscPosWidthDots}
+            escPosCut={escPosCut}
+            onEscPosCutChange={setEscPosCut}
+            escPosFeedLines={escPosFeedLines}
+            onEscPosFeedLinesChange={setEscPosFeedLines}
+            printOrigins={printOrigins}
+            onPrintOriginsChange={setPrintOrigins}
             urlRotationEnabled={urlRotationEnabled}
             onUrlRotationEnabledChange={setUrlRotationEnabled}
             urlRotationList={urlRotationList}

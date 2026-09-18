@@ -22,6 +22,7 @@ import { WebView } from 'react-native-webview';
 import type { WebViewErrorEvent, ShouldStartLoadRequest, WebViewRenderProcessGoneEvent } from 'react-native-webview/lib/WebViewTypes';
 import { useNavigation } from '@react-navigation/native';
 import PrintModule from '../utils/PrintModule';
+import SilentPrintModule from '../utils/SilentPrintModule';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
@@ -41,8 +42,13 @@ interface WebViewComponentProps {
   urlFilterPatterns?: string[]; // URL patterns to filter
   urlFilterShowFeedback?: boolean; // Show feedback when URL is blocked
   pdfViewerEnabled?: boolean; // Enable inline PDF viewing via PDF.js
-  printEnabled?: boolean; // Enable window.print() interception for native printing
+  windowPrintEnabled?: boolean; // Enable window.print() interception for native printing
   printPaperSize?: string; // Default paper size: 'A4' | 'A5' | 'A3' | 'LETTER' | 'LEGAL'
+  silentPrintEnabled?: boolean; // Inject window.FreeKiosk.silentPrinter, which drives an ESC/POS printer
+  escPosWidthDots?: number; // Printable width in dots
+  escPosCut?: boolean;
+  escPosFeedLines?: number;
+  printOrigins?: string[] | null; // Origins allowed to use Silent Print; null = any, [] = none
   zoomLevel?: number; // Zoom level percentage (50-200, default 100)
   zoomMode?: string; // 'standard' (CSS zoom) | 'fit' (viewport reflow, #188)
   disableUserZoom?: boolean; // Prevent pinch-to-zoom and double-tap zoom
@@ -80,8 +86,13 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   urlFilterPatterns,
   urlFilterShowFeedback = false,
   pdfViewerEnabled = false,
-  printEnabled = false,
+  windowPrintEnabled = false,
   printPaperSize = 'A4',
+  silentPrintEnabled = false,
+  escPosWidthDots = 384,
+  escPosCut = false,
+  escPosFeedLines = 0,
+  printOrigins = null,
   zoomLevel = 100,
   zoomMode = 'standard',
   disableUserZoom = false,
@@ -374,7 +385,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
     }
 
     // Intercept window.print() to use native Android print (only when printing is enabled)
-    ${printEnabled ? `
+    ${windowPrintEnabled ? `
     window.print = function() {
       window.ReactNativeWebView.postMessage(JSON.stringify({
         type: 'PRINT_REQUEST',
@@ -383,6 +394,53 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
       }));
     };
     ` : '// Printing disabled - window.print() not intercepted'}
+
+    // Silent Print: window.FreeKiosk.silentPrinter drives the ESC/POS printer with no dialog.
+    // window.print() is left to the block above.
+    ${silentPrintEnabled ? `
+    (function() {
+      var pending = {};
+      var nextId = 1;
+
+      function call(op, data) {
+        return new Promise(function(resolve, reject) {
+          var id = String(nextId++);
+          pending[id] = { resolve: resolve, reject: reject };
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'FK_PRINTER', op: op, id: id, data: data || {}
+          }));
+        });
+      }
+
+      window.__fkSettle = function(json) {
+        var result;
+        try { result = JSON.parse(json); } catch (e) { return; }
+        var entry = pending[result.id];
+        if (!entry) return;
+        delete pending[result.id];
+        if (result.ok) {
+          entry.resolve(result.value);
+        } else {
+          var error = new Error(result.message || 'Printing failed');
+          error.code = result.code || 'ERROR';
+          entry.reject(error);
+        }
+      };
+
+      window.FreeKiosk = window.FreeKiosk || {};
+      window.FreeKiosk.version = 1;
+      window.FreeKiosk.silentPrinter = {
+        getStatus: function() { return call('getStatus'); },
+        print: function(jobName) {
+          return call('print', { jobName: jobName || document.title || '' });
+        },
+        printImage: function(base64) { return call('printImage', { base64: base64 }); }
+      };
+
+      // Injection happens after load, so a page that booted first has to be told.
+      window.dispatchEvent(new Event('freekiosk:ready'));
+    })();
+    ` : ''}
 
     // Throttling pour éviter le flood de messages (critique sur Fire OS)
     let lastInteraction = 0;
@@ -711,6 +769,63 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   const combinedInjectedJavaScript = injectedJavaScript + getKeyboardModeScript();
 
   // Gestion des messages venant de la webview
+  const settlePrinterRequest = (payload: Record<string, unknown>) => {
+    // Double-stringify so the JSON survives being embedded in a JS string literal.
+    const safeArg = JSON.stringify(JSON.stringify(payload));
+    webViewRef.current?.injectJavaScript(`window.__fkSettle && window.__fkSettle(${safeArg}); true;`);
+  };
+
+  const originOf = (address?: string): string | null =>
+    address?.trim().match(/^[a-z]+:\/\/[^/?#]+/i)?.[0].toLowerCase() ?? null;
+
+  /** No allow-list means any displayed page may print. */
+  const printerOriginAllowed = (pageUrl?: string): boolean => {
+    if (!printOrigins) return true;
+    const origin = originOf(pageUrl);
+    return origin !== null && printOrigins.some((entry) => originOf(entry) === origin);
+  };
+
+  const handlePrinterRequest = (data: any, pageUrl?: string) => {
+    // The API is only injected when Silent Print is on, but any page can post this message itself.
+    if (!silentPrintEnabled) return;
+
+    const id = data.id;
+    const fail = (code: string, message: string) =>
+      settlePrinterRequest({ id, ok: false, code, message });
+
+    if (!printerOriginAllowed(pageUrl)) {
+      console.warn('[FreeKiosk] Printer request blocked for origin:', pageUrl);
+      fail('ORIGIN_NOT_ALLOWED', 'This page is not allowed to print');
+      return;
+    }
+
+    const options = {
+      widthDots: escPosWidthDots,
+      cut: escPosCut,
+      feedLines: escPosFeedLines,
+    };
+    const payload = data.data || {};
+    let work: Promise<unknown>;
+    switch (data.op) {
+      case 'getStatus':
+        work = SilentPrintModule.status();
+        break;
+      case 'print':
+        work = SilentPrintModule.printPage(payload.jobName ?? null, options);
+        break;
+      case 'printImage':
+        work = SilentPrintModule.printImage(payload.base64 ?? '', options);
+        break;
+      default:
+        fail('UNKNOWN_OP', `Unknown printer operation: ${data.op}`);
+        return;
+    }
+
+    work
+      .then((value) => settlePrinterRequest({ id, ok: true, value }))
+      .catch((err: any) => fail(err?.code ?? 'ERROR', err?.message ?? 'Printing failed'));
+  };
+
   const onMessageHandler = (event: any) => {
     const message = event.nativeEvent.data;
     
@@ -754,6 +869,8 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
           PrintModule.printWebView(data.title || 'FreeKiosk Print', data.paperSize || 'A4')
             .then(() => console.log('[WebView] Print job started'))
             .catch((err: any) => console.error('[WebView] Print failed:', err));
+        } else if (data.type === 'FK_PRINTER') {
+          handlePrinterRequest(data, event.nativeEvent?.url);
         } else if (data.type === 'PDF_VIEWER_CLOSE') {
           // User closed PDF viewer, go back to previous page
           if (webViewRef.current) {
@@ -1020,10 +1137,10 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
             return false;
           }
           
-          // data: URLs - allow when printing is enabled (some label/receipt sites
+          // data: URLs - allow when window.print() is enabled (some label/receipt sites
           // generate print content as data:text/html popups)
           if (urlLower.startsWith('data:')) {
-            if (printEnabled) {
+            if (windowPrintEnabled) {
               console.log('[FreeKiosk] Allowing data: URL (printing enabled)');
               return true;
             }

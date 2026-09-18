@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Class 7 is the USB Printer Class, matched by Android against the device class or any interface
+  class. A printer exposing only a vendor-specific interface needs adding by id (DECIMAL, while
+  Settings shows the usual hexadecimal pair):
+    <usb-device vendor-id="1234" product-id="5678" />
+-->
+<resources>
+    <usb-device class="7" />
+</resources>

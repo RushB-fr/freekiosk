@@ -591,8 +591,8 @@ class MainActivity : ReactActivity() {
         // Add all managed apps to lock task whitelist
         whitelist.addAll(getManagedAppPackages())
         
-        // Add print spooler packages if printing is enabled
-        if (isPrintSettingEnabled()) {
+        // Add print spooler packages if window.print() is enabled
+        if (isWindowPrintSettingEnabled()) {
             whitelist.addAll(getPrintSpoolerPackages())
         }
 
@@ -1323,9 +1323,9 @@ class MainActivity : ReactActivity() {
   }
 
   /**
-   * Check if printing is enabled in settings (read from AsyncStorage)
+   * Check if window.print() (Allow Printing) is enabled in settings (read from AsyncStorage)
    */
-  private fun isPrintSettingEnabled(): Boolean {
+  private fun isWindowPrintSettingEnabled(): Boolean {
     return getAsyncStorageValue("@kiosk_print_enabled", "false") == "true"
   }
 
