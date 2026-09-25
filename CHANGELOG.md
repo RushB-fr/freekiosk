@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - 🌙 **External App mode: the Dim screensaver can stay over the app instead of switching back to FreeKiosk** (#266). Until now the screensaver brought FreeKiosk to the foreground and relaunched the app on wake, so an app like Home Assistant reloaded every time. The new **Keep the app in front** option (Settings > Display > Screensaver, Dim style only, off by default) lays a dimming layer over the app, which stays open; the first tap only wakes the screen and never presses anything underneath. Motion and proximity wake are not available with this option, and the 5-tap escape still works.
+- 🔄 **`GET /api/camera/photo` takes a `rotate` parameter** (#142): `auto`, `0`, `90`, `180` or `270`, clockwise. It covers cameras that still come out rotated after the fix below, and wall-mounted tablets.
+
+### Fixed
+- 📷 **Camera photos came out rotated 90°** (#253). The REST photo and the MQTT camera snapshots were served as the raw sensor frame. They are now turned upright from the camera and screen orientation, with the pixels rotated rather than an EXIF tag, since Home Assistant's generic camera and MQTT image entities do not read EXIF. Some sensors are mounted against the orientation Android documents (a Xiaomi front camera was measured 180° off); on those, pass `rotate=90` or the value that fits. **If you had compensated for the old rotation** (a CSS rotate on a dashboard card, for instance), remove it, or pass `rotate=0` to get the raw frame back on the REST photo. Motion detection is unaffected.
 
 ***
 

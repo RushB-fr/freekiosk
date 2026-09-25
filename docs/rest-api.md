@@ -382,6 +382,7 @@ Take a photo using the device camera. **(v1.2.5+)**
 |---|---|---|
 | **camera** | `back` | Camera to use: `front` or `back` |
 | **quality** | `80` | JPEG compression quality (1-100) |
+| **rotate** | `auto` | Clockwise rotation: `auto`, `0`, `90`, `180` or `270`. `auto` turns the photo upright from the camera and screen orientation; use a fixed value when a camera still comes out rotated, or for a wall-mounted tablet. `0` returns the raw sensor frame, as versions before 2.0.0 did. **(2.0.0+)** |
 
 
 
@@ -391,6 +392,7 @@ Take a photo using the device camera. **(v1.2.5+)**
 ```
 GET /api/camera/photo?camera=back&quality=80
 GET /api/camera/photo?camera=front&quality=60
+GET /api/camera/photo?camera=front&rotate=90
 ```
 
 

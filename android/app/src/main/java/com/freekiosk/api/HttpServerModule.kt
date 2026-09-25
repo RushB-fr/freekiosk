@@ -266,7 +266,7 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 commandHandler = { command, params -> handleCommand(command, params) },
                 screenshotProvider = { captureScreenshot() },
                 screenshotErrorProvider = { ScreenCapture.lastError },
-                cameraPhotoProvider = { camera, quality -> cameraPhotoModule?.capturePhoto(camera, quality) }
+                cameraPhotoProvider = { camera, quality, rotation -> cameraPhotoModule?.capturePhoto(camera, quality, rotation) }
             )
 
             server?.start()

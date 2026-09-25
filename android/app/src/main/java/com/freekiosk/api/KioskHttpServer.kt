@@ -4,6 +4,7 @@ import fi.iki.elonen.NanoHTTPD
 import org.json.JSONObject
 import org.json.JSONArray
 import android.util.Log
+import com.freekiosk.CameraPhotoModule
 
 /**
  * FreeKiosk REST API Server
@@ -17,7 +18,7 @@ class KioskHttpServer(
     private val commandHandler: (String, JSONObject?) -> JSONObject,
     private val screenshotProvider: (() -> java.io.InputStream?)? = null,
     private val screenshotErrorProvider: (() -> String?)? = null,
-    private val cameraPhotoProvider: ((camera: String, quality: Int) -> java.io.InputStream?)? = null
+    private val cameraPhotoProvider: ((camera: String, quality: Int, rotation: Int) -> java.io.InputStream?)? = null
 ) : NanoHTTPD(port) {
 
     companion object {
@@ -623,10 +624,18 @@ class KioskHttpServer(
         val params = session.parms ?: emptyMap()
         val camera = params["camera"] ?: "back"
         val quality = (params["quality"]?.toIntOrNull() ?: 80).coerceIn(1, 100)
+        // #253, #142: upright by default; rotate=0/90/180/270 overrides it for sensors
+        // mounted against the documented orientation, or wall mounts
+        val rotateParam = params["rotate"]
+        val rotation = when {
+            rotateParam == null || rotateParam == "auto" -> CameraPhotoModule.ROTATION_AUTO
+            rotateParam.toIntOrNull() in listOf(0, 90, 180, 270) -> rotateParam.toInt()
+            else -> return jsonError(Response.Status.BAD_REQUEST, "rotate must be auto, 0, 90, 180 or 270")
+        }
 
-        Log.d(TAG, "Camera photo request: camera=$camera, quality=$quality")
+        Log.d(TAG, "Camera photo request: camera=$camera, quality=$quality, rotate=${rotateParam ?: "auto"}")
 
-        val photoData = cameraPhotoProvider?.invoke(camera, quality)
+        val photoData = cameraPhotoProvider?.invoke(camera, quality, rotation)
         return if (photoData != null) {
             val bytes = photoData.readBytes()
             newFixedLengthResponse(
