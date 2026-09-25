@@ -29,15 +29,23 @@ class CameraPhotoModule(private val context: Context) {
 
         /** Rotate the picture upright from the sensor and display orientation (#253). */
         const val ROTATION_AUTO = -1
+
+        /**
+         * The Camera Rotation setting when one is stored (0/90/180/270), [ROTATION_AUTO]
+         * otherwise. Shared with the live stream, for sensors the formula gets wrong.
+         */
+        const val ROTATION_DEFAULT = -2
+
+        private const val ROTATION_SETTING_KEY = "@kiosk_camera_stream_rotate"
     }
 
     /**
      * Capture a photo from the specified camera
      * @param cameraFacing "front" or "back" (default: "back")
      * @param quality JPEG compression quality 0-100 (default: 80)
-     * @param rotation clockwise degrees applied to the pixels (0, 90, 180, 270), or
-     *   [ROTATION_AUTO]. Default 0: the raw sensor frame, which is what motion detection
-     *   wants, with no re-encoding cost.
+     * @param rotation clockwise degrees applied to the pixels (0, 90, 180, 270),
+     *   [ROTATION_AUTO] or [ROTATION_DEFAULT]. Default 0: the raw sensor frame, which is
+     *   what motion detection wants, with no re-encoding cost.
      * @return ByteArrayInputStream of JPEG data, or null on failure
      */
     fun capturePhoto(cameraFacing: String = "back", quality: Int = 80, rotation: Int = 0): ByteArrayInputStream? {
@@ -73,7 +81,8 @@ class CameraPhotoModule(private val context: Context) {
             val map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
             val outputSizes = map?.getOutputSizes(ImageFormat.JPEG) ?: emptyArray()
             
-            val degrees = if (rotation == ROTATION_AUTO) autoRotation(characteristics) else rotation
+            val requested = if (rotation == ROTATION_DEFAULT) storedRotation() else rotation
+            val degrees = if (requested == ROTATION_AUTO) autoRotation(characteristics) else requested
             // Pick a reasonable size (not too large for API response speed)
             val targetSize = selectOptimalSize(outputSizes)
             Log.d(TAG, "Selected capture size: ${targetSize.width}x${targetSize.height}")
@@ -257,8 +266,8 @@ class CameraPhotoModule(private val context: Context) {
      * CaptureRequest.JPEG_ORIENTATION. The pixels are rotated rather than setting that key,
      * because the frame also goes to consumers that ignore EXIF (Home Assistant's generic
      * camera, MQTT image entities). Some sensors are mounted against what the formula
-     * assumes (a Xiaomi front camera measured 180 off); the REST `rotate` parameter
-     * covers those.
+     * assumes (a Xiaomi front camera measured 180 off); the Camera Rotation setting and
+     * the REST `rotate` parameter cover those.
      */
     private fun autoRotation(characteristics: CameraCharacteristics): Int {
         val sensor = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
@@ -277,6 +286,21 @@ class CameraPhotoModule(private val context: Context) {
         val result = (sensor + device + 360) % 360
         Log.d(TAG, "Auto rotation: $result (sensor=$sensor, display=$displayRotation, front=$front)")
         return result
+    }
+
+    /** Camera Rotation setting, read where the settings screen stores it. */
+    private fun storedRotation(): Int = try {
+        val db = android.database.sqlite.SQLiteDatabase.openDatabase(
+            context.getDatabasePath("RKStorage").absolutePath, null,
+            android.database.sqlite.SQLiteDatabase.OPEN_READONLY
+        )
+        val value = db.rawQuery(
+            "SELECT value FROM catalystLocalStorage WHERE key = ?", arrayOf(ROTATION_SETTING_KEY)
+        ).use { c -> if (c.moveToFirst()) c.getString(0) else null }
+        db.close()
+        value?.toIntOrNull()?.takeIf { it in listOf(0, 90, 180, 270) } ?: ROTATION_AUTO
+    } catch (e: Exception) {
+        ROTATION_AUTO
     }
 
     private fun rotateJpeg(bytes: ByteArray, degrees: Int, quality: Int): ByteArray {

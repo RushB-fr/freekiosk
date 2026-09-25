@@ -393,6 +393,17 @@ export const ApiSettingsSection: React.FC<ApiSettingsSectionProps> = ({
             hint="Enable POST commands (brightness, reload, etc.)"
           />
 
+          {/* Camera rotation: photos (REST and MQTT) and the live stream */}
+          <SettingsInput
+            label="Camera Rotation"
+            value={streamRotate}
+            onChangeText={handleStreamRotateChange}
+            placeholder="-1"
+            keyboardType="numeric"
+            icon="rotate-right"
+            hint="Applies to camera photos (REST and MQTT) and the live stream. -1 derives it from the sensor. Use 0, 90, 180 or 270 if the picture comes out sideways. A request can override it with ?rotate=."
+          />
+
           {/* Live camera stream */}
           <SettingsSwitch
             label="Live Camera Stream"
@@ -442,15 +453,6 @@ export const ApiSettingsSection: React.FC<ApiSettingsSectionProps> = ({
                 hint="Largest camera resolution to use, 160-3840."
               />
 
-              <SettingsInput
-                label="Stream Rotation"
-                value={streamRotate}
-                onChangeText={handleStreamRotateChange}
-                placeholder="-1"
-                keyboardType="numeric"
-                icon="rotate-right"
-                hint="-1 derives it from the sensor. Use 0, 90, 180 or 270 if the picture comes out sideways."
-              />
             </>
           )}
 

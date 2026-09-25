@@ -638,13 +638,14 @@ class KioskHttpServer(
         val params = session.parms ?: emptyMap()
         val camera = params["camera"] ?: "back"
         val quality = (params["quality"]?.toIntOrNull() ?: 80).coerceIn(1, 100)
-        // #253, #142: upright by default; rotate=0/90/180/270 overrides it for sensors
-        // mounted against the documented orientation, or wall mounts
+        // #253, #142: without rotate, the Camera Rotation setting applies (sensor formula
+        // when unset); auto forces the formula, 0/90/180/270 a fixed angle
         val rotateParam = params["rotate"]
-        val rotation = when {
-            rotateParam == null || rotateParam == "auto" -> CameraPhotoModule.ROTATION_AUTO
-            rotateParam.toIntOrNull() in listOf(0, 90, 180, 270) -> rotateParam.toInt()
-            else -> return jsonError(Response.Status.BAD_REQUEST, "rotate must be auto, 0, 90, 180 or 270")
+        val rotation = when (val r = parseRotate(rotateParam)) {
+            RotateParam.Invalid -> return rotateError()
+            RotateParam.Absent -> CameraPhotoModule.ROTATION_DEFAULT
+            RotateParam.Auto -> CameraPhotoModule.ROTATION_AUTO
+            is RotateParam.Fixed -> r.degrees
         }
 
         Log.d(TAG, "Camera photo request: camera=$camera, quality=$quality, rotate=${rotateParam ?: "auto"}")
@@ -660,6 +661,24 @@ class KioskHttpServer(
             jsonError(Response.Status.SERVICE_UNAVAILABLE, "Camera not available. Check camera permission and hardware.")
         }
     }
+
+    /** The `rotate` query parameter, shared by the photo and the stream. */
+    private sealed class RotateParam {
+        object Absent : RotateParam()
+        object Auto : RotateParam()
+        object Invalid : RotateParam()
+        class Fixed(val degrees: Int) : RotateParam()
+    }
+
+    private fun parseRotate(raw: String?): RotateParam = when {
+        raw == null -> RotateParam.Absent
+        raw == "auto" -> RotateParam.Auto
+        raw.toIntOrNull() in listOf(0, 90, 180, 270) -> RotateParam.Fixed(raw.toInt())
+        else -> RotateParam.Invalid
+    }
+
+    private fun rotateError(): Response =
+        jsonError(Response.Status.BAD_REQUEST, "rotate must be auto, 0, 90, 180 or 270")
 
     private fun handleCameraList(): Response {
         val result = commandHandler("cameraList", null)
@@ -678,12 +697,19 @@ class KioskHttpServer(
         // Query parameters override the configured defaults, one request at a time
         val params = session.parms ?: emptyMap()
         val defaults = cameraStreamDefaults?.invoke()
+        // Same rotate values as the photo; null lets the stream derive it from the sensor
+        val rotate = when (val r = parseRotate(params["rotate"])) {
+            RotateParam.Invalid -> return rotateError()
+            RotateParam.Absent -> defaults?.rotate
+            RotateParam.Auto -> null
+            is RotateParam.Fixed -> r.degrees
+        }
         val streamParams = CameraStreamManager.StreamParams(
             facing = params["camera"] ?: defaults?.facing ?: "front",
             fps = (params["fps"]?.toIntOrNull() ?: defaults?.fps ?: 10).coerceIn(1, 30),
             quality = (params["quality"]?.toIntOrNull() ?: defaults?.quality ?: 60).coerceIn(1, 100),
             maxWidth = (params["width"]?.toIntOrNull() ?: defaults?.maxWidth ?: 1280).coerceIn(160, 3840),
-            rotate = (params["rotate"]?.toIntOrNull() ?: defaults?.rotate)?.let { ((it % 360) + 360) % 360 }
+            rotate = rotate
         )
 
         Log.i(TAG, "Camera stream request: $streamParams")

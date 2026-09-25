@@ -382,7 +382,7 @@ Take a photo using the device camera. **(v1.2.5+)**
 |---|---|---|
 | **camera** | `back` | Camera to use: `front` or `back` |
 | **quality** | `80` | JPEG compression quality (1-100) |
-| **rotate** | `auto` | Clockwise rotation: `auto`, `0`, `90`, `180` or `270`. `auto` turns the photo upright from the camera and screen orientation; use a fixed value when a camera still comes out rotated, or for a wall-mounted tablet. `0` returns the raw sensor frame, as versions before 2.0.0 did. **(2.0.0+)** |
+| **rotate** | *(setting, auto)* | Clockwise rotation: `auto`, `0`, `90`, `180` or `270`. Without it, the **Camera Rotation** setting (Settings > Advanced > REST API) applies, and when that is unset the photo is turned upright from the camera and screen orientation. `auto` forces that computation; a fixed value covers a camera that still comes out rotated, or a wall-mounted tablet. `0` returns the raw sensor frame, as versions before 2.0.0 did. Any other value is a `400`. **(2.0.0+)** |
 
 
 
@@ -425,7 +425,7 @@ Live **MJPEG** stream of the device camera, so a kiosk tablet can be used as a c
 | **fps** | *(setting, 10)* | Frames per second, 1-30 |
 | **quality** | *(setting, 60)* | JPEG compression quality, 1-100 |
 | **width** | *(setting, 1280)* | Largest camera resolution to use, 160-3840 |
-| **rotate** | *(setting, auto)* | Clockwise rotation in degrees: `0`, `90`, `180`, `270`. Derived from the sensor when unset |
+| **rotate** | *(setting, auto)* | Clockwise rotation: `auto`, `0`, `90`, `180` or `270`, as for `/api/camera/photo`. Without it, the **Camera Rotation** setting applies, derived from the sensor when unset. Any other value is a `400` |
 
 
 

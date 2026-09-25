@@ -158,8 +158,8 @@ class MqttImagePublisher(
         if (!throttle("${STREAM_CAMERA}_$normalized")) return
 
         submitCapture {
-            // #253: upright, like the REST photo
-            val stream = cameraModule.capturePhoto(normalized, cameraQuality, CameraPhotoModule.ROTATION_AUTO)
+            // #253: upright, like the REST photo, honouring the Camera Rotation setting
+            val stream = cameraModule.capturePhoto(normalized, cameraQuality, CameraPhotoModule.ROTATION_DEFAULT)
             val bytes = stream?.readBytes()
             if (bytes == null || bytes.isEmpty()) {
                 // Most common cause: motion detection currently holds the camera (CAMERA_IN_USE)
