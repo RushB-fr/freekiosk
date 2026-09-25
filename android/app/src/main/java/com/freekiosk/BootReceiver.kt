@@ -322,6 +322,14 @@ class BootReceiver : BroadcastReceiver() {
             Thread {
                 launchBackgroundApps(context)
                 mainHandler.postDelayed({
+                    // FreeKiosk is usually the HOME app, so Android has already started it
+                    // by now, and in External App mode it has already launched the app.
+                    // Launching MainActivity again pulled FreeKiosk back over that app ~4 s
+                    // after boot, and the resume it caused read as a return from the app.
+                    if (MainActivity.hasStarted) {
+                        DebugLog.d("BootReceiver", "Legacy path: MainActivity already running, not relaunching")
+                        return@postDelayed
+                    }
                     val launchIntent = Intent(context, MainActivity::class.java)
                     launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     launchIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)

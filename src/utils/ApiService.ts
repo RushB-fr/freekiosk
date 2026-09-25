@@ -39,6 +39,16 @@ export interface ApiCallbacks {
   onAutoBrightnessDisable?: () => void;
   onSetMotionAlwaysOn?: (value: boolean) => void;
   onSetMode?: (mode: 'webview' | 'external_app' | 'media_player', target?: string) => void;
+  /**
+   * A live camera stream started (true) or ended (false). Motion detection must release the
+   * camera while a stream is running: only one client can hold the sensor.
+   */
+  onCameraStreamStateChanged?: (streaming: boolean) => void;
+  /**
+   * Movement seen in the live camera stream. While a stream runs it is the only motion source:
+   * the regular detector cannot open the same sensor.
+   */
+  onCameraStreamMotion?: () => void;
   onSetMqttImageAuto?: (stream: MqttImageStream, value: boolean) => void;
   onSetMqttImageInterval?: (stream: MqttImageStream, seconds: number) => void;
 }
@@ -75,6 +85,8 @@ export interface AppStatus {
   scheduledSleep?: boolean;
   motionDetected?: boolean;
   motionAlwaysOn?: boolean;
+  /** Sensitivity used by the stream-based motion detection */
+  motionSensitivity?: 'low' | 'medium' | 'high';
 }
 
 const ok = (result?: Record<string, unknown>): ActionResult => ({ ok: true, result });
@@ -88,6 +100,8 @@ class ApiServiceClass {
   private callbacks: ApiCallbacks = {};
   private eventEmitter: NativeEventEmitter | null = null;
   private commandSubscription: any = null;
+  private cameraStreamSubscription: any = null;
+  private cameraStreamMotionSubscription: any = null;
   private appStatus: AppStatus = {
     currentUrl: '',
     canGoBack: false,
@@ -133,10 +147,39 @@ class ApiServiceClass {
         }
       );
 
+      // Camera arbitration: the native stream manager tells us when it needs the camera
+      this.cameraStreamSubscription = this.eventEmitter.addListener(
+        'onCameraStreamState',
+        (event: { streaming: boolean }) => {
+          console.log('ApiService: Camera stream state', event.streaming);
+          this.callbacks.onCameraStreamStateChanged?.(event.streaming === true);
+        }
+      );
+
+      this.cameraStreamMotionSubscription = this.eventEmitter.addListener(
+        'onCameraStreamMotion',
+        () => {
+          console.log('ApiService: Motion detected in camera stream');
+          this.callbacks.onCameraStreamMotion?.();
+        }
+      );
+
       console.log('ApiService: Initialized and listening for commands');
     }
 
     this.isInitialized = true;
+
+    // A stream may already be running (the kiosk screen remounts on settings reload, losing
+    // its state). Ask the native side for the truth so motion detection stays out of the way.
+    try {
+      const streaming = await httpServer.isCameraStreaming();
+      if (streaming) {
+        console.log('ApiService: A camera stream is already running');
+        this.callbacks.onCameraStreamStateChanged?.(true);
+      }
+    } catch (error) {
+      // Older native module without the method, or server not started yet
+    }
   }
 
   /**
@@ -172,8 +215,29 @@ class ApiServiceClass {
 
       const result = await httpServer.startServer(port, apiKey || null, allowControl);
       console.log(`ApiService: Server started on ${result.ip}:${result.port}`);
+
+      await this.pushCameraStreamSettings();
     } catch (error) {
       console.error('ApiService: Failed to auto-start server', error);
+    }
+  }
+
+  /**
+   * Push the live camera stream settings to the running server. Called on start and whenever
+   * the settings change, so toggling the stream takes effect without restarting the server.
+   */
+  async pushCameraStreamSettings(): Promise<void> {
+    try {
+      await httpServer.updateCameraStreamSettings({
+        enabled: await StorageService.getCameraStreamEnabled(),
+        camera: await StorageService.getCameraStreamCamera(),
+        fps: await StorageService.getCameraStreamFps(),
+        quality: await StorageService.getCameraStreamQuality(),
+        width: await StorageService.getCameraStreamWidth(),
+        rotate: await StorageService.getCameraStreamRotate(),
+      });
+    } catch (error) {
+      console.log('ApiService: Could not push camera stream settings', error);
     }
   }
 
@@ -495,6 +559,14 @@ class ApiServiceClass {
     if (this.commandSubscription) {
       this.commandSubscription.remove();
       this.commandSubscription = null;
+    }
+    if (this.cameraStreamSubscription) {
+      this.cameraStreamSubscription.remove();
+      this.cameraStreamSubscription = null;
+    }
+    if (this.cameraStreamMotionSubscription) {
+      this.cameraStreamMotionSubscription.remove();
+      this.cameraStreamMotionSubscription = null;
     }
     this.isInitialized = false;
     console.log('ApiService: Destroyed');

@@ -102,6 +102,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [screensaverUrl, setScreensaverUrl] = useState<string>('');
   const [screensaverVideoItems, setScreensaverVideoItems] = useState<MediaItem[]>([]);
   const [screensaverVideoLoop, setScreensaverVideoLoop] = useState<boolean>(true);
+  const [screensaverKeepExternalApp, setScreensaverKeepExternalApp] = useState<boolean>(false);
   const [pickingScreensaverMedia, setPickingScreensaverMedia] = useState<boolean>(false);
   const [defaultBrightness, setDefaultBrightness] = useState<number>(0.5);
   const [certificates, setCertificates] = useState<CertificateInfo[]>([]);
@@ -478,6 +479,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedScreensaverUrl = await StorageService.getScreensaverUrl();
     const savedScreensaverVideoItems = await StorageService.getScreensaverVideoItems<MediaItem>();
     const savedScreensaverVideoLoop = await StorageService.getScreensaverVideoLoop();
+    const savedScreensaverKeepExternalApp = await StorageService.getScreensaverKeepExternalApp();
     const hasPinConfigured = await hasSecurePin();
     
     setIsPinConfigured(hasPinConfigured);
@@ -509,6 +511,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setScreensaverUrl(savedScreensaverUrl);
     setScreensaverVideoItems(savedScreensaverVideoItems);
     setScreensaverVideoLoop(savedScreensaverVideoLoop);
+    setScreensaverKeepExternalApp(savedScreensaverKeepExternalApp);
 
     // Detect available cameras (first attempt — may return [] on slow SoCs before
     // ProcessCameraProvider resolves; the CameraDevicesChanged listener handles the retry)
@@ -1337,11 +1340,21 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     let finalUrl = url.trim();
     if (displayMode === 'webview' && !dashboardModeEnabled) {
       const urlLower = finalUrl.toLowerCase();
-      if (urlLower.startsWith('file://') || urlLower.startsWith('javascript:') || urlLower.startsWith('data:')) {
-        Alert.alert('Security Error', 'This type of URL is not allowed. Use http:// or https://');
+      if (urlLower.startsWith('javascript:') || urlLower.startsWith('data:')) {
+        Alert.alert('Security Error', 'This type of URL is not allowed. Use http://, https:// or file://');
         return;
       }
-      if (!urlLower.startsWith('http://') && !urlLower.startsWith('https://')) {
+      // #239: local files are supported, but only the PDF Viewer setting gives the WebView
+      // file access. This check predates that and refused every file:// URL, so a local
+      // page could only be set over ADB.
+      if (urlLower.startsWith('file://') && !pdfViewerEnabled) {
+        Alert.alert(
+          'File access is off',
+          'To open a local file, turn on General > PDF Viewer > Inline PDF Viewer first. That setting is what gives the browser access to files on the device.',
+        );
+        return;
+      }
+      if (!urlLower.startsWith('http://') && !urlLower.startsWith('https://') && !urlLower.startsWith('file://')) {
         if (finalUrl.includes('.')) {
           finalUrl = 'https://' + finalUrl;
           setUrl(finalUrl);
@@ -1438,6 +1451,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.saveScreensaverUrl(screensaverUrl);
     await StorageService.saveScreensaverVideoItems(screensaverVideoItems);
     await StorageService.saveScreensaverVideoLoop(screensaverVideoLoop);
+    await StorageService.saveScreensaverKeepExternalApp(screensaverKeepExternalApp);
 
     if (displayMode === 'webview' || displayMode === 'media_player') {
       await StorageService.saveAutoReload(displayMode === 'webview' ? autoReload : false);
@@ -2099,6 +2113,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             onScreensaverVideoItemsChange={setScreensaverVideoItems}
             screensaverVideoLoop={screensaverVideoLoop}
             onScreensaverVideoLoopChange={setScreensaverVideoLoop}
+            screensaverKeepExternalApp={screensaverKeepExternalApp}
+            onScreensaverKeepExternalAppChange={setScreensaverKeepExternalApp}
             onPickScreensaverMedia={handlePickScreensaverMediaFromDevice}
             pickingScreensaverMedia={pickingScreensaverMedia}
             inactivityDelay={inactivityDelay}

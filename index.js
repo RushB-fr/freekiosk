@@ -3,7 +3,7 @@
  */
 
 import 'react-native-gesture-handler';
-import { AppRegistry } from 'react-native';
+import { AppRegistry, AppState } from 'react-native';
 import App from './App';
 import { name as appName } from './app.json';
 import { CLOUD_ENABLED } from './src/config/features';
@@ -24,6 +24,9 @@ AppRegistry.registerHeadlessTask(
   'CloudHeartbeat',
   () => async () => {
     if (!CLOUD_ENABLED) return;
+    // In the foreground the JS interval sends the heartbeat. The task is allowed to start
+    // there only so a service restart cannot crash the app (CloudHeartbeatTaskService).
+    if (AppState.currentState === 'active') return;
     try {
       await CloudSyncService.sendHeartbeat();
     } catch {

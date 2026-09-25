@@ -32,7 +32,7 @@ FreeKiosk includes a built-in REST API server for integration with **Home Assist
 |---|---|
 | **Default Port** | 8080 |
 | **Protocol** | HTTP (HTTPS planned) |
-| **Authentication** | Optional API Key (X-Api-Key header) |
+| **Authentication** | Optional API Key (`X-Api-Key` header, or HTTP Basic password) |
 | **Format** | JSON responses |
 
 
@@ -71,7 +71,7 @@ adb shell am start -n com.freekiosk/.MainActivity \
 
 
 > [!NOTE]
-> See [ADB Configuration Guide](ADB-Configuration) for full headless provisioning.
+> See [ADB Configuration Guide](adb-configuration.md) for full headless provisioning.
 
 
 ## Endpoints Reference
@@ -369,7 +369,7 @@ curl http://TABLET_IP:8080/api/screenshot -o screenshot.png
 > {"success": false, "error": "Accessibility service is not enabled (required to capture another app)"}
 > ```
 
-> 💡 Home Assistant users can also get the screenshot as an auto-discovered `image` / `camera` entity over MQTT, without exposing the HTTP server — see [MQTT: Images (Screenshot & Camera)](MQTT#-images-screenshot--camera).
+> 💡 Home Assistant users can also get the screenshot as an auto-discovered `image` / `camera` entity over MQTT, without exposing the HTTP server — see [MQTT: Images (Screenshot & Camera)](MQTT.md#-images-screenshot--camera).
 
 #### `GET /api/camera/photo`
 
@@ -382,6 +382,7 @@ Take a photo using the device camera. **(v1.2.5+)**
 |---|---|---|
 | **camera** | `back` | Camera to use: `front` or `back` |
 | **quality** | `80` | JPEG compression quality (1-100) |
+| **rotate** | *(setting, auto)* | Clockwise rotation: `auto`, `0`, `90`, `180` or `270`. Without it, the **Camera Rotation** setting (Settings > Advanced > REST API) applies, and when that is unset the photo is turned upright from the camera and screen orientation. `auto` forces that computation; a fixed value covers a camera that still comes out rotated, or a wall-mounted tablet. `0` returns the raw sensor frame, as versions before 2.0.0 did. Any other value is a `400`. **(2.0.0+)** |
 
 
 
@@ -391,6 +392,7 @@ Take a photo using the device camera. **(v1.2.5+)**
 ```
 GET /api/camera/photo?camera=back&quality=80
 GET /api/camera/photo?camera=front&quality=60
+GET /api/camera/photo?camera=front&rotate=90
 ```
 
 
@@ -404,7 +406,65 @@ GET /api/camera/photo?camera=front&quality=60
 - Higher quality values produce larger files
 - Capture fails while motion detection is using the camera
 
-> 💡 Camera snapshots can also be published over MQTT as auto-discovered `image` / `camera` entities (one per camera) with a capture button in Home Assistant — see [MQTT: Images (Screenshot & Camera)](MQTT#-images-screenshot--camera).
+> 💡 Camera snapshots can also be published over MQTT as auto-discovered `image` / `camera` entities (one per camera) with a capture button in Home Assistant — see [MQTT: Images (Screenshot & Camera)](MQTT.md#-images-screenshot--camera).
+
+#### `GET /api/camera/stream`
+
+Live **MJPEG** stream of the device camera, so a kiosk tablet can be used as a camera in Home Assistant.
+
+**Opt-in**: enable **Live Camera Stream** in Settings → Advanced → REST API. Until then the endpoint answers `503`.
+
+**Response**: `multipart/x-mixed-replace; boundary=frame` — an endless sequence of JPEG parts, one per frame. The response only ends when the client disconnects.
+
+**Query Parameters:** *(each overrides the configured default for that request)*
+
+
+| Parameter | Default | Description |
+|---|---|---|
+| **camera** | *(setting)* | Camera to use: `front` or `back` |
+| **fps** | *(setting, 10)* | Frames per second, 1-30 |
+| **quality** | *(setting, 60)* | JPEG compression quality, 1-100 |
+| **width** | *(setting, 1280)* | Largest camera resolution to use, 160-3840 |
+| **rotate** | *(setting, auto)* | Clockwise rotation: `auto`, `0`, `90`, `180` or `270`, as for `/api/camera/photo`. Without it, the **Camera Rotation** setting applies, derived from the sensor when unset. Any other value is a `400` |
+
+
+
+**Examples:**
+
+
+```bash
+# Watch with ffplay
+ffplay "http://TABLET_IP:8080/api/camera/stream?camera=front&fps=10"
+
+# In a web page
+<img src="http://TABLET_IP:8080/api/camera/stream" />
+
+# Save 10 seconds of stream
+curl -m 10 "http://TABLET_IP:8080/api/camera/stream?fps=5" -o stream.mjpeg
+```
+
+
+
+**Home Assistant** — the *MJPEG IP Camera* integration (Settings → Devices & Services → Add integration):
+
+
+| Field | Value |
+|---|---|
+| **MJPEG URL** | `http://TABLET_IP:8080/api/camera/stream?camera=front&fps=10` |
+| **Still image URL** | `http://TABLET_IP:8080/api/camera/photo?camera=front` |
+| **Username** | anything (ignored) |
+| **Password** | your API key, if one is set |
+
+
+
+**Notes:**
+- **Motion detection keeps working.** A camera can only have one client, so while the stream runs, movement is measured on the stream's own frames and wakes the screen through the same path as the regular detector. Nothing to configure — the sensitivity you chose still applies.
+  - Measured on a Xiaomi tablet: frames are compared twice a second instead of once, a still scene sits at a 0.005-0.012 changed-pixel ratio against 0.026 for the regular detector, and movement reached 0.16-0.56. Detection to screen wake took 19 ms.
+  - The one thing it does not see: a **colour change at constant brightness**, since only the luma plane is compared. Movement, people and lighting changes are unaffected.
+- The camera is opened when the first viewer connects and released when the last one leaves.
+- Up to **2 concurrent viewers**; further requests get `503`. A second viewer asking for the other camera is refused too — one camera at a time.
+- Measured on a Xiaomi tablet at 1280×960, quality 60, 10 fps: ~8 fps sustained, ~80 KB per frame (~5 Mbit/s), ~66% of one CPU core. Lower `fps` and `quality` for wall-mounted tablets.
+- If the picture comes out sideways, set `rotate` — see the camera orientation note under `/api/camera/photo`.
 
 #### `GET /api/camera/list`
 
@@ -854,6 +914,15 @@ If an API key is configured, include it in requests:
 curl -H "X-Api-Key: your-api-key" http://tablet-ip:8080/api/status
 ```
 
+The key is also accepted as the **password of an HTTP Basic credential** (the username is ignored). This exists for clients that cannot send custom headers — Home Assistant's *MJPEG IP Camera* integration among them:
+
+```bash
+curl -u "freekiosk:your-api-key" http://tablet-ip:8080/api/status
+```
+
+> [!TIP]
+> Prefer the header when you can. A Basic credential travels in every request and, over plain HTTP, is no more protected than the header — but it does keep the key out of URLs, browser history and server logs, unlike a query parameter.
+
 
 ## Home Assistant Integration
 
@@ -1039,7 +1108,7 @@ they are two switches and not one.
 > the lag and costs one HTTP request per tablet per interval. If you want a toggle that
 > updates the instant the tablet changes, use MQTT instead: it publishes on the real
 > `ACTION_SCREEN_ON` / `ACTION_SCREEN_OFF` broadcast and Home Assistant discovers the
-> entities on its own. See [MQTT](MQTT). The two can coexist on the same tablet.
+> entities on its own. See [MQTT](MQTT.md). The two can coexist on the same tablet.
 
 ### Screenshot Camera
 
@@ -1183,9 +1252,8 @@ Common errors:
 
 ## See Also
 
-- [ADB Configuration Guide](ADB-Configuration) - Headless provisioning via ADB
-- [MDM Specification](MDM-SPEC) - Enterprise deployment
-- [Installation Guide](Installation) - Manual setup
+- [ADB Configuration Guide](adb-configuration.md) - Headless provisioning via ADB
+- [Installation Guide](installation.md) - Manual setup
 
 
 ## Changelog

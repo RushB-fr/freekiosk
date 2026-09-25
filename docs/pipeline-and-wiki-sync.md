@@ -2,7 +2,7 @@
 
 **How documentation is published to GitHub Wiki**
 
-[Docs Home](README)
+[Docs Home](README.md)
 
 
 > [!WARNING]

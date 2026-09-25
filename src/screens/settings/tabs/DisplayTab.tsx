@@ -103,6 +103,8 @@ interface DisplayTabProps {
   onScreensaverVideoItemsChange: (items: MediaItem[]) => void;
   screensaverVideoLoop: boolean;
   onScreensaverVideoLoopChange: (value: boolean) => void;
+  screensaverKeepExternalApp: boolean;
+  onScreensaverKeepExternalAppChange: (value: boolean) => void;
   onPickScreensaverMedia: (type: 'video' | 'image' | 'any') => void;
   pickingScreensaverMedia: boolean;
 
@@ -200,6 +202,8 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
   onScreensaverVideoItemsChange,
   screensaverVideoLoop,
   onScreensaverVideoLoopChange,
+  screensaverKeepExternalApp,
+  onScreensaverKeepExternalAppChange,
   onPickScreensaverMedia,
   pickingScreensaverMedia,
   motionEnabled,
@@ -245,6 +249,8 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
 
   // Check whether the selected camera is available on this device
   const selectedCameraAvailable = availableCameras.some(cam => cam.position === motionCameraPosition);
+  // #266: the screensaver dims over the external app; FreeKiosk stays in the background
+  const dimsOverExternalApp = displayMode === 'external_app' && screensaverType === 'dim' && screensaverKeepExternalApp;
 
   // Detect whether this device has a hardware proximity sensor (many tablets don't).
   const [proximityAvailable, setProximityAvailable] = React.useState<boolean | null>(null);
@@ -453,6 +459,16 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                   value={screensaverType}
                   onValueChange={(v) => onScreensaverTypeChange(v as 'dim' | 'url' | 'video')}
                 />
+
+                {/* #266: opt-in, External App + Dim only. Off keeps today's behaviour. */}
+                {displayMode === 'external_app' && screensaverType === 'dim' && (
+                  <SettingsSwitch
+                    label="Keep the app in front"
+                    hint="Dim over the external app instead of switching back to FreeKiosk, so it does not reload on wake. The first tap only wakes the screen. Motion and proximity wake are not available with this option."
+                    value={screensaverKeepExternalApp}
+                    onValueChange={onScreensaverKeepExternalAppChange}
+                  />
+                )}
 
                 {screensaverType === 'url' && (
                   <>
@@ -682,15 +698,18 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                 <Text style={styles.infoText}>
                   • After {inactivityDelay || '10'} minute(s) without interaction, the screensaver activates{`
 `}
-                  {displayMode === 'external_app'
+                  {dimsOverExternalApp
+                    ? `• The screen dims over the external app, which stays open; the first tap wakes it
+`
+                    : displayMode === 'external_app'
                     ? `• FreeKiosk comes to the foreground to show the screensaver; the external app resumes on wake
 `
                     : ''}
                   • Touch the screen to wake the device{`
 `}
-                  {motionEnabled && `• Motion in front of the camera also wakes the screen
+                  {motionEnabled && !dimsOverExternalApp && `• Motion in front of the camera also wakes the screen
 `}
-                  {proximityEnabled && proximityAvailable !== false && `• A hand close to the proximity sensor also wakes the screen
+                  {proximityEnabled && proximityAvailable !== false && !dimsOverExternalApp && `• A hand close to the proximity sensor also wakes the screen
 `}
                   • Normal brightness is restored automatically
                 </Text>
