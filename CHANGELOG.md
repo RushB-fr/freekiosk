@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- 🌙 **External App mode: the Dim screensaver can stay over the app instead of switching back to FreeKiosk** (#266). Until now the screensaver brought FreeKiosk to the foreground and relaunched the app on wake, so an app like Home Assistant reloaded every time. The new **Keep the app in front** option (Settings > Display > Screensaver, Dim style only, off by default) lays a dimming layer over the app, which stays open; the first tap only wakes the screen and never presses anything underneath. Motion and proximity wake are not available with this option, and the 5-tap escape still works.
+
 ***
 
 ## [2.0.0-beta.4] - 2026-09-24

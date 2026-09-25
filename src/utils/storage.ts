@@ -28,6 +28,7 @@ export const KEYS = {
   SCREENSAVER_URL: '@screensaver_url',
   SCREENSAVER_VIDEO_ITEMS: '@screensaver_video_items',
   SCREENSAVER_VIDEO_LOOP: '@screensaver_video_loop',
+  SCREENSAVER_KEEP_EXTERNAL_APP: '@screensaver_keep_external_app',
   DEFAULT_BRIGHTNESS: '@default_brightness',
   DISPLAY_MODE: '@kiosk_display_mode',
   EXTERNAL_APP_PACKAGE: '@kiosk_external_app_package',
@@ -422,6 +423,7 @@ export const StorageService = {
         KEYS.SCREENSAVER_URL,
         KEYS.SCREENSAVER_VIDEO_ITEMS,
         KEYS.SCREENSAVER_VIDEO_LOOP,
+        KEYS.SCREENSAVER_KEEP_EXTERNAL_APP,
         KEYS.DEFAULT_BRIGHTNESS,
         KEYS.DISPLAY_MODE,
         KEYS.EXTERNAL_APP_PACKAGE,
@@ -901,6 +903,26 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting screensaver video loop:', error);
       return true;
+    }
+  },
+
+  // External App mode, Dim style only: dim over the external app instead of bringing
+  // FreeKiosk to the foreground. Off by default so existing setups keep today's behaviour.
+  saveScreensaverKeepExternalApp: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.SCREENSAVER_KEEP_EXTERNAL_APP, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving screensaver keep-external-app:', error);
+    }
+  },
+
+  getScreensaverKeepExternalApp: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.SCREENSAVER_KEEP_EXTERNAL_APP);
+      return value === null ? false : JSON.parse(value);
+    } catch (error) {
+      console.error('Error getting screensaver keep-external-app:', error);
+      return false;
     }
   },
 
@@ -3257,6 +3279,7 @@ export const StorageService = {
           url: str(KEYS.SCREENSAVER_URL),
           videoItems: json(KEYS.SCREENSAVER_VIDEO_ITEMS, []),
           videoLoop: bool(KEYS.SCREENSAVER_VIDEO_LOOP, true),
+          keepExternalApp: bool(KEYS.SCREENSAVER_KEEP_EXTERNAL_APP),
         },
         motionDetection: {
           enabled: bool(KEYS.SCREENSAVER_MOTION_ENABLED),
@@ -3469,6 +3492,7 @@ export const StorageService = {
         set(KEYS.SCREENSAVER_URL, ss.url);
         set(KEYS.SCREENSAVER_VIDEO_ITEMS, ss.videoItems);
         set(KEYS.SCREENSAVER_VIDEO_LOOP, ss.videoLoop);
+        set(KEYS.SCREENSAVER_KEEP_EXTERNAL_APP, ss.keepExternalApp);
       }
       const md = d.motionDetection as Record<string, unknown> | undefined;
       if (md) {

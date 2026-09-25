@@ -63,6 +63,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [screensaverUrl, setScreensaverUrl] = useState<string>('');
   const [screensaverVideoItems, setScreensaverVideoItems] = useState<MediaItem[]>([]);
   const [screensaverVideoLoop, setScreensaverVideoLoop] = useState<boolean>(true);
+  const [screensaverKeepExternalApp, setScreensaverKeepExternalApp] = useState<boolean>(false);
   const [inactivityEnabled, setInactivityEnabled] = useState(true);
   const [inactivityDelay, setInactivityDelay] = useState(600000);
   const [motionEnabled, setMotionEnabled] = useState(false);
@@ -1202,20 +1203,51 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
 
   // External App mode: bring FreeKiosk to foreground when screensaver activates so the full
   // screensaver (dim/URL/video) renders normally in React Native. On dismiss, re-launch the app.
+  // #266: opt-in ("Keep the app in front", Dim style only). OverlayService lays a dimming
+  // window over the external app instead, which stays in the foreground and does not
+  // reload on wake. The first tap is absorbed by that window, so waking never presses
+  // anything in the app. Falls back to bringToFront() when the overlay can't be shown
+  // (service not running, no overlay permission).
   const wasExternalAppScreensaverRef = useRef(false);
+  const dimOverExternalAppRef = useRef(false);
   useEffect(() => {
     if (displayMode !== 'external_app') return;
     if (!screensaverEnabled) return;
     if (isScreensaverActive) {
+      if (screensaverKeepExternalApp && screensaverType === 'dim') {
+        // -1 = FreeKiosk does not manage brightness: the overlay goes opaque black instead
+        const level = brightnessManagementEnabled ? screensaverBrightness : -1;
+        (async () => {
+          const shown = await OverlayServiceModule.showDimOverlay?.(level).catch(() => false);
+          if (shown) {
+            dimOverExternalAppRef.current = true;
+            // Woken while the call was in flight: take the overlay straight back down
+            if (!isScreensaverActiveRef.current) {
+              dimOverExternalAppRef.current = false;
+              OverlayServiceModule.hideDimOverlay?.().catch(() => {});
+            }
+            return;
+          }
+          console.warn('[KioskScreen] Dim overlay unavailable, bringing FreeKiosk to front instead');
+          if (!isScreensaverActiveRef.current) return;
+          wasExternalAppScreensaverRef.current = true;
+          KioskModule.bringToFront().catch(() => {});
+        })();
+        return;
+      }
       wasExternalAppScreensaverRef.current = true;
       KioskModule.bringToFront().catch(() => {});
+    } else if (dimOverExternalAppRef.current) {
+      // The external app never left the foreground: nothing to relaunch
+      dimOverExternalAppRef.current = false;
+      OverlayServiceModule.hideDimOverlay?.().catch(() => {});
     } else if (wasExternalAppScreensaverRef.current) {
       wasExternalAppScreensaverRef.current = false;
       if (externalAppPackage) {
         launchExternalApp(externalAppPackage);
       }
     }
-  }, [isScreensaverActive, screensaverEnabled, displayMode, externalAppPackage]);
+  }, [isScreensaverActive, screensaverEnabled, displayMode, externalAppPackage, screensaverKeepExternalApp, screensaverType, screensaverBrightness, brightnessManagementEnabled]);
 
   useEffect(() => {
     if (screensaverEnabled && inactivityEnabled) {
@@ -1702,6 +1734,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       const savedScreensaverUrl = str(K.SCREENSAVER_URL) ?? '';
       const savedScreensaverVideoItems = jsonParse(K.SCREENSAVER_VIDEO_ITEMS, []) as MediaItem[];
       const savedScreensaverVideoLoop = bool(K.SCREENSAVER_VIDEO_LOOP, true);
+      const savedScreensaverKeepExternalApp = bool(K.SCREENSAVER_KEEP_EXTERNAL_APP, false);
       const savedStatusBarEnabled = bool(K.STATUS_BAR_ENABLED, false);
       const savedStatusBarOnOverlay = bool(K.STATUS_BAR_ON_OVERLAY, true);
       const savedStatusBarOnReturn = bool(K.STATUS_BAR_ON_RETURN, true);
@@ -1756,6 +1789,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       setScreensaverUrl(savedScreensaverUrl);
       setScreensaverVideoItems(savedScreensaverVideoItems);
       setScreensaverVideoLoop(savedScreensaverVideoLoop);
+      setScreensaverKeepExternalApp(savedScreensaverKeepExternalApp);
       setStatusBarEnabled(savedStatusBarEnabled);
       setStatusBarOnOverlay(savedStatusBarOnOverlay);
       setStatusBarOnReturn(savedStatusBarOnReturn);
@@ -2589,6 +2623,20 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       }
     }
   }, [resetTimer, defaultBrightness, autoBrightnessEnabled, exitScheduledSleep]);
+
+  // #266: the dim overlay over the external app was tapped. It has already removed itself;
+  // run the same dismissal as a tap on FreeKiosk's own screensaver. Read through a ref:
+  // onScreensaverTap is rebuilt on every render (resetTimer is not memoised).
+  const onScreensaverTapRef = useRef(onScreensaverTap);
+  onScreensaverTapRef.current = onScreensaverTap;
+  useEffect(() => {
+    if (displayMode !== 'external_app') return;
+    const emitter = new NativeEventEmitter(NativeModules.DeviceEventManagerModule);
+    const sub = emitter.addListener('dimOverlayTouched', () => {
+      onScreensaverTapRef.current();
+    });
+    return () => sub.remove();
+  }, [displayMode]);
 
   const onMotionDetected = useCallback(async () => {
     // Report motion to API/MQTT
