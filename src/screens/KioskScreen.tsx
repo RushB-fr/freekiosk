@@ -2809,9 +2809,15 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     const isVoluntary = event?.voluntary ?? false;
     setIsAppLaunched(false);
 
-    // Stop OverlayService when returning to FreeKiosk
-    OverlayServiceModule.stopOverlayService()
-      .catch(error => console.warn('[KioskScreen] Failed to stop overlay:', error));
+    // Stop OverlayService only on a voluntary return (5-tap), matching MainActivity (#106).
+    // Involuntary returns include a transient resume while the external app is starting:
+    // on a cold boot FreeKiosk resumes for a moment after launching it, and stopping here
+    // left the app in front with no 5-tap escape. With FreeKiosk genuinely in front the
+    // running overlay is harmless: its foreground monitor ignores FreeKiosk's own package.
+    if (isVoluntary) {
+      OverlayServiceModule.stopOverlayService()
+        .catch(error => console.warn('[KioskScreen] Failed to stop overlay:', error));
+    }
 
     // On a voluntary return (5-tap), the native flag is already set by OverlayService
     if (isVoluntary) {
