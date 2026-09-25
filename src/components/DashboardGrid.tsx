@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { DashboardTile } from '../types/dashboard';
 import { getColorForLabel } from '../utils/dashboardColors';
+import { useTranslation } from 'react-i18next';
 
 interface DashboardGridProps {
   tiles: DashboardTile[];
@@ -58,6 +59,7 @@ const TileIcon: React.FC<{ tile: DashboardTile }> = ({ tile }) => {
 };
 
 const DashboardGrid: React.FC<DashboardGridProps> = ({ tiles, onTilePress, onUserInteraction }) => {
+  const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const numColumns = Math.max(1, Math.floor(width / (TILE_WIDTH + TILE_GAP)));
 
@@ -121,7 +123,7 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ tiles, onTilePress, onUse
       ListEmptyComponent={
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>
-            Configure your first tile in the Dashboard tab.
+            {t('components.dashboardGrid.emptyText')}
           </Text>
         </View>
       }

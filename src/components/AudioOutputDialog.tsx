@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import Icon, { IconName } from './Icon';
 import { Colors } from '../theme';
+import { useTranslation } from 'react-i18next';
 
 const { AudioControlModule } = NativeModules;
 
@@ -43,6 +44,7 @@ interface Props {
 }
 
 export default function AudioOutputDialog({ visible, onClose }: Props) {
+  const { t } = useTranslation();
   const [audioInfo, setAudioInfo] = useState<AudioInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -93,7 +95,7 @@ export default function AudioOutputDialog({ visible, onClose }: Props) {
     >
       <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
         <TouchableOpacity style={styles.card} activeOpacity={1}>
-          <Text style={styles.title}>Audio Output</Text>
+          <Text style={styles.title}>{t('components.audioOutputDialog.title')}</Text>
 
           {isLoading && !audioInfo ? (
             <ActivityIndicator color="#2b7fff" />
@@ -117,12 +119,12 @@ export default function AudioOutputDialog({ visible, onClose }: Props) {
               })}
 
               {outputs.length === 0 && (
-                <Text style={styles.empty}>No selectable outputs found</Text>
+                <Text style={styles.empty}>{t('components.audioOutputDialog.noOutputsFound')}</Text>
               )}
 
               <TouchableOpacity style={styles.muteButton} onPress={handleMuteToggle}>
                 <Icon name={audioInfo?.isMuted ? 'volume-off' : 'volume-high'} size={20} color="#fff" style={styles.muteIcon} />
-                <Text style={styles.muteLabel}>{audioInfo?.isMuted ? 'Unmute' : 'Mute'}</Text>
+                <Text style={styles.muteLabel}>{audioInfo?.isMuted ? t('components.audioOutputDialog.unmute') : t('components.audioOutputDialog.mute')}</Text>
               </TouchableOpacity>
             </>
           )}

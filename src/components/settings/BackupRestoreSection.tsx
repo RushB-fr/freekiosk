@@ -28,6 +28,7 @@ import {
   BackupData,
 } from '../../utils/BackupService';
 import FilePickerModule from '../../utils/FilePickerModule';
+import { useTranslation } from 'react-i18next';
 
 interface BackupFile {
   name: string;
@@ -42,6 +43,7 @@ interface BackupRestoreSectionProps {
 const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
   onRestoreComplete,
 }) => {
+  const { t } = useTranslation();
   const [isExporting, setIsExporting] = useState(false);
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [backupFiles, setBackupFiles] = useState<BackupFile[]>([]);
@@ -70,19 +72,19 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
       // Build JSON content first
       const built = await buildBackupJson();
       if (!built.success || !built.json || !built.filename) {
-        Alert.alert('Export Failed', built.error || 'Failed to prepare backup data', [{ text: 'OK' }]);
+        Alert.alert(t('components.backupRestore.exportFailed'), built.error || t('components.backupRestore.prepareFailedMessage'), [{ text: t('components.backupRestore.ok') }]);
         return;
       }
       // Use SAF "Save As" dialog — works on all Android versions without storage permissions
       const saved = await FilePickerModule.saveJsonFile(built.json, built.filename);
       Alert.alert(
-        'Backup Created',
-        `Configuration exported successfully!\n\nSaved as: ${saved.name}`,
-        [{ text: 'OK' }]
+        t('components.backupRestore.backupCreated'),
+        t('components.backupRestore.exportSuccess', { name: saved.name }),
+        [{ text: t('components.backupRestore.ok') }]
       );
     } catch (error: any) {
       if (error?.code === 'PICKER_CANCELLED') return;
-      Alert.alert('Export Failed', error?.message || String(error), [{ text: 'OK' }]);
+      Alert.alert(t('components.backupRestore.exportFailed'), error?.message || String(error), [{ text: t('components.backupRestore.ok') }]);
     } finally {
       setIsExporting(false);
     }
@@ -109,7 +111,7 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
 
   const handleBrowseFile = async () => {
     if (Platform.OS !== 'android') {
-      Alert.alert('Not Supported', 'File browsing is only available on Android.');
+      Alert.alert(t('components.backupRestore.notSupported'), t('components.backupRestore.fileBrowsingAndroidOnly'));
       return;
     }
 
@@ -121,20 +123,20 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
           // Clear any previous file-based selection
           setSelectedBackup(null);
           setBrowsedContent(result.content);
-          setBrowsedFileName(result.name || 'Selected backup');
+          setBrowsedFileName(result.name || t('components.backupRestore.selectedBackupDefault'));
           setBackupPreview(parsed.data);
         } else {
           Alert.alert(
-            'Invalid Backup',
-            parsed.error || 'The selected file is not a valid FreeKiosk backup.',
-            [{ text: 'OK' }]
+            t('components.backupRestore.invalidBackup'),
+            parsed.error || t('components.backupRestore.notValidBackup'),
+            [{ text: t('components.backupRestore.ok') }]
           );
         }
       }
     } catch (error: any) {
       if (error?.code === 'PICKER_CANCELLED') return;
       console.error('Browse file error:', error);
-      Alert.alert('Error', `Failed to browse file: ${error?.message || String(error)}`);
+      Alert.alert(t('components.backupRestore.error'), t('components.backupRestore.browseFileFailed', { error: error?.message || String(error) }));
     }
   };
 
@@ -142,27 +144,27 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
     if (!browsedContent) return;
 
     Alert.alert(
-      'Restore Configuration',
-      `This will replace all current settings with the backup from "${browsedFileName}".\n\nAre you sure you want to continue?`,
+      t('components.backupRestore.restoreConfigTitle'),
+      t('components.backupRestore.restoreFromNamedMessage', { name: browsedFileName }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('components.backupRestore.cancel'), style: 'cancel' },
         {
-          text: 'Restore',
+          text: t('components.backupRestore.restore'),
           style: 'destructive',
           onPress: async () => {
             setIsRestoring(true);
             try {
               const result = await importBackupFromContent(browsedContent, browsedFileName || undefined);
               if (result.success) {
-                let message = 'Configuration restored successfully!';
+                let message = t('components.backupRestore.restoreSuccessBase');
                 if (result.warning) {
                   message += `\n\n${result.warning}`;
                 }
-                message += '\n\nPlease restart the app for all changes to take effect.';
+                message += t('components.backupRestore.restartNote');
 
-                Alert.alert('Restore Complete', message, [
+                Alert.alert(t('components.backupRestore.restoreCompleteTitle'), message, [
                   {
-                    text: 'OK',
+                    text: t('components.backupRestore.ok'),
                     onPress: () => {
                       setShowRestoreModal(false);
                       setSelectedBackup(null);
@@ -175,9 +177,9 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
                 ]);
               } else {
                 Alert.alert(
-                  'Restore Failed',
-                  result.error || 'Unknown error occurred',
-                  [{ text: 'OK' }]
+                  t('components.backupRestore.restoreFailedTitle'),
+                  result.error || t('components.backupRestore.unknownError'),
+                  [{ text: t('components.backupRestore.ok') }]
                 );
               }
             } finally {
@@ -193,27 +195,27 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
     if (!selectedBackup) return;
 
     Alert.alert(
-      'Restore Configuration',
-      'This will replace all current settings with the backup.\n\nAre you sure you want to continue?',
+      t('components.backupRestore.restoreConfigTitle'),
+      t('components.backupRestore.restoreGenericMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('components.backupRestore.cancel'), style: 'cancel' },
         {
-          text: 'Restore',
+          text: t('components.backupRestore.restore'),
           style: 'destructive',
           onPress: async () => {
             setIsRestoring(true);
             try {
               const result = await importBackup(selectedBackup.path);
               if (result.success) {
-                let message = 'Configuration restored successfully!';
+                let message = t('components.backupRestore.restoreSuccessBase');
                 if (result.warning) {
                   message += `\n\n${result.warning}`;
                 }
-                message += '\n\nPlease restart the app for all changes to take effect.';
-                
-                Alert.alert('Restore Complete', message, [
+                message += t('components.backupRestore.restartNote');
+
+                Alert.alert(t('components.backupRestore.restoreCompleteTitle'), message, [
                   {
-                    text: 'OK',
+                    text: t('components.backupRestore.ok'),
                     onPress: () => {
                       setShowRestoreModal(false);
                       setSelectedBackup(null);
@@ -224,9 +226,9 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
                 ]);
               } else {
                 Alert.alert(
-                  'Restore Failed',
-                  result.error || 'Unknown error occurred',
-                  [{ text: 'OK' }]
+                  t('components.backupRestore.restoreFailedTitle'),
+                  result.error || t('components.backupRestore.unknownError'),
+                  [{ text: t('components.backupRestore.ok') }]
                 );
               }
             } finally {
@@ -240,12 +242,12 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
 
   const handleDeleteBackup = async (file: BackupFile) => {
     Alert.alert(
-      'Delete Backup',
-      `Are you sure you want to delete this backup?\n\n${file.name}`,
+      t('components.backupRestore.deleteBackupTitle'),
+      t('components.backupRestore.deleteBackupMessage', { name: file.name }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('components.backupRestore.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('components.backupRestore.delete'),
           style: 'destructive',
           onPress: async () => {
             const result = await deleteBackupFile(file.path);
@@ -256,7 +258,7 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
               }
               await loadBackupFiles();
             } else {
-              Alert.alert('Error', result.error || 'Failed to delete backup');
+              Alert.alert(t('components.backupRestore.error'), result.error || t('components.backupRestore.deleteFailed'));
             }
           },
         },
@@ -265,7 +267,7 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
   };
 
   const formatDate = (dateString: string): string => {
-    if (!dateString) return 'Unknown date';
+    if (!dateString) return t('components.backupRestore.unknownDate');
     try {
       const date = new Date(dateString);
       return date.toLocaleString();
@@ -319,12 +321,11 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
     <View style={styles.container}>
       <View style={styles.header}>
         <Icon name="content-copy" size={20} color={Colors.textSecondary} />
-        <Text style={styles.headerTitle}>Backup & Restore</Text>
+        <Text style={styles.headerTitle}>{t('components.backupRestore.headerTitle')}</Text>
       </View>
-      
+
       <Text style={styles.description}>
-        Export your current configuration or restore from a previous backup.
-        PIN codes are not included in backups for security.
+        {t('components.backupRestore.description')}
       </Text>
 
       <View style={styles.buttonRow}>
@@ -338,7 +339,7 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
           ) : (
             <>
               <Icon name="upload" size={18} color={Colors.textOnPrimary} />
-              <Text style={styles.actionButtonText}>Export</Text>
+              <Text style={styles.actionButtonText}>{t('components.backupRestore.export')}</Text>
             </>
           )}
         </TouchableOpacity>
@@ -348,7 +349,7 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
           onPress={handleOpenRestoreModal}
         >
           <Icon name="download" size={18} color={Colors.primary} />
-          <Text style={styles.importButtonText}>Import</Text>
+          <Text style={styles.importButtonText}>{t('components.backupRestore.import')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -360,7 +361,7 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Select Backup to Restore</Text>
+            <Text style={styles.modalTitle}>{t('components.backupRestore.selectBackupTitle')}</Text>
             <TouchableOpacity
               style={styles.modalCloseButton}
               onPress={() => {
@@ -383,7 +384,7 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
                 onPress={handleBrowseFile}
               >
                 <Icon name="folder-open-outline" size={20} color={Colors.primary} />
-                <Text style={styles.browseButtonText}>Browse device for backup file...</Text>
+                <Text style={styles.browseButtonText}>{t('components.backupRestore.browseDeviceButton')}</Text>
               </TouchableOpacity>
             )}
 
@@ -392,7 +393,7 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
               <View style={styles.browsedFileIndicator}>
                 <Icon name="file-document-outline" size={18} color={Colors.success} />
                 <Text style={styles.browsedFileText} numberOfLines={1}>
-                  Selected: {browsedFileName}
+                  {t('components.backupRestore.selectedFile', { name: browsedFileName })}
                 </Text>
                 <TouchableOpacity
                   onPress={() => {
@@ -408,19 +409,18 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
 
             {/* Backup List */}
             <View style={styles.listSection}>
-              <Text style={styles.sectionTitle}>Available Backups</Text>
+              <Text style={styles.sectionTitle}>{t('components.backupRestore.availableBackups')}</Text>
               {loadingFiles ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="large" color={Colors.primary} />
-                  <Text style={styles.loadingText}>Loading backups...</Text>
+                  <Text style={styles.loadingText}>{t('components.backupRestore.loadingBackups')}</Text>
                 </View>
               ) : backupFiles.length === 0 ? (
                 <View style={styles.emptyContainer}>
                   <Icon name="calendar" size={48} color={Colors.textHint} />
-                  <Text style={styles.emptyText}>No backups found</Text>
+                  <Text style={styles.emptyText}>{t('components.backupRestore.noBackupsFound')}</Text>
                   <Text style={styles.emptySubtext}>
-                    Only backups created by this app are listed here.{'\n'}
-                    Use "Browse device" above to import backups from other devices or pushed via ADB.
+                    {t('components.backupRestore.noBackupsHint')}
                   </Text>
                 </View>
               ) : (
@@ -437,37 +437,37 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
             {/* Preview Section */}
             {(selectedBackup || browsedContent) && (
               <View style={styles.previewSection}>
-                <Text style={styles.sectionTitle}>Backup Details</Text>
+                <Text style={styles.sectionTitle}>{t('components.backupRestore.backupDetails')}</Text>
                 <View style={styles.previewCard}>
                   {backupPreview ? (
                     <>
                       <View style={styles.previewRow}>
-                        <Text style={styles.previewLabel}>App Version:</Text>
-                        <Text style={styles.previewValue}>{backupPreview.appVersion || 'Unknown'}</Text>
+                        <Text style={styles.previewLabel}>{t('components.backupRestore.appVersion')}</Text>
+                        <Text style={styles.previewValue}>{backupPreview.appVersion || t('components.backupRestore.unknown')}</Text>
                       </View>
                       <View style={styles.previewRow}>
-                        <Text style={styles.previewLabel}>Export Date:</Text>
+                        <Text style={styles.previewLabel}>{t('components.backupRestore.exportDate')}</Text>
                         <Text style={styles.previewValue}>{formatDate(backupPreview.exportDate)}</Text>
                       </View>
                       <View style={styles.previewRow}>
-                        <Text style={styles.previewLabel}>Settings Count:</Text>
+                        <Text style={styles.previewLabel}>{t('components.backupRestore.settingsCount')}</Text>
                         <Text style={styles.previewValue}>{getSettingsCount(backupPreview)}</Text>
                       </View>
                       <View style={styles.previewRow}>
-                        <Text style={styles.previewLabel}>Had PIN:</Text>
+                        <Text style={styles.previewLabel}>{t('components.backupRestore.hadPin')}</Text>
                         <Text style={styles.previewValue}>
-                          {backupPreview.hasPinConfigured ? 'Yes (not included)' : 'No'}
+                          {backupPreview.hasPinConfigured ? t('components.backupRestore.yesNotIncluded') : t('components.backupRestore.no')}
                         </Text>
                       </View>
                       {browsedContent && (
                         <View style={styles.previewRow}>
-                          <Text style={styles.previewLabel}>Source:</Text>
-                          <Text style={styles.previewValue}>Browsed file</Text>
+                          <Text style={styles.previewLabel}>{t('components.backupRestore.source')}</Text>
+                          <Text style={styles.previewValue}>{t('components.backupRestore.browsedFile')}</Text>
                         </View>
                       )}
                     </>
                   ) : (
-                    <Text style={styles.previewError}>Unable to read backup details</Text>
+                    <Text style={styles.previewError}>{t('components.backupRestore.previewError')}</Text>
                   )}
                 </View>
 
@@ -484,7 +484,7 @@ const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({
                   ) : (
                     <>
                       <Icon name="refresh" size={18} color={Colors.textOnPrimary} />
-                      <Text style={styles.restoreButtonText}>Restore This Backup</Text>
+                      <Text style={styles.restoreButtonText}>{t('components.backupRestore.restoreThisBackup')}</Text>
                     </>
                   )}
                 </TouchableOpacity>

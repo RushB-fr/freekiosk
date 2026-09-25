@@ -29,6 +29,7 @@ import { CloudSyncService, PROVISIONING_STATUS_EVENT } from '../utils/CloudSyncS
 import type { ProvisioningStatus } from '../utils/CloudSyncService';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
+import { useTranslation } from 'react-i18next';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -108,6 +109,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   basicAuthCredential,
   onRenderProcessGone,
 }, ref) => {
+  const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp>();
   const webViewRef = useRef<WebView>(null);
   // #190 — Host-view ref for pauseMedia/resumeMedia. react-native-webview's ref is a
@@ -1047,22 +1049,22 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
             {/* Title */}
             <Text style={styles.welcomeTitle}>FreeKiosk</Text>
             <Text style={styles.welcomeSubtitle}>
-              Professional Kiosk Application
+              {t('components.webView.welcomeSubtitle')}
             </Text>
 
             {/* Features List */}
             <View style={styles.featuresList}>
               <FeatureItem
                 icon="shield-check"
-                text="Secure kiosk mode"
+                text={t('components.webView.featureSecureKiosk')}
               />
               <FeatureItem
                 icon="flash"
-                text="Optimal performance"
+                text={t('components.webView.featureOptimalPerformance')}
               />
               <FeatureItem
                 icon="github"
-                text="100% free & open source"
+                text={t('components.webView.featureOpenSource')}
               />
             </View>
 
@@ -1071,10 +1073,10 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
               <View style={styles.provisioningBox}>
                 <Text style={styles.provisioningText}>
                   {provisioning.state === 'enrolling'
-                    ? `Connecting to FreeKiosk Cloud… (attempt ${provisioning.attempts})`
+                    ? t('components.webView.provisioningEnrolling', { attempts: provisioning.attempts })
                     : provisioning.state === 'retrying'
-                      ? `Cannot reach FreeKiosk Cloud yet. Retrying every 30 seconds (attempt ${provisioning.attempts}).`
-                      : `Cloud enrollment failed: ${provisioning.error}. Enter a new token in Settings > Cloud.`}
+                      ? t('components.webView.provisioningRetrying', { attempts: provisioning.attempts })
+                      : t('components.webView.provisioningFailed', { error: provisioning.error })}
                 </Text>
               </View>
             )}
@@ -1087,7 +1089,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
             >
               <Icon name="rocket-launch" size={20} color="#2b7fff" style={styles.buttonLeadingIcon} />
               <Text style={styles.setupButtonText}>
-                Start Configuration
+                {t('components.webView.startConfiguration')}
               </Text>
             </TouchableOpacity>
 
@@ -1099,20 +1101,20 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
             >
               <Icon name="github" size={20} color="#fff" style={styles.buttonLeadingIcon} />
               <Text style={styles.githubButtonText}>
-                Support us on GitHub
+                {t('components.webView.supportOnGithub')}
               </Text>
             </TouchableOpacity>
 
             {/* Hint */}
             <View style={styles.hintContainer}>
               <Text style={styles.hintText}>
-                Tip: Tap 5× anywhere on the screen to access settings
+                {t('components.webView.tapHint')}
               </Text>
             </View>
 
             {/* Footer */}
             <Text style={styles.footerText}>
-              {appVersion ? `Version ${appVersion} • by Rushb` : 'by Rushb'}
+              {appVersion ? t('components.webView.footerVersion', { version: appVersion }) : t('components.webView.footerByRushb')}
             </Text>
           </Animated.View>
         </ScrollView>
@@ -1379,7 +1381,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
       {loading && !error && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2b7fff" />
-          <Text style={styles.loadingText}>Loading...</Text>
+          <Text style={styles.loadingText}>{t('components.webView.loading')}</Text>
           {/* Fallback settings button inside loading overlay */}
           <TouchableOpacity
             style={styles.fallbackSettingsButton}
@@ -1398,20 +1400,20 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
       {error && (
         <View style={styles.errorContainer}>
           <Icon name="alert" size={48} color="#f59e0b" style={styles.errorIcon} />
-          <Text style={styles.errorText}>Loading Error</Text>
-          <Text style={styles.errorSubtext}>URL: {url}</Text>
+          <Text style={styles.errorText}>{t('components.webView.loadingError')}</Text>
+          <Text style={styles.errorSubtext}>{t('components.webView.urlLabel', { url })}</Text>
           {autoReload && (
             <Text style={styles.helpText}>
-              Automatic reload in 5 seconds...
+              {t('components.webView.autoReloadText')}
             </Text>
           )}
           <TouchableOpacity style={[styles.reloadButton, styles.rowCenter]} onPress={handleReload}>
             <Icon name="refresh" size={18} color="#fff" style={styles.buttonLeadingIcon} />
-            <Text style={styles.reloadText}>Reload Now</Text>
+            <Text style={styles.reloadText}>{t('components.webView.reloadNow')}</Text>
           </TouchableOpacity>
           {/* Fallback settings button inside error overlay */}
           <Text style={styles.fallbackSettingsHint}>
-            Tap the settings button 5× to return to settings
+            {t('components.webView.fallbackSettingsHint')}
           </Text>
           <TouchableOpacity
             style={styles.fallbackSettingsButton}

@@ -5,6 +5,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Alert } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import Icon from '../Icon';
 import { Colors, FontSizes, Spacing } from '../../theme';
@@ -31,21 +32,22 @@ interface EscPosPrinterSectionProps {
   onOriginsChange: (value: string[] | null) => void;
 }
 
+// Translation keys, resolved with t() at render time
 const STATE_LABELS: Record<PrinterStatus['state'], string> = {
-  ready: 'Ready',
-  no_printer: 'No printer detected',
-  no_permission: 'Access not granted',
-  paper_out: 'Out of paper',
-  error: 'Error',
+  ready: 'components.escPos.stateReady',
+  no_printer: 'components.escPos.stateNoPrinter',
+  no_permission: 'components.escPos.stateNoPermission',
+  paper_out: 'components.escPos.statePaperOut',
+  error: 'components.escPos.stateError',
 };
 
 const ERROR_MESSAGES: Record<string, string> = {
-  NO_PRINTER: 'No printer is attached. Check the cable and the USB adapter.',
-  NO_PERMISSION: 'Access to the printer has not been granted yet.',
-  PAPER_OUT: 'The printer is out of paper.',
-  OPEN_FAILED: 'The printer could not be opened. Another app may be holding it.',
-  WRITE_FAILED: 'The printer stopped accepting data part-way through.',
-  PAGE_RENDER_FAILED: 'The page could not be rendered for printing.',
+  NO_PRINTER: 'components.escPos.errorNoPrinter',
+  NO_PERMISSION: 'components.escPos.errorNoPermission',
+  PAPER_OUT: 'components.escPos.errorPaperOut',
+  OPEN_FAILED: 'components.escPos.errorOpenFailed',
+  WRITE_FAILED: 'components.escPos.errorWriteFailed',
+  PAGE_RENDER_FAILED: 'components.escPos.errorPageRender',
 };
 
 const EscPosPrinterSection: React.FC<EscPosPrinterSectionProps> = ({
@@ -58,6 +60,7 @@ const EscPosPrinterSection: React.FC<EscPosPrinterSectionProps> = ({
   origins,
   onOriginsChange,
 }) => {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<PrinterStatus | null>(null);
   const [checking, setChecking] = useState(false);
   const [printing, setPrinting] = useState(false);
@@ -89,8 +92,8 @@ const EscPosPrinterSection: React.FC<EscPosPrinterSectionProps> = ({
       const next = await refresh();
       if (next.state === 'no_permission') {
         Alert.alert(
-          'Access denied',
-          'The printer cannot be used until access is granted.',
+          t('components.escPos.accessDeniedTitle'),
+          t('components.escPos.accessDeniedMessage'),
         );
       }
     } catch (error) {
@@ -103,8 +106,9 @@ const EscPosPrinterSection: React.FC<EscPosPrinterSectionProps> = ({
     try {
       await SilentPrintModule.printTestPage({ widthDots, cut, feedLines });
     } catch (error: any) {
-      const message = ERROR_MESSAGES[error?.code] ?? error?.message ?? 'Unknown error';
-      Alert.alert('Test page failed', message);
+      const key = ERROR_MESSAGES[error?.code];
+      const message = key ? t(key) : error?.message ?? t('components.escPos.unknownError');
+      Alert.alert(t('components.escPos.testPageFailed'), message);
     } finally {
       setPrinting(false);
       refresh();
@@ -125,25 +129,27 @@ const EscPosPrinterSection: React.FC<EscPosPrinterSectionProps> = ({
             size={18}
             color={tone}
           />
-          <Text style={[styles.statusText, { color: tone }]}>{STATE_LABELS[state]}</Text>
+          <Text style={[styles.statusText, { color: tone }]}>{t(STATE_LABELS[state])}</Text>
         </View>
 
         {printer && (
           <>
             <Text style={styles.detail}>{printer.name}</Text>
             <Text style={styles.detailMuted}>
-              {printer.commandSet ? `Commands: ${printer.commandSet}` : 'Command set not reported'}
+              {printer.commandSet
+                ? t('components.escPos.commandSet', { commandSet: printer.commandSet })
+                : t('components.escPos.commandSetUnknown')}
               {printer.hardwareId ? `  ·  ${printer.hardwareId}` : ''}
             </Text>
           </>
         )}
         {status?.paper === 'unknown' && state === 'ready' && (
-          <Text style={styles.detailMuted}>This printer does not report paper level.</Text>
+          <Text style={styles.detailMuted}>{t('components.escPos.noPaperLevel')}</Text>
         )}
 
         <View style={styles.actions}>
           <SettingsButton
-            title="Refresh"
+            title={t('components.escPos.refresh')}
             icon="refresh"
             variant="outline"
             size="small"
@@ -153,7 +159,7 @@ const EscPosPrinterSection: React.FC<EscPosPrinterSectionProps> = ({
           />
           {state === 'no_permission' && (
             <SettingsButton
-              title="Grant access"
+              title={t('components.escPos.grantAccess')}
               icon="lock-open"
               size="small"
               fullWidth={false}
@@ -164,8 +170,8 @@ const EscPosPrinterSection: React.FC<EscPosPrinterSectionProps> = ({
       </View>
 
       <SettingsInput
-        label="Print width (dots)"
-        hint="Printable width in dots (set according to the printer's specification)"
+        label={t('components.escPos.widthDots')}
+        hint={t('components.escPos.widthDotsHint')}
         value={String(widthDots)}
         onChangeText={(text) => onWidthDotsChange(parseInt(text, 10) || 0)}
         placeholder={String(DEFAULT_ESC_POS_WIDTH_DOTS)}
@@ -173,26 +179,26 @@ const EscPosPrinterSection: React.FC<EscPosPrinterSectionProps> = ({
       />
 
       <SettingsSlider
-        label="Feed after printing"
-        hint="Blank lines fed at the end of each print job"
+        label={t('components.escPos.feedLines')}
+        hint={t('components.escPos.feedLinesHint')}
         value={feedLines}
         onValueChange={onFeedLinesChange}
         minimumValue={0}
         maximumValue={10}
         step={1}
-        formatValue={(value) => `${Math.round(value)} lines`}
+        formatValue={(value) => t('components.escPos.feedLinesValue', { count: Math.round(value) })}
       />
 
       <SettingsSwitch
-        label="Cut paper"
-        hint="Automatically cut after each print job (does not affect printers without cutters)"
+        label={t('components.escPos.cut')}
+        hint={t('components.escPos.cutHint')}
         value={cut}
         onValueChange={onCutChange}
       />
 
       <SettingsSwitch
-        label="Restrict printing by origin"
-        hint="Only pages from the origins you list can use window.FreeKiosk.silentPrinter"
+        label={t('components.escPos.restrictOrigins')}
+        hint={t('components.escPos.restrictOriginsHint')}
         value={origins !== null}
         onValueChange={(enabled) => onOriginsChange(enabled ? [] : null)}
       />
@@ -203,13 +209,13 @@ const EscPosPrinterSection: React.FC<EscPosPrinterSectionProps> = ({
           onUrlsChange={onOriginsChange}
           maxUrls={0}
           placeholder="https://app.example.com"
-          emptyTitle="No origins allowed"
-          emptyHint="No page can print until you add one"
+          emptyTitle={t('components.escPos.noOrigins')}
+          emptyHint={t('components.escPos.noOriginsHint')}
         />
       )}
 
       <SettingsButton
-        title="Print test page"
+        title={t('components.escPos.printTestPage')}
         icon="printer"
         variant="secondary"
         loading={printing}
@@ -219,10 +225,7 @@ const EscPosPrinterSection: React.FC<EscPosPrinterSectionProps> = ({
 
       <SettingsInfoBox variant="info">
         <Text style={styles.infoText}>
-          {'Web pages print silently by calling window.FreeKiosk.silentPrinter.print() or printImage(). print() lays the page out so one CSS pixel is one dot.\n\n'}
-          {'window.print() is not affected: it opens the Android print dialog when Window Printing is enabled, and does nothing otherwise.\n\n'}
-          {'For access that survives reboots: plug the printer in, then choose FreeKiosk and tick "Always open". The button above only grants access until the printer is unplugged, and lock task mode suppresses that dialog entirely.\n\n'}
-          {'Printers exposing a vendor-specific USB interface instead of the standard printer class still print, but cannot report paper level.'}
+          {t('components.escPos.info')}
         </Text>
       </SettingsInfoBox>
     </>

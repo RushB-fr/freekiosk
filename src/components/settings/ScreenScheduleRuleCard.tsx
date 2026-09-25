@@ -8,6 +8,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Colors, Spacing, Typography } from '../../theme';
 import Icon from '../Icon';
 import { ScreenScheduleRule, getDaysDisplayString } from '../../types/screenScheduler';
+import { useTranslation } from 'react-i18next';
 
 interface ScreenScheduleRuleCardProps {
   rule: ScreenScheduleRule;
@@ -22,6 +23,7 @@ const ScreenScheduleRuleCard: React.FC<ScreenScheduleRuleCardProps> = ({
   onEdit,
   onDelete,
 }) => {
+  const { t } = useTranslation();
   const daysText = getDaysDisplayString(rule.days);
   
   // Display sleep window with midnight-crossing indicator
@@ -33,10 +35,10 @@ const ScreenScheduleRuleCard: React.FC<ScreenScheduleRuleCardProps> = ({
       <View style={styles.header}>
         <View style={styles.titleRow}>
           <Text style={[styles.name, !rule.enabled && styles.textDisabled]}>
-            {rule.name || 'Unnamed Rule'}
+            {rule.name || t('components.screenScheduleRuleCard.unnamedRule')}
           </Text>
           {sleepCrossesMidnight && (
-            <Text style={styles.midnightBadge}>overnight</Text>
+            <Text style={styles.midnightBadge}>{t('components.screenScheduleRuleCard.overnight')}</Text>
           )}
         </View>
         <TouchableOpacity
@@ -44,7 +46,7 @@ const ScreenScheduleRuleCard: React.FC<ScreenScheduleRuleCardProps> = ({
           onPress={() => onToggle(rule.id, !rule.enabled)}
         >
           <Text style={[styles.toggleText, rule.enabled && styles.toggleTextActive]}>
-            {rule.enabled ? 'ON' : 'OFF'}
+            {rule.enabled ? t('components.screenScheduleRuleCard.on') : t('components.screenScheduleRuleCard.off')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -67,11 +69,11 @@ const ScreenScheduleRuleCard: React.FC<ScreenScheduleRuleCardProps> = ({
       <View style={styles.actions}>
         <TouchableOpacity style={styles.actionButton} onPress={() => onEdit(rule)}>
           <Icon name="pencil" size={18} color={Colors.primary} />
-          <Text style={styles.actionText}>Edit</Text>
+          <Text style={styles.actionText}>{t('components.screenScheduleRuleCard.edit')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton} onPress={() => onDelete(rule.id)}>
           <Icon name="delete" size={18} color={Colors.error} />
-          <Text style={[styles.actionText, { color: Colors.error }]}>Delete</Text>
+          <Text style={[styles.actionText, { color: Colors.error }]}>{t('components.screenScheduleRuleCard.delete')}</Text>
         </TouchableOpacity>
       </View>
     </View>

@@ -21,6 +21,7 @@ import {
 } from 'react-native';
 import { NativeModules } from 'react-native';
 import Icon from './Icon';
+import { useTranslation } from 'react-i18next';
 
 const { BluetoothControlModule } = NativeModules;
 
@@ -45,6 +46,7 @@ interface Props {
 }
 
 export default function BluetoothDialog({ visible, onClose }: Props) {
+  const { t } = useTranslation();
   const [btInfo, setBtInfo] = useState<BTInfo | null>(null);
   const [discoveredDevices, setDiscoveredDevices] = useState<BTDevice[]>([]);
   const [discovering, setDiscovering] = useState(false);
@@ -138,14 +140,14 @@ export default function BluetoothDialog({ visible, onClose }: Props) {
         setBtInfo(previousInfo);
         // Do NOT open system Settings panels — that would break kiosk isolation.
         Alert.alert(
-          'Bluetooth toggle unavailable',
-          'Bluetooth could not be toggled on this device. Please ask an administrator to enable it.'
+          t('components.bluetoothDialog.toggleUnavailableTitle'),
+          t('components.bluetoothDialog.toggleUnavailableMessage')
         );
       } else if (result.success === false) {
         const reachedState = await waitForBluetoothState(nextEnabled);
         if (!reachedState) {
           setBtInfo(previousInfo);
-          Alert.alert('Bluetooth toggle failed', `Could not turn Bluetooth ${nextEnabled ? 'on' : 'off'}.`);
+          Alert.alert(t('components.bluetoothDialog.toggleFailedTitle'), t('components.bluetoothDialog.toggleFailedMessage', { state: nextEnabled ? t('components.bluetoothDialog.on') : t('components.bluetoothDialog.off') }));
         }
       } else {
         const reachedState = await waitForBluetoothState(nextEnabled, 5000);
@@ -154,7 +156,7 @@ export default function BluetoothDialog({ visible, onClose }: Props) {
     } catch (e) {
       setBtInfo(previousInfo);
       console.warn('[BluetoothDialog] toggle error:', e);
-      Alert.alert('Bluetooth toggle failed', `Could not turn Bluetooth ${nextEnabled ? 'on' : 'off'}.`);
+      Alert.alert(t('components.bluetoothDialog.toggleFailedTitle'), t('components.bluetoothDialog.toggleFailedMessage', { state: nextEnabled ? t('components.bluetoothDialog.on') : t('components.bluetoothDialog.off') }));
     } finally {
       setTogglingBt(false);
     }
@@ -170,7 +172,7 @@ export default function BluetoothDialog({ visible, onClose }: Props) {
       setTimeout(() => setDiscovering(false), 15000);
     } catch (e: any) {
       setDiscovering(false);
-      Alert.alert('Scan error', e?.message ?? 'Could not start Bluetooth scan');
+      Alert.alert(t('components.bluetoothDialog.scanErrorTitle'), e?.message ?? t('components.bluetoothDialog.scanErrorDefault'));
     }
   };
 
@@ -183,7 +185,7 @@ export default function BluetoothDialog({ visible, onClose }: Props) {
       // Remove from discovered list once paired
       setDiscoveredDevices((prev) => prev.filter((d) => d.address !== device.address));
     } catch (e: any) {
-      Alert.alert('Pairing failed', e?.message ?? 'Could not pair with device');
+      Alert.alert(t('components.bluetoothDialog.pairingFailedTitle'), e?.message ?? t('components.bluetoothDialog.pairingFailedDefault'));
     } finally {
       setPairingAddress(null);
     }
@@ -195,13 +197,13 @@ export default function BluetoothDialog({ visible, onClose }: Props) {
     try {
       const success = await BluetoothControlModule.connectDevice(device.address);
       if (!success) {
-        Alert.alert('Connection failed', 'Could not connect to this paired device.');
+        Alert.alert(t('components.bluetoothDialog.connectionFailedTitle'), t('components.bluetoothDialog.connectionFailedMessage'));
       } else {
         updateBondedDeviceConnection(device.address, true);
       }
       refreshSoon();
     } catch (e: any) {
-      Alert.alert('Connection failed', e?.message ?? 'Could not connect to device');
+      Alert.alert(t('components.bluetoothDialog.connectionFailedTitle'), e?.message ?? t('components.bluetoothDialog.connectionFailedDefault'));
     } finally {
       setConnectingAddress(null);
     }
@@ -213,13 +215,13 @@ export default function BluetoothDialog({ visible, onClose }: Props) {
     try {
       const success = await BluetoothControlModule.disconnectDevice(device.address);
       if (!success) {
-        Alert.alert('Disconnect failed', 'Could not disconnect this device.');
+        Alert.alert(t('components.bluetoothDialog.disconnectFailedTitle'), t('components.bluetoothDialog.disconnectFailedMessage'));
       } else {
         updateBondedDeviceConnection(device.address, false);
       }
       refreshSoon();
     } catch (e: any) {
-      Alert.alert('Disconnect failed', e?.message ?? 'Could not disconnect device');
+      Alert.alert(t('components.bluetoothDialog.disconnectFailedTitle'), e?.message ?? t('components.bluetoothDialog.disconnectFailedDefault'));
     } finally {
       setDisconnectingAddress(null);
     }
@@ -239,11 +241,11 @@ export default function BluetoothDialog({ visible, onClose }: Props) {
       }
       const success = await BluetoothControlModule.unpairDevice(device.address);
       if (!success) {
-        Alert.alert('Remove failed', 'Could not remove this paired device.');
+        Alert.alert(t('components.bluetoothDialog.removeFailedTitle'), t('components.bluetoothDialog.removeFailedMessage'));
       }
       refreshSoon();
     } catch (e: any) {
-      Alert.alert('Remove failed', e?.message ?? 'Could not remove this paired device.');
+      Alert.alert(t('components.bluetoothDialog.removeFailedTitle'), e?.message ?? t('components.bluetoothDialog.removeFailedMessage'));
     } finally {
       setRemovingAddress(null);
     }
@@ -251,12 +253,12 @@ export default function BluetoothDialog({ visible, onClose }: Props) {
 
   const handleRemovePairedDevice = (device: BTDevice) => {
     Alert.alert(
-      'Remove paired device',
-      `Forget ${device.name}?`,
+      t('components.bluetoothDialog.removePairedDeviceTitle'),
+      t('components.bluetoothDialog.forgetDevice', { name: device.name }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('components.bluetoothDialog.cancel'), style: 'cancel' },
         {
-          text: 'Remove',
+          text: t('components.bluetoothDialog.remove'),
           style: 'destructive',
           onPress: () => {
             void performRemovePairedDevice(device);
@@ -292,7 +294,7 @@ export default function BluetoothDialog({ visible, onClose }: Props) {
         </View>
         <View style={styles.deviceActions}>
           <Text style={[styles.deviceStatus, item.connected && styles.deviceStatusConnected]}>
-            {item.connected ? '● Connected' : '○ Paired'}
+            {item.connected ? t('components.bluetoothDialog.connected') : t('components.bluetoothDialog.paired')}
           </Text>
           <TouchableOpacity
             style={[styles.deviceActionBtn, isBusy && styles.deviceActionBtnDisabled]}
@@ -303,12 +305,12 @@ export default function BluetoothDialog({ visible, onClose }: Props) {
               <ActivityIndicator color="#1e63d6" size="small" />
             ) : (
               <Text style={styles.deviceActionBtnText}>
-                {item.connected ? 'Disconnect' : 'Connect'}
+                {item.connected ? t('components.bluetoothDialog.disconnect') : t('components.bluetoothDialog.connect')}
               </Text>
             )}
           </TouchableOpacity>
           <Text style={styles.deviceHint}>
-            {isRemoving ? 'Removing…' : 'Hold to remove'}
+            {isRemoving ? t('components.bluetoothDialog.removing') : t('components.bluetoothDialog.holdToRemove')}
           </Text>
         </View>
       </TouchableOpacity>
@@ -332,7 +334,7 @@ export default function BluetoothDialog({ visible, onClose }: Props) {
         {isPairing ? (
           <ActivityIndicator color="#2b7fff" size="small" />
         ) : (
-          <Text style={styles.pairBtn}>Pair ›</Text>
+          <Text style={styles.pairBtn}>{t('components.bluetoothDialog.pair')}</Text>
         )}
       </TouchableOpacity>
     );
@@ -351,7 +353,7 @@ export default function BluetoothDialog({ visible, onClose }: Props) {
         <View style={styles.header}>
           <View style={styles.headerTitleRow}>
             <Icon name="bluetooth" size={22} color="#fff" style={styles.headerIcon} />
-            <Text style={styles.headerTitle}>Bluetooth</Text>
+            <Text style={styles.headerTitle}>{t('components.bluetoothDialog.title')}</Text>
           </View>
           <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
             <Icon name="close" size={22} color="#fff" />
@@ -360,14 +362,14 @@ export default function BluetoothDialog({ visible, onClose }: Props) {
 
         {/* Bluetooth not supported */}
         {btInfo?.supported === false && (
-          <Text style={styles.unsupportedText}>Bluetooth is not available on this device.</Text>
+          <Text style={styles.unsupportedText}>{t('components.bluetoothDialog.notAvailable')}</Text>
         )}
 
         {btInfo?.supported !== false && (
           <>
             {/* Toggle row */}
             <View style={styles.toggleRow}>
-              <Text style={styles.toggleLabel}>Bluetooth</Text>
+              <Text style={styles.toggleLabel}>{t('components.bluetoothDialog.title')}</Text>
               {togglingBt ? (
                 <ActivityIndicator color="#2b7fff" />
               ) : (
@@ -390,7 +392,7 @@ export default function BluetoothDialog({ visible, onClose }: Props) {
                     {/* Paired devices */}
                     {(btInfo?.bondedDevices?.length ?? 0) > 0 && (
                       <>
-                        <Text style={styles.sectionTitle}>Paired Devices</Text>
+                        <Text style={styles.sectionTitle}>{t('components.bluetoothDialog.pairedDevices')}</Text>
                         {btInfo!.bondedDevices.map((d) => (
                           <View key={d.address}>{renderBondedDevice({ item: d })}</View>
                         ))}
@@ -408,14 +410,14 @@ export default function BluetoothDialog({ visible, onClose }: Props) {
                       ) : (
                         <View style={styles.scanBtnRow}>
                           <Icon name="magnify" size={18} color="#fff" style={styles.scanBtnIcon} />
-                          <Text style={styles.scanBtnText}>Scan for devices</Text>
+                          <Text style={styles.scanBtnText}>{t('components.bluetoothDialog.scanForDevices')}</Text>
                         </View>
                       )}
                     </TouchableOpacity>
 
                     {/* Discovered devices */}
                     {discoveredDevices.length > 0 && (
-                      <Text style={styles.sectionTitle}>Available Devices</Text>
+                      <Text style={styles.sectionTitle}>{t('components.bluetoothDialog.availableDevices')}</Text>
                     )}
                   </>
                 }
@@ -425,10 +427,10 @@ export default function BluetoothDialog({ visible, onClose }: Props) {
                       <View key={d.address}>{renderDiscoveredDevice({ item: d })}</View>
                     ))}
                     {discovering && discoveredDevices.length === 0 && (
-                      <Text style={styles.scanningText}>Scanning…</Text>
+                      <Text style={styles.scanningText}>{t('components.bluetoothDialog.scanning')}</Text>
                     )}
                     {!discovering && discoveredDevices.length === 0 && (
-                      <Text style={styles.emptyText}>Tap "Scan" to find nearby devices</Text>
+                      <Text style={styles.emptyText}>{t('components.bluetoothDialog.tapScanHint')}</Text>
                     )}
                   </>
                 }
@@ -437,7 +439,7 @@ export default function BluetoothDialog({ visible, onClose }: Props) {
             )}
 
             {!btInfo?.isEnabled && (
-              <Text style={styles.disabledText}>Turn on Bluetooth to see paired and nearby devices.</Text>
+              <Text style={styles.disabledText}>{t('components.bluetoothDialog.disabledHint')}</Text>
             )}
           </>
         )}

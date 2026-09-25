@@ -33,6 +33,7 @@ import {
   saveSecureWifiPassword,
 } from '../utils/secureStorage';
 import Icon, { IconName } from './Icon';
+import { useTranslation } from 'react-i18next';
 
 const { WifiControlModule } = NativeModules;
 
@@ -60,6 +61,7 @@ interface Props {
 const SIGNAL_ICONS: IconName[] = ['wifi-strength-1', 'wifi-strength-2', 'wifi-strength-3', 'wifi-strength-4'];
 
 export default function WifiDialog({ visible, onClose }: Props) {
+  const { t } = useTranslation();
   const [wifiInfo, setWifiInfo] = useState<WifiInfo | null>(null);
   const [networks, setNetworks] = useState<WifiNetwork[]>([]);
   const [scanning, setScanning] = useState(false);
@@ -128,12 +130,12 @@ export default function WifiDialog({ visible, onClose }: Props) {
         // We do NOT open the system Settings panel — that would create a potential
         // escape route from kiosk mode. Instead inform the user.
         Alert.alert(
-          'WiFi toggle unavailable',
-          'On this Android version, WiFi can only be toggled via the device status bar or by an administrator. Connect to a network below while WiFi is already on.'
+          t('components.wifiDialog.toggleUnavailableTitle'),
+          t('components.wifiDialog.toggleUnavailableMessage')
         );
       } else if (result.success === false) {
         setWifiInfo(previousInfo);
-        Alert.alert('Wi-Fi toggle failed', `Could not turn Wi-Fi ${nextEnabled ? 'on' : 'off'}.`);
+        Alert.alert(t('components.wifiDialog.toggleFailedTitle'), t('components.wifiDialog.toggleFailedMessage', { state: nextEnabled ? t('components.wifiDialog.on') : t('components.wifiDialog.off') }));
       } else {
         setTimeout(async () => {
           await refresh();
@@ -145,7 +147,7 @@ export default function WifiDialog({ visible, onClose }: Props) {
     } catch (e) {
       setWifiInfo(previousInfo);
       console.warn('[WifiDialog] toggle error:', e);
-      Alert.alert('Wi-Fi toggle failed', `Could not turn Wi-Fi ${nextEnabled ? 'on' : 'off'}.`);
+      Alert.alert(t('components.wifiDialog.toggleFailedTitle'), t('components.wifiDialog.toggleFailedMessage', { state: nextEnabled ? t('components.wifiDialog.on') : t('components.wifiDialog.off') }));
     } finally {
       setTogglingWifi(false);
     }
@@ -168,7 +170,7 @@ export default function WifiDialog({ visible, onClose }: Props) {
     } catch (e: any) {
       setScanning(false);
       console.warn('[WifiDialog] scan error:', e);
-      Alert.alert('Wi-Fi scan unavailable', e?.message || 'FreeKiosk does not have permission to scan for Wi-Fi networks.');
+      Alert.alert(t('components.wifiDialog.scanUnavailableTitle'), e?.message || t('components.wifiDialog.scanUnavailableDefault'));
     }
   };
 
@@ -209,20 +211,20 @@ export default function WifiDialog({ visible, onClose }: Props) {
           await clearSecureWifiPassword(ssid);
           setPasswordSsid(ssid);
           setPassword('');
-          Alert.alert('Saved Wi-Fi password failed', `Enter the password for "${ssid}" again.`);
+          Alert.alert(t('components.wifiDialog.savedPasswordFailedTitle'), t('components.wifiDialog.enterPasswordAgain', { ssid }));
           return;
         }
-        Alert.alert('Connection failed', `Could not connect to "${ssid}"`);
+        Alert.alert(t('components.wifiDialog.connectionFailedTitle'), t('components.wifiDialog.couldNotConnect', { ssid }));
       }
     } catch (e: any) {
       if (usedSavedPassword) {
         await clearSecureWifiPassword(ssid);
         setPasswordSsid(ssid);
         setPassword('');
-        Alert.alert('Saved Wi-Fi password failed', e?.message || `Enter the password for "${ssid}" again.`);
+        Alert.alert(t('components.wifiDialog.savedPasswordFailedTitle'), e?.message || t('components.wifiDialog.enterPasswordAgain', { ssid }));
         return;
       }
-      Alert.alert('Connection failed', e?.message || `Could not connect to "${ssid}"`);
+      Alert.alert(t('components.wifiDialog.connectionFailedTitle'), e?.message || t('components.wifiDialog.couldNotConnect', { ssid }));
     } finally {
       setConnecting(null);
       connectingRef.current = null;
@@ -264,14 +266,14 @@ export default function WifiDialog({ visible, onClose }: Props) {
       const result = await WifiControlModule.disconnectFromCurrentNetwork();
       if (result.success === false) {
         setWifiInfo(previousInfo);
-        Alert.alert('Disconnect failed', `Could not disconnect from "${previousInfo.ssid}".`);
+        Alert.alert(t('components.wifiDialog.disconnectFailedTitle'), t('components.wifiDialog.couldNotDisconnect', { ssid: previousInfo.ssid }));
       } else {
         setTimeout(refresh, 700);
         setTimeout(refresh, 1800);
       }
     } catch (e: any) {
       setWifiInfo(previousInfo);
-      Alert.alert('Disconnect failed', e?.message || `Could not disconnect from "${previousInfo.ssid}".`);
+      Alert.alert(t('components.wifiDialog.disconnectFailedTitle'), e?.message || t('components.wifiDialog.couldNotDisconnect', { ssid: previousInfo.ssid }));
     } finally {
       setDisconnectingWifi(false);
     }
@@ -292,7 +294,7 @@ export default function WifiDialog({ visible, onClose }: Props) {
         <View style={styles.header}>
           <View style={styles.headerTitleRow}>
             <Icon name="wifi" size={22} color="#fff" style={styles.headerIcon} />
-            <Text style={styles.headerTitle}>Wi-Fi</Text>
+            <Text style={styles.headerTitle}>{t('components.wifiDialog.title')}</Text>
           </View>
           <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
             <Icon name="close" size={22} color="#fff" />
@@ -301,7 +303,7 @@ export default function WifiDialog({ visible, onClose }: Props) {
 
         {/* Toggle row */}
         <View style={styles.toggleRow}>
-          <Text style={styles.toggleLabel}>Wi-Fi</Text>
+          <Text style={styles.toggleLabel}>{t('components.wifiDialog.title')}</Text>
           <Switch
             value={wifiInfo?.isEnabled ?? false}
             onValueChange={handleToggleWifi}
@@ -318,7 +320,7 @@ export default function WifiDialog({ visible, onClose }: Props) {
               <View style={styles.connectedBanner}>
                 <View style={styles.connectedTextRow}>
                   <Icon name="check" size={16} color="#2e7d32" style={styles.connectedCheck} />
-                  <Text style={styles.connectedText} numberOfLines={1}>Connected: {wifiInfo.ssid}</Text>
+                  <Text style={styles.connectedText} numberOfLines={1}>{t('components.wifiDialog.connected', { ssid: wifiInfo.ssid })}</Text>
                   <Icon name={signalIcon(wifiInfo.signalLevel)} size={16} color="#2e7d32" style={styles.connectedSignal} />
                 </View>
                 <TouchableOpacity
@@ -329,7 +331,7 @@ export default function WifiDialog({ visible, onClose }: Props) {
                   {disconnectingWifi ? (
                     <ActivityIndicator color="#2e7d32" size="small" />
                   ) : (
-                    <Text style={styles.disconnectBtnText}>Disconnect</Text>
+                    <Text style={styles.disconnectBtnText}>{t('components.wifiDialog.disconnect')}</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -346,7 +348,7 @@ export default function WifiDialog({ visible, onClose }: Props) {
               ) : (
                 <View style={styles.scanBtnRow}>
                   <Icon name="magnify" size={18} color="#fff" style={styles.scanBtnIcon} />
-                  <Text style={styles.scanBtnText}>Scan for networks</Text>
+                  <Text style={styles.scanBtnText}>{t('components.wifiDialog.scanForNetworks')}</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -377,7 +379,7 @@ export default function WifiDialog({ visible, onClose }: Props) {
                     {isConnecting ? (
                       <ActivityIndicator color="#2b7fff" size="small" />
                     ) : isCurrentNetwork ? (
-                      <Text style={styles.connectedBadge}>Connected</Text>
+                      <Text style={styles.connectedBadge}>{t('components.wifiDialog.connectedBadge')}</Text>
                     ) : (
                       <Text style={styles.connectArrow}>›</Text>
                     )}
@@ -386,7 +388,7 @@ export default function WifiDialog({ visible, onClose }: Props) {
               }}
               ListEmptyComponent={
                 !scanning ? (
-                  <Text style={styles.emptyText}>Tap "Scan" to find networks</Text>
+                  <Text style={styles.emptyText}>{t('components.wifiDialog.tapScanHint')}</Text>
                 ) : null
               }
             />
@@ -394,7 +396,7 @@ export default function WifiDialog({ visible, onClose }: Props) {
         )}
 
         {!wifiInfo?.isEnabled && (
-          <Text style={styles.disabledText}>Turn on Wi-Fi to see available networks.</Text>
+          <Text style={styles.disabledText}>{t('components.wifiDialog.disabledHint')}</Text>
         )}
       </View>
 
@@ -408,7 +410,7 @@ export default function WifiDialog({ visible, onClose }: Props) {
         >
           <View style={styles.pwdOverlay}>
             <View style={styles.pwdCard}>
-              <Text style={styles.pwdTitle}>Connect to</Text>
+              <Text style={styles.pwdTitle}>{t('components.wifiDialog.connectTo')}</Text>
               <Text style={styles.pwdSsid} numberOfLines={1}>{passwordSsid}</Text>
 
               <View style={styles.pwdInputRow}>
@@ -417,7 +419,7 @@ export default function WifiDialog({ visible, onClose }: Props) {
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
-                  placeholder="Password"
+                  placeholder={t('components.wifiDialog.passwordPlaceholder')}
                   placeholderTextColor="#999"
                   autoFocus
                   autoCapitalize="none"
@@ -436,14 +438,14 @@ export default function WifiDialog({ visible, onClose }: Props) {
                   style={styles.pwdCancel}
                   onPress={() => setPasswordSsid(null)}
                 >
-                  <Text style={styles.pwdCancelText}>Cancel</Text>
+                  <Text style={styles.pwdCancelText}>{t('components.wifiDialog.cancel')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.pwdConnect, !password && styles.pwdConnectDisabled]}
                   onPress={() => connectTo(passwordSsid!, password, false)}
                   disabled={!password}
                 >
-                  <Text style={styles.pwdConnectText}>Connect</Text>
+                  <Text style={styles.pwdConnectText}>{t('components.wifiDialog.connect')}</Text>
                 </TouchableOpacity>
               </View>
             </View>

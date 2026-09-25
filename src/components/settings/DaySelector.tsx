@@ -6,16 +6,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Colors, Spacing, Typography } from '../../theme';
-
-const DAYS = [
-  { index: 0, short: 'S', label: 'Sun' },
-  { index: 1, short: 'M', label: 'Mon' },
-  { index: 2, short: 'T', label: 'Tue' },
-  { index: 3, short: 'W', label: 'Wed' },
-  { index: 4, short: 'T', label: 'Thu' },
-  { index: 5, short: 'F', label: 'Fri' },
-  { index: 6, short: 'S', label: 'Sat' },
-];
+import { useTranslation } from 'react-i18next';
 
 interface DaySelectorProps {
   selectedDays: number[];
@@ -28,6 +19,18 @@ const DaySelector: React.FC<DaySelectorProps> = ({
   onDaysChange,
   disabled = false,
 }) => {
+  const { t } = useTranslation();
+
+  const DAYS = [
+    { index: 0, short: t('components.daySelector.day0') },
+    { index: 1, short: t('components.daySelector.day1') },
+    { index: 2, short: t('components.daySelector.day2') },
+    { index: 3, short: t('components.daySelector.day3') },
+    { index: 4, short: t('components.daySelector.day4') },
+    { index: 5, short: t('components.daySelector.day5') },
+    { index: 6, short: t('components.daySelector.day6') },
+  ];
+
   const toggleDay = (dayIndex: number) => {
     if (disabled) return;
     
@@ -55,7 +58,7 @@ const DaySelector: React.FC<DaySelectorProps> = ({
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.label, disabled && styles.labelDisabled]}>Days</Text>
+      <Text style={[styles.label, disabled && styles.labelDisabled]}>{t('components.daySelector.days')}</Text>
       
       <View style={styles.daysRow}>
         {DAYS.map(day => {
@@ -93,7 +96,7 @@ const DaySelector: React.FC<DaySelectorProps> = ({
           disabled={disabled}
         >
           <Text style={[styles.quickText, disabled && styles.quickTextDisabled]}>
-            Weekdays
+            {t('components.daySelector.weekdays')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -102,7 +105,7 @@ const DaySelector: React.FC<DaySelectorProps> = ({
           disabled={disabled}
         >
           <Text style={[styles.quickText, disabled && styles.quickTextDisabled]}>
-            Weekends
+            {t('components.daySelector.weekends')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -111,7 +114,7 @@ const DaySelector: React.FC<DaySelectorProps> = ({
           disabled={disabled}
         >
           <Text style={[styles.quickText, disabled && styles.quickTextDisabled]}>
-            Every day
+            {t('components.daySelector.everyDay')}
           </Text>
         </TouchableOpacity>
       </View>

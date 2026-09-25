@@ -23,6 +23,7 @@ import { mqttClient } from '../utils/MqttModule';
 import { getSecureMqttPassword, saveSecureMqttPassword } from '../utils/secureStorage';
 import { ApiService } from '../utils/ApiService';
 import KioskModule from '../utils/KioskModule';
+import { useTranslation } from 'react-i18next';
 
 interface MqttSettingsSectionProps {
   onSettingsChanged?: () => void;
@@ -31,6 +32,7 @@ interface MqttSettingsSectionProps {
 export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
   onSettingsChanged,
 }) => {
+  const { t } = useTranslation();
   const [mqttEnabled, setMqttEnabled] = useState(false);
   const [brokerUrl, setBrokerUrl] = useState('');
   const [port, setPort] = useState('1883');
@@ -227,7 +229,7 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
       connectionTimeoutRef.current = setTimeout(() => {
         setIsLoading((current) => {
           if (current) {
-            setConnectionError('Connection timed out after 15 seconds. Check broker URL, port, and network connectivity.');
+            setConnectionError(t('components.mqtt.timeoutError'));
             return false;
           }
           return current;
@@ -235,7 +237,7 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
       }, 15000);
     } catch (error: any) {
       console.error('[MqttSettings] Failed to connect MQTT:', error);
-      setConnectionError(error.message || 'Unknown error');
+      setConnectionError(error.message || t('components.mqtt.unknownError'));
       setIsLoading(false);
     }
   };
@@ -309,11 +311,8 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
     const saved = await saveSecureMqttPassword(value);
     if (!saved && value) {
       Alert.alert(
-        'Password not saved',
-        'The MQTT password could not be written to secure storage on this device, so ' +
-        'the broker will refuse the connection. This happens on firmwares whose Android ' +
-        'Keystore is broken. The field is cleared so it does not show a password that ' +
-        'was never stored.',
+        t('components.mqtt.passwordNotSavedTitle'),
+        t('components.mqtt.passwordNotSavedMessage'),
       );
       setPassword('');
     }
@@ -369,12 +368,12 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
     // Only prompt reconnect if the name actually changed and MQTT is connected
     if (isConnected && deviceName !== deviceNameBeforeEditRef.current) {
       Alert.alert(
-        'Reconnect Required',
-        'The Device Name change will take effect after reconnecting MQTT. Reconnect now?',
+        t('components.mqtt.reconnectRequiredTitle'),
+        t('components.mqtt.reconnectRequiredMessage'),
         [
-          { text: 'Later', style: 'cancel' },
+          { text: t('components.mqtt.later'), style: 'cancel' },
           {
-            text: 'Reconnect',
+            text: t('components.mqtt.reconnect'),
             onPress: async () => {
               await handleDisconnect();
               setTimeout(() => handleConnect(), 500);
@@ -399,12 +398,12 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
   const promptReconnectForDiscovery = () => {
     if (!isConnected) return;
     Alert.alert(
-      'Reconnect Required',
-      'Home Assistant entities are published when connecting. Reconnect now to apply this change?',
+      t('components.mqtt.reconnectRequiredTitle'),
+      t('components.mqtt.discoveryReconnectMessage'),
       [
-        { text: 'Later', style: 'cancel' },
+        { text: t('components.mqtt.later'), style: 'cancel' },
         {
-          text: 'Reconnect',
+          text: t('components.mqtt.reconnect'),
           onPress: async () => {
             await handleDisconnect();
             setTimeout(() => handleConnect(), 500);
@@ -487,8 +486,8 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
         );
         if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
           Alert.alert(
-            'Camera Permission Required',
-            'FreeKiosk needs camera access to publish camera snapshots over MQTT.'
+            t('components.mqtt.cameraPermissionTitle'),
+            t('components.mqtt.cameraPermissionMessage')
           );
           return;
         }
@@ -537,17 +536,17 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
   };
 
   const getStatusText = () => {
-    if (isLoading) return 'Connecting...';
-    return isConnected ? 'Connected' : 'Disconnected';
+    if (isLoading) return t('components.mqtt.connecting');
+    return isConnected ? t('components.mqtt.connected') : t('components.mqtt.disconnected');
   };
 
   return (
     <SettingsSection
-      title="MQTT"
+      title={t('components.mqtt.title')}
       icon="lan-connect"
     >
       <SettingsSwitch
-        label="Enable MQTT"
+        label={t('components.mqtt.enable')}
         value={mqttEnabled}
         onValueChange={handleMqttEnabledChange}
         icon="lan-connect"
@@ -581,7 +580,7 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
                     onPress={handleDisconnect}
                   >
                     <Icon name="lan-disconnect" size={16} color="#FFF" />
-                    <Text style={styles.connectButtonText}>Disconnect</Text>
+                    <Text style={styles.connectButtonText}>{t('components.mqtt.disconnect')}</Text>
                   </TouchableOpacity>
                 ) : brokerUrl.trim().length > 0 ? (
                   <TouchableOpacity
@@ -589,10 +588,10 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
                     onPress={handleConnect}
                   >
                     <Icon name="lan-connect" size={16} color="#FFF" />
-                    <Text style={styles.connectButtonText}>Connect</Text>
+                    <Text style={styles.connectButtonText}>{t('components.mqtt.connect')}</Text>
                   </TouchableOpacity>
                 ) : (
-                  <Text style={styles.connectHint}>Enter broker URL to connect</Text>
+                  <Text style={styles.connectHint}>{t('components.mqtt.enterBrokerUrl')}</Text>
                 )}
               </View>
             )}
@@ -603,19 +602,17 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
             <View style={styles.dozeWarning}>
               <View style={styles.dozeHeader}>
                 <Icon name="power-sleep" size={18} color="#E65100" />
-                <Text style={styles.dozeTitle}>Battery optimization is active</Text>
+                <Text style={styles.dozeTitle}>{t('components.mqtt.dozeTitle')}</Text>
               </View>
               <Text style={styles.dozeText}>
-                Android may suspend FreeKiosk's network once the tablet has been idle for a
-                while, so the broker drops the connection and Home Assistant shows the device
-                as unavailable after a couple of hours. Exempting FreeKiosk keeps MQTT alive.
+                {t('components.mqtt.dozeText')}
               </Text>
               <TouchableOpacity style={styles.dozeButton} onPress={handleRequestBatteryExemption}>
                 <Icon name="shield-check" size={16} color="#FFF" />
-                <Text style={styles.connectButtonText}>Exempt FreeKiosk</Text>
+                <Text style={styles.connectButtonText}>{t('components.mqtt.dozeExempt')}</Text>
               </TouchableOpacity>
               <Text style={styles.dozeText}>
-                If the dialog does not appear, grant it over ADB instead:
+                {t('components.mqtt.dozeAdbHint')}
               </Text>
               <Text style={styles.dozeCommand}>
                 adb shell dumpsys deviceidle whitelist +com.freekiosk
@@ -625,204 +622,204 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
 
           {/* Broker URL */}
           <SettingsInput
-            label="Broker URL"
+            label={t('components.mqtt.brokerUrl')}
             value={brokerUrl}
             onChangeText={handleBrokerUrlChange}
             placeholder="e.g. 192.168.1.100"
             keyboardType="url"
             icon="server-network"
-            hint="MQTT broker hostname or IP address (required)"
+            hint={t('components.mqtt.brokerUrlHint')}
           />
 
           {/* Port */}
           <SettingsInput
-            label="Port"
+            label={t('components.mqtt.port')}
             value={port}
             onChangeText={handlePortChange}
             placeholder="1883"
             keyboardType="numeric"
             icon="numeric"
-            hint="Port 1-65535 (default: 1883)"
+            hint={t('components.mqtt.portHint')}
           />
 
           {/* Username */}
           <SettingsInput
-            label="Username (optional)"
+            label={t('components.mqtt.username')}
             value={username}
             onChangeText={handleUsernameChange}
-            placeholder="Leave empty if not required"
+            placeholder={t('components.mqtt.leaveEmptyIfNotRequired')}
             icon="account"
           />
 
           {/* Password */}
           <SettingsInput
-            label="Password (optional)"
+            label={t('components.mqtt.password')}
             value={password}
             onChangeText={handlePasswordChange}
-            placeholder="Leave empty if not required"
+            placeholder={t('components.mqtt.leaveEmptyIfNotRequired')}
             secureTextEntry
             icon="lock"
-            hint={password.length > 0 ? "Password is saved. Leave untouched to keep current password." : undefined}
+            hint={password.length > 0 ? t('components.mqtt.passwordSavedHint') : undefined}
           />
 
           {/* Client ID */}
           <SettingsInput
-            label="Client ID (optional)"
+            label={t('components.mqtt.clientId')}
             value={clientId}
             onChangeText={handleClientIdChange}
-            placeholder="Auto-generated if empty"
+            placeholder={t('components.mqtt.autoGeneratedIfEmpty')}
             icon="identifier"
           />
 
           {/* Device Name */}
           <SettingsInput
-            label="Device Name (optional)"
+            label={t('components.mqtt.deviceName')}
             value={deviceName}
             onChangeText={handleDeviceNameChange}
             onFocus={handleDeviceNameFocus}
             onBlur={handleDeviceNameBlur}
-            placeholder="e.g. lobby, entrance, kitchen"
+            placeholder={t('components.mqtt.deviceNamePlaceholder')}
             icon="rename-box"
-            hint="Friendly name used in MQTT topics and HA device name. If empty, uses Android ID."
+            hint={t('components.mqtt.deviceNameHint')}
           />
 
           {/* Base Topic */}
           <SettingsInput
-            label="Base Topic"
+            label={t('components.mqtt.baseTopic')}
             value={baseTopic}
             onChangeText={handleBaseTopicChange}
             placeholder="freekiosk"
             icon="tag"
-            hint="Base MQTT topic for this device"
+            hint={t('components.mqtt.baseTopicHint')}
           />
 
           {/* Discovery Prefix */}
           <SettingsInput
-            label="Discovery Prefix"
+            label={t('components.mqtt.discoveryPrefix')}
             value={discoveryPrefix}
             onChangeText={handleDiscoveryPrefixChange}
             placeholder="homeassistant"
             icon="home-search"
-            hint="Home Assistant MQTT discovery prefix"
+            hint={t('components.mqtt.discoveryPrefixHint')}
           />
 
           {/* Status Interval */}
           <SettingsInput
-            label="Status Interval (seconds)"
+            label={t('components.mqtt.statusInterval')}
             value={statusInterval}
             onChangeText={handleStatusIntervalChange}
             placeholder="30"
             keyboardType="numeric"
             icon="timer-outline"
-            hint="How often to publish status (5-3600 seconds)"
+            hint={t('components.mqtt.statusIntervalHint')}
           />
 
           {/* Allow Remote Control */}
           <SettingsSwitch
-            label="Allow Remote Control"
+            label={t('components.mqtt.allowControl')}
             value={allowControl}
             onValueChange={handleAllowControlChange}
             icon="remote"
-            hint="Enable commands via MQTT (brightness, reload, etc.)"
+            hint={t('components.mqtt.allowControlHint')}
           />
 
           {/* Always-on Motion Detection */}
           <SettingsSwitch
-            label="Always-on Motion Detection"
+            label={t('components.mqtt.motionAlwaysOn')}
             value={motionAlwaysOn}
             onValueChange={handleMotionAlwaysOnChange}
             icon="motion-sensor"
-            hint="Run camera-based motion detection continuously (higher battery usage). Without this, motion is only detected during screensaver."
+            hint={t('components.mqtt.motionAlwaysOnHint')}
           />
 
           {/* Screenshot publishing */}
           <SettingsSwitch
-            label="Publish Screenshot"
+            label={t('components.mqtt.publishScreenshot')}
             value={screenshotEnabled}
             onValueChange={handleScreenshotEnabledChange}
             icon="monitor-screenshot"
-            hint="Expose the kiosk screen in Home Assistant as an image/camera entity, with a capture button. The screen is published to the broker, in clear text unless the port is 8883, and anyone who can read the topic can see it."
+            hint={t('components.mqtt.publishScreenshotHint')}
           />
 
           {screenshotEnabled && (
             <>
               <SettingsSwitch
-                label="Screenshot Auto-publish"
+                label={t('components.mqtt.screenshotAuto')}
                 value={screenshotAuto}
                 onValueChange={handleScreenshotAutoChange}
                 icon="refresh"
-                hint="Publish a screenshot periodically. Can also be toggled from Home Assistant."
+                hint={t('components.mqtt.screenshotAutoHint')}
               />
 
               <SettingsInput
-                label="Screenshot Interval (seconds)"
+                label={t('components.mqtt.screenshotInterval')}
                 value={screenshotInterval}
                 onChangeText={handleScreenshotIntervalChange}
                 placeholder="60"
                 keyboardType="numeric"
                 icon="timer-outline"
-                hint="5-3600 seconds (only used when auto-publish is on)"
+                hint={t('components.mqtt.intervalHint')}
               />
 
               <SettingsInput
-                label="Screenshot JPEG Quality"
+                label={t('components.mqtt.screenshotQuality')}
                 value={screenshotQuality}
                 onChangeText={handleScreenshotQualityChange}
                 placeholder="70"
                 keyboardType="numeric"
                 icon="quality-high"
-                hint="1-100. Lower values mean smaller MQTT messages."
+                hint={t('components.mqtt.jpegQualityHint')}
               />
 
               <SettingsInput
-                label="Screenshot Max Width (px)"
+                label={t('components.mqtt.screenshotMaxWidth')}
                 value={screenshotMaxWidth}
                 onChangeText={handleScreenshotMaxWidthChange}
                 placeholder="1280"
                 keyboardType="numeric"
                 icon="arrow-expand-horizontal"
-                hint="Downscale before publishing. 0 keeps the native resolution."
+                hint={t('components.mqtt.screenshotMaxWidthHint')}
               />
             </>
           )}
 
           {/* Camera publishing */}
           <SettingsSwitch
-            label="Publish Camera Snapshots"
+            label={t('components.mqtt.publishCamera')}
             value={cameraEnabled}
             onValueChange={handleCameraEnabledChange}
             icon="camera"
-            hint="Expose each device camera in Home Assistant as an image/camera entity. Photos are published to the broker, in clear text unless the port is 8883, and anyone who can read the topic can see whoever is in front of the device. Snapshots fail while motion detection is using the camera."
+            hint={t('components.mqtt.publishCameraHint')}
           />
 
           {cameraEnabled && (
             <>
               <SettingsSwitch
-                label="Camera Auto-publish"
+                label={t('components.mqtt.cameraAuto')}
                 value={cameraAuto}
                 onValueChange={handleCameraAutoChange}
                 icon="camera-retake"
-                hint="Publish a snapshot periodically (higher battery usage). Can also be toggled from Home Assistant."
+                hint={t('components.mqtt.cameraAutoHint')}
               />
 
               <SettingsInput
-                label="Camera Interval (seconds)"
+                label={t('components.mqtt.cameraInterval')}
                 value={cameraInterval}
                 onChangeText={handleCameraIntervalChange}
                 placeholder="300"
                 keyboardType="numeric"
                 icon="timer-outline"
-                hint="5-3600 seconds (only used when auto-publish is on)"
+                hint={t('components.mqtt.intervalHint')}
               />
 
               <SettingsInput
-                label="Camera JPEG Quality"
+                label={t('components.mqtt.cameraQuality')}
                 value={cameraQuality}
                 onChangeText={handleCameraQualityChange}
                 placeholder="70"
                 keyboardType="numeric"
                 icon="quality-high"
-                hint="1-100. Lower values mean smaller MQTT messages."
+                hint={t('components.mqtt.jpegQualityHint')}
               />
             </>
           )}
@@ -831,7 +828,7 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
           <View style={styles.hintContainer}>
             <Icon name="home-assistant" size={20} color="#41BDF5" />
             <Text style={styles.hintText}>
-              Devices auto-discover in Home Assistant via MQTT Discovery. Ensure your HA MQTT integration is configured.
+              {t('components.mqtt.haInfo')}
             </Text>
           </View>
         </>

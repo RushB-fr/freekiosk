@@ -4,6 +4,7 @@ import StatusBar from './StatusBar';
 import Icon from './Icon';
 import AppLauncherModule, { AppInfo } from '../utils/AppLauncherModule';
 import { ManagedApp } from '../types/managedApps';
+import { useTranslation } from 'react-i18next';
 
 interface ExternalAppOverlayProps {
   /** Legacy single-app package (backward compat) */
@@ -59,6 +60,7 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
   onGoToSettings,
   onLaunchApp,
 }) => {
+  const { t } = useTranslation();
   // Window dimensions must be reactive — `Dimensions.get('window')` is evaluated once
   // at module load, so tile widths captured in landscape stay wrong after rotation to portrait.
   const { width: windowWidth } = useWindowDimensions();
@@ -252,7 +254,7 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
         {/* Test mode warning */}
         {backButtonMode === 'test' && (
           <View style={styles.testModeBar}>
-            <Text style={styles.testModeText}>Test Mode — Back button returns to settings</Text>
+            <Text style={styles.testModeText}>{t('components.externalAppOverlay.testModeWarning')}</Text>
           </View>
         )}
 
@@ -308,7 +310,7 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
 
           {/* Title */}
           <Text style={styles.title}>FreeKiosk</Text>
-          <Text style={styles.subtitle}>External App Mode</Text>
+          <Text style={styles.subtitle}>{t('components.externalAppOverlay.subtitle')}</Text>
 
           {/* Status Message */}
           <View style={styles.statusContainer}>
@@ -321,8 +323,8 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
               />
               <Text style={styles.statusText}>
                 {isAppLaunched
-                  ? 'External application is running'
-                  : 'Waiting for application...'}
+                  ? t('components.externalAppOverlay.running')
+                  : t('components.externalAppOverlay.waiting')}
               </Text>
               {externalAppPackage && (
                 <Text style={styles.packageName}>{appLabels[externalAppPackage] || externalAppPackage}</Text>
@@ -335,9 +337,9 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
             <View style={styles.warningContainer}>
               <View style={styles.warningCard}>
                 <Icon name="test-tube" size={28} color="#f59e0b" style={styles.warningIcon} />
-                <Text style={styles.warningTitle}>Test Mode Active</Text>
+                <Text style={styles.warningTitle}>{t('components.externalAppOverlay.testModeTitle')}</Text>
                 <Text style={styles.warningText}>
-                  You can use the Android back button to return to FreeKiosk.
+                  {t('components.externalAppOverlay.testModeText')}
                 </Text>
               </View>
             </View>
@@ -351,7 +353,7 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
               activeOpacity={0.8}
             >
               <Text style={styles.primaryButtonText}>
-                Return to Application
+                {t('components.externalAppOverlay.returnToApp')}
               </Text>
             </TouchableOpacity>
 
@@ -360,14 +362,14 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
               onPress={onGoToSettings}
               activeOpacity={0.8}
             >
-              <Text style={styles.secondaryButtonText}>Settings</Text>
+              <Text style={styles.secondaryButtonText}>{t('components.externalAppOverlay.settings')}</Text>
             </TouchableOpacity>
           </View>
 
           {/* Hint */}
           <View style={styles.hintContainer}>
             <Text style={styles.hintText}>
-              Tip: While in the external app, tap 5× on the secret button to return here (position configurable)
+              {t('components.externalAppOverlay.hint')}
             </Text>
           </View>
         </View>

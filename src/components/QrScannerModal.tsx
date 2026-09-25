@@ -11,6 +11,7 @@ import {
   useCameraPermission,
   useCodeScanner,
 } from 'react-native-vision-camera';
+import { useTranslation } from 'react-i18next';
 
 interface QrScannerModalProps {
   visible: boolean;
@@ -19,6 +20,7 @@ interface QrScannerModalProps {
 }
 
 const QrScannerModal: React.FC<QrScannerModalProps> = ({ visible, onClose, onScanned }) => {
+  const { t } = useTranslation();
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('back');
   // Guard so a single QR isn't reported repeatedly across frames.
@@ -62,8 +64,8 @@ const QrScannerModal: React.FC<QrScannerModalProps> = ({ visible, onClose, onSca
           <View style={styles.center}>
             <Text style={styles.message}>
               {hasPermission
-                ? 'No camera available on this device.'
-                : 'Camera permission is required to scan the QR code.'}
+                ? t('components.qrScannerModal.noCameraAvailable')
+                : t('components.qrScannerModal.cameraPermissionRequired')}
             </Text>
           </View>
         )}
@@ -71,12 +73,12 @@ const QrScannerModal: React.FC<QrScannerModalProps> = ({ visible, onClose, onSca
         <View style={styles.overlay} pointerEvents="none">
           <View style={styles.frame} />
           <Text style={styles.hint}>
-            Point the camera at the enrollment QR code on the cloud dashboard
+            {t('components.qrScannerModal.hint')}
           </Text>
         </View>
 
         <TouchableOpacity style={styles.cancelBtn} onPress={onClose} activeOpacity={0.8}>
-          <Text style={styles.cancelText}>Cancel</Text>
+          <Text style={styles.cancelText}>{t('components.qrScannerModal.cancel')}</Text>
         </TouchableOpacity>
       </View>
     </Modal>

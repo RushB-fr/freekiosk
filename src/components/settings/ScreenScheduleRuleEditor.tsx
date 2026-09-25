@@ -24,6 +24,7 @@ import {
   isValidTime,
   createDefaultRule,
 } from '../../types/screenScheduler';
+import { useTranslation } from 'react-i18next';
 
 interface ScreenScheduleRuleEditorProps {
   visible: boolean;
@@ -38,6 +39,7 @@ const ScreenScheduleRuleEditor: React.FC<ScreenScheduleRuleEditorProps> = ({
   onSave,
   onCancel,
 }) => {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [days, setDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [sleepTime, setSleepTime] = useState('22:00');
@@ -68,27 +70,27 @@ const ScreenScheduleRuleEditor: React.FC<ScreenScheduleRuleEditorProps> = ({
   const handleSave = () => {
     // Validation
     if (!name.trim()) {
-      Alert.alert('Error', 'Please enter a rule name');
+      Alert.alert(t('components.screenScheduleRuleEditor.error'), t('components.screenScheduleRuleEditor.errorEnterName'));
       return;
     }
 
     if (days.length === 0) {
-      Alert.alert('Error', 'Please select at least one day');
+      Alert.alert(t('components.screenScheduleRuleEditor.error'), t('components.screenScheduleRuleEditor.errorSelectDay'));
       return;
     }
 
     if (!isValidTime(sleepTime)) {
-      Alert.alert('Error', 'Please enter a valid sleep time (HH:MM)');
+      Alert.alert(t('components.screenScheduleRuleEditor.error'), t('components.screenScheduleRuleEditor.errorInvalidSleepTime'));
       return;
     }
 
     if (!isValidTime(wakeTime)) {
-      Alert.alert('Error', 'Please enter a valid wake time (HH:MM)');
+      Alert.alert(t('components.screenScheduleRuleEditor.error'), t('components.screenScheduleRuleEditor.errorInvalidWakeTime'));
       return;
     }
 
     if (sleepTime === wakeTime) {
-      Alert.alert('Error', 'Sleep time and wake time cannot be the same');
+      Alert.alert(t('components.screenScheduleRuleEditor.error'), t('components.screenScheduleRuleEditor.errorSameTime'));
       return;
     }
 
@@ -111,7 +113,7 @@ const ScreenScheduleRuleEditor: React.FC<ScreenScheduleRuleEditorProps> = ({
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>
-            {rule ? 'Edit Schedule Rule' : 'New Schedule Rule'}
+            {rule ? t('components.screenScheduleRuleEditor.editTitle') : t('components.screenScheduleRuleEditor.newTitle')}
           </Text>
           <TouchableOpacity onPress={onCancel} style={styles.closeButton}>
             <Icon name="close" size={22} color={Colors.textSecondary} />
@@ -121,12 +123,12 @@ const ScreenScheduleRuleEditor: React.FC<ScreenScheduleRuleEditorProps> = ({
         <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
           {/* Rule Name */}
           <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Rule Name</Text>
+            <Text style={styles.fieldLabel}>{t('components.screenScheduleRuleEditor.ruleName')}</Text>
             <TextInput
               style={styles.textInput}
               value={name}
               onChangeText={setName}
-              placeholder="e.g., Night, Weekend"
+              placeholder={t('components.screenScheduleRuleEditor.ruleNamePlaceholder')}
               placeholderTextColor={Colors.textDisabled}
               maxLength={30}
             />
@@ -143,7 +145,7 @@ const ScreenScheduleRuleEditor: React.FC<ScreenScheduleRuleEditorProps> = ({
           {/* Sleep Time (screen OFF) */}
           <View style={styles.field}>
             <TimeInput
-              label="Screen OFF at"
+              label={t('components.screenScheduleRuleEditor.screenOffAt')}
               value={sleepTime}
               onChange={setSleepTime}
               placeholder="22:00"
@@ -153,7 +155,7 @@ const ScreenScheduleRuleEditor: React.FC<ScreenScheduleRuleEditorProps> = ({
           {/* Wake Time (screen ON) */}
           <View style={styles.field}>
             <TimeInput
-              label="Screen ON at"
+              label={t('components.screenScheduleRuleEditor.screenOnAt')}
               value={wakeTime}
               onChange={setWakeTime}
               placeholder="07:00"
@@ -164,7 +166,7 @@ const ScreenScheduleRuleEditor: React.FC<ScreenScheduleRuleEditorProps> = ({
           {crossesMidnight && (
             <View style={styles.infoBox}>
               <Text style={styles.infoText}>
-                This rule crosses midnight. The screen will turn off at {sleepTime} and back on at {wakeTime} the next day.
+                {t('components.screenScheduleRuleEditor.midnightInfo', { sleep: sleepTime, wake: wakeTime })}
               </Text>
             </View>
           )}
@@ -172,16 +174,25 @@ const ScreenScheduleRuleEditor: React.FC<ScreenScheduleRuleEditorProps> = ({
           {/* Preview */}
           {isValidTime(sleepTime) && isValidTime(wakeTime) && days.length > 0 && (
             <View style={styles.previewBox}>
-              <Text style={styles.previewTitle}>Preview</Text>
+              <Text style={styles.previewTitle}>{t('components.screenScheduleRuleEditor.preview')}</Text>
               <Text style={styles.previewText}>
-                Screen OFF: {sleepTime} → Screen ON: {wakeTime}
+                {t('components.screenScheduleRuleEditor.previewOffOn', { sleep: sleepTime, wake: wakeTime })}
               </Text>
               <Text style={styles.previewText}>
-                Active on: {days.length === 7 ? 'Every day' :
-                  days.length === 5 && !days.includes(0) && !days.includes(6) ? 'Weekdays' :
-                  days.length === 2 && days.includes(0) && days.includes(6) ? 'Weekends' :
-                  days.sort((a, b) => a - b).map(d => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]).join(', ')
-                }
+                {t('components.screenScheduleRuleEditor.activeOn', {
+                  days: days.length === 7 ? t('components.screenScheduleRuleEditor.everyDay') :
+                    days.length === 5 && !days.includes(0) && !days.includes(6) ? t('components.screenScheduleRuleEditor.weekdays') :
+                    days.length === 2 && days.includes(0) && days.includes(6) ? t('components.screenScheduleRuleEditor.weekends') :
+                    days.sort((a, b) => a - b).map(d => [
+                      t('components.screenScheduleRuleEditor.sun'),
+                      t('components.screenScheduleRuleEditor.mon'),
+                      t('components.screenScheduleRuleEditor.tue'),
+                      t('components.screenScheduleRuleEditor.wed'),
+                      t('components.screenScheduleRuleEditor.thu'),
+                      t('components.screenScheduleRuleEditor.fri'),
+                      t('components.screenScheduleRuleEditor.sat'),
+                    ][d]).join(', ')
+                })}
               </Text>
             </View>
           )}
@@ -190,11 +201,11 @@ const ScreenScheduleRuleEditor: React.FC<ScreenScheduleRuleEditorProps> = ({
         {/* Action Buttons */}
         <View style={styles.footer}>
           <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
-            <Text style={styles.cancelButtonText}>Cancel</Text>
+            <Text style={styles.cancelButtonText}>{t('components.screenScheduleRuleEditor.cancel')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
             <Text style={styles.saveButtonText}>
-              {rule ? 'Update' : 'Add Rule'}
+              {rule ? t('components.screenScheduleRuleEditor.update') : t('components.screenScheduleRuleEditor.addRule')}
             </Text>
           </TouchableOpacity>
         </View>
