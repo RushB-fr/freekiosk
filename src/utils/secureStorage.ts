@@ -700,13 +700,26 @@ export async function saveSecureApiKey(apiKey: string): Promise<boolean> {
  * Get REST API key from secure storage
  * Supports migration from legacy AsyncStorage (backward compatibility)
  */
-export async function getSecureApiKey(): Promise<string> {
+/**
+ * The outcome of reading a secret, with the one distinction that matters for security:
+ * a secret that is not set is not the same thing as a secret we could not read.
+ *
+ * Both used to come back as an empty string. On a device whose Keystore HAL is broken
+ * (issue #258) every Keychain call throws, the REST API key read as "", and
+ * KioskHttpServer skips its auth check entirely when no key is set: the server then
+ * served every endpoint unauthenticated on the LAN, for a configuration whose owner had
+ * deliberately set a key. Nothing said so. Telling the two apart lets the caller fail
+ * closed on a read failure while leaving a deliberately keyless setup alone.
+ */
+export type SecureRead = { value: string; readFailed: boolean };
+
+export async function readSecureApiKey(): Promise<SecureRead> {
   try {
     // First, try to get from Keychain
     const credentials = await Keychain.getGenericPassword({ service: API_KEY_SERVICE });
 
     if (credentials && credentials.password) {
-      return credentials.password;
+      return { value: credentials.password, readFailed: false };
     }
 
     // If not in Keychain, check legacy AsyncStorage (migration)
@@ -716,15 +729,19 @@ export async function getSecureApiKey(): Promise<string> {
       // Migrate to Keychain
       await saveSecureApiKey(legacyKey);
       // Return the migrated key
-      return legacyKey;
+      return { value: legacyKey, readFailed: false };
     }
 
     // No key found anywhere
-    return '';
+    return { value: '', readFailed: false };
   } catch (error) {
     console.error('[SecureStorage] Error getting API key:', error);
-    return '';
+    return { value: '', readFailed: true };
   }
+}
+
+export async function getSecureApiKey(): Promise<string> {
+  return (await readSecureApiKey()).value;
 }
 
 /**

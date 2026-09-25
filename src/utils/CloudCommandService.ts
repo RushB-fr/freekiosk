@@ -24,7 +24,7 @@ import { getCloudCredentials, CloudCredentials } from './secureStorage';
 import { StorageService } from './storage';
 import ManagedAppInstaller from './ManagedAppInstaller';
 
-const { HttpServerModule } = NativeModules;
+const { HttpServerModule, WifiControlModule } = NativeModules;
 
 /** Our own package, so a self-update is recognised as a process-killing command. */
 const OWN_PACKAGE = 'com.freekiosk';
@@ -230,6 +230,12 @@ class CloudCommandServiceClass {
     if (cmd.type === 'screenshot') {
       return this.captureAndUploadScreenshot(c);
     }
+    // Handled here rather than through COMMAND_MAP on purpose: that map feeds the
+    // shared action layer the local REST API and MQTT also drive, and a way to plant a
+    // Wi-Fi network on the tablet has no business being reachable from the LAN.
+    if (cmd.type === 'add_wifi_network') {
+      return this.saveWifiNetwork(cmd.params || {});
+    }
 
     const mapper = COMMAND_MAP[cmd.type];
     if (!mapper) {
@@ -243,6 +249,29 @@ class CloudCommandServiceClass {
       const native = await this.tryNative(command, params);
       if (native) return native;
       return await ApiService.executeAction(command, params);
+    } catch (error: any) {
+      return { ok: false, error: error?.message ?? String(error) };
+    }
+  }
+
+  /**
+   * Save a Wi-Fi network for later, without switching to it. The native side refuses a
+   * name the tablet already knows, since Android keeps one configuration per name and
+   * replacing the one in use would disconnect a remote kiosk. See saveNetworkForLater.
+   * The password is never echoed back in the result.
+   */
+  private async saveWifiNetwork(params: Record<string, any>): Promise<ActionResult> {
+    if (!WifiControlModule?.saveNetworkForLater) {
+      return { ok: false, error: 'This app version cannot save Wi-Fi networks' };
+    }
+    const ssid = typeof params.ssid === 'string' ? params.ssid : '';
+    const password = typeof params.password === 'string' ? params.password : '';
+    try {
+      const saved = await WifiControlModule.saveNetworkForLater(ssid, password);
+      return {
+        ok: true,
+        result: { saved: true, ssid: saved?.ssid ?? ssid, secured: !!saved?.secured },
+      };
     } catch (error: any) {
       return { ok: false, error: error?.message ?? String(error) };
     }

@@ -129,6 +129,13 @@ export type IconName =
   // Features
   | 'camera'
   | 'camera-outline'
+  | 'camera-flip'
+  | 'video'
+  | 'rotate-right'
+  | 'camera-retake'
+  | 'monitor-screenshot'
+  | 'quality-high'
+  | 'arrow-expand-horizontal'
   | 'motion-sensor'
   | 'keyboard'
   | 'keyboard-outline'

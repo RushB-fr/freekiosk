@@ -74,7 +74,7 @@ const BlockingOverlayEditor: React.FC<BlockingOverlayEditorProps> = ({
       setDisplayMode('semi_transparent');
       setTargetPackage('');
     }
-  }, [region, visible]);
+  }, [region, visible, t]);
 
   const handleSave = () => {
     const updatedRegion: BlockingRegion = {

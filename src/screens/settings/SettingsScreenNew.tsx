@@ -16,11 +16,14 @@ import {
   Modal,
   StyleSheet,
   BackHandler,
+  DeviceEventEmitter,
 } from 'react-native';
+import { CLOUD_ENABLED } from '../../config/features';
+import { CONFIG_UPDATED_EVENT } from '../../utils/CloudSyncService';
 import CookieManager from '@react-native-cookies/cookies';
 import { Camera } from 'react-native-vision-camera';
 import { StorageService } from '../../utils/storage';
-import { setAppLanguage, resolveSupportedLanguage, SupportedLanguage } from '../../i18n';
+import i18n, { setAppLanguage, resolveSupportedLanguage, SupportedLanguage } from '../../i18n';
 import { useTranslation } from 'react-i18next';
 import { saveSecurePin, hasSecurePin, clearSecurePin, saveSecureBasicAuthPassword, getSecureBasicAuthPassword } from '../../utils/secureStorage';
 import CertificateModuleTyped, { CertificateInfo } from '../../utils/CertificateModule';
@@ -102,6 +105,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [screensaverUrl, setScreensaverUrl] = useState<string>('');
   const [screensaverVideoItems, setScreensaverVideoItems] = useState<MediaItem[]>([]);
   const [screensaverVideoLoop, setScreensaverVideoLoop] = useState<boolean>(true);
+  const [screensaverKeepExternalApp, setScreensaverKeepExternalApp] = useState<boolean>(false);
   const [pickingScreensaverMedia, setPickingScreensaverMedia] = useState<boolean>(false);
   const [defaultBrightness, setDefaultBrightness] = useState<number>(0.5);
   const [certificates, setCertificates] = useState<CertificateInfo[]>([]);
@@ -162,7 +166,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [webViewBackButtonEnabled, setWebViewBackButtonEnabled] = useState<boolean>(false);
   const [webViewBackButtonXPercent, setWebViewBackButtonXPercent] = useState<string>('2');
   const [webViewBackButtonYPercent, setWebViewBackButtonYPercent] = useState<string>('10');
-  
+  const [restartButtonEnabled, setRestartButtonEnabled] = useState<boolean>(false);
+  const [restartButtonLongPressSeconds, setRestartButtonLongPressSeconds] = useState<number>(5);
+
   // Auto-Brightness states
   const [autoBrightnessEnabled, setAutoBrightnessEnabled] = useState<boolean>(false);
   const [autoBrightnessMin, setAutoBrightnessMin] = useState<number>(0.1);
@@ -211,8 +217,13 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [pdfViewerEnabled, setPdfViewerEnabled] = useState<boolean>(false);
   
   // Printing state
-  const [printEnabled, setPrintEnabled] = useState<boolean>(false);
+  const [windowPrintEnabled, setWindowPrintEnabled] = useState<boolean>(false);
   const [printPaperSize, setPrintPaperSize] = useState<string>('A4');
+  const [silentPrintEnabled, setSilentPrintEnabled] = useState<boolean>(false);
+  const [escPosWidthDots, setEscPosWidthDots] = useState<number>(384);
+  const [escPosCut, setEscPosCut] = useState<boolean>(false);
+  const [escPosFeedLines, setEscPosFeedLines] = useState<number>(0);
+  const [printOrigins, setPrintOrigins] = useState<string[] | null>(null);
   
   // WebView Zoom Level
   const [zoomLevel, setZoomLevel] = useState<number>(100);
@@ -305,6 +316,27 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     checkDeviceOwner();
     loadCurrentVersion();
     checkLightSensor();
+  }, []);
+
+  // A config pushed from the cloud while this screen is open used to leave it showing
+  // the old values, so an operator concluded the push had failed when it had not.
+  // Reloading in their back would throw away whatever they are typing, since this screen
+  // does not track unsaved edits, so ask. Keeping the edits and saving them later is a
+  // local edit like any other, and the regular sync takes it from there.
+  useEffect(() => {
+    if (!CLOUD_ENABLED) return;
+    const sub = DeviceEventEmitter.addListener(CONFIG_UPDATED_EVENT, () => {
+      Alert.alert(
+        t('screens.settingsMain.configUpdatedTitle'),
+        t('screens.settingsMain.configUpdatedMessage'),
+        [
+          { text: t('screens.settingsMain.keepMyEdits'), style: 'cancel' },
+          { text: t('screens.settingsMain.reloadConfig'), onPress: () => { loadSettings(); } },
+        ],
+      );
+    });
+    return () => sub.remove();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Block Android back gesture/button on Settings screen to prevent PIN bypass (#93)
@@ -451,6 +483,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedScreensaverUrl = await StorageService.getScreensaverUrl();
     const savedScreensaverVideoItems = await StorageService.getScreensaverVideoItems<MediaItem>();
     const savedScreensaverVideoLoop = await StorageService.getScreensaverVideoLoop();
+    const savedScreensaverKeepExternalApp = await StorageService.getScreensaverKeepExternalApp();
     const hasPinConfigured = await hasSecurePin();
     
     setIsPinConfigured(hasPinConfigured);
@@ -482,6 +515,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setScreensaverUrl(savedScreensaverUrl);
     setScreensaverVideoItems(savedScreensaverVideoItems);
     setScreensaverVideoLoop(savedScreensaverVideoLoop);
+    setScreensaverKeepExternalApp(savedScreensaverKeepExternalApp);
 
     // Detect available cameras (first attempt — may return [] on slow SoCs before
     // ProcessCameraProvider resolves; the CameraDevicesChanged listener handles the retry)
@@ -508,7 +542,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedShowVolume = await StorageService.getStatusBarShowVolume();
     const savedShowTime = await StorageService.getStatusBarShowTime();
     const savedStatusBarTheme = await StorageService.getStatusBarTheme();
-    const savedLanguage = resolveSupportedLanguage(await StorageService.getLanguage());
+    // No choice stored yet: show the language actually in use (the device's), not English
+    const savedLanguage = resolveSupportedLanguage((await StorageService.getLanguage()) ?? i18n.language);
     const savedBackButtonMode = await StorageService.getBackButtonMode();
     const savedBackButtonTimerDelay = await StorageService.getBackButtonTimerDelay();
     const savedKeyboardMode = await StorageService.getKeyboardMode();
@@ -536,7 +571,11 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedWebViewBackButtonEnabled = await StorageService.getWebViewBackButtonEnabled();
     const savedWebViewBackButtonXPercent = await StorageService.getWebViewBackButtonXPercent();
     const savedWebViewBackButtonYPercent = await StorageService.getWebViewBackButtonYPercent();
-    
+
+    // Restart Button settings
+    const savedRestartButtonEnabled = await StorageService.getRestartButtonEnabled();
+    const savedRestartButtonLongPressSeconds = await StorageService.getRestartButtonLongPressSeconds();
+
     // Auto-Brightness settings
     const savedAutoBrightnessEnabled = await StorageService.getAutoBrightnessEnabled();
     const savedAutoBrightnessMin = await StorageService.getAutoBrightnessMin();
@@ -602,6 +641,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setWebViewBackButtonEnabled(savedWebViewBackButtonEnabled);
     setWebViewBackButtonXPercent(String(savedWebViewBackButtonXPercent));
     setWebViewBackButtonYPercent(String(savedWebViewBackButtonYPercent));
+    setRestartButtonEnabled(savedRestartButtonEnabled);
+    setRestartButtonLongPressSeconds(savedRestartButtonLongPressSeconds);
     setAutoBrightnessEnabled(savedAutoBrightnessEnabled);
     setAutoBrightnessMin(savedAutoBrightnessMin);
     setAutoBrightnessMax(savedAutoBrightnessMax);
@@ -667,10 +708,15 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setPdfViewerEnabled(savedPdfViewerEnabled);
 
     // Printing setting
-    const savedPrintEnabled = await StorageService.getPrintEnabled();
-    setPrintEnabled(savedPrintEnabled);
+    const savedWindowPrintEnabled = await StorageService.getWindowPrintEnabled();
+    setWindowPrintEnabled(savedWindowPrintEnabled);
     const savedPrintPaperSize = await StorageService.getPrintPaperSize();
     setPrintPaperSize(savedPrintPaperSize);
+    setSilentPrintEnabled(await StorageService.getSilentPrintEnabled());
+    setEscPosWidthDots(await StorageService.getEscPosWidthDots());
+    setEscPosCut(await StorageService.getEscPosCut());
+    setEscPosFeedLines(await StorageService.getEscPosFeedLines());
+    setPrintOrigins(await StorageService.getPrintOrigins());
 
     // Dashboard settings
     const savedDashboardModeEnabled = await StorageService.getDashboardModeEnabled();
@@ -1305,11 +1351,21 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     let finalUrl = url.trim();
     if (displayMode === 'webview' && !dashboardModeEnabled) {
       const urlLower = finalUrl.toLowerCase();
-      if (urlLower.startsWith('file://') || urlLower.startsWith('javascript:') || urlLower.startsWith('data:')) {
+      if (urlLower.startsWith('javascript:') || urlLower.startsWith('data:')) {
         Alert.alert(t('screens.settingsMain.securityErrorTitle'), t('screens.settingsMain.urlNotAllowed'));
         return;
       }
-      if (!urlLower.startsWith('http://') && !urlLower.startsWith('https://')) {
+      // #239: local files are supported, but only the PDF Viewer setting gives the WebView
+      // file access. This check predates that and refused every file:// URL, so a local
+      // page could only be set over ADB.
+      if (urlLower.startsWith('file://') && !pdfViewerEnabled) {
+        Alert.alert(
+          t('screens.settingsMain.fileAccessOffTitle'),
+          t('screens.settingsMain.fileAccessOffMessage'),
+        );
+        return;
+      }
+      if (!urlLower.startsWith('http://') && !urlLower.startsWith('https://') && !urlLower.startsWith('file://')) {
         if (finalUrl.includes('.')) {
           finalUrl = 'https://' + finalUrl;
           setUrl(finalUrl);
@@ -1343,7 +1399,14 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
         return;
       }
     } else if (!isPinConfigured && !pin) {
-      Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.enterPassword'));
+      // Save can be pressed from any tab, and the PIN lives on General. "Please enter a
+      // password" named neither, so an operator saving from Display had nothing to go
+      // on. Say where, and take them there.
+      Alert.alert(
+        t('screens.settingsMain.pinRequiredTitle'),
+        t('screens.settingsMain.pinRequiredMessage'),
+        [{ text: t('screens.settingsMain.goToGeneral'), onPress: () => setActiveTab('general') }],
+      );
       return;
     }
 
@@ -1399,11 +1462,18 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.saveScreensaverUrl(screensaverUrl);
     await StorageService.saveScreensaverVideoItems(screensaverVideoItems);
     await StorageService.saveScreensaverVideoLoop(screensaverVideoLoop);
+    await StorageService.saveScreensaverKeepExternalApp(screensaverKeepExternalApp);
 
     if (displayMode === 'webview' || displayMode === 'media_player') {
       await StorageService.saveAutoReload(displayMode === 'webview' ? autoReload : false);
       await StorageService.saveKioskEnabled(kioskEnabled);
       await StorageService.saveDefaultBrightness(defaultBrightness);
+      // #242: also mirror it natively, so the wake paths and a reboot keep it.
+      try {
+        await AutoBrightnessModule.setDefaultBrightness(defaultBrightness);
+      } catch (error) {
+        console.warn('[Settings] Could not persist brightness natively:', error);
+      }
       
       // Auto-brightness settings
       await StorageService.saveAutoBrightnessEnabled(autoBrightnessEnabled);
@@ -1457,7 +1527,16 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.saveCustomUserAgent(customUserAgent);
     await StorageService.savePauseWebMediaWhenHidden(pauseWebMediaWhenHidden);
     await StorageService.saveHttpBasicAuthUsername(basicAuthUsername);
-    await saveSecureBasicAuthPassword(basicAuthPassword);
+    // Checked rather than discarded: on a device whose Keystore is broken (#258) this
+    // returns false, and saving the whole settings screen used to report success while
+    // the password had gone nowhere.
+    const basicAuthSaved = await saveSecureBasicAuthPassword(basicAuthPassword);
+    if (!basicAuthSaved && basicAuthPassword) {
+      Alert.alert(
+        t('screens.settingsMain.passwordNotSavedTitle'),
+        t('screens.settingsMain.basicAuthNotSavedMessage'),
+      );
+    }
     await StorageService.saveAllowPowerButton(allowPowerButton);
     await StorageService.saveBlockFactoryReset(blockFactoryReset);
     await StorageService.saveAllowRemoteScreenshot(allowRemoteScreenshot);
@@ -1491,6 +1570,10 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       const yPercent = parseFloat(webViewBackButtonYPercent);
       await StorageService.saveWebViewBackButtonXPercent(isNaN(xPercent) ? 2 : Math.max(0, Math.min(100, xPercent)));
       await StorageService.saveWebViewBackButtonYPercent(isNaN(yPercent) ? 10 : Math.max(0, Math.min(100, yPercent)));
+
+      // Save Restart Button settings
+      await StorageService.saveRestartButtonEnabled(restartButtonEnabled);
+      await StorageService.saveRestartButtonLongPressSeconds(Math.max(1, Math.min(10, restartButtonLongPressSeconds)));
     } else {
       await StorageService.saveUrlRotationEnabled(false);
       await StorageService.saveUrlPlannerEnabled(false);
@@ -1517,8 +1600,13 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.savePdfViewerEnabled(pdfViewerEnabled);
 
     // Save Printing setting
-    await StorageService.savePrintEnabled(printEnabled);
+    await StorageService.saveWindowPrintEnabled(windowPrintEnabled);
     await StorageService.savePrintPaperSize(printPaperSize);
+    await StorageService.saveSilentPrintEnabled(silentPrintEnabled);
+    await StorageService.saveEscPosWidthDots(escPosWidthDots);
+    await StorageService.saveEscPosCut(escPosCut);
+    await StorageService.saveEscPosFeedLines(escPosFeedLines);
+    await StorageService.savePrintOrigins(printOrigins);
 
     // Save Media Player settings
     if (displayMode === 'media_player') {
@@ -1864,10 +1952,20 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             onAutoReloadChange={setAutoReload}
             pdfViewerEnabled={pdfViewerEnabled}
             onPdfViewerEnabledChange={setPdfViewerEnabled}
-            printEnabled={printEnabled}
-            onPrintEnabledChange={setPrintEnabled}
+            windowPrintEnabled={windowPrintEnabled}
+            onWindowPrintEnabledChange={setWindowPrintEnabled}
             printPaperSize={printPaperSize}
             onPrintPaperSizeChange={setPrintPaperSize}
+            silentPrintEnabled={silentPrintEnabled}
+            onSilentPrintEnabledChange={setSilentPrintEnabled}
+            escPosWidthDots={escPosWidthDots}
+            onEscPosWidthDotsChange={setEscPosWidthDots}
+            escPosCut={escPosCut}
+            onEscPosCutChange={setEscPosCut}
+            escPosFeedLines={escPosFeedLines}
+            onEscPosFeedLinesChange={setEscPosFeedLines}
+            printOrigins={printOrigins}
+            onPrintOriginsChange={setPrintOrigins}
             urlRotationEnabled={urlRotationEnabled}
             onUrlRotationEnabledChange={setUrlRotationEnabled}
             urlRotationList={urlRotationList}
@@ -1904,6 +2002,10 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
               setWebViewBackButtonXPercent('2');
               setWebViewBackButtonYPercent('10');
             }}
+            restartButtonEnabled={restartButtonEnabled}
+            onRestartButtonEnabledChange={setRestartButtonEnabled}
+            restartButtonLongPressSeconds={restartButtonLongPressSeconds}
+            onRestartButtonLongPressSecondsChange={setRestartButtonLongPressSeconds}
             inactivityReturnEnabled={inactivityReturnEnabled}
             onInactivityReturnEnabledChange={setInactivityReturnEnabled}
             inactivityReturnDelay={inactivityReturnDelay}
@@ -2020,6 +2122,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             onScreensaverVideoItemsChange={setScreensaverVideoItems}
             screensaverVideoLoop={screensaverVideoLoop}
             onScreensaverVideoLoopChange={setScreensaverVideoLoop}
+            screensaverKeepExternalApp={screensaverKeepExternalApp}
+            onScreensaverKeepExternalAppChange={setScreensaverKeepExternalApp}
             onPickScreensaverMedia={handlePickScreensaverMediaFromDevice}
             pickingScreensaverMedia={pickingScreensaverMedia}
             inactivityDelay={inactivityDelay}

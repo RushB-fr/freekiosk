@@ -7,7 +7,7 @@ import { NativeModules, DeviceEventEmitter } from 'react-native';
 import RNBrightness from '../utils/BrightnessModule';
 import UpdateModule from '../utils/UpdateModule';
 
-const { KioskModule } = NativeModules;
+const { KioskModule, SystemInfoModule } = NativeModules;
 
 export interface BatteryStatus {
   level: number;
@@ -48,12 +48,30 @@ export interface WifiStatus {
   connected: boolean;
 }
 
+/**
+ * Cellular state, deliberately shaped like WifiStatus.
+ *
+ * `networkType` is '' and `signalDbm` is null whenever READ_PHONE_STATE is not held,
+ * which is every Play Store build: the src/playstore overlay strips it. `connected`,
+ * `carrier` and `airplaneMode` need no permission and are always reported, so a Play
+ * build still shows whether the tablet has mobile data and whether someone put it in
+ * airplane mode.
+ */
+export interface CellularStatus {
+  connected: boolean;
+  carrier: string;
+  networkType: string;
+  signalDbm: number | null;
+  airplaneMode: boolean;
+}
+
 export interface DeviceStatus {
   battery: BatteryStatus;
   screen: ScreenStatus;
   webview: WebViewStatus;
   device: DeviceInfo;
   wifi: WifiStatus;
+  cellular: CellularStatus;
   timestamp: number;
 }
 
@@ -117,12 +135,13 @@ class DeviceControlServiceClass {
   // ==================== READ OPERATIONS ====================
 
   async getStatus(): Promise<DeviceStatus> {
-    const [battery, screen, webview, device, wifi] = await Promise.all([
+    const [battery, screen, webview, device, wifi, cellular] = await Promise.all([
       this.getBatteryStatus(),
       this.getScreenStatus(),
       this.getWebViewStatus(),
       this.getDeviceInfo(),
       this.getWifiStatus(),
+      this.getCellularStatus(),
     ]);
 
     return {
@@ -131,6 +150,7 @@ class DeviceControlServiceClass {
       webview,
       device,
       wifi,
+      cellular,
       timestamp: Math.floor(Date.now() / 1000),
     };
   }
@@ -153,10 +173,26 @@ class DeviceControlServiceClass {
 
   async getScreenStatus(): Promise<ScreenStatus> {
     const screensaverActive = this.getScreensaverCallback?.() || false;
-    
+
+    // #242: read the brightness actually in effect. This used to report
+    // this.currentBrightness, which only setBrightness() below ever wrote and which
+    // nothing calls, so the value was the 0.5 initialiser for the whole life of the
+    // process. Every cloud heartbeat therefore reported 50% for every device
+    // (CloudSyncService sends status.screen.brightness), regardless of the panel.
+    let brightness = this.currentBrightness;
+    try {
+      const actual = await RNBrightness.getBrightnessLevel();
+      if (typeof actual === 'number') {
+        brightness = actual;
+        this.currentBrightness = actual;
+      }
+    } catch (error) {
+      console.warn('DeviceControlService: getBrightnessLevel error', error);
+    }
+
     return {
       on: !screensaverActive,
-      brightness: Math.round(this.currentBrightness * 100),
+      brightness: Math.round(brightness * 100),
       screensaverActive,
       scheduledSleep: this.scheduledSleep,
     };
@@ -239,6 +275,30 @@ class DeviceControlServiceClass {
     return { ssid: '', signalStrength: 0, connected: false };
   }
 
+  async getCellularStatus(): Promise<CellularStatus> {
+    try {
+      if (SystemInfoModule?.getCellularInfo) {
+        const info = await SystemInfoModule.getCellularInfo();
+        return {
+          connected: info.isConnected || false,
+          carrier: info.carrier || '',
+          networkType: info.networkType || '',
+          signalDbm: typeof info.signalDbm === 'number' ? info.signalDbm : null,
+          airplaneMode: info.airplaneMode || false,
+        };
+      }
+    } catch (error) {
+      console.warn('DeviceControlService: getCellularInfo error', error);
+    }
+    return {
+      connected: false,
+      carrier: '',
+      networkType: '',
+      signalDbm: null,
+      airplaneMode: false,
+    };
+  }
+
   async getLocalIpAddress(): Promise<string> {
     try {
       if (KioskModule?.getLocalIpAddress) {
@@ -258,7 +318,10 @@ class DeviceControlServiceClass {
       const clamped = Math.max(0, Math.min(100, value));
       const normalized = clamped / 100;
       
-      await RNBrightness.setBrightnessLevel(normalized);
+      // #242: a caller asking this layer for a brightness means it to last, so it
+      // goes through setDefaultBrightness and reaches the native mirror plus
+      // Settings.System, rather than a window override the next wake would drop.
+      await RNBrightness.setDefaultBrightness(normalized);
       this.currentBrightness = normalized;
       
       // Emit event for UI updates

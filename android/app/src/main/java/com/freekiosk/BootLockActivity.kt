@@ -93,6 +93,9 @@ class BootLockActivity : Activity() {
     @Volatile private var lastPollAt = 0L
     @Volatile private var recoveryAttempted = false
 
+    // #243: the timeout below keeps polling, so its release must fire once, not every second.
+    @Volatile private var timeoutReleaseAttempted = false
+
     // ────────────────────────────────────────────────────────────────────
     // Lifecycle
     // ────────────────────────────────────────────────────────────────────
@@ -283,6 +286,25 @@ class BootLockActivity : Activity() {
             // the loop straight away.
             if (elapsed >= MAX_WAIT_MS) {
                 DebugLog.errorProduction(TAG, "Timeout reached after ${elapsed}ms — finishing BootLockActivity")
+                // #243: finish() on its own cannot end this screen. We are in lock task, and
+                // lock task absorbs it, which is exactly what the #222 branch below already
+                // documents and works around. This timeout was the last thing standing between
+                // a stalled boot and a device locked on the loading screen forever, and it has
+                // never been able to do its job: leave lock task first, as #222 does.
+                //
+                // Bounded to the case where MainActivity never started. React Native never ran,
+                // no kiosk configuration was ever applied, and lock task is guarding a black
+                // screen rather than a kiosk, so there is nothing to weaken. Once MainActivity
+                // has started the previous behaviour is correct and is left untouched.
+                if (!MainActivity.hasStarted && !timeoutReleaseAttempted) {
+                    timeoutReleaseAttempted = true
+                    try {
+                        stopLockTask()
+                        DebugLog.errorProduction(TAG, "Left lock task after timeout — MainActivity never started")
+                    } catch (e: Exception) {
+                        DebugLog.errorProduction(TAG, "Could not leave lock task after timeout: ${e.message}")
+                    }
+                }
                 finish()
                 handler.postDelayed(this, POLL_INTERVAL_MS)
                 return

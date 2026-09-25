@@ -1,12 +1,15 @@
 package com.freekiosk
 
 import android.content.Context
+import android.content.Intent
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.net.Uri
 import android.provider.Settings
 import android.util.Log
+import android.view.WindowManager
 import com.facebook.react.bridge.*
 import kotlin.math.abs
 import kotlin.math.log10
@@ -183,19 +186,18 @@ class AutoBrightnessModule(private val reactContext: ReactApplicationContext) :
     @ReactMethod
     fun getBrightnessLevel(promise: Promise) {
         try {
+            // #242: report what the panel is actually running at, not what we last
+            // asked for. The old fallback to lastBrightnessValue is exactly what hid the
+            // mismatch: after a wake blanked the window override, this returned the
+            // requested 80% while the panel sat at the system value of 14/255.
             val activity = reactContext.currentActivity
             if (activity == null) {
-                promise.resolve(lastBrightnessValue.takeIf { it >= 0f }?.toDouble() ?: 0.5)
+                promise.resolve(effectiveLevel(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE).toDouble())
                 return
             }
 
-            val current = activity.window.attributes.screenBrightness
-            val value = when {
-                current >= 0f -> current
-                lastBrightnessValue >= 0f -> lastBrightnessValue
-                else -> 0.5f
-            }
-            promise.resolve(value.toDouble())
+            val override = activity.window.attributes.screenBrightness
+            promise.resolve(effectiveLevel(override).toDouble())
         } catch (e: Exception) {
             Log.e(TAG, "Failed to get brightness level", e)
             promise.reject("GET_BRIGHTNESS_FAILED", "Failed to get brightness level: ${e.message}")
@@ -238,6 +240,86 @@ class AutoBrightnessModule(private val reactContext: ReactApplicationContext) :
     }
 
     /**
+     * Set the level FreeKiosk should hold, as opposed to a transient one (#242).
+     *
+     * setBrightnessLevel() is also how the light sensor and the screensaver drive the
+     * panel, so it cannot persist anything: it would store the screensaver's 0 as the
+     * user's chosen default. This is the deliberate-intent entry point, called from the
+     * brightness dialog, the settings screen and the REST/MQTT/cloud setBrightness
+     * action.
+     *
+     * Resolves with systemWrite = whether Settings.System could be updated. false is
+     * not a failure: the window override still applies, it just will not survive a
+     * reboot on a device with neither Device Owner nor WRITE_SETTINGS.
+     */
+    @ReactMethod
+    fun setDefaultBrightness(brightnessLevel: Double, promise: Promise) {
+        try {
+            val normalized = brightnessLevel.toFloat().coerceIn(0.0f, 1.0f)
+            applyBrightness(normalized)
+            lastBrightnessValue = normalized
+            BrightnessPrefs.store(reactContext, normalized)
+            val systemWrite = BrightnessPrefs.writeSystem(reactContext, normalized)
+            val result = Arguments.createMap().apply {
+                putBoolean("success", true)
+                putDouble("level", normalized.toDouble())
+                putBoolean("systemWrite", systemWrite)
+            }
+            promise.resolve(result)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to set default brightness", e)
+            promise.reject("SET_DEFAULT_BRIGHTNESS_FAILED", "Failed to set default brightness: ${e.message}")
+        }
+    }
+
+    /**
+     * Whether the requested brightness can be written to Settings.System, and so
+     * survive a reboot. True as Device Owner on API 28+, or once WRITE_SETTINGS has
+     * been granted.
+     */
+    @ReactMethod
+    fun canWriteSystemBrightness(promise: Promise) {
+        promise.resolve(BrightnessPrefs.canWriteSystem(reactContext))
+    }
+
+    /**
+     * Open the WRITE_SETTINGS grant screen. Only relevant without Device Owner: this
+     * permission cannot be granted programmatically, the user has to toggle it. Play
+     * Store builds strip WRITE_SETTINGS from the manifest, so this resolves false there.
+     */
+    @ReactMethod
+    fun requestWriteSystemBrightnessAccess(promise: Promise) {
+        try {
+            if (BrightnessPrefs.canWriteSystem(reactContext)) {
+                promise.resolve(true)
+                return
+            }
+            val intent = Intent(
+                Settings.ACTION_MANAGE_WRITE_SETTINGS,
+                Uri.parse("package:${reactContext.packageName}")
+            ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+            reactContext.startActivity(intent)
+            promise.resolve(false)
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not open the WRITE_SETTINGS screen: ${e.message}")
+            promise.resolve(false)
+        }
+    }
+
+    /**
+     * The level actually in effect: the window override when one is set, otherwise the
+     * system value the panel is really using, and only then a fallback.
+     */
+    private fun effectiveLevel(windowOverride: Float): Float {
+        if (windowOverride >= 0f) return windowOverride
+        val system = BrightnessPrefs.systemLevel(reactContext)
+        if (system != BrightnessPrefs.UNSET) return system
+        val stored = BrightnessPrefs.stored(reactContext)
+        if (stored != BrightnessPrefs.UNSET) return stored
+        return 0.5f
+    }
+
+    /**
      * Reset screen brightness to system default (BRIGHTNESS_OVERRIDE_NONE)
      * This tells Android to use the system brightness setting instead of an app-override.
      */
@@ -252,6 +334,10 @@ class AutoBrightnessModule(private val reactContext: ReactApplicationContext) :
             activity.runOnUiThread {
                 try {
                     val window = activity.window
+                    // #242: forget the stored level too. Without this the wake paths
+                    // would keep re-applying it, which is precisely what the user opted
+                    // out of by disabling brightness management (#65).
+                    BrightnessPrefs.clear(reactContext)
                     val layoutParams = window.attributes
                     layoutParams.screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
                     window.attributes = layoutParams

@@ -28,6 +28,7 @@ export const KEYS = {
   SCREENSAVER_URL: '@screensaver_url',
   SCREENSAVER_VIDEO_ITEMS: '@screensaver_video_items',
   SCREENSAVER_VIDEO_LOOP: '@screensaver_video_loop',
+  SCREENSAVER_KEEP_EXTERNAL_APP: '@screensaver_keep_external_app',
   DEFAULT_BRIGHTNESS: '@default_brightness',
   DISPLAY_MODE: '@kiosk_display_mode',
   EXTERNAL_APP_PACKAGE: '@kiosk_external_app_package',
@@ -64,6 +65,13 @@ export const KEYS = {
   REST_API_PORT: '@kiosk_rest_api_port',
   REST_API_KEY: '@kiosk_rest_api_key',
   REST_API_ALLOW_CONTROL: '@kiosk_rest_api_allow_control',
+  // Live MJPEG camera stream (GET /api/camera/stream)
+  CAMERA_STREAM_ENABLED: '@kiosk_camera_stream_enabled',
+  CAMERA_STREAM_CAMERA: '@kiosk_camera_stream_camera',
+  CAMERA_STREAM_FPS: '@kiosk_camera_stream_fps',
+  CAMERA_STREAM_QUALITY: '@kiosk_camera_stream_quality',
+  CAMERA_STREAM_WIDTH: '@kiosk_camera_stream_width',
+  CAMERA_STREAM_ROTATE: '@kiosk_camera_stream_rotate',
   // Power Button setting
   ALLOW_POWER_BUTTON: '@kiosk_allow_power_button',
   // Block factory reset in system Settings (Device Owner user restriction) (#201)
@@ -87,6 +95,9 @@ export const KEYS = {
   WEBVIEW_BACK_BUTTON_ENABLED: '@kiosk_webview_back_button_enabled',
   WEBVIEW_BACK_BUTTON_X_PERCENT: '@kiosk_webview_back_button_x_percent',
   WEBVIEW_BACK_BUTTON_Y_PERCENT: '@kiosk_webview_back_button_y_percent',
+  // Restart Button (WebView reload via long-press, top-right)
+  RESTART_BUTTON_ENABLED: '@kiosk_restart_button_enabled',
+  RESTART_BUTTON_LONG_PRESS_SECONDS: '@kiosk_restart_button_long_press_seconds',
   // Auto-Brightness
   AUTO_BRIGHTNESS_ENABLED: '@kiosk_auto_brightness_enabled',
   AUTO_BRIGHTNESS_MIN: '@kiosk_auto_brightness_min',
@@ -118,8 +129,15 @@ export const KEYS = {
   // PDF Viewer
   PDF_VIEWER_ENABLED: '@kiosk_pdf_viewer_enabled',
   // Printing
-  PRINT_ENABLED: '@kiosk_print_enabled',
+  WINDOW_PRINT_ENABLED: '@kiosk_print_enabled',
   PRINT_PAPER_SIZE: '@kiosk_print_paper_size',
+  // Silent Print: window.FreeKiosk.silentPrinter drives an ESC/POS printer, independent of window.print()
+  SILENT_PRINT_ENABLED: '@kiosk_silent_print_enabled',
+  // Origins allowed to use Silent Print (JSON): null = any page, [] = none
+  PRINT_ORIGINS: '@kiosk_print_origins',
+  ESC_POS_WIDTH_DOTS: '@kiosk_esc_pos_width_dots',
+  ESC_POS_CUT: '@kiosk_esc_pos_cut',
+  ESC_POS_FEED_LINES: '@kiosk_esc_pos_feed_lines',
   // WebView Zoom Level
   WEBVIEW_ZOOM_LEVEL: '@kiosk_webview_zoom_level',
   // WebView Zoom Mode ('standard' = CSS zoom | 'fit' = viewport reflow, #188)
@@ -142,6 +160,16 @@ export const KEYS = {
   MQTT_ALLOW_CONTROL: '@kiosk_mqtt_allow_control',
   MQTT_DEVICE_NAME: '@kiosk_mqtt_device_name',
   MQTT_MOTION_ALWAYS_ON: '@kiosk_mqtt_motion_always_on',
+  // MQTT image publishing (screenshot / camera snapshots)
+  MQTT_SCREENSHOT_ENABLED: '@kiosk_mqtt_screenshot_enabled',
+  MQTT_SCREENSHOT_AUTO: '@kiosk_mqtt_screenshot_auto',
+  MQTT_SCREENSHOT_INTERVAL: '@kiosk_mqtt_screenshot_interval',
+  MQTT_SCREENSHOT_QUALITY: '@kiosk_mqtt_screenshot_quality',
+  MQTT_SCREENSHOT_MAX_WIDTH: '@kiosk_mqtt_screenshot_max_width',
+  MQTT_CAMERA_ENABLED: '@kiosk_mqtt_camera_enabled',
+  MQTT_CAMERA_AUTO: '@kiosk_mqtt_camera_auto',
+  MQTT_CAMERA_INTERVAL: '@kiosk_mqtt_camera_interval',
+  MQTT_CAMERA_QUALITY: '@kiosk_mqtt_camera_quality',
   // Beta Updates
   BETA_UPDATES_ENABLED: '@kiosk_beta_updates_enabled',
   // Managed Apps (multi-app mode, background apps, accessibility whitelist)
@@ -215,6 +243,13 @@ const deepMerge = (base: unknown, overlay: unknown): unknown => {
   }
   return out;
 };
+
+/**
+ * Normalizes the silent-print origin allow-list: null = any page may print, [] = none may.
+ * Anything but an array reads as null.
+ */
+export const toPrintOrigins = (value: unknown): string[] | null =>
+  Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : null;
 
 export const StorageService = {
   //URL
@@ -410,6 +445,7 @@ export const StorageService = {
         KEYS.SCREENSAVER_URL,
         KEYS.SCREENSAVER_VIDEO_ITEMS,
         KEYS.SCREENSAVER_VIDEO_LOOP,
+        KEYS.SCREENSAVER_KEEP_EXTERNAL_APP,
         KEYS.DEFAULT_BRIGHTNESS,
         KEYS.DISPLAY_MODE,
         KEYS.EXTERNAL_APP_PACKAGE,
@@ -466,6 +502,9 @@ export const StorageService = {
         KEYS.WEBVIEW_BACK_BUTTON_ENABLED,
         KEYS.WEBVIEW_BACK_BUTTON_X_PERCENT,
         KEYS.WEBVIEW_BACK_BUTTON_Y_PERCENT,
+        // Restart Button
+        KEYS.RESTART_BUTTON_ENABLED,
+        KEYS.RESTART_BUTTON_LONG_PRESS_SECONDS,
         // Auto-Brightness
         KEYS.AUTO_BRIGHTNESS_ENABLED,
         KEYS.AUTO_BRIGHTNESS_MIN,
@@ -497,7 +536,12 @@ export const StorageService = {
         // PDF Viewer
         KEYS.PDF_VIEWER_ENABLED,
         // Printing
-        KEYS.PRINT_ENABLED,
+        KEYS.WINDOW_PRINT_ENABLED,
+        KEYS.SILENT_PRINT_ENABLED,
+        KEYS.ESC_POS_WIDTH_DOTS,
+        KEYS.ESC_POS_CUT,
+        KEYS.ESC_POS_FEED_LINES,
+        KEYS.PRINT_ORIGINS,
         // WebView Zoom Level
         KEYS.WEBVIEW_ZOOM_LEVEL,
         KEYS.WEBVIEW_ZOOM_MODE,
@@ -515,6 +559,16 @@ export const StorageService = {
         KEYS.MQTT_ALLOW_CONTROL,
         KEYS.MQTT_DEVICE_NAME,
         KEYS.MQTT_MOTION_ALWAYS_ON,
+        // MQTT image publishing
+        KEYS.MQTT_SCREENSHOT_ENABLED,
+        KEYS.MQTT_SCREENSHOT_AUTO,
+        KEYS.MQTT_SCREENSHOT_INTERVAL,
+        KEYS.MQTT_SCREENSHOT_QUALITY,
+        KEYS.MQTT_SCREENSHOT_MAX_WIDTH,
+        KEYS.MQTT_CAMERA_ENABLED,
+        KEYS.MQTT_CAMERA_AUTO,
+        KEYS.MQTT_CAMERA_INTERVAL,
+        KEYS.MQTT_CAMERA_QUALITY,
         // Dashboard
         KEYS.DASHBOARD_MODE_ENABLED,
         KEYS.DASHBOARD_TILES,
@@ -876,6 +930,26 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting screensaver video loop:', error);
       return true;
+    }
+  },
+
+  // External App mode, Dim style only: dim over the external app instead of bringing
+  // FreeKiosk to the foreground. Off by default so existing setups keep today's behaviour.
+  saveScreensaverKeepExternalApp: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.SCREENSAVER_KEEP_EXTERNAL_APP, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving screensaver keep-external-app:', error);
+    }
+  },
+
+  getScreensaverKeepExternalApp: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.SCREENSAVER_KEEP_EXTERNAL_APP);
+      return value === null ? false : JSON.parse(value);
+    } catch (error) {
+      console.error('Error getting screensaver keep-external-app:', error);
+      return false;
     }
   },
 
@@ -1531,6 +1605,121 @@ export const StorageService = {
     }
   },
 
+  // LIVE CAMERA STREAM (MJPEG)
+  saveCameraStreamEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.CAMERA_STREAM_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving camera stream enabled:', error);
+    }
+  },
+
+  getCameraStreamEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.CAMERA_STREAM_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting camera stream enabled:', error);
+      return false;
+    }
+  },
+
+  saveCameraStreamCamera: async (camera: 'front' | 'back'): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.CAMERA_STREAM_CAMERA, camera);
+    } catch (error) {
+      console.error('Error saving camera stream camera:', error);
+    }
+  },
+
+  getCameraStreamCamera: async (): Promise<'front' | 'back'> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.CAMERA_STREAM_CAMERA);
+      return value === 'back' ? 'back' : 'front';
+    } catch (error) {
+      console.error('Error getting camera stream camera:', error);
+      return 'front';
+    }
+  },
+
+  saveCameraStreamFps: async (fps: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.CAMERA_STREAM_FPS, fps.toString());
+    } catch (error) {
+      console.error('Error saving camera stream fps:', error);
+    }
+  },
+
+  getCameraStreamFps: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.CAMERA_STREAM_FPS);
+      const fps = value ? parseInt(value, 10) : 10;
+      return isNaN(fps) ? 10 : Math.min(30, Math.max(1, fps));
+    } catch (error) {
+      console.error('Error getting camera stream fps:', error);
+      return 10;
+    }
+  },
+
+  saveCameraStreamQuality: async (quality: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.CAMERA_STREAM_QUALITY, quality.toString());
+    } catch (error) {
+      console.error('Error saving camera stream quality:', error);
+    }
+  },
+
+  getCameraStreamQuality: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.CAMERA_STREAM_QUALITY);
+      const quality = value ? parseInt(value, 10) : 60;
+      return isNaN(quality) ? 60 : Math.min(100, Math.max(1, quality));
+    } catch (error) {
+      console.error('Error getting camera stream quality:', error);
+      return 60;
+    }
+  },
+
+  saveCameraStreamWidth: async (width: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.CAMERA_STREAM_WIDTH, width.toString());
+    } catch (error) {
+      console.error('Error saving camera stream width:', error);
+    }
+  },
+
+  getCameraStreamWidth: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.CAMERA_STREAM_WIDTH);
+      const width = value ? parseInt(value, 10) : 1280;
+      return isNaN(width) ? 1280 : Math.min(3840, Math.max(160, width));
+    } catch (error) {
+      console.error('Error getting camera stream width:', error);
+      return 1280;
+    }
+  },
+
+  /** Extra clockwise rotation in degrees, or -1 to derive it from the sensor. */
+  saveCameraStreamRotate: async (rotate: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.CAMERA_STREAM_ROTATE, rotate.toString());
+    } catch (error) {
+      console.error('Error saving camera stream rotation:', error);
+    }
+  },
+
+  getCameraStreamRotate: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.CAMERA_STREAM_ROTATE);
+      const rotate = value ? parseInt(value, 10) : -1;
+      if (isNaN(rotate)) return -1;
+      return [0, 90, 180, 270].includes(rotate) ? rotate : -1;
+    } catch (error) {
+      console.error('Error getting camera stream rotation:', error);
+      return -1;
+    }
+  },
+
   // POWER BUTTON
   saveAllowPowerButton: async (value: boolean): Promise<void> => {
     try {
@@ -1791,6 +1980,45 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting webview back button Y percent:', error);
       return 10;
+    }
+  },
+
+  // Restart Button (top-right, long-press to reload the WebView)
+  saveRestartButtonEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.RESTART_BUTTON_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving restart button enabled:', error);
+    }
+  },
+
+  getRestartButtonEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.RESTART_BUTTON_ENABLED);
+      // Off by default: it draws a visible control over the kiosk page and lets anyone
+      // standing in front of the screen restart the WebView, so it is opt-in.
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting restart button enabled:', error);
+      return false;
+    }
+  },
+
+  saveRestartButtonLongPressSeconds: async (value: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.RESTART_BUTTON_LONG_PRESS_SECONDS, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving restart button long-press seconds:', error);
+    }
+  },
+
+  getRestartButtonLongPressSeconds: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.RESTART_BUTTON_LONG_PRESS_SECONDS);
+      return value ? JSON.parse(value) : 5; // 5s long-press by default
+    } catch (error) {
+      console.error('Error getting restart button long-press seconds:', error);
+      return 5;
     }
   },
 
@@ -2207,17 +2435,17 @@ export const StorageService = {
 
   // ============ PRINTING ============
 
-  savePrintEnabled: async (value: boolean): Promise<void> => {
+  saveWindowPrintEnabled: async (value: boolean): Promise<void> => {
     try {
-      await AsyncStorage.setItem(KEYS.PRINT_ENABLED, JSON.stringify(value));
+      await AsyncStorage.setItem(KEYS.WINDOW_PRINT_ENABLED, JSON.stringify(value));
     } catch (error) {
       console.error('Error saving print enabled:', error);
     }
   },
 
-  getPrintEnabled: async (): Promise<boolean> => {
+  getWindowPrintEnabled: async (): Promise<boolean> => {
     try {
-      const value = await AsyncStorage.getItem(KEYS.PRINT_ENABLED);
+      const value = await AsyncStorage.getItem(KEYS.WINDOW_PRINT_ENABLED);
       return value ? JSON.parse(value) : false;
     } catch (error) {
       console.error('Error getting print enabled:', error);
@@ -2240,6 +2468,98 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting print paper size:', error);
       return 'A4';
+    }
+  },
+
+  saveSilentPrintEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.SILENT_PRINT_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving silent print enabled:', error);
+    }
+  },
+
+  getSilentPrintEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.SILENT_PRINT_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting silent print enabled:', error);
+      return false;
+    }
+  },
+
+  saveEscPosWidthDots: async (value: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.ESC_POS_WIDTH_DOTS, String(value));
+    } catch (error) {
+      console.error('Error saving ESC/POS width:', error);
+    }
+  },
+
+  getEscPosWidthDots: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.ESC_POS_WIDTH_DOTS);
+      const parsed = value ? parseInt(value, 10) : NaN;
+      return Number.isFinite(parsed) ? parsed : 384;
+    } catch (error) {
+      console.error('Error getting ESC/POS width:', error);
+      return 384;
+    }
+  },
+
+  saveEscPosCut: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.ESC_POS_CUT, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving ESC/POS cut:', error);
+    }
+  },
+
+  getEscPosCut: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.ESC_POS_CUT);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting ESC/POS cut:', error);
+      return false;
+    }
+  },
+
+  saveEscPosFeedLines: async (value: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.ESC_POS_FEED_LINES, String(value));
+    } catch (error) {
+      console.error('Error saving ESC/POS feed lines:', error);
+    }
+  },
+
+  getEscPosFeedLines: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.ESC_POS_FEED_LINES);
+      const parsed = value ? parseInt(value, 10) : NaN;
+      return Number.isFinite(parsed) ? parsed : 0;
+    } catch (error) {
+      console.error('Error getting ESC/POS feed lines:', error);
+      return 0;
+    }
+  },
+
+  savePrintOrigins: async (value: string[] | null): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.PRINT_ORIGINS, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving print origins:', error);
+    }
+  },
+
+  getPrintOrigins: async (): Promise<string[] | null> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.PRINT_ORIGINS);
+      return toPrintOrigins(value ? JSON.parse(value) : null);
+    } catch (error) {
+      console.error('Error getting print origins:', error);
+      return null;
     }
   },
 
@@ -2546,6 +2866,175 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting MQTT motion always on:', error);
       return false;
+    }
+  },
+
+  // MQTT IMAGE PUBLISHING (screenshot / camera snapshots)
+  saveMqttScreenshotEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_SCREENSHOT_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving MQTT screenshot enabled:', error);
+    }
+  },
+
+  getMqttScreenshotEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_SCREENSHOT_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting MQTT screenshot enabled:', error);
+      return false;
+    }
+  },
+
+  saveMqttScreenshotAuto: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_SCREENSHOT_AUTO, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving MQTT screenshot auto-publish:', error);
+    }
+  },
+
+  getMqttScreenshotAuto: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_SCREENSHOT_AUTO);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting MQTT screenshot auto-publish:', error);
+      return false;
+    }
+  },
+
+  saveMqttScreenshotInterval: async (seconds: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_SCREENSHOT_INTERVAL, seconds.toString());
+    } catch (error) {
+      console.error('Error saving MQTT screenshot interval:', error);
+    }
+  },
+
+  getMqttScreenshotInterval: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_SCREENSHOT_INTERVAL);
+      const interval = value ? parseInt(value, 10) : 60;
+      return isNaN(interval) ? 60 : Math.min(3600, Math.max(5, interval));
+    } catch (error) {
+      console.error('Error getting MQTT screenshot interval:', error);
+      return 60;
+    }
+  },
+
+  saveMqttScreenshotQuality: async (quality: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_SCREENSHOT_QUALITY, quality.toString());
+    } catch (error) {
+      console.error('Error saving MQTT screenshot quality:', error);
+    }
+  },
+
+  getMqttScreenshotQuality: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_SCREENSHOT_QUALITY);
+      const quality = value ? parseInt(value, 10) : 70;
+      return isNaN(quality) ? 70 : Math.min(100, Math.max(1, quality));
+    } catch (error) {
+      console.error('Error getting MQTT screenshot quality:', error);
+      return 70;
+    }
+  },
+
+  saveMqttScreenshotMaxWidth: async (width: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_SCREENSHOT_MAX_WIDTH, width.toString());
+    } catch (error) {
+      console.error('Error saving MQTT screenshot max width:', error);
+    }
+  },
+
+  getMqttScreenshotMaxWidth: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_SCREENSHOT_MAX_WIDTH);
+      const width = value ? parseInt(value, 10) : 1280;
+      // 0 means "keep native resolution"
+      return isNaN(width) ? 1280 : Math.max(0, width);
+    } catch (error) {
+      console.error('Error getting MQTT screenshot max width:', error);
+      return 1280;
+    }
+  },
+
+  saveMqttCameraEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_CAMERA_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving MQTT camera enabled:', error);
+    }
+  },
+
+  getMqttCameraEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_CAMERA_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting MQTT camera enabled:', error);
+      return false;
+    }
+  },
+
+  saveMqttCameraAuto: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_CAMERA_AUTO, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving MQTT camera auto-publish:', error);
+    }
+  },
+
+  getMqttCameraAuto: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_CAMERA_AUTO);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting MQTT camera auto-publish:', error);
+      return false;
+    }
+  },
+
+  saveMqttCameraInterval: async (seconds: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_CAMERA_INTERVAL, seconds.toString());
+    } catch (error) {
+      console.error('Error saving MQTT camera interval:', error);
+    }
+  },
+
+  getMqttCameraInterval: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_CAMERA_INTERVAL);
+      const interval = value ? parseInt(value, 10) : 300;
+      return isNaN(interval) ? 300 : Math.min(3600, Math.max(5, interval));
+    } catch (error) {
+      console.error('Error getting MQTT camera interval:', error);
+      return 300;
+    }
+  },
+
+  saveMqttCameraQuality: async (quality: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.MQTT_CAMERA_QUALITY, quality.toString());
+    } catch (error) {
+      console.error('Error saving MQTT camera quality:', error);
+    }
+  },
+
+  getMqttCameraQuality: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.MQTT_CAMERA_QUALITY);
+      const quality = value ? parseInt(value, 10) : 70;
+      return isNaN(quality) ? 70 : Math.min(100, Math.max(1, quality));
+    } catch (error) {
+      console.error('Error getting MQTT camera quality:', error);
+      return 70;
     }
   },
 
@@ -2955,8 +3444,13 @@ export const StorageService = {
         url: str(KEYS.URL),
         autoReload: bool(KEYS.AUTO_RELOAD),
         pdfViewerEnabled: bool(KEYS.PDF_VIEWER_ENABLED),
-        printEnabled: bool(KEYS.PRINT_ENABLED),
+        printEnabled: bool(KEYS.WINDOW_PRINT_ENABLED), // window.print(); name kept for existing exports
         printPaperSize: str(KEYS.PRINT_PAPER_SIZE, 'A4'),
+        silentPrintEnabled: bool(KEYS.SILENT_PRINT_ENABLED),
+        escPosWidthDots: num(KEYS.ESC_POS_WIDTH_DOTS, 384),
+        escPosCut: bool(KEYS.ESC_POS_CUT),
+        escPosFeedLines: num(KEYS.ESC_POS_FEED_LINES, 0),
+        printOrigins: toPrintOrigins(json(KEYS.PRINT_ORIGINS)),
         urlRotation: {
           enabled: bool(KEYS.URL_ROTATION_ENABLED),
           list: json(KEYS.URL_ROTATION_LIST, []),
@@ -3041,6 +3535,7 @@ export const StorageService = {
           url: str(KEYS.SCREENSAVER_URL),
           videoItems: json(KEYS.SCREENSAVER_VIDEO_ITEMS, []),
           videoLoop: bool(KEYS.SCREENSAVER_VIDEO_LOOP, true),
+          keepExternalApp: bool(KEYS.SCREENSAVER_KEEP_EXTERNAL_APP),
         },
         motionDetection: {
           enabled: bool(KEYS.SCREENSAVER_MOTION_ENABLED),
@@ -3155,8 +3650,16 @@ export const StorageService = {
       set(KEYS.URL, g.url);
       set(KEYS.AUTO_RELOAD, g.autoReload);
       set(KEYS.PDF_VIEWER_ENABLED, g.pdfViewerEnabled);
-      set(KEYS.PRINT_ENABLED, g.printEnabled);
+      set(KEYS.WINDOW_PRINT_ENABLED, g.printEnabled);
       set(KEYS.PRINT_PAPER_SIZE, g.printPaperSize);
+      set(KEYS.SILENT_PRINT_ENABLED, g.silentPrintEnabled);
+      set(KEYS.ESC_POS_WIDTH_DOTS, g.escPosWidthDots);
+      set(KEYS.ESC_POS_CUT, g.escPosCut);
+      set(KEYS.ESC_POS_FEED_LINES, g.escPosFeedLines);
+      // Not through set(): it skips null, and null is what lifts the restriction.
+      if ('printOrigins' in g) {
+        pairs.push([KEYS.PRINT_ORIGINS, JSON.stringify(toPrintOrigins(g.printOrigins))]);
+      }
       const ur = g.urlRotation as Record<string, unknown> | undefined;
       if (ur) {
         set(KEYS.URL_ROTATION_ENABLED, ur.enabled);
@@ -3253,6 +3756,7 @@ export const StorageService = {
         set(KEYS.SCREENSAVER_URL, ss.url);
         set(KEYS.SCREENSAVER_VIDEO_ITEMS, ss.videoItems);
         set(KEYS.SCREENSAVER_VIDEO_LOOP, ss.videoLoop);
+        set(KEYS.SCREENSAVER_KEEP_EXTERNAL_APP, ss.keepExternalApp);
       }
       const md = d.motionDetection as Record<string, unknown> | undefined;
       if (md) {

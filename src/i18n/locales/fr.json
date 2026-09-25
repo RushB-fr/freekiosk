@@ -11,8 +11,8 @@
       "media": "Média",
       "app": "Appli",
       "hint": "Site web, lecteur multimédia (vidéo/images), ou application Android",
-      "deviceOwnerWarningTitle": "Propriétaire de l'appareil recommandé",
-      "deviceOwnerWarningBody": "Sans le mode Propriétaire de l'appareil :\n• Les boutons de navigation restent accessibles\n• L'utilisateur peut quitter l'application librement\n• Le mode verrouillé peut ne pas fonctionner correctement"
+      "deviceOwnerWarningTitle": "Device Owner recommandé",
+      "deviceOwnerWarningBody": "Sans le mode Device Owner :\n• Les boutons de navigation restent accessibles\n• L'utilisateur peut quitter l'application librement\n• Le mode verrouillé peut ne pas fonctionner correctement"
     },
     "howToUse": {
       "title": "Comment utiliser",
@@ -143,7 +143,8 @@
       "hintAlphanumeric": "Minimum 4 caractères. Peut inclure lettres, chiffres et caractères spéciaux.",
       "hintNumeric": "Code PIN numérique : 4-6 chiffres (par défaut : 1234)",
       "maxAttempts": "Tentatives max avant blocage (15 min)",
-      "maxAttemptsHint": "Nombre de tentatives de mot de passe incorrectes autorisées (1-100)"
+      "maxAttemptsHint": "Nombre de tentatives de mot de passe incorrectes autorisées (1-100)",
+      "notSetPlaceholder": "Non défini : saisissez un PIN"
     },
     "inactivityReturn": {
       "title": "Retour sur inactivité",
@@ -172,10 +173,14 @@
     },
     "printing": {
       "title": "Impression",
-      "allow": "Autoriser l'impression",
+      "allow": "Activer l'impression de la page",
       "allowHint": "Active le support de window.print() pour les pages web (imprimantes d'étiquettes, tickets, etc.)",
       "paperSize": "Format de papier par défaut",
-      "info": "Les pages web peuvent déclencher la boîte de dialogue d'impression Android via window.print().\n\nEn mode Propriétaire de l'appareil (kiosque), le spouleur d'impression système est automatiquement autorisé pour faire apparaître la boîte de dialogue.\n\nCompatible WiFi, Bluetooth, imprimantes USB, et Enregistrer en PDF."
+      "info": "Les pages web peuvent déclencher la boîte de dialogue d'impression Android via window.print().\n\nEn mode Device Owner (kiosque), le spouleur d'impression système est automatiquement autorisé pour faire apparaître la boîte de dialogue.\n\nCompatible WiFi, Bluetooth, imprimantes USB, et Enregistrer en PDF.",
+      "windowTitle": "Impression de la page",
+      "silentTitle": "Impression silencieuse",
+      "silentEnable": "Activer l'impression silencieuse",
+      "silentEnableHint": "Permet aux pages web d'imprimer sur une imprimante USB ESC/POS sans boîte de dialogue, via window.FreeKiosk.silentPrinter"
     },
     "webNav": {
       "title": "Bouton de navigation web",
@@ -192,7 +197,14 @@
       "title": "Applications en arrière-plan",
       "info": "Facultatif : ajoutez des applications à lancer et maintenir actives en arrière-plan pendant que la WebView du kiosque est affichée.\n\nExemple : garder une application de musique ou de récepteur audio active à côté de votre tableau de bord web."
     },
-    "backToKiosk": "Retour au kiosque"
+    "backToKiosk": "Retour au kiosque",
+    "restartButton": {
+      "title": "Bouton de redémarrage",
+      "enable": "Activer le bouton de redémarrage",
+      "enableHint": "Affiche un bouton gris en haut à droite. Un appui long redémarre la WebView sur l'URL configurée.",
+      "longPress": "Durée de l'appui long",
+      "longPressHint": "Temps pendant lequel le bouton doit rester appuyé avant que la WebView redémarre."
+    }
   },
   "display": {
     "brightness": {
@@ -289,7 +301,10 @@
       "howItWorksTouch": "• Toucher l'écran pour réveiller l'appareil",
       "howItWorksMotion": "• Un mouvement devant la caméra réveille aussi l'écran",
       "howItWorksProximity": "• Une main proche du capteur de proximité réveille aussi l'écran",
-      "howItWorksBrightness": "• La luminosité normale est restaurée automatiquement"
+      "howItWorksBrightness": "• La luminosité normale est restaurée automatiquement",
+      "howItWorksDimOverApp": "• L'écran s'assombrit par-dessus l'application externe, qui reste ouverte ; le premier appui le réveille",
+      "keepExternalApp": "Garder l'application au premier plan",
+      "keepExternalAppHint": "Assombrit l'écran par-dessus l'application externe au lieu de revenir à FreeKiosk, pour qu'elle ne se recharge pas au réveil. Le premier appui ne fait que réveiller l'écran. Le réveil par mouvement ou par proximité n'est pas disponible avec cette option."
     },
     "screenSchedule": {
       "title": "Programmation de mise en veille",
@@ -313,8 +328,8 @@
       "howItWorksLine4": "• Les règles nocturnes (ex. 22:00→07:00) sont prises en charge",
       "touchWakeEnabled": "• Toucher l'écran pour le réveiller temporairement pendant la veille",
       "touchWakeDisabled": "• Le réveil au toucher est désactivé pendant les périodes de veille",
-      "deviceOwnerInfo": "Propriétaire de l'appareil : l'écran est réellement verrouillé (lockNow) + alarme native pour le réveil",
-      "nonDeviceOwnerInfo": "Sans Propriétaire de l'appareil : luminosité réglée à 0 + superposition noire",
+      "deviceOwnerInfo": "Device Owner : l'écran est réellement verrouillé (lockNow) + alarme native pour le réveil",
+      "nonDeviceOwnerInfo": "Sans Device Owner : luminosité réglée à 0 + superposition noire",
       "wakeAlarmInfo": "L'alarme de réveil utilise l'AlarmManager Android pour un minutage fiable"
     },
     "statusBar": {
@@ -388,8 +403,8 @@
       "enableHint": "Empêche les utilisateurs de quitter l'application kiosque. Nécessite un code PIN pour quitter.",
       "disabledWarning": "Avec le mode verrouillé désactivé, les utilisateurs peuvent quitter l'application normalement",
       "screenPinningInfo": "Épinglage d'écran activé : seul le geste 5-tap + code PIN permet de quitter",
-      "noDeviceOwnerWarning": "Sans Propriétaire de l'appareil, les utilisateurs peuvent quitter via le geste Retour + Applications récentes. Définissez FreeKiosk comme Propriétaire de l'appareil pour un verrouillage complet.",
-      "externalAppNoOwnerError": "Propriétaire de l'appareil requis : le mode verrouillé ne fonctionnera pas en mode Application externe sans les privilèges Propriétaire de l'appareil.",
+      "noDeviceOwnerWarning": "Sans Device Owner, les utilisateurs peuvent quitter via le geste Retour + Applications récentes. Définissez FreeKiosk comme Device Owner pour un verrouillage complet.",
+      "externalAppNoOwnerError": "Device Owner requis : le mode verrouillé ne fonctionnera pas en mode Application externe sans les privilèges Device Owner.",
       "externalAppOwnerInfo": "Mode verrouillé activé : seul le geste 5-tap n'importe où sur l'écran + code PIN permet de quitter l'application externe",
       "blockPowerMenu": "Bloquer le menu d'alimentation",
       "blockPowerMenuHint": "Une fois activé, l'appui long sur le bouton d'alimentation n'a aucun effet — il ne peut qu'allumer/éteindre l'écran par appui court. Désactivé, l'appui long affiche le menu d'alimentation (Redémarrer/Éteindre). Bloquer le menu d'alimentation peut couper le son sur certains appareils Samsung/OneUI.",
@@ -398,7 +413,7 @@
       "showSystemInfo": "Afficher la barre d'informations système",
       "showSystemInfoHint": "Affiche la barre d'état Android native (heure, batterie, connectivité) dans l'application verrouillée. Corrige aussi le son coupé sur certains appareils Samsung/OneUI en mode verrouillé.",
       "blockFactoryReset": "Bloquer la réinitialisation d'usine",
-      "blockFactoryResetHint": "Retire l'option « Réinitialisation d'usine » de l'application Réglages système (restriction Propriétaire de l'appareil). Utile quand l'application Réglages est dans votre liste blanche multi-applications, pour que les utilisateurs verrouillés ne puissent pas effacer l'appareil. Persiste après redémarrage. Prend effet immédiatement, même hors du mode verrouillé.",
+      "blockFactoryResetHint": "Retire l'option « Réinitialisation d'usine » de l'application Réglages système (restriction Device Owner). Utile quand l'application Réglages est dans votre liste blanche multi-applications, pour que les utilisateurs verrouillés ne puissent pas effacer l'appareil. Persiste après redémarrage. Prend effet immédiatement, même hors du mode verrouillé.",
       "allowRemoteScreenshots": "Autoriser les captures d'écran à distance",
       "allowRemoteScreenshotsHint": "Le mode verrouillé bloque la capture d'écran sur tout l'appareil (Alimentation+Volume bas), ce qui empêche aussi l'API REST /api/screenshot et les commandes de capture cloud de capturer une autre application que FreeKiosk (mode multi-applications). Activez ceci pour laisser FreeKiosk lever ce blocage le temps d'une capture à distance, puis le rétablir. Nécessite le service d'accessibilité FreeKiosk et Android 11+.",
       "remoteScreenshotWarning": "Pendant qu'une capture d'écran à distance est prise, la combinaison matérielle de capture d'écran est brièvement disponible pour quiconque se trouve devant l'appareil."
@@ -410,13 +425,13 @@
       "appearOnTopInfo": "Assurez-vous que l'autorisation « Apparaître au-dessus » est activée dans les réglages système pour un lancement automatique fiable.",
       "openSystemSettings": "Ouvrir les réglages système",
       "screenLockCompat": "Compatibilité verrouillage d'écran système",
-      "screenLockCompatHint": "À activer UNIQUEMENT si vous avez défini un verrouillage d'écran Android natif (PIN/mot de passe) sur cet appareil. FreeKiosk (1) s'efface alors pour l'écran de verrouillage sécurisé au démarrage au lieu de se verrouiller immédiatement — évitant le blocage au redémarrage causé par le conflit entre le kiosque et l'écran de verrouillage sécurisé — et (2) garde le keyguard système actif pendant l'épinglage, pour que le verrouillage d'écran demande effectivement le mot de passe après que l'écran s'éteint et se rallume (sans cela, le mode lock-task désactive le keyguard et le mot de passe n'apparaît jamais). Un verrouillage d'écran système signifie qu'une personne doit entrer le mot de passe sur l'appareil après chaque redémarrage avant que le kiosque ne démarre, et à chaque réveil — inadapté aux appareils sans surveillance. Pour la sécurité de l'appareil, le PIN de sortie FreeKiosk + Propriétaire de l'appareil est généralement le meilleur choix.",
+      "screenLockCompatHint": "À activer UNIQUEMENT si vous avez défini un verrouillage d'écran Android natif (PIN/mot de passe) sur cet appareil. FreeKiosk (1) s'efface alors pour l'écran de verrouillage sécurisé au démarrage au lieu de se verrouiller immédiatement — évitant le blocage au redémarrage causé par le conflit entre le kiosque et l'écran de verrouillage sécurisé — et (2) garde le keyguard système actif pendant l'épinglage, pour que le verrouillage d'écran demande effectivement le mot de passe après que l'écran s'éteint et se rallume (sans cela, le mode lock-task désactive le keyguard et le mot de passe n'apparaît jamais). Un verrouillage d'écran système signifie qu'une personne doit entrer le mot de passe sur l'appareil après chaque redémarrage avant que le kiosque ne démarre, et à chaque réveil — inadapté aux appareils sans surveillance. Pour la sécurité de l'appareil, le PIN de sortie FreeKiosk + Device Owner est généralement le meilleur choix.",
       "screenLockCompatWarning": "Avec un verrouillage d'écran natif défini, l'appareil demandera le mot de passe manuellement après chaque redémarrage avant que FreeKiosk ne se lance. Ceci n'a aucun effet sauf si un verrouillage d'écran Android est réellement configuré.",
       "defaultLauncher": "Définir FreeKiosk comme lanceur par défaut",
-      "defaultLauncherHintOwner": "Fait de FreeKiosk l'application d'accueil persistante via Propriétaire de l'appareil. Le système relance alors FreeKiosk lui-même après chaque redémarrage et mise à jour système, sans dépendre des autorisations « Apparaître au-dessus » / Démarrage automatique du fabricant que certaines marques (ex. Samsung) réinitialisent lors des mises à jour OS — la cause principale du kiosque qui disparaît après un redémarrage/mise à jour. Le bouton Accueil revient aussi ici. Désactiver ceci restaure votre lanceur normal.",
-      "defaultLauncherHintNonOwner": "Ouvre le sélecteur d'application d'accueil système pour que vous puissiez définir FreeKiosk comme lanceur par défaut. Le système relance alors FreeKiosk au démarrage. Sans Propriétaire de l'appareil, ce choix n'est pas verrouillé — l'utilisateur peut le changer et certaines marques peuvent le réinitialiser lors d'une mise à jour système (Propriétaire de l'appareil le rend permanent).",
-      "defaultLauncherWarningOwner": "FreeKiosk devient l'application d'accueil/lanceur de l'appareil. Si l'application venait à planter au lancement, il n'y a pas de lanceur de secours, donc testez sur un appareil avant un déploiement en flotte. Désactiver ceci (ou retirer Propriétaire de l'appareil) restaure le lanceur normal.",
-      "defaultLauncherWarningNonOwner": "Choisissez FreeKiosk dans l'écran de sélection d'application d'accueil qui s'ouvre. Ceci n'est pas imposé sans Propriétaire de l'appareil et peut être réinitialisé par une mise à jour système. Pour le retirer plus tard, choisissez un autre lanceur dans le même écran système."
+      "defaultLauncherHintOwner": "Fait de FreeKiosk l'application d'accueil persistante via Device Owner. Le système relance alors FreeKiosk lui-même après chaque redémarrage et mise à jour système, sans dépendre des autorisations « Apparaître au-dessus » / Démarrage automatique du fabricant que certaines marques (ex. Samsung) réinitialisent lors des mises à jour OS — la cause principale du kiosque qui disparaît après un redémarrage/mise à jour. Le bouton Accueil revient aussi ici. Désactiver ceci restaure votre lanceur normal.",
+      "defaultLauncherHintNonOwner": "Ouvre le sélecteur d'application d'accueil système pour que vous puissiez définir FreeKiosk comme lanceur par défaut. Le système relance alors FreeKiosk au démarrage. Sans Device Owner, ce choix n'est pas verrouillé — l'utilisateur peut le changer et certaines marques peuvent le réinitialiser lors d'une mise à jour système (le Device Owner le rend permanent).",
+      "defaultLauncherWarningOwner": "FreeKiosk devient l'application d'accueil/lanceur de l'appareil. Si l'application venait à planter au lancement, il n'y a pas de lanceur de secours, donc testez sur un appareil avant un déploiement en flotte. Désactiver ceci (ou retirer le Device Owner) restaure le lanceur normal.",
+      "defaultLauncherWarningNonOwner": "Choisissez FreeKiosk dans l'écran de sélection d'application d'accueil qui s'ouvre. Ceci n'est pas imposé sans Device Owner et peut être réinitialisé par une mise à jour système. Pour le retirer plus tard, choisissez un autre lanceur dans le même écran système."
     },
     "returnToSettings": {
       "title": "Retour aux réglages",
@@ -452,9 +467,9 @@
       "info": "Bloquer la saisie tactile sur des zones spécifiques de l'écran (ex. barres de navigation, barres d'outils) pour empêcher les utilisateurs d'interagir avec certaines parties {{target}}.",
       "website": "du site web",
       "externalApps": "des applications externes",
-      "warningNoLockMode": "Sans mode verrouillé + Propriétaire de l'appareil, les utilisateurs peuvent encore quitter l'application via les boutons Accueil/Retour. Pour une sécurité maximale, activez les deux.",
+      "warningNoLockMode": "Sans mode verrouillé + Device Owner, les utilisateurs peuvent encore quitter l'application via les boutons Accueil/Retour. Pour une sécurité maximale, activez les deux.",
       "configureButton": "Configurer les zones de blocage",
-      "maxSecurity": "Mode verrouillé + Propriétaire de l'appareil actifs. Sécurité maximale activée."
+      "maxSecurity": "Mode verrouillé + Device Owner actifs. Sécurité maximale activée."
     },
     "urlFiltering": {
       "title": "Filtrage d'URL",
@@ -524,29 +539,29 @@
     "cloud": {
       "title": "Gestion cloud",
       "enrolledTitle": "Géré par le cloud",
-      "enrolledInfo": "Cet appareil est inscrit{{org}}.\nLa configuration est synchronisée automatiquement toutes les 30 secondes.",
+      "enrolledInfo": "Cet appareil est enrôlé{{org}}.\nLa configuration est synchronisée automatiquement toutes les 30 secondes.",
       "enrolledInOrg": " dans {{org}}",
       "setupPermissions": "Configurer les autorisations",
-      "unenrolling": "Désinscription...",
+      "unenrolling": "Désenrôlement...",
       "leaveCloud": "Quitter la gestion cloud",
       "zeroTouchTitle": "Provisionnement sans intervention",
-      "zeroTouchInfo": "Inscrivez cet appareil sur une instance FreeKiosk Cloud pour gérer sa configuration à distance.\n\nAttention : l'inscription réinitialisera tous les réglages actuels.",
+      "zeroTouchInfo": "Enrôlez cet appareil sur une instance FreeKiosk Cloud pour gérer sa configuration à distance.\n\nAttention : l'enrôlement réinitialisera tous les réglages actuels.",
       "cloudUrl": "URL du cloud",
-      "enrollmentToken": "Jeton d'inscription",
+      "enrollmentToken": "Jeton d'enrôlement",
       "scanQr": "Scanner le QR code",
-      "enrolling": "Inscription...",
-      "enrollDevice": "Inscrire l'appareil",
+      "enrolling": "Enrôlement...",
+      "enrollDevice": "Enrôler l'appareil",
       "missingFieldsTitle": "Champs manquants",
-      "missingFieldsMessage": "Veuillez saisir à la fois l'URL du cloud et le jeton d'inscription.",
-      "enrollConfirmTitle": "Inscription à la gestion cloud",
-      "enrollConfirmMessage": "L'inscription réinitialisera tous les réglages locaux de FreeKiosk. L'appareil sera ensuite configuré depuis le cloud.\n\nContinuer ?",
+      "missingFieldsMessage": "Veuillez saisir à la fois l'URL du cloud et le jeton d'enrôlement.",
+      "enrollConfirmTitle": "Enrôlement dans la gestion cloud",
+      "enrollConfirmMessage": "L'enrôlement réinitialisera tous les réglages locaux de FreeKiosk. L'appareil sera ensuite configuré depuis le cloud.\n\nContinuer ?",
       "cancel": "Annuler",
-      "enroll": "Inscrire",
-      "enrollmentFailedTitle": "Échec de l'inscription",
+      "enroll": "Enrôler",
+      "enrollmentFailedTitle": "Échec de l'enrôlement",
       "unknownError": "Erreur inconnue",
       "leaveConfirmTitle": "Quitter la gestion cloud",
       "leaveConfirmMessage": "Ceci déconnectera l'appareil du cloud et effacera tous les réglages de FreeKiosk.\n\nContinuer ?",
-      "unenroll": "Désinscrire"
+      "unenroll": "Désenrôler"
     },
     "updates": {
       "title": "Mises à jour",
@@ -563,7 +578,7 @@
       "downloading": "Téléchargement...",
       "checkForUpdates": "Vérifier les mises à jour",
       "downloadInstall": "Télécharger et installer",
-      "hintOwner": "Mode Propriétaire de l'appareil : mises à jour manuelles via GitHub.",
+      "hintOwner": "Mode Device Owner : mises à jour manuelles via GitHub.",
       "hintNonOwner": "Télécharger et installer les mises à jour depuis GitHub."
     },
     "certificates": {
@@ -581,20 +596,20 @@
       "disabled": "○ Désactivé",
       "whyTitle": "Pourquoi est-ce nécessaire ?",
       "whyInfo": "Le service d'accessibilité permet à FreeKiosk d'envoyer des entrées clavier (contrôle à distance, saisie de texte) aux applications externes.\n\nSans lui, l'émulation de clavier ne fonctionne que dans la WebView propre à FreeKiosk.",
-      "enableAuto": "Activer automatiquement (Propriétaire de l'appareil)",
+      "enableAuto": "Activer automatiquement (Device Owner)",
       "openSettings": "Ouvrir les réglages d'accessibilité",
-      "hintOwner": "Le mode Propriétaire de l'appareil peut activer le service automatiquement si l'autorisation WRITE_SECURE_SETTINGS a été accordée via ADB. Sinon, activez-le manuellement dans les réglages Android.",
+      "hintOwner": "Le mode Device Owner peut activer le service automatiquement si l'autorisation WRITE_SECURE_SETTINGS a été accordée via ADB. Sinon, activez-le manuellement dans les réglages Android.",
       "hintNonOwner": "Activez « FreeKiosk » dans Réglages → Accessibilité → Services installés.",
       "runningHint": "L'émulation de clavier est disponible pour toutes les applications (WebView + Applications externes).",
       "managedAppsTitle": "Accessibilité des applications gérées",
-      "managedAppsInfo": "Vous pouvez autoriser les services d'accessibilité d'autres applications dans la section « Applications gérées » de l'onglet Général.\nActivez « Autoriser l'accessibilité » par application pour ajouter leurs services d'accessibilité à la liste blanche via Propriétaire de l'appareil.",
+      "managedAppsInfo": "Vous pouvez autoriser les services d'accessibilité d'autres applications dans la section « Applications gérées » de l'onglet Général.\nActivez « Autoriser l'accessibilité » par application pour ajouter leurs services d'accessibilité à la liste blanche via Device Owner.",
       "errorTitle": "Erreur",
       "errorOpenSettings": "Impossible d'ouvrir les réglages d'accessibilité",
       "successTitle": "Succès",
-      "successEnabled": "Le service d'accessibilité a été activé automatiquement via Propriétaire de l'appareil.",
+      "successEnabled": "Le service d'accessibilité a été activé automatiquement via Device Owner.",
       "permissionRequiredTitle": "Autorisation requise",
       "permissionRequiredMessage": "Pour activer automatiquement le service d'accessibilité, l'autorisation WRITE_SECURE_SETTINGS doit être accordée via ADB (configuration unique) :\n\nadb shell pm grant com.freekiosk android.permission.WRITE_SECURE_SETTINGS\n\nSinon, appuyez sur « Ouvrir les réglages d'accessibilité » ci-dessous pour l'activer manuellement.",
-      "failedEnable": "Échec de l'activation via Propriétaire de l'appareil"
+      "failedEnable": "Échec de l'activation via Device Owner"
     },
     "androidSettings": {
       "title": "Réglages système Android",
@@ -612,7 +627,7 @@
     "actions": {
       "title": "Actions",
       "resetSettings": "Réinitialiser tous les réglages",
-      "removeDeviceOwner": "Retirer Propriétaire de l'appareil",
+      "removeDeviceOwner": "Retirer le Device Owner",
       "exitKioskMode": "Quitter le mode kiosque"
     },
     "versionFooter": "FreeKiosk v{{version}}"
@@ -751,7 +766,28 @@
       "allowControlHint": "Active les commandes via MQTT (luminosité, rechargement, etc.)",
       "motionAlwaysOn": "Détection de mouvement permanente",
       "motionAlwaysOnHint": "Exécute la détection de mouvement par caméra en continu (consommation batterie plus élevée). Sans cela, le mouvement n'est détecté que pendant l'économiseur d'écran.",
-      "haInfo": "Les appareils se découvrent automatiquement dans Home Assistant via MQTT Discovery. Assurez-vous que votre intégration MQTT HA est configurée."
+      "haInfo": "Les appareils se découvrent automatiquement dans Home Assistant via MQTT Discovery. Assurez-vous que votre intégration MQTT HA est configurée.",
+      "passwordNotSavedTitle": "Mot de passe non enregistré",
+      "passwordNotSavedMessage": "Le mot de passe MQTT n'a pas pu être écrit dans le stockage sécurisé de cet appareil : le broker refusera donc la connexion. Cela arrive sur les firmwares dont le Keystore Android est défaillant. Le champ est vidé pour ne pas afficher un mot de passe qui n'a jamais été enregistré.",
+      "discoveryReconnectMessage": "Les entités Home Assistant sont publiées à la connexion. Reconnecter maintenant pour appliquer ce changement ?",
+      "cameraPermissionTitle": "Autorisation caméra requise",
+      "cameraPermissionMessage": "FreeKiosk a besoin d'accéder à la caméra pour publier des photos en MQTT.",
+      "publishScreenshot": "Publier une capture d'écran",
+      "publishScreenshotHint": "Expose l'écran du kiosque dans Home Assistant comme entité image/caméra, avec un bouton de capture. L'écran est publié sur le broker, en clair sauf sur le port 8883, et toute personne qui peut lire le topic peut le voir.",
+      "screenshotAuto": "Publication automatique des captures",
+      "screenshotAutoHint": "Publie une capture d'écran à intervalle régulier. Activable aussi depuis Home Assistant.",
+      "screenshotInterval": "Intervalle des captures (secondes)",
+      "screenshotQuality": "Qualité JPEG des captures",
+      "screenshotMaxWidth": "Largeur max des captures (px)",
+      "screenshotMaxWidthHint": "Réduit la taille avant publication. 0 garde la résolution native.",
+      "publishCamera": "Publier des photos de la caméra",
+      "publishCameraHint": "Expose chaque caméra de l'appareil dans Home Assistant comme entité image/caméra. Les photos sont publiées sur le broker, en clair sauf sur le port 8883, et toute personne qui peut lire le topic voit qui se trouve devant l'appareil. Les photos échouent tant que la détection de mouvement utilise la caméra.",
+      "cameraAuto": "Publication automatique des photos",
+      "cameraAutoHint": "Publie une photo à intervalle régulier (consomme plus de batterie). Activable aussi depuis Home Assistant.",
+      "cameraInterval": "Intervalle des photos (secondes)",
+      "cameraQuality": "Qualité JPEG des photos",
+      "intervalHint": "5 à 3600 secondes (utilisé seulement avec la publication automatique)",
+      "jpegQualityHint": "1 à 100. Une valeur plus basse donne des messages MQTT plus légers."
     },
     "wifiDialog": {
       "title": "Wi-Fi",
@@ -880,10 +916,25 @@
       "getReadOnly": "GET (lecture seule)",
       "postControl": "POST (contrôle)",
       "postRemoteControl": "POST (télécommande - Android TV)",
-      "getEndpoints": "/api/status - État complet de l'appareil\n/api/battery - Infos batterie\n/api/brightness - Luminosité actuelle\n/api/screen - État de l'écran\n/api/info - Infos appareil\n/api/health - Vérification de santé\n/api/sensors - Lumière, proximité, accéléromètre\n/api/storage - Infos stockage\n/api/memory - Infos RAM\n/api/wifi - État WiFi\n/api/screenshot - Capture d'écran (PNG)",
-      "postEndpoints": "/api/brightness - Régler la luminosité\n/api/screen/on - Allumer l'écran\n/api/screen/off - Éteindre l'écran\n/api/screensaver/on - Activer l'économiseur d'écran\n/api/screensaver/off - Désactiver l'économiseur d'écran\n/api/reload - Recharger la WebView\n/api/url - Naviguer vers une URL\n/api/wake - Réveiller depuis l'économiseur d'écran\n/api/tts - Synthèse vocale\n/api/volume - Régler le volume\n/api/toast - Afficher un message toast\n/api/js - Exécuter du JavaScript\n/api/clearCache - Vider le cache de la WebView\n/api/app/launch - Lancer une application externe\n/api/reboot - Redémarrer (Propriétaire de l'appareil)\n/api/audio/play - Jouer une URL audio\n/api/audio/stop - Arrêter l'audio\n/api/audio/beep - Jouer un bip",
+      "getEndpoints": "/api/status - État complet de l'appareil\n/api/battery - Infos batterie\n/api/brightness - Luminosité actuelle\n/api/screen - État de l'écran\n/api/info - Infos appareil\n/api/health - Vérification de santé\n/api/sensors - Lumière, proximité, accéléromètre\n/api/storage - Infos stockage\n/api/memory - Infos RAM\n/api/wifi - État WiFi\n/api/screenshot - Capture d'écran (PNG)\n/api/camera/photo - Prendre une photo (JPEG)",
+      "postEndpoints": "/api/brightness - Régler la luminosité\n/api/screen/on - Allumer l'écran\n/api/screen/off - Éteindre l'écran\n/api/screensaver/on - Activer l'économiseur d'écran\n/api/screensaver/off - Désactiver l'économiseur d'écran\n/api/reload - Recharger la WebView\n/api/url - Naviguer vers une URL\n/api/wake - Réveiller depuis l'économiseur d'écran\n/api/tts - Synthèse vocale\n/api/volume - Régler le volume\n/api/toast - Afficher un message toast\n/api/js - Exécuter du JavaScript\n/api/clearCache - Vider le cache de la WebView\n/api/app/launch - Lancer une application externe\n/api/reboot - Redémarrer (Device Owner)\n/api/audio/play - Jouer une URL audio\n/api/audio/stop - Arrêter l'audio\n/api/audio/beep - Jouer un bip",
       "postRemoteEndpoints": "/api/remote/up - D-pad haut\n/api/remote/down - D-pad bas\n/api/remote/left - D-pad gauche\n/api/remote/right - D-pad droite\n/api/remote/select - Sélectionner/Entrée\n/api/remote/back - Bouton retour\n/api/remote/home - Bouton accueil\n/api/remote/menu - Bouton menu\n/api/remote/playpause - Lecture/Pause",
-      "haHint": "À utiliser avec l'intégration RESTful de Home Assistant. Voir la documentation pour des exemples de configuration."
+      "haHint": "À utiliser avec l'intégration RESTful de Home Assistant. Voir la documentation pour des exemples de configuration.",
+      "streamEndpoint": "/api/camera/stream - Flux MJPEG en direct",
+      "cameraPermissionTitle": "Autorisation caméra requise",
+      "cameraPermissionStream": "FreeKiosk a besoin d'accéder à la caméra pour diffuser un flux en direct.",
+      "cameraRotation": "Rotation de la caméra",
+      "cameraRotationHint": "S'applique aux photos (REST et MQTT) et au flux en direct. -1 la déduit du capteur. Utilisez 0, 90, 180 ou 270 si l'image sort de travers. Une requête peut la remplacer avec ?rotate=.",
+      "stream": "Flux caméra en direct",
+      "streamHint": "Sert GET /api/camera/stream en MJPEG, pour l'intégration MJPEG IP Camera de Home Assistant. Une caméra n'accepte qu'un client à la fois : pendant qu'on regarde le flux, la détection de mouvement travaille sur ses images. Elle garde votre réglage de sensibilité, mais ne se comporte pas exactement comme la détection habituelle.",
+      "streamBackCamera": "Utiliser la caméra arrière",
+      "streamBackCameraHint": "Caméra par défaut du flux. Remplaçable par requête avec ?camera=front|back.",
+      "streamFps": "Images par seconde",
+      "streamFpsHint": "1 à 30. Plus la valeur est haute, plus le flux consomme de processeur et de bande passante ; 5 à 10 suffisent pour de la surveillance.",
+      "streamQuality": "Qualité JPEG du flux",
+      "streamQualityHint": "1 à 100. Une valeur plus basse réduit la bande passante.",
+      "streamWidth": "Largeur max du flux (px)",
+      "streamWidthHint": "Plus grande résolution caméra à utiliser, de 160 à 3840."
     },
     "managedApps": {
       "error": "Erreur",
@@ -1095,7 +1146,7 @@
     },
     "permissionWizard": {
       "setupPermissions": "Configurer les autorisations",
-      "managedModeBanner": "Mode géré (Propriétaire de l'appareil). Les autorisations sont accordées automatiquement ; vous pouvez terminer tout de suite.",
+      "managedModeBanner": "Mode géré (Device Owner). Les autorisations d'exécution sont accordées automatiquement, mais pas « Afficher par-dessus d'autres applis » ni « Accès aux données d'utilisation » : Android ne permet pas à un Device Owner de s'accorder ces deux-là lui-même, chacune demande donc un appui ci-dessous.",
       "standardModeBanner": "Mode standard. Accordez les autorisations ci-dessous pour débloquer toutes les fonctionnalités. Le redémarrage, l'installation silencieuse et la véritable extinction d'écran nécessitent le mode géré (réinitialisation d'usine + QR de provisionnement).",
       "granted": "Accordée",
       "grant": "Accorder",
@@ -1144,7 +1195,10 @@
       "supportOnGithub": "Soutenez-nous sur GitHub",
       "tapHint": "Astuce : appuyez 5× n'importe où sur l'écran pour accéder aux réglages",
       "footerVersion": "Version {{version}} • par Rushb",
-      "footerByRushb": "par Rushb"
+      "footerByRushb": "par Rushb",
+      "provisioningEnrolling": "Connexion à FreeKiosk Cloud… (tentative {{attempts}})",
+      "provisioningRetrying": "FreeKiosk Cloud est injoignable pour le moment. Nouvel essai toutes les 30 secondes (tentative {{attempts}}).",
+      "provisioningFailed": "Échec de l'enrôlement cloud : {{error}}. Saisissez un nouveau jeton dans Réglages > Cloud."
     },
     "mediaPlayer": {
       "title": "Lecteur multimédia",
@@ -1167,6 +1221,42 @@
     },
     "dashboardGrid": {
       "emptyText": "Configurez votre première tuile dans l'onglet Tableau de bord."
+    },
+    "escPos": {
+      "stateReady": "Prête",
+      "stateNoPrinter": "Aucune imprimante détectée",
+      "stateNoPermission": "Accès non accordé",
+      "statePaperOut": "Plus de papier",
+      "stateError": "Erreur",
+      "errorNoPrinter": "Aucune imprimante n'est branchée. Vérifiez le câble et l'adaptateur USB.",
+      "errorNoPermission": "L'accès à l'imprimante n'a pas encore été accordé.",
+      "errorPaperOut": "L'imprimante n'a plus de papier.",
+      "errorOpenFailed": "L'imprimante n'a pas pu être ouverte. Une autre application l'utilise peut-être.",
+      "errorWriteFailed": "L'imprimante a cessé d'accepter les données en cours d'impression.",
+      "errorPageRender": "La page n'a pas pu être préparée pour l'impression.",
+      "unknownError": "Erreur inconnue",
+      "accessDeniedTitle": "Accès refusé",
+      "accessDeniedMessage": "L'imprimante ne peut pas être utilisée tant que l'accès n'est pas accordé.",
+      "testPageFailed": "Échec de la page de test",
+      "commandSet": "Commandes : {{commandSet}}",
+      "commandSetUnknown": "Jeu de commandes non indiqué",
+      "noPaperLevel": "Cette imprimante n'indique pas son niveau de papier.",
+      "refresh": "Actualiser",
+      "grantAccess": "Accorder l'accès",
+      "widthDots": "Largeur d'impression (points)",
+      "widthDotsHint": "Largeur imprimable en points (selon la fiche technique de l'imprimante)",
+      "feedLines": "Avance après l'impression",
+      "feedLinesHint": "Lignes vides ajoutées à la fin de chaque impression",
+      "feedLinesValue_one": "{{count}} ligne",
+      "feedLinesValue_other": "{{count}} lignes",
+      "cut": "Couper le papier",
+      "cutHint": "Coupe automatiquement après chaque impression (sans effet sur les imprimantes sans massicot)",
+      "restrictOrigins": "Limiter l'impression par origine",
+      "restrictOriginsHint": "Seules les pages des origines listées peuvent utiliser window.FreeKiosk.silentPrinter",
+      "noOrigins": "Aucune origine autorisée",
+      "noOriginsHint": "Aucune page ne peut imprimer tant que vous n'en ajoutez pas une",
+      "printTestPage": "Imprimer une page de test",
+      "info": "Les pages web impriment sans dialogue en appelant window.FreeKiosk.silentPrinter.print() ou printImage(). print() met la page en forme pour qu'un pixel CSS corresponde à un point.\n\nwindow.print() n'est pas concerné : il ouvre la boîte de dialogue d'impression Android quand l'impression de la page est activée, et ne fait rien sinon.\n\nPour un accès qui survit aux redémarrages : branchez l'imprimante, choisissez FreeKiosk et cochez l'option qui l'ouvre toujours pour cet appareil. Le bouton ci-dessus n'accorde l'accès que jusqu'au débranchement de l'imprimante, et le mode kiosque verrouillé masque complètement cette boîte de dialogue.\n\nLes imprimantes qui exposent une interface USB propre au fabricant au lieu de la classe imprimante standard impriment quand même, mais ne peuvent pas indiquer le niveau de papier."
     }
   },
   "screens": {
@@ -1218,7 +1308,7 @@
       "disable": "Désactiver",
       "safetyHub": "Safety Hub",
       "safetyHubFailed": "Safety Hub n'a pas pu être désactivé automatiquement.",
-      "safetyHubFailedDeviceOwner": "Safety Hub n'a pas pu être désactivé automatiquement. Le mode Propriétaire de l'appareil est requis.",
+      "safetyHubFailedDeviceOwner": "Safety Hub n'a pas pu être désactivé automatiquement. Le mode Device Owner est requis.",
       "updateAvailableTitle": "Mise à jour disponible{{betaTag}}",
       "updateAvailableMessage": "Nouvelle version {{version}} disponible !{{prerelease}}\n\nActuelle : {{current}}\n\nVoulez-vous la télécharger et l'installer ?",
       "beta": " Bêta",
@@ -1248,7 +1338,7 @@
       "unableToVerifyApp": "Impossible de vérifier l'application : {{error}}",
       "multiAppNeedsHomeScreen": "Le mode multi-applications nécessite au moins une application avec « Afficher sur l'écran d'accueil » activé",
       "securityErrorTitle": "Erreur de sécurité",
-      "urlNotAllowed": "Ce type d'URL n'est pas autorisé. Utilisez http:// ou https://",
+      "urlNotAllowed": "Ce type d'URL n'est pas autorisé. Utilisez http://, https:// ou file://",
       "urlUpdatedTitle": "URL mise à jour",
       "urlUpdatedMessage": "https:// a été ajouté à votre URL :\n\n{{url}}\n\nCliquez à nouveau sur Enregistrer pour confirmer.",
       "invalidUrlTitle": "URL invalide",
@@ -1278,10 +1368,10 @@
       "info": "Info",
       "kioskModeDisabled": "Mode kiosque désactivé",
       "unableToExit": "Impossible de quitter : {{error}}",
-      "removeDeviceOwnerTitle": "Retirer Propriétaire de l'appareil",
-      "removeDeviceOwnerMessage": "ATTENTION : Ceci retirera les privilèges Propriétaire de l'appareil.\n\nVous perdrez :\n• Le mode kiosque complet\n• Le blocage de navigation\n• La protection par verrouillage\n\nTous les réglages seront réinitialisés.\n\nContinuer ?",
+      "removeDeviceOwnerTitle": "Retirer le Device Owner",
+      "removeDeviceOwnerMessage": "ATTENTION : Ceci retirera les privilèges Device Owner.\n\nVous perdrez :\n• Le mode kiosque complet\n• Le blocage de navigation\n• La protection par verrouillage\n\nTous les réglages seront réinitialisés.\n\nContinuer ?",
       "remove": "Retirer",
-      "deviceOwnerRemovedMessage": "Propriétaire de l'appareil retiré !\n\nVous pouvez maintenant désinstaller FreeKiosk normalement.",
+      "deviceOwnerRemovedMessage": "Device Owner retiré !\n\nVous pouvez maintenant désinstaller FreeKiosk normalement.",
       "failedMessage": "Échec : {{error}}",
       "removeCertificateTitle": "Supprimer le certificat",
       "removeCertificateMessage": "Supprimer le certificat accepté pour :\n\n{{url}}\n\nVous devrez l'accepter à nouveau lors de votre prochaine visite.",
@@ -1290,8 +1380,8 @@
       "pleaseWaitDownloading": "Veuillez patienter pendant le téléchargement...",
       "doNotCloseApp": "Ne fermez pas l'application.",
       "title": "Réglages",
-      "deviceOwnerActive": "Propriétaire de l'appareil actif",
-      "deviceOwnerInactive": "Propriétaire de l'appareil inactif",
+      "deviceOwnerActive": "Device Owner actif",
+      "deviceOwnerInactive": "Device Owner inactif",
       "save": "Enregistrer",
       "selectAnApp": "Sélectionner une application",
       "tabs": {
@@ -1300,7 +1390,18 @@
         "display": "Affichage",
         "security": "Sécurité",
         "advanced": "Avancé"
-      }
+      },
+      "pinRequiredTitle": "PIN requis",
+      "pinRequiredMessage": "Définissez le PIN dans Général > Mot de passe avant d'enregistrer. C'est lui qui protège la sortie du mode kiosque.",
+      "goToGeneral": "Aller à Général",
+      "configUpdatedTitle": "Configuration mise à jour",
+      "configUpdatedMessage": "FreeKiosk Cloud a envoyé une nouvelle configuration pendant que cet écran était ouvert : les valeurs affichées ici ne sont plus à jour.",
+      "keepMyEdits": "Garder mes modifications",
+      "reloadConfig": "Recharger",
+      "fileAccessOffTitle": "Accès aux fichiers désactivé",
+      "fileAccessOffMessage": "Pour ouvrir un fichier local, activez d'abord Général > Lecteur PDF > Lecteur PDF intégré. C'est ce réglage qui donne au navigateur l'accès aux fichiers de l'appareil.",
+      "passwordNotSavedTitle": "Mot de passe non enregistré",
+      "basicAuthNotSavedMessage": "Le mot de passe HTTP Basic Auth n'a pas pu être écrit dans le stockage sécurisé de cet appareil. Tous les autres réglages de cet écran ont été enregistrés. Cela arrive sur les firmwares dont le Keystore Android est défaillant."
     }
   }
 }

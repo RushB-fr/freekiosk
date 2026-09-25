@@ -9,6 +9,7 @@ import {
   SettingsSection,
   SettingsInput,
   SettingsSwitch,
+  SettingsSlider,
   SettingsModeSelector,
   SettingsInfoBox,
   SettingsButton,
@@ -16,6 +17,7 @@ import {
   ScheduleEventList,
   ManagedAppsSection,
   SettingsRadioGroup,
+  EscPosPrinterSection,
 } from '../../../components/settings';
 import { ManagedApp } from '../../../types/managedApps';
 import Icon from '../../../components/Icon';
@@ -87,10 +89,20 @@ interface GeneralTabProps {
   onPdfViewerEnabledChange: (value: boolean) => void;
   
   // Printing (webview only)
-  printEnabled: boolean;
-  onPrintEnabledChange: (value: boolean) => void;
+  windowPrintEnabled: boolean;
+  onWindowPrintEnabledChange: (value: boolean) => void;
   printPaperSize: string;
   onPrintPaperSizeChange: (value: string) => void;
+  silentPrintEnabled: boolean;
+  onSilentPrintEnabledChange: (value: boolean) => void;
+  escPosWidthDots: number;
+  onEscPosWidthDotsChange: (value: number) => void;
+  escPosCut: boolean;
+  onEscPosCutChange: (value: boolean) => void;
+  escPosFeedLines: number;
+  onEscPosFeedLinesChange: (value: number) => void;
+  printOrigins: string[] | null;
+  onPrintOriginsChange: (value: string[] | null) => void;
   
   // URL Rotation (webview only)
   urlRotationEnabled: boolean;
@@ -117,7 +129,13 @@ interface GeneralTabProps {
   webViewBackButtonYPercent: string;
   onWebViewBackButtonYPercentChange: (value: string) => void;
   onResetWebViewBackButtonPosition: () => void;
-  
+
+  // Restart Button (webview only): long-press reloads the WebView
+  restartButtonEnabled: boolean;
+  onRestartButtonEnabledChange: (value: boolean) => void;
+  restartButtonLongPressSeconds: number;
+  onRestartButtonLongPressSecondsChange: (value: number) => void;
+
   // Inactivity Return to Home (webview only)
   inactivityReturnEnabled: boolean;
   onInactivityReturnEnabledChange: (value: boolean) => void;
@@ -201,10 +219,20 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
   onAutoReloadChange,
   pdfViewerEnabled,
   onPdfViewerEnabledChange,
-  printEnabled,
-  onPrintEnabledChange,
+  windowPrintEnabled,
+  onWindowPrintEnabledChange,
   printPaperSize,
   onPrintPaperSizeChange,
+  silentPrintEnabled,
+  onSilentPrintEnabledChange,
+  escPosWidthDots,
+  onEscPosWidthDotsChange,
+  escPosCut,
+  onEscPosCutChange,
+  escPosFeedLines,
+  onEscPosFeedLinesChange,
+  printOrigins,
+  onPrintOriginsChange,
   urlRotationEnabled,
   onUrlRotationEnabledChange,
   urlRotationList,
@@ -225,6 +253,10 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
   webViewBackButtonYPercent,
   onWebViewBackButtonYPercentChange,
   onResetWebViewBackButtonPosition,
+  restartButtonEnabled,
+  onRestartButtonEnabledChange,
+  restartButtonLongPressSeconds,
+  onRestartButtonLongPressSecondsChange,
   inactivityReturnEnabled,
   onInactivityReturnEnabledChange,
   inactivityReturnDelay,
@@ -839,7 +871,9 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
           label=""
           value={pin}
           onChangeText={onPinChange}
-          placeholder={isPinConfigured && !pinModeChanged ? '••••' : '1234'}
+          // Not '1234': greyed, it read as a PIN already filled in, and a beta tester
+          // hunted for a missing password in a field that looked set.
+          placeholder={isPinConfigured && !pinModeChanged ? '••••' : t('general.password.notSetPlaceholder')}
           keyboardType={pinMode === 'alphanumeric' ? 'default' : 'numeric'}
           secureTextEntry
           maxLength={pinMode === 'alphanumeric' ? undefined : 6}
@@ -958,14 +992,16 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
       {/* Printing - WebView only */}
       {displayMode === 'webview' && (
         <SettingsSection title={t('general.printing.title')} icon="printer">
+          {/* Window Printing (Android print dialog) */}
+          <Text style={[styles.subSectionTitle, styles.subSectionTitleFirst]}>{t('general.printing.windowTitle')}</Text>
           <SettingsSwitch
             label={t('general.printing.allow')}
             hint={t('general.printing.allowHint')}
-            value={printEnabled}
-            onValueChange={onPrintEnabledChange}
+            value={windowPrintEnabled}
+            onValueChange={onWindowPrintEnabledChange}
           />
 
-          {printEnabled && (
+          {windowPrintEnabled && (
             <>
               <View style={styles.rotationSpacer} />
               <SettingsRadioGroup
@@ -983,13 +1019,37 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
             </>
           )}
 
-          {printEnabled && (
+          {windowPrintEnabled && (
             <SettingsInfoBox variant="info">
               <Text style={styles.infoText}>
                 {t('general.printing.info')}
               </Text>
             </SettingsInfoBox>
           )}
+
+          {/* Silent Printing (USB ESC/POS, no dialog) */}
+          <View style={styles.subSection}>
+            <Text style={styles.subSectionTitle}>{t('general.printing.silentTitle')}</Text>
+            <SettingsSwitch
+              label={t('general.printing.silentEnable')}
+              hint={t('general.printing.silentEnableHint')}
+              value={silentPrintEnabled}
+              onValueChange={onSilentPrintEnabledChange}
+            />
+
+            {silentPrintEnabled && (
+              <EscPosPrinterSection
+                widthDots={escPosWidthDots}
+                onWidthDotsChange={onEscPosWidthDotsChange}
+                cut={escPosCut}
+                onCutChange={onEscPosCutChange}
+                feedLines={escPosFeedLines}
+                onFeedLinesChange={onEscPosFeedLinesChange}
+                origins={printOrigins}
+                onOriginsChange={onPrintOriginsChange}
+              />
+            )}
+          </View>
         </SettingsSection>
       )}
 
@@ -1036,6 +1096,35 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
                 icon="restore"
                 variant="outline"
                 onPress={onResetWebViewBackButtonPosition}
+              />
+            </>
+          )}
+        </SettingsSection>
+      )}
+
+      {/* Restart Button - WebView only. Top-right grey button, long-press restarts the WebView. */}
+      {displayMode === 'webview' && (
+        <SettingsSection title={t('general.restartButton.title')} icon="refresh">
+          <SettingsSwitch
+            label={t('general.restartButton.enable')}
+            hint={t('general.restartButton.enableHint')}
+            value={restartButtonEnabled}
+            onValueChange={onRestartButtonEnabledChange}
+          />
+
+          {restartButtonEnabled && (
+            <>
+              <View style={styles.rotationSpacer} />
+              <SettingsSlider
+                label={t('general.restartButton.longPress')}
+                hint={t('general.restartButton.longPressHint')}
+                icon="refresh"
+                value={restartButtonLongPressSeconds}
+                onValueChange={onRestartButtonLongPressSecondsChange}
+                minimumValue={1}
+                maximumValue={10}
+                step={1}
+                unit="s"
               />
             </>
           )}
@@ -1099,6 +1188,21 @@ const styles = StyleSheet.create({
   },
   rotationSpacer: {
     height: Spacing.md,
+  },
+  subSection: {
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
+  },
+  subSectionTitle: {
+    ...Typography.labelSmall,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  subSectionTitleFirst: {
+    // Directly under the section header, which already provides the gap
+    marginTop: 0,
   },
   mediaItemCard: {
     backgroundColor: Colors.surfaceVariant,

@@ -73,7 +73,7 @@ const BlockingOverlaysScreen: React.FC<{ navigation: any }> = ({ navigation }) =
       console.error('Failed to save blocking overlays settings:', error);
       Alert.alert(t('screens.blockingOverlays.error'), t('screens.blockingOverlays.saveFailed'));
     }
-  }, []);
+  }, [t]);
 
   // Handle master toggle
   const handleToggleEnabled = async (value: boolean) => {

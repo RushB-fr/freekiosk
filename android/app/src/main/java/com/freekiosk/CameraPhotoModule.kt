@@ -26,15 +26,29 @@ class CameraPhotoModule(private val context: Context) {
     companion object {
         private const val TAG = "CameraPhotoModule"
         private const val CAPTURE_TIMEOUT_SECONDS = 10L
+
+        /** Rotate the picture upright from the sensor and display orientation (#253). */
+        const val ROTATION_AUTO = -1
+
+        /**
+         * The Camera Rotation setting when one is stored (0/90/180/270), [ROTATION_AUTO]
+         * otherwise. Shared with the live stream, for sensors the formula gets wrong.
+         */
+        const val ROTATION_DEFAULT = -2
+
+        private const val ROTATION_SETTING_KEY = "@kiosk_camera_stream_rotate"
     }
 
     /**
      * Capture a photo from the specified camera
      * @param cameraFacing "front" or "back" (default: "back")
      * @param quality JPEG compression quality 0-100 (default: 80)
+     * @param rotation clockwise degrees applied to the pixels (0, 90, 180, 270),
+     *   [ROTATION_AUTO] or [ROTATION_DEFAULT]. Default 0: the raw sensor frame, which is
+     *   what motion detection wants, with no re-encoding cost.
      * @return ByteArrayInputStream of JPEG data, or null on failure
      */
-    fun capturePhoto(cameraFacing: String = "back", quality: Int = 80): ByteArrayInputStream? {
+    fun capturePhoto(cameraFacing: String = "back", quality: Int = 80, rotation: Int = 0): ByteArrayInputStream? {
         // Check camera permission
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) 
             != PackageManager.PERMISSION_GRANTED) {
@@ -67,6 +81,8 @@ class CameraPhotoModule(private val context: Context) {
             val map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
             val outputSizes = map?.getOutputSizes(ImageFormat.JPEG) ?: emptyArray()
             
+            val requested = if (rotation == ROTATION_DEFAULT) storedRotation() else rotation
+            val degrees = if (requested == ROTATION_AUTO) autoRotation(characteristics) else requested
             // Pick a reasonable size (not too large for API response speed)
             val targetSize = selectOptimalSize(outputSizes)
             Log.d(TAG, "Selected capture size: ${targetSize.width}x${targetSize.height}")
@@ -84,10 +100,11 @@ class CameraPhotoModule(private val context: Context) {
                         val bytes = ByteArray(buffer.remaining())
                         buffer.get(bytes)
                         
-                        // If quality < 100, we could recompress, but JPEG from camera
-                        // is already compressed. We'll use the quality in the capture request.
-                        resultStream = ByteArrayInputStream(bytes)
-                        Log.d(TAG, "Photo captured: ${bytes.size} bytes")
+                        // JPEG quality is set in the capture request; the frame is only
+                        // re-encoded when it has to be rotated.
+                        val output = rotateJpeg(bytes, degrees, quality)
+                        resultStream = ByteArrayInputStream(output)
+                        Log.d(TAG, "Photo captured: ${output.size} bytes, rotated $degrees")
                     } finally {
                         image.close()
                         latch.countDown()
@@ -242,6 +259,66 @@ class CameraPhotoModule(private val context: Context) {
         }
 
         return resultStream
+    }
+
+    /**
+     * #253: rotation that makes the picture upright, from the formula documented on
+     * CaptureRequest.JPEG_ORIENTATION. The pixels are rotated rather than setting that key,
+     * because the frame also goes to consumers that ignore EXIF (Home Assistant's generic
+     * camera, MQTT image entities). Some sensors are mounted against what the formula
+     * assumes (a Xiaomi front camera measured 180 off); the Camera Rotation setting and
+     * the REST `rotate` parameter cover those.
+     */
+    private fun autoRotation(characteristics: CameraCharacteristics): Int {
+        val sensor = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
+        val front = characteristics.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_FRONT
+        val displayRotation = try {
+            val dm = context.getSystemService(Context.DISPLAY_SERVICE) as android.hardware.display.DisplayManager
+            when (dm.getDisplay(android.view.Display.DEFAULT_DISPLAY)?.rotation) {
+                android.view.Surface.ROTATION_90 -> 90
+                android.view.Surface.ROTATION_180 -> 180
+                android.view.Surface.ROTATION_270 -> 270
+                else -> 0
+            }
+        } catch (e: Exception) { 0 }
+        var device = (360 - displayRotation) % 360
+        if (front) device = -device
+        val result = (sensor + device + 360) % 360
+        Log.d(TAG, "Auto rotation: $result (sensor=$sensor, display=$displayRotation, front=$front)")
+        return result
+    }
+
+    /** Camera Rotation setting, read where the settings screen stores it. */
+    private fun storedRotation(): Int = try {
+        val db = android.database.sqlite.SQLiteDatabase.openDatabase(
+            context.getDatabasePath("RKStorage").absolutePath, null,
+            android.database.sqlite.SQLiteDatabase.OPEN_READONLY
+        )
+        val value = db.rawQuery(
+            "SELECT value FROM catalystLocalStorage WHERE key = ?", arrayOf(ROTATION_SETTING_KEY)
+        ).use { c -> if (c.moveToFirst()) c.getString(0) else null }
+        db.close()
+        value?.toIntOrNull()?.takeIf { it in listOf(0, 90, 180, 270) } ?: ROTATION_AUTO
+    } catch (e: Exception) {
+        ROTATION_AUTO
+    }
+
+    private fun rotateJpeg(bytes: ByteArray, degrees: Int, quality: Int): ByteArray {
+        if (degrees % 360 == 0) return bytes
+        return try {
+            val source = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return bytes
+            val matrix = android.graphics.Matrix().apply { postRotate(degrees.toFloat()) }
+            val rotated = android.graphics.Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
+            val out = ByteArrayOutputStream()
+            rotated.compress(android.graphics.Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), out)
+            if (rotated !== source) rotated.recycle()
+            source.recycle()
+            out.toByteArray()
+        } catch (e: Throwable) {
+            // OutOfMemoryError included: an unrotated photo beats no photo
+            Log.w(TAG, "Rotation failed, serving the unrotated frame: ${e.message}")
+            bytes
+        }
     }
 
     /**

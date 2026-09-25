@@ -143,7 +143,8 @@
       "hintAlphanumeric": "Minimum 4 characters. Can include letters, numbers, and special characters.",
       "hintNumeric": "Numeric PIN: 4-6 digits (default: 1234)",
       "maxAttempts": "Max Attempts Before Lockout (15min)",
-      "maxAttemptsHint": "Number of incorrect password attempts allowed (1-100)"
+      "maxAttemptsHint": "Number of incorrect password attempts allowed (1-100)",
+      "notSetPlaceholder": "Not set: enter a PIN"
     },
     "inactivityReturn": {
       "title": "Inactivity Return",
@@ -172,10 +173,14 @@
     },
     "printing": {
       "title": "Printing",
-      "allow": "Allow Printing",
+      "allow": "Enable Window Printing",
       "allowHint": "Enable window.print() support for web pages (label printers, receipts, etc.)",
       "paperSize": "Default Paper Size",
-      "info": "Web pages can trigger the Android print dialog via window.print().\n\nIn Device Owner (kiosk) mode, the system print spooler is automatically whitelisted to allow the print dialog to appear.\n\nSupports WiFi, Bluetooth, USB printers, and Save as PDF."
+      "info": "Web pages can trigger the Android print dialog via window.print().\n\nIn Device Owner (kiosk) mode, the system print spooler is automatically whitelisted to allow the print dialog to appear.\n\nSupports WiFi, Bluetooth, USB printers, and Save as PDF.",
+      "windowTitle": "Window Printing",
+      "silentTitle": "Silent Printing",
+      "silentEnable": "Enable Silent Printing",
+      "silentEnableHint": "Let web pages print to a USB ESC/POS printer with no dialog, via window.FreeKiosk.silentPrinter"
     },
     "webNav": {
       "title": "Web Navigation Button",
@@ -192,7 +197,14 @@
       "title": "Background Apps",
       "info": "Optional: add apps to launch and keep running in the background while the kiosk WebView is displayed.\n\nExample: keep a music or audio receiver app alive alongside your web dashboard."
     },
-    "backToKiosk": "Back to Kiosk"
+    "backToKiosk": "Back to Kiosk",
+    "restartButton": {
+      "title": "Restart Button",
+      "enable": "Enable Restart Button",
+      "enableHint": "Show a grey button in the top-right corner. Long-press it to restart the WebView on the configured URL.",
+      "longPress": "Long-press Duration",
+      "longPressHint": "How long the button must be held before the WebView restarts."
+    }
   },
   "display": {
     "brightness": {
@@ -289,7 +301,10 @@
       "howItWorksTouch": "• Touch the screen to wake the device",
       "howItWorksMotion": "• Motion in front of the camera also wakes the screen",
       "howItWorksProximity": "• A hand close to the proximity sensor also wakes the screen",
-      "howItWorksBrightness": "• Normal brightness is restored automatically"
+      "howItWorksBrightness": "• Normal brightness is restored automatically",
+      "howItWorksDimOverApp": "• The screen dims over the external app, which stays open; the first tap wakes it",
+      "keepExternalApp": "Keep the app in front",
+      "keepExternalAppHint": "Dim over the external app instead of switching back to FreeKiosk, so it does not reload on wake. The first tap only wakes the screen. Motion and proximity wake are not available with this option."
     },
     "screenSchedule": {
       "title": "Screen Sleep Schedule",
@@ -751,7 +766,28 @@
       "allowControlHint": "Enable commands via MQTT (brightness, reload, etc.)",
       "motionAlwaysOn": "Always-on Motion Detection",
       "motionAlwaysOnHint": "Run camera-based motion detection continuously (higher battery usage). Without this, motion is only detected during screensaver.",
-      "haInfo": "Devices auto-discover in Home Assistant via MQTT Discovery. Ensure your HA MQTT integration is configured."
+      "haInfo": "Devices auto-discover in Home Assistant via MQTT Discovery. Ensure your HA MQTT integration is configured.",
+      "passwordNotSavedTitle": "Password not saved",
+      "passwordNotSavedMessage": "The MQTT password could not be written to secure storage on this device, so the broker will refuse the connection. This happens on firmwares whose Android Keystore is broken. The field is cleared so it does not show a password that was never stored.",
+      "discoveryReconnectMessage": "Home Assistant entities are published when connecting. Reconnect now to apply this change?",
+      "cameraPermissionTitle": "Camera Permission Required",
+      "cameraPermissionMessage": "FreeKiosk needs camera access to publish camera snapshots over MQTT.",
+      "publishScreenshot": "Publish Screenshot",
+      "publishScreenshotHint": "Expose the kiosk screen in Home Assistant as an image/camera entity, with a capture button. The screen is published to the broker, in clear text unless the port is 8883, and anyone who can read the topic can see it.",
+      "screenshotAuto": "Screenshot Auto-publish",
+      "screenshotAutoHint": "Publish a screenshot periodically. Can also be toggled from Home Assistant.",
+      "screenshotInterval": "Screenshot Interval (seconds)",
+      "screenshotQuality": "Screenshot JPEG Quality",
+      "screenshotMaxWidth": "Screenshot Max Width (px)",
+      "screenshotMaxWidthHint": "Downscale before publishing. 0 keeps the native resolution.",
+      "publishCamera": "Publish Camera Snapshots",
+      "publishCameraHint": "Expose each device camera in Home Assistant as an image/camera entity. Photos are published to the broker, in clear text unless the port is 8883, and anyone who can read the topic can see whoever is in front of the device. Snapshots fail while motion detection is using the camera.",
+      "cameraAuto": "Camera Auto-publish",
+      "cameraAutoHint": "Publish a snapshot periodically (higher battery usage). Can also be toggled from Home Assistant.",
+      "cameraInterval": "Camera Interval (seconds)",
+      "cameraQuality": "Camera JPEG Quality",
+      "intervalHint": "5-3600 seconds (only used when auto-publish is on)",
+      "jpegQualityHint": "1-100. Lower values mean smaller MQTT messages."
     },
     "wifiDialog": {
       "title": "Wi-Fi",
@@ -880,10 +916,25 @@
       "getReadOnly": "GET (Read-only)",
       "postControl": "POST (Control)",
       "postRemoteControl": "POST (Remote Control - Android TV)",
-      "getEndpoints": "/api/status - Full device status\n/api/battery - Battery info\n/api/brightness - Current brightness\n/api/screen - Screen state\n/api/info - Device info\n/api/health - Health check\n/api/sensors - Light, proximity, accelerometer\n/api/storage - Storage info\n/api/memory - RAM info\n/api/wifi - WiFi status\n/api/screenshot - Capture screen (PNG)",
+      "getEndpoints": "/api/status - Full device status\n/api/battery - Battery info\n/api/brightness - Current brightness\n/api/screen - Screen state\n/api/info - Device info\n/api/health - Health check\n/api/sensors - Light, proximity, accelerometer\n/api/storage - Storage info\n/api/memory - RAM info\n/api/wifi - WiFi status\n/api/screenshot - Capture screen (PNG)\n/api/camera/photo - Take a photo (JPEG)",
       "postEndpoints": "/api/brightness - Set brightness\n/api/screen/on - Turn screen on\n/api/screen/off - Turn screen off\n/api/screensaver/on - Enable screensaver\n/api/screensaver/off - Disable screensaver\n/api/reload - Reload WebView\n/api/url - Navigate to URL\n/api/wake - Wake from screensaver\n/api/tts - Text to speech\n/api/volume - Set volume\n/api/toast - Show toast message\n/api/js - Execute JavaScript\n/api/clearCache - Clear WebView cache\n/api/app/launch - Launch external app\n/api/reboot - Reboot (Device Owner)\n/api/audio/play - Play audio URL\n/api/audio/stop - Stop audio\n/api/audio/beep - Play beep sound",
       "postRemoteEndpoints": "/api/remote/up - D-pad up\n/api/remote/down - D-pad down\n/api/remote/left - D-pad left\n/api/remote/right - D-pad right\n/api/remote/select - Select/Enter\n/api/remote/back - Back button\n/api/remote/home - Home button\n/api/remote/menu - Menu button\n/api/remote/playpause - Play/Pause",
-      "haHint": "Use with Home Assistant's RESTful integration. See documentation for configuration examples."
+      "haHint": "Use with Home Assistant's RESTful integration. See documentation for configuration examples.",
+      "streamEndpoint": "/api/camera/stream - Live MJPEG stream",
+      "cameraPermissionTitle": "Camera Permission Required",
+      "cameraPermissionStream": "FreeKiosk needs camera access to serve a live stream.",
+      "cameraRotation": "Camera Rotation",
+      "cameraRotationHint": "Applies to camera photos (REST and MQTT) and the live stream. -1 derives it from the sensor. Use 0, 90, 180 or 270 if the picture comes out sideways. A request can override it with ?rotate=.",
+      "stream": "Live Camera Stream",
+      "streamHint": "Serve GET /api/camera/stream as MJPEG, for the MJPEG IP Camera integration in Home Assistant. A camera only accepts one client at a time: while someone is watching the stream, motion detection works from its frames instead. It keeps your sensitivity setting, but does not behave exactly like the usual detection.",
+      "streamBackCamera": "Use Back Camera",
+      "streamBackCameraHint": "Default camera for the stream. Overridable per request with ?camera=front|back.",
+      "streamFps": "Frames per Second",
+      "streamFpsHint": "1-30. Higher values cost CPU and bandwidth; 5-10 is plenty for monitoring.",
+      "streamQuality": "Stream JPEG Quality",
+      "streamQualityHint": "1-100. Lower values reduce bandwidth.",
+      "streamWidth": "Stream Max Width (px)",
+      "streamWidthHint": "Largest camera resolution to use, 160-3840."
     },
     "managedApps": {
       "error": "Error",
@@ -1095,7 +1146,7 @@
     },
     "permissionWizard": {
       "setupPermissions": "Set up permissions",
-      "managedModeBanner": "Managed mode (Device Owner). Permissions are granted automatically; you can finish right away.",
+      "managedModeBanner": "Managed mode (Device Owner). Runtime permissions are granted automatically, but \"Display over other apps\" and \"Usage access\" are not: Android gives no way for a Device Owner to grant those two itself, so they still need a tap each below.",
       "standardModeBanner": "Standard mode. Grant the permissions below to unlock every feature. Reboot, silent install and true screen-off need Managed mode (factory reset + provisioning QR).",
       "granted": "Granted",
       "grant": "Grant",
@@ -1144,7 +1195,10 @@
       "supportOnGithub": "Support us on GitHub",
       "tapHint": "Tip: Tap 5× anywhere on the screen to access settings",
       "footerVersion": "Version {{version}} • by Rushb",
-      "footerByRushb": "by Rushb"
+      "footerByRushb": "by Rushb",
+      "provisioningEnrolling": "Connecting to FreeKiosk Cloud… (attempt {{attempts}})",
+      "provisioningRetrying": "Cannot reach FreeKiosk Cloud yet. Retrying every 30 seconds (attempt {{attempts}}).",
+      "provisioningFailed": "Cloud enrollment failed: {{error}}. Enter a new token in Settings > Cloud."
     },
     "mediaPlayer": {
       "title": "Media Player",
@@ -1167,6 +1221,42 @@
     },
     "dashboardGrid": {
       "emptyText": "Configure your first tile in the Dashboard tab."
+    },
+    "escPos": {
+      "stateReady": "Ready",
+      "stateNoPrinter": "No printer detected",
+      "stateNoPermission": "Access not granted",
+      "statePaperOut": "Out of paper",
+      "stateError": "Error",
+      "errorNoPrinter": "No printer is attached. Check the cable and the USB adapter.",
+      "errorNoPermission": "Access to the printer has not been granted yet.",
+      "errorPaperOut": "The printer is out of paper.",
+      "errorOpenFailed": "The printer could not be opened. Another app may be holding it.",
+      "errorWriteFailed": "The printer stopped accepting data part-way through.",
+      "errorPageRender": "The page could not be rendered for printing.",
+      "unknownError": "Unknown error",
+      "accessDeniedTitle": "Access denied",
+      "accessDeniedMessage": "The printer cannot be used until access is granted.",
+      "testPageFailed": "Test page failed",
+      "commandSet": "Commands: {{commandSet}}",
+      "commandSetUnknown": "Command set not reported",
+      "noPaperLevel": "This printer does not report paper level.",
+      "refresh": "Refresh",
+      "grantAccess": "Grant access",
+      "widthDots": "Print width (dots)",
+      "widthDotsHint": "Printable width in dots (set according to the printer's specification)",
+      "feedLines": "Feed after printing",
+      "feedLinesHint": "Blank lines fed at the end of each print job",
+      "feedLinesValue_one": "{{count}} line",
+      "feedLinesValue_other": "{{count}} lines",
+      "cut": "Cut paper",
+      "cutHint": "Automatically cut after each print job (does not affect printers without cutters)",
+      "restrictOrigins": "Restrict printing by origin",
+      "restrictOriginsHint": "Only pages from the origins you list can use window.FreeKiosk.silentPrinter",
+      "noOrigins": "No origins allowed",
+      "noOriginsHint": "No page can print until you add one",
+      "printTestPage": "Print test page",
+      "info": "Web pages print silently by calling window.FreeKiosk.silentPrinter.print() or printImage(). print() lays the page out so one CSS pixel is one dot.\n\nwindow.print() is not affected: it opens the Android print dialog when Window Printing is enabled, and does nothing otherwise.\n\nFor access that survives reboots: plug the printer in, then choose FreeKiosk and tick \"Always open\". The button above only grants access until the printer is unplugged, and lock task mode suppresses that dialog entirely.\n\nPrinters exposing a vendor-specific USB interface instead of the standard printer class still print, but cannot report paper level."
     }
   },
   "screens": {
@@ -1248,7 +1338,7 @@
       "unableToVerifyApp": "Unable to verify app: {{error}}",
       "multiAppNeedsHomeScreen": "Multi App mode requires at least one app with \"Show on Home Screen\" enabled",
       "securityErrorTitle": "Security Error",
-      "urlNotAllowed": "This type of URL is not allowed. Use http:// or https://",
+      "urlNotAllowed": "This type of URL is not allowed. Use http://, https:// or file://",
       "urlUpdatedTitle": "URL Updated",
       "urlUpdatedMessage": "https:// added to your URL:\n\n{{url}}\n\nClick Save again to confirm.",
       "invalidUrlTitle": "Invalid URL",
@@ -1300,7 +1390,18 @@
         "display": "Display",
         "security": "Security",
         "advanced": "Advanced"
-      }
+      },
+      "pinRequiredTitle": "PIN required",
+      "pinRequiredMessage": "Set the PIN in General > Password before saving. It protects the way out of kiosk mode.",
+      "goToGeneral": "Go to General",
+      "configUpdatedTitle": "Configuration updated",
+      "configUpdatedMessage": "FreeKiosk Cloud pushed a new configuration while this screen was open, so the values shown here are out of date.",
+      "keepMyEdits": "Keep my edits",
+      "reloadConfig": "Reload",
+      "fileAccessOffTitle": "File access is off",
+      "fileAccessOffMessage": "To open a local file, turn on General > PDF Viewer > Inline PDF Viewer first. That setting is what gives the browser access to files on the device.",
+      "passwordNotSavedTitle": "Password not saved",
+      "basicAuthNotSavedMessage": "The HTTP Basic Auth password could not be written to secure storage on this device. Every other setting on this screen was saved. This happens on firmwares whose Android Keystore is broken."
     }
   }
 }

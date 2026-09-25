@@ -14,8 +14,39 @@ class MqttDiscovery(
     private val deviceName: String?
 ) {
 
+    companion object {
+        private const val STREAM_SCREENSHOT = MqttImagePublisher.STREAM_SCREENSHOT
+        private const val STREAM_CAMERA_PREFIX = MqttImagePublisher.STREAM_CAMERA
+        private const val MIN_IMAGE_INTERVAL = MqttImagePublisher.MIN_INTERVAL_SECONDS
+        private const val MAX_IMAGE_INTERVAL = MqttImagePublisher.MAX_INTERVAL_SECONDS
+    }
+
     private val stateTopic = "$baseTopic/$topicId/state"
     private val availabilityTopic = "$baseTopic/$topicId/availability"
+
+    /**
+     * An image stream advertised to Home Assistant as an `image` + a `camera` entity,
+     * plus a button to capture on demand.
+     *
+     * @param objectId     stable id, e.g. "screenshot" or "camera_front"
+     * @param name         friendly entity name
+     * @param imageTopic   topic carrying the raw JPEG payload
+     * @param commandTopic topic used by the capture button
+     * @param icon         mdi icon
+     */
+    data class ImageStream(
+        val objectId: String,
+        val name: String,
+        val imageTopic: String,
+        val commandTopic: String,
+        val icon: String
+    )
+
+    /**
+     * Image streams to advertise. Set by MqttModule from the user settings and the cameras
+     * actually present on the device; empty when image publishing is disabled.
+     */
+    var imageStreams: List<ImageStream> = emptyList()
 
     private fun buildDeviceBlock(localIp: String): JSONObject {
         val displayName = deviceName?.takeIf { it.isNotBlank() } ?: "FreeKiosk $topicId"
@@ -34,14 +65,24 @@ class MqttDiscovery(
         return "$discoveryPrefix/$component/freekiosk_$deviceId/$objectId/config"
     }
 
-    private fun baseConfig(objectId: String, name: String, localIp: String): JSONObject {
+    /**
+     * Common config keys shared by every entity. Kept separate from [baseConfig] because the
+     * `image` and `camera` MQTT platforms do not accept `state_topic` — Home Assistant rejects
+     * the whole discovery payload when an unsupported key is present.
+     */
+    private fun commonConfig(objectId: String, name: String, localIp: String): JSONObject {
         return JSONObject().apply {
             put("unique_id", "freekiosk_${deviceId}_$objectId")
             put("object_id", "freekiosk_${deviceId}_$objectId")
             put("name", name)
-            put("state_topic", stateTopic)
             put("availability_topic", availabilityTopic)
             put("device", buildDeviceBlock(localIp))
+        }
+    }
+
+    private fun baseConfig(objectId: String, name: String, localIp: String): JSONObject {
+        return commonConfig(objectId, name, localIp).apply {
+            put("state_topic", stateTopic)
         }
     }
 
@@ -54,6 +95,7 @@ class MqttDiscovery(
         configs.addAll(buildSwitchConfigs(localIp))
         configs.addAll(buildButtonConfigs(localIp))
         configs.addAll(buildTextConfigs(localIp))
+        configs.addAll(buildImageConfigs(localIp))
 
         return configs
     }
@@ -156,7 +198,7 @@ class MqttDiscovery(
             val icon: String
         )
 
-        val numbers = listOf(
+        val numbers = mutableListOf(
             NumberDef(
                 "brightness_control", "Brightness Control",
                 "$baseTopic/$topicId/set/brightness",
@@ -170,6 +212,28 @@ class MqttDiscovery(
                 0, 100, 1, "%", "mdi:volume-high"
             )
         )
+
+        // Auto-publish interval for the enabled image streams
+        if (hasScreenshotStream()) {
+            numbers.add(
+                NumberDef(
+                    "${STREAM_SCREENSHOT}_interval", "Screenshot Interval",
+                    "$baseTopic/$topicId/set/${STREAM_SCREENSHOT}_interval",
+                    "{{ value_json.images.screenshotInterval }}",
+                    MIN_IMAGE_INTERVAL, MAX_IMAGE_INTERVAL, 5, "s", "mdi:timer-outline"
+                )
+            )
+        }
+        if (hasCameraStream()) {
+            numbers.add(
+                NumberDef(
+                    "camera_interval", "Camera Interval",
+                    "$baseTopic/$topicId/set/camera_interval",
+                    "{{ value_json.images.cameraInterval }}",
+                    MIN_IMAGE_INTERVAL, MAX_IMAGE_INTERVAL, 5, "s", "mdi:timer-outline"
+                )
+            )
+        }
 
         return numbers.map { number ->
             val config = baseConfig(number.objectId, number.name, localIp).apply {
@@ -194,7 +258,7 @@ class MqttDiscovery(
             val icon: String
         )
 
-        val switches = listOf(
+        val switches = mutableListOf(
             SwitchDef(
                 "screen_power", "Screen Power",
                 "$baseTopic/$topicId/set/screen",
@@ -214,6 +278,28 @@ class MqttDiscovery(
                 "mdi:motion-sensor"
             )
         )
+
+        // Periodic publishing toggles for the enabled image streams
+        if (hasScreenshotStream()) {
+            switches.add(
+                SwitchDef(
+                    "${STREAM_SCREENSHOT}_auto", "Screenshot Auto-publish",
+                    "$baseTopic/$topicId/set/${STREAM_SCREENSHOT}_auto",
+                    "{% if value_json.images.screenshotAuto %}ON{% else %}OFF{% endif %}",
+                    "mdi:image-refresh"
+                )
+            )
+        }
+        if (hasCameraStream()) {
+            switches.add(
+                SwitchDef(
+                    "camera_auto", "Camera Auto-publish",
+                    "$baseTopic/$topicId/set/camera_auto",
+                    "{% if value_json.images.cameraAuto %}ON{% else %}OFF{% endif %}",
+                    "mdi:camera-retake"
+                )
+            )
+        }
 
         return switches.map { switch ->
             val config = baseConfig(switch.objectId, switch.name, localIp).apply {
@@ -291,6 +377,106 @@ class MqttDiscovery(
                 put("icon", text.icon)
             }
             Pair(discoveryTopic("text", text.objectId), config)
+        }
+    }
+
+    /**
+     * Build the configs for every advertised image stream: an `image` entity, a `camera` entity
+     * (both fed by the same raw JPEG topic) and a button to capture on demand.
+     */
+    private fun buildImageConfigs(localIp: String): List<Pair<String, JSONObject>> {
+        val configs = mutableListOf<Pair<String, JSONObject>>()
+
+        for (stream in imageStreams) {
+            val imageObjectId = "${stream.objectId}_image"
+            val imageConfig = commonConfig(imageObjectId, stream.name, localIp).apply {
+                put("image_topic", stream.imageTopic)
+                put("content_type", "image/jpeg")
+                put("icon", stream.icon)
+            }
+            configs.add(Pair(discoveryTopic("image", imageObjectId), imageConfig))
+
+            // Same payload exposed as a camera entity, for picture-glance/picture-entity cards
+            val cameraObjectId = "${stream.objectId}_cam"
+            val cameraConfig = commonConfig(cameraObjectId, "${stream.name} Camera", localIp).apply {
+                put("topic", stream.imageTopic)
+                put("icon", stream.icon)
+            }
+            configs.add(Pair(discoveryTopic("camera", cameraObjectId), cameraConfig))
+
+            val buttonObjectId = "${stream.objectId}_capture"
+            val buttonConfig = baseConfig(buttonObjectId, "${stream.name} Capture", localIp).apply {
+                put("command_topic", stream.commandTopic)
+                put("payload_press", "PRESS")
+                put("icon", "mdi:camera-iris")
+            }
+            configs.add(Pair(discoveryTopic("button", buttonObjectId), buttonConfig))
+        }
+
+        return configs
+    }
+
+    private fun hasScreenshotStream(): Boolean =
+        imageStreams.any { it.objectId == STREAM_SCREENSHOT }
+
+    private fun hasCameraStream(): Boolean =
+        imageStreams.any { it.objectId.startsWith(STREAM_CAMERA_PREFIX) }
+
+    /**
+     * Every (component, objectId) pair the image feature can publish, whether currently
+     * advertised or not. Used to compute discovery removals.
+     */
+    private fun allImageEntities(): List<Pair<String, String>> {
+        val perStream = listOf(STREAM_SCREENSHOT, "camera_front", "camera_back").flatMap { stream ->
+            listOf(
+                "image" to "${stream}_image",
+                "camera" to "${stream}_cam",
+                "button" to "${stream}_capture"
+            )
+        }
+        return perStream + listOf(
+            "switch" to "${STREAM_SCREENSHOT}_auto",
+            "number" to "${STREAM_SCREENSHOT}_interval",
+            "switch" to "camera_auto",
+            "number" to "camera_interval"
+        )
+    }
+
+    /** Discovery topics of the image entities currently advertised. */
+    private fun advertisedImageTopics(): Set<String> {
+        val topics = mutableSetOf<String>()
+        for (stream in imageStreams) {
+            topics.add(discoveryTopic("image", "${stream.objectId}_image"))
+            topics.add(discoveryTopic("camera", "${stream.objectId}_cam"))
+            topics.add(discoveryTopic("button", "${stream.objectId}_capture"))
+        }
+        if (hasScreenshotStream()) {
+            topics.add(discoveryTopic("switch", "${STREAM_SCREENSHOT}_auto"))
+            topics.add(discoveryTopic("number", "${STREAM_SCREENSHOT}_interval"))
+        }
+        if (hasCameraStream()) {
+            topics.add(discoveryTopic("switch", "camera_auto"))
+            topics.add(discoveryTopic("number", "camera_interval"))
+        }
+        return topics
+    }
+
+    /**
+     * Publish an empty retained payload on the discovery topics of the image entities that are
+     * not currently advertised, which makes Home Assistant delete them.
+     */
+    fun publishImageDiscoveryRemovals(client: KioskMqttClient) {
+        val advertised = advertisedImageTopics()
+        var removed = 0
+        for ((component, objectId) in allImageEntities()) {
+            val topic = discoveryTopic(component, objectId)
+            if (topic !in advertised) {
+                client.publish(topic, "", qos = 1, retained = true)
+                removed++
+            }
+        }
+        if (removed > 0) {
+            Log.d("MqttDiscovery", "Published $removed image discovery removals")
         }
     }
 }

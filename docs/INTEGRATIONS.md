@@ -2,7 +2,7 @@
 
 **Connect FreeKiosk to your automation stack**
 
-[Docs Home](README) • [REST API](REST-API) • [MQTT](MQTT)
+[Docs Home](README.md) • [REST API](rest-api.md) • [MQTT](MQTT.md)
 
 
 > [!IMPORTANT]
@@ -23,8 +23,8 @@ FreeKiosk offers two main integration methods:
 
 | Channel | Best For | Documentation |
 |---------|----------|---------------|
-| **REST API** | On-demand control via HTTP | [REST API Docs](REST-API) |
-| **MQTT** | Real-time telemetry + Home Assistant | [MQTT Docs](MQTT) |
+| **REST API** | On-demand control via HTTP | [REST API Docs](rest-api.md) |
+| **MQTT** | Real-time telemetry + Home Assistant | [MQTT Docs](MQTT.md) |
 
 ### Feature Comparison
 
@@ -70,10 +70,42 @@ curl -X POST -H "X-Api-Key: your-key" \
 
 # Take screenshot
 curl -H "X-Api-Key: your-key" http://tablet-ip:8080/api/screenshot -o screenshot.png
+
+# Watch the live camera stream (enable it first in Settings > Advanced > REST API)
+ffplay "http://tablet-ip:8080/api/camera/stream?camera=front&fps=10"
 ```
 
 > [!TIP]
-> See the complete [REST API Reference](REST-API) for all endpoints.
+> See the complete [REST API Reference](rest-api.md) for all endpoints.
+
+### Using the Tablet as a Camera
+
+A wall-mounted tablet is often the only device already installed in a room. With **Live Camera Stream** enabled, its camera shows up in Home Assistant through the *MJPEG IP Camera* integration:
+
+
+
+| Field | Value |
+|---|---|
+| **MJPEG URL** | `http://TABLET_IP:8080/api/camera/stream?camera=front&fps=10` |
+| **Still image URL** | `http://TABLET_IP:8080/api/camera/photo?camera=front` |
+| **Username / Password** | anything / your API key, if one is set |
+
+
+
+```yaml
+# Or in configuration.yaml
+camera:
+  - platform: mjpeg
+    name: Lobby Kiosk
+    mjpeg_url: http://TABLET_IP:8080/api/camera/stream?camera=front&fps=10
+    still_image_url: http://TABLET_IP:8080/api/camera/photo?camera=front
+```
+
+> [!NOTE]
+> Wake-on-motion keeps working while the stream runs: a camera accepts a single client, so movement is measured on the stream's own frames instead. Nothing to configure, and the sensitivity you chose still applies. The only difference in practice is that a colour change at constant brightness goes unnoticed, since only the luma plane is compared.
+
+> [!TIP]
+> MJPEG is not free: budget ~5 Mbit/s and about two thirds of a CPU core at 1280×960, quality 60, 10 fps. For plain monitoring, 5 fps and quality 50 look nearly identical for half the cost. For still images only, the [MQTT camera entities](MQTT.md#-images-screenshot--camera) are far cheaper.
 
 
 ## MQTT
@@ -115,7 +147,7 @@ freekiosk/lobby/set/url              # Navigate to URL
 ```
 
 > [!TIP]
-> See the complete [MQTT Reference](MQTT) for topics and commands.
+> See the complete [MQTT Reference](MQTT.md) for topics and commands.
 
 
 ## Headless Setup
@@ -172,7 +204,7 @@ adb shell am start -n com.freekiosk/.MainActivity \
 ```
 
 > [!NOTE]
-> See the complete [ADB Configuration Guide](ADB-Configuration) for all parameters.
+> See the complete [ADB Configuration Guide](adb-configuration.md) for all parameters.
 
 
 ## Choosing Your Integration
@@ -201,8 +233,8 @@ Use both for maximum flexibility:
 
 ## Related Documentation
 
-- **REST API:** [Complete endpoint reference](REST-API)
-- **MQTT:** [Topics, discovery, and commands](MQTT)
-- **ADB Configuration:** [Headless provisioning](ADB-Configuration)
-- **Installation:** [Device setup guide](Installation)
-- **FAQ:** [Common questions](FAQ)
+- **REST API:** [Complete endpoint reference](rest-api.md)
+- **MQTT:** [Topics, discovery, and commands](MQTT.md)
+- **ADB Configuration:** [Headless provisioning](adb-configuration.md)
+- **Installation:** [Device setup guide](installation.md)
+- **FAQ:** [Common questions](faq.md)

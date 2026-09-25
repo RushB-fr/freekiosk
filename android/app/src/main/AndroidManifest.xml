@@ -42,6 +42,11 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
+    <!-- #242: persist the requested brightness to Settings.System.SCREEN_BRIGHTNESS so it
+         survives a wake and a reboot. Only needed without Device Owner, which writes the
+         same setting through DevicePolicyManager.setSystemSetting() and no permission.
+         Play-sensitive: removed in Play Store builds via the src/playstore overlay. -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
 
     <!-- Declare camera and audio as optional features -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
@@ -50,6 +55,9 @@
 
     <!-- Permissions pour la Status Bar -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+  <!-- Cellular generation (5G/4G) and signal strength for the status bar and the
+       cloud dashboard. Stripped from Play Store builds by src/playstore. -->
+  <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
@@ -133,6 +141,23 @@
             <category android:name="android.intent.category.HOME" />
             <category android:name="android.intent.category.DEFAULT" />
         </intent-filter>
+      </activity>
+
+      <!-- USB printer. Declaring this filter is what lets Android offer "always open for
+           this device", the only USB grant that survives an unplug or a reboot. -->
+      <activity
+        android:name="com.freekiosk.printing.UsbPrinterAttachActivity"
+        android:exported="true"
+        android:excludeFromRecents="true"
+        android:noHistory="true"
+        android:taskAffinity=""
+        android:theme="@android:style/Theme.NoDisplay">
+        <intent-filter>
+          <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
+        </intent-filter>
+        <meta-data
+          android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+          android:resource="@xml/usb_printer_filter" />
       </activity>
 
       <!-- Device Admin Receiver pour le mode kiosk -->

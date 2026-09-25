@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.location.Location
 import android.location.LocationManager
-import android.graphics.Bitmap
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -38,18 +37,17 @@ import android.widget.Toast
 import com.facebook.react.bridge.*
 import com.facebook.react.bridge.UiThreadUtil
 import com.facebook.react.modules.core.DeviceEventManagerModule
-import com.facebook.react.common.LifecycleState
 import android.accessibilityservice.AccessibilityService
 import android.os.Build
 import com.freekiosk.DeviceAdminReceiver
-import com.freekiosk.KioskModule
 import com.freekiosk.MainActivity
 import com.freekiosk.CameraPhotoModule
+import com.freekiosk.camera.CameraStreamManager
 import com.freekiosk.FreeKioskAccessibilityService
+import com.freekiosk.ScreenCapture
 import com.freekiosk.ScreenController
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.Locale
@@ -63,6 +61,12 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     companion object {
         private const val TAG = "HttpServerModule"
         private const val NAME = "HttpServerModule"
+
+        /**
+         * Time given to MotionDetector to release the camera before a stream opens it.
+         * Measured on a Xiaomi tablet: unmounting the CameraView takes a few hundred ms.
+         */
+        private const val MOTION_RELEASE_WAIT_MS = 1200L
 
         /**
          * Commands the `when` in handleCommand() finishes on its own, with no help from
@@ -81,14 +85,6 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             "remoteKey", "keyboardKey", "keyboardCombo", "keyboardText",
             "getLocation", "cameraList", "getAutoBrightness",
         )
-
-        // #229: time the window manager needs to drop the secure flag from every layer
-        // after the Device Owner screen-capture policy is lifted.
-        private const val POLICY_SETTLE_MS = 300L
-
-        // #229: if the first capture still comes back black, the flag had not propagated
-        // to every layer yet, so wait this much longer and retake once.
-        private const val POLICY_SETTLE_RETRY_MS = 700L
     }
 
     private var server: KioskHttpServer? = null
@@ -104,6 +100,8 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     private var jsLoading: Boolean = false
     private var jsBrightness: Int = 50
     private var jsScreensaverActive: Boolean = false
+    private var jsMotionAlwaysOn: Boolean = false
+    private var jsMotionSensitivity: String = "medium"
     private var jsKioskMode: Boolean = false
     private var jsRotationEnabled: Boolean = false
     private var jsRotationUrls: List<String> = emptyList()
@@ -137,17 +135,8 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     
     // Camera
     private var cameraPhotoModule: CameraPhotoModule? = null
+    private var cameraStreamManager: CameraStreamManager? = null
     
-    // #229: why the last screenshot attempt failed, surfaced to the REST client and the
-    // cloud command result instead of a bare "not available".
-    @Volatile
-    private var lastScreenshotError: String? = null
-
-    // Serializes captures: the two channels (REST + cloud) can fire at once, and the
-    // accessibility path toggles a device-wide policy that must not be restored while
-    // another capture is still running.
-    private val screenshotLock = Any()
-
     // Text-to-Speech
     private var tts: TextToSpeech? = null
     private var ttsReady: Boolean = false
@@ -279,6 +268,29 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 cameraPhotoModule = CameraPhotoModule(reactContext.applicationContext)
             }
 
+            // Initialize the MJPEG stream manager and wire the camera arbitration:
+            // motion detection holds the camera through vision-camera, so it must release it
+            // before we can open a streaming session (and resume once the last viewer left).
+            val streamManager = cameraStreamManager ?: CameraStreamManager(reactContext.applicationContext).also {
+                cameraStreamManager = it
+            }
+            streamManager.prepareCamera = {
+                emitCameraStreamState(true)
+                // Give MotionDetector time to unmount its CameraView. Only worth waiting when
+                // motion detection can actually be running.
+                if (jsMotionActive()) MOTION_RELEASE_WAIT_MS else 0L
+            }
+            streamManager.releaseCamera = { emitCameraStreamState(false) }
+            // While a stream holds the camera, motion is derived from its own frames: the
+            // regular detector cannot open the sensor at the same time.
+            streamManager.motionThreshold = motionThresholdForSensitivity()
+            // Reported unconditionally: whether movement should wake the screen depends on
+            // settings and screensaver state that JS already arbitrates for the regular
+            // detector. Duplicating that decision here would drift out of sync.
+            streamManager.onMotionDetected = {
+                sendEvent("onCameraStreamMotion", Arguments.createMap())
+            }
+
             server = KioskHttpServer(
                 port = port,
                 apiKey = if (apiKey.isNullOrEmpty()) null else apiKey,
@@ -286,8 +298,18 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 statusProvider = { getDeviceStatus() },
                 commandHandler = { command, params -> handleCommand(command, params) },
                 screenshotProvider = { captureScreenshot() },
-                screenshotErrorProvider = { lastScreenshotError },
-                cameraPhotoProvider = { camera, quality -> cameraPhotoModule?.capturePhoto(camera, quality) }
+                screenshotErrorProvider = { ScreenCapture.lastError },
+                cameraPhotoProvider = { camera, quality, rotation -> cameraPhotoModule?.capturePhoto(camera, quality, rotation) },
+                cameraStreamProvider = { params -> streamManager.openClient(params) },
+                cameraStreamDefaults = {
+                    CameraStreamManager.StreamParams(
+                        facing = streamManager.defaultFacing,
+                        fps = streamManager.defaultFps,
+                        quality = streamManager.defaultQuality,
+                        maxWidth = streamManager.defaultWidth,
+                        rotate = streamManager.defaultRotate
+                    )
+                }
             )
 
             server?.start()
@@ -310,6 +332,8 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     @ReactMethod
     fun stopServer(promise: Promise) {
         try {
+            // Drop viewers first so the camera is released before the server goes away
+            cameraStreamManager?.stopAll()
             server?.stop()
             server = null
             releaseServerLocks()
@@ -1110,6 +1134,35 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             .emit(eventName, params)
     }
 
+    // ==================== Camera stream arbitration ====================
+
+    /**
+     * Whether motion detection may currently be holding the camera: it runs continuously in
+     * always-on mode, and during the screensaver otherwise.
+     */
+    private fun jsMotionActive(): Boolean = jsMotionAlwaysOn || jsScreensaverActive
+
+    /**
+     * Same thresholds as MotionDetector on the JS side, so switching between the two detection
+     * paths does not change how sensitive the kiosk feels.
+     */
+    private fun motionThresholdForSensitivity(): Double = when (jsMotionSensitivity) {
+        "low" -> 0.15
+        "high" -> 0.04
+        else -> 0.08
+    }
+
+    /**
+     * Tell JS that a camera stream started or stopped, so MotionDetector can release the
+     * camera and pick it up again afterwards.
+     */
+    private fun emitCameraStreamState(streaming: Boolean) {
+        Log.i(TAG, "Camera stream state: streaming=$streaming")
+        sendEvent("onCameraStreamState", Arguments.createMap().apply {
+            putBoolean("streaming", streaming)
+        })
+    }
+
     /**
      * #209: Bring FreeKiosk's MainActivity to the foreground from native code. Used when a
      * REST/MQTT setMode switches away from an external app while the JS thread is frozen in
@@ -1151,6 +1204,62 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
 
     // ==================== JS Interface for Status Updates ====================
 
+    /**
+     * Whether a camera stream is currently running. JS state is lost whenever the kiosk screen
+     * remounts, so it must be able to ask the native side for the truth — otherwise motion
+     * detection restarts and steals the camera from a live stream.
+     */
+    /**
+     * Apply the live stream settings. Streaming stays refused until this is called with
+     * `enabled: true`, so the endpoint is opt-in like the rest of the camera features.
+     * Disabling it also drops any viewer currently connected.
+     */
+    @ReactMethod
+    fun updateCameraStreamSettings(configMap: ReadableMap, promise: Promise) {
+        try {
+            val manager = cameraStreamManager
+            if (manager == null) {
+                promise.resolve(false)
+                return
+            }
+
+            val enabled = if (configMap.hasKey("enabled")) configMap.getBoolean("enabled") else false
+            val wasEnabled = manager.enabled
+            manager.enabled = enabled
+            if (configMap.hasKey("camera")) {
+                manager.defaultFacing = configMap.getString("camera") ?: "front"
+            }
+            if (configMap.hasKey("fps")) manager.defaultFps = configMap.getInt("fps")
+            if (configMap.hasKey("quality")) manager.defaultQuality = configMap.getInt("quality")
+            if (configMap.hasKey("width")) manager.defaultWidth = configMap.getInt("width")
+            if (configMap.hasKey("rotate")) {
+                val rotate = configMap.getInt("rotate")
+                manager.defaultRotate = if (rotate < 0) null else rotate
+            }
+
+            if (wasEnabled && !enabled) {
+                Log.i(TAG, "Camera streaming disabled, dropping viewers")
+                manager.stopAll()
+            }
+
+            Log.i(
+                TAG,
+                "Camera stream settings: enabled=$enabled, camera=${manager.defaultFacing}, " +
+                    "fps=${manager.defaultFps}, quality=${manager.defaultQuality}, " +
+                    "width=${manager.defaultWidth}, rotate=${manager.defaultRotate ?: "auto"}"
+            )
+            promise.resolve(true)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to update camera stream settings", e)
+            promise.reject("UPDATE_ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun isCameraStreaming(promise: Promise) {
+        promise.resolve(cameraStreamManager?.isStreaming == true)
+    }
+
     @ReactMethod
     fun updateStatus(statusJson: String) {
         // Parse status from JS and update local variables
@@ -1173,6 +1282,13 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             if (status.has("autoBrightnessEnabled")) jsAutoBrightnessEnabled = status.getBoolean("autoBrightnessEnabled")
             if (status.has("autoBrightnessMin")) jsAutoBrightnessMin = status.getInt("autoBrightnessMin")
             if (status.has("autoBrightnessMax")) jsAutoBrightnessMax = status.getInt("autoBrightnessMax")
+            // Tells the stream manager whether motion detection may be holding the camera,
+            // and how sensitive the stream-based detection should be
+            if (status.has("motionAlwaysOn")) jsMotionAlwaysOn = status.getBoolean("motionAlwaysOn")
+            if (status.has("motionSensitivity")) {
+                jsMotionSensitivity = status.getString("motionSensitivity")
+                cameraStreamManager?.motionThreshold = motionThresholdForSensitivity()
+            }
             Log.d(TAG, "Status updated: url=$jsCurrentUrl, screensaver=$jsScreensaverActive, rotation=$jsRotationEnabled, autoBrightness=$jsAutoBrightnessEnabled")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse status update from JS", e)
@@ -2002,239 +2118,16 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     // ==================== Screenshot Method ====================
 
     /**
-     * Capture the current screen.
+     * Screenshot for `GET /api/screenshot` and the cloud `screenshot` command.
      *
-     * Two capture paths, because neither one covers every case (#229):
-     *
-     * - PixelCopy on our own Activity window. Cheap, not rate-limited, and immune to the
-     *   Device Owner screen-capture policy, but it only works while FreeKiosk is on
-     *   screen. In multi-app mode the external app runs in its own task, our Activity is
-     *   stopped and its ViewRootImpl surface released, so PixelCopy throws
-     *   "Window doesn't have a backing surface!" (and would capture an empty FreeKiosk
-     *   window even if it didn't).
-     * - AccessibilityService.takeScreenshot(). Captures the real display whatever app is
-     *   in front, needs API 30+ and the accessibility service enabled, and is blacked out
-     *   by the Device Owner screen-capture policy unless we lift it around the capture.
-     *
-     * So: PixelCopy while we are in the foreground, accessibility otherwise, each one
-     * falling back to the other.
+     * The two capture paths (#229) and the Device Owner policy handling now live in
+     * [ScreenCapture], shared with the MQTT image publisher. PNG at quality 90 and no
+     * downscale keeps this endpoint byte-identical to what it returned before the move.
+     * Called from a NanoHTTPD worker thread, never from the main thread.
      */
-    private fun captureScreenshot(): java.io.InputStream? = synchronized(screenshotLock) {
-        lastScreenshotError = null
-        val foreground = reactContext.lifecycleState == LifecycleState.RESUMED
-
-        if (foreground) {
-            capturePixelCopy()?.let { return it }
-            captureViaAccessibility()?.let { return it }
-        } else {
-            captureViaAccessibility()?.let { return it }
-            // Keep the accessibility reason: it names what to fix (policy, service not
-            // enabled, Android version), whereas PixelCopy's fallback failure would just
-            // overwrite it with "window is not on screen", which is the situation, not the
-            // cause.
-            val accessibilityError = lastScreenshotError
-            capturePixelCopy()?.let { return it }
-            if (accessibilityError != null) {
-                lastScreenshotError = accessibilityError
-            }
-        }
-
-        if (lastScreenshotError == null) {
-            lastScreenshotError = "Screenshot capture failed"
-        }
-        Log.e(TAG, "Screenshot unavailable (foreground=$foreground): $lastScreenshotError")
-        return null
-    }
-
-    /**
-     * PixelCopy on the FreeKiosk Activity window. Captures hardware-accelerated layers
-     * (WebView, video, SurfaceView) correctly, unlike the deprecated drawingCache which
-     * rendered them black.
-     */
-    private fun capturePixelCopy(): java.io.InputStream? {
-        return try {
-            var screenshot: ByteArrayInputStream? = null
-            val latch = java.util.concurrent.CountDownLatch(1)
-
-            UiThreadUtil.runOnUiThread {
-                try {
-                    val activity = reactContext.currentActivity
-                    val window = activity?.window
-                    val decorView = window?.decorView
-
-                    if (window != null && decorView != null &&
-                        decorView.width > 0 && decorView.height > 0
-                    ) {
-                        // PixelCopy is asynchronous, so the latch is released from the copy
-                        // callback (and from every early-out path).
-                        val bitmap = Bitmap.createBitmap(
-                            decorView.width,
-                            decorView.height,
-                            Bitmap.Config.ARGB_8888,
-                        )
-                        val copyThread = android.os.HandlerThread("ScreenshotPixelCopy").apply { start() }
-                        val copyHandler = android.os.Handler(copyThread.looper)
-                        android.view.PixelCopy.request(
-                            window,
-                            bitmap,
-                            { copyResult ->
-                                try {
-                                    if (copyResult == android.view.PixelCopy.SUCCESS) {
-                                        val outputStream = ByteArrayOutputStream()
-                                        bitmap.compress(Bitmap.CompressFormat.PNG, 90, outputStream)
-                                        screenshot = ByteArrayInputStream(outputStream.toByteArray())
-                                    } else {
-                                        lastScreenshotError = "PixelCopy failed (result $copyResult)"
-                                        Log.e(TAG, "PixelCopy failed with result: $copyResult")
-                                    }
-                                } catch (e: Exception) {
-                                    lastScreenshotError = "Failed to encode screenshot: ${e.message}"
-                                    Log.e(TAG, "Failed to encode screenshot bitmap", e)
-                                } finally {
-                                    bitmap.recycle()
-                                    copyThread.quitSafely()
-                                    latch.countDown()
-                                }
-                            },
-                            copyHandler,
-                        )
-                    } else {
-                        lastScreenshotError = "FreeKiosk window is not on screen"
-                        Log.e(TAG, "Cannot capture screenshot: no valid window/decorView")
-                        latch.countDown()
-                    }
-                } catch (e: Exception) {
-                    // IllegalArgumentException("Window doesn't have a backing surface!") when
-                    // our Activity is stopped behind an external app (multi-app mode, #229).
-                    lastScreenshotError = "FreeKiosk window is not on screen (${e.message})"
-                    Log.e(TAG, "Failed to capture screenshot on UI thread", e)
-                    latch.countDown()
-                }
-            }
-
-            // Wait for UI thread to complete (max 5 seconds)
-            latch.await(5, java.util.concurrent.TimeUnit.SECONDS)
-            screenshot
-        } catch (e: Exception) {
-            lastScreenshotError = "Screenshot capture error: ${e.message}"
-            Log.e(TAG, "Failed to capture screenshot", e)
-            null
-        }
-    }
-
-    /**
-     * #229: full-display capture through the accessibility service, the only path that
-     * sees an external app launched in multi-app mode.
-     *
-     * In Device Owner kiosk mode the screen-capture policy set by startLockTask (#172)
-     * blacks out every layer, so it is lifted for the duration of the capture and restored
-     * in the finally block. That brief window is opt-in via the "Allow remote screenshots"
-     * setting, since it also re-enables the Power+Volume Down combo for those few hundred
-     * milliseconds.
-     */
-    private fun captureViaAccessibility(): java.io.InputStream? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            lastScreenshotError = "Full-screen capture requires Android 11+"
-            return null
-        }
-        if (!FreeKioskAccessibilityService.isRunning()) {
-            lastScreenshotError = "Accessibility service is not enabled (required to capture another app)"
-            return null
-        }
-        if (!FreeKioskAccessibilityService.canTakeScreenshot()) {
-            lastScreenshotError = "Accessibility service is enabled but has no screenshot capability: " +
-                "disable and re-enable FreeKiosk in Android accessibility settings"
-            return null
-        }
-
-        var policyLifted = false
-        return try {
-            if (KioskModule.isScreenCapturePolicyBlocked(reactContext)) {
-                if (!isRemoteScreenshotAllowed()) {
-                    lastScreenshotError = "Screen capture is blocked by the Device Owner policy: " +
-                        "enable 'Allow remote screenshots' in Security settings"
-                    return null
-                }
-                policyLifted = KioskModule.setScreenCapturePolicyBlocked(reactContext, false)
-                if (policyLifted) {
-                    // The window manager needs a beat to drop the secure flag from the
-                    // layers, otherwise the capture still comes back black.
-                    Thread.sleep(POLICY_SETTLE_MS)
-                }
-            }
-
-            var bitmap = FreeKioskAccessibilityService.captureScreen()
-            if (bitmap != null && policyLifted && isBlankFrame(bitmap)) {
-                // POLICY_SETTLE_MS is a best guess at how long the window manager needs to
-                // drop the secure flag; an all-black frame says it was not enough on this
-                // device, so the wait extends itself rather than returning a black PNG.
-                Log.w(TAG, "Screenshot came back black after lifting the capture policy, retrying")
-                bitmap.recycle()
-                Thread.sleep(POLICY_SETTLE_RETRY_MS)
-                bitmap = FreeKioskAccessibilityService.captureScreen()
-            }
-            if (bitmap == null) {
-                lastScreenshotError = "Accessibility screenshot failed (see logcat)"
-                return null
-            }
-            val outputStream = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.PNG, 90, outputStream)
-            bitmap.recycle()
-            ByteArrayInputStream(outputStream.toByteArray())
-        } catch (e: Exception) {
-            lastScreenshotError = "Accessibility screenshot error: ${e.message}"
-            Log.e(TAG, "Failed to capture screenshot via accessibility service", e)
-            null
-        } finally {
-            if (policyLifted) {
-                KioskModule.setScreenCapturePolicyBlocked(reactContext, true)
-            }
-        }
-    }
-
-    /**
-     * #229: is every sampled pixel opaque black? That is what a capture blocked by the
-     * screen-capture policy looks like. A genuinely black screen (dim screensaver, video
-     * letterbox) costs one extra capture and is then returned as-is.
-     */
-    private fun isBlankFrame(bitmap: Bitmap): Boolean {
-        val stepX = maxOf(1, bitmap.width / 16)
-        val stepY = maxOf(1, bitmap.height / 16)
-        var y = 0
-        while (y < bitmap.height) {
-            var x = 0
-            while (x < bitmap.width) {
-                if ((bitmap.getPixel(x, y) and 0x00FFFFFF) != 0) return false
-                x += stepX
-            }
-            y += stepY
-        }
-        return true
-    }
-
-    /**
-     * #229: reads @kiosk_allow_remote_screenshot straight from the AsyncStorage database,
-     * same trick as KioskModule. The capture can run while JS is paused behind an
-     * external app, so we cannot ask the JS side.
-     */
-    private fun isRemoteScreenshotAllowed(): Boolean {
-        return try {
-            val dbPath = reactContext.getDatabasePath("RKStorage").absolutePath
-            val db = android.database.sqlite.SQLiteDatabase.openDatabase(
-                dbPath, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY,
-            )
-            val cursor = db.rawQuery(
-                "SELECT value FROM catalystLocalStorage WHERE key = ?",
-                arrayOf("@kiosk_allow_remote_screenshot"),
-            )
-            val result = if (cursor.moveToFirst()) cursor.getString(0) == "true" else false
-            cursor.close()
-            db.close()
-            result
-        } catch (e: Exception) {
-            Log.w(TAG, "Could not read remote screenshot setting: ${e.message}")
-            false
-        }
+    private fun captureScreenshot(): java.io.InputStream? {
+        val bytes = ScreenCapture.capture(reactContext) ?: return null
+        return ByteArrayInputStream(bytes)
     }
 
     /**
@@ -2248,7 +2141,7 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
         try {
             val stream = captureScreenshot()
             if (stream == null) {
-                promise.reject("CAPTURE_FAILED", lastScreenshotError ?: "Unable to capture screenshot")
+                promise.reject("CAPTURE_FAILED", ScreenCapture.lastError ?: "Unable to capture screenshot")
                 return
             }
             val bytes = stream.readBytes()
@@ -2277,6 +2170,8 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             tts = null
             ttsReady = false
             sensorManager?.unregisterListener(this)
+            cameraStreamManager?.stopAll()
+            cameraStreamManager = null
             cameraPhotoModule = null
             Log.d(TAG, "HttpServerModule cleaned up")
         } catch (e: Exception) {

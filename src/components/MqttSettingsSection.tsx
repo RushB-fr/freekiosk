@@ -12,6 +12,7 @@ import {
   Alert,
   Clipboard,
   ActivityIndicator,
+  PermissionsAndroid,
 } from 'react-native';
 import SettingsSection from './settings/SettingsSection';
 import SettingsSwitch from './settings/SettingsSwitch';
@@ -44,6 +45,16 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
   const [allowControl, setAllowControl] = useState(true);
   const [deviceName, setDeviceName] = useState('');
   const [motionAlwaysOn, setMotionAlwaysOn] = useState(false);
+  // Image publishing (screenshot / camera snapshots)
+  const [screenshotEnabled, setScreenshotEnabled] = useState(false);
+  const [screenshotAuto, setScreenshotAuto] = useState(false);
+  const [screenshotInterval, setScreenshotInterval] = useState('60');
+  const [screenshotQuality, setScreenshotQuality] = useState('70');
+  const [screenshotMaxWidth, setScreenshotMaxWidth] = useState('1280');
+  const [cameraEnabled, setCameraEnabled] = useState(false);
+  const [cameraAuto, setCameraAuto] = useState(false);
+  const [cameraInterval, setCameraInterval] = useState('300');
+  const [cameraQuality, setCameraQuality] = useState('70');
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -136,6 +147,15 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
       mqttDeviceName,
       mqttPassword,
       mqttMotionAlwaysOn,
+      mqttScreenshotEnabled,
+      mqttScreenshotAuto,
+      mqttScreenshotInterval,
+      mqttScreenshotQuality,
+      mqttScreenshotMaxWidth,
+      mqttCameraEnabled,
+      mqttCameraAuto,
+      mqttCameraInterval,
+      mqttCameraQuality,
     ] = await Promise.all([
       StorageService.getMqttEnabled(),
       StorageService.getMqttBrokerUrl(),
@@ -149,6 +169,15 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
       StorageService.getMqttDeviceName(),
       getSecureMqttPassword(),
       StorageService.getMqttMotionAlwaysOn(),
+      StorageService.getMqttScreenshotEnabled(),
+      StorageService.getMqttScreenshotAuto(),
+      StorageService.getMqttScreenshotInterval(),
+      StorageService.getMqttScreenshotQuality(),
+      StorageService.getMqttScreenshotMaxWidth(),
+      StorageService.getMqttCameraEnabled(),
+      StorageService.getMqttCameraAuto(),
+      StorageService.getMqttCameraInterval(),
+      StorageService.getMqttCameraQuality(),
     ]);
 
     setMqttEnabled(enabled);
@@ -162,6 +191,15 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
     setAllowControl(control);
     setPassword(mqttPassword);
     setMotionAlwaysOn(mqttMotionAlwaysOn);
+    setScreenshotEnabled(mqttScreenshotEnabled);
+    setScreenshotAuto(mqttScreenshotAuto);
+    setScreenshotInterval(mqttScreenshotInterval.toString());
+    setScreenshotQuality(mqttScreenshotQuality.toString());
+    setScreenshotMaxWidth(mqttScreenshotMaxWidth.toString());
+    setCameraEnabled(mqttCameraEnabled);
+    setCameraAuto(mqttCameraAuto);
+    setCameraInterval(mqttCameraInterval.toString());
+    setCameraQuality(mqttCameraQuality.toString());
 
     // Pre-fill Device Name with Android model if never set
     if (!mqttDeviceName) {
@@ -267,7 +305,17 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
 
   const handlePasswordChange = async (value: string) => {
     setPassword(value);
-    await saveSecureMqttPassword(value);
+    // The return value used to be thrown away. When secure storage fails (#258) nothing
+    // was written, yet the field kept showing what had just been typed, so the password
+    // looked saved until the screen was reloaded and the broker answered NOT_AUTHORIZED.
+    const saved = await saveSecureMqttPassword(value);
+    if (!saved && value) {
+      Alert.alert(
+        t('components.mqtt.passwordNotSavedTitle'),
+        t('components.mqtt.passwordNotSavedMessage'),
+      );
+      setPassword('');
+    }
     onSettingsChanged?.();
   };
 
@@ -341,6 +389,145 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
     setMotionAlwaysOn(value);
     await StorageService.saveMqttMotionAlwaysOn(value);
     onSettingsChanged?.();
+  };
+
+  /**
+   * Enabling or disabling an image stream changes the set of discovered entities, which is
+   * only published on connect — offer to reconnect right away.
+   */
+  const promptReconnectForDiscovery = () => {
+    if (!isConnected) return;
+    Alert.alert(
+      t('components.mqtt.reconnectRequiredTitle'),
+      t('components.mqtt.discoveryReconnectMessage'),
+      [
+        { text: t('components.mqtt.later'), style: 'cancel' },
+        {
+          text: t('components.mqtt.reconnect'),
+          onPress: async () => {
+            await handleDisconnect();
+            setTimeout(() => handleConnect(), 500);
+          },
+        },
+      ]
+    );
+  };
+
+  /**
+   * Push the stored image settings to the running MQTT client so a change applies immediately
+   * instead of on the next connect. No-op when MQTT is not running.
+   */
+  const pushImageSettings = async () => {
+    try {
+      await mqttClient.updateImageSettings({
+        screenshotAuto: await StorageService.getMqttScreenshotAuto(),
+        screenshotInterval: await StorageService.getMqttScreenshotInterval(),
+        screenshotQuality: await StorageService.getMqttScreenshotQuality(),
+        screenshotMaxWidth: await StorageService.getMqttScreenshotMaxWidth(),
+        cameraAuto: await StorageService.getMqttCameraAuto(),
+        cameraInterval: await StorageService.getMqttCameraInterval(),
+        cameraQuality: await StorageService.getMqttCameraQuality(),
+      });
+    } catch (error) {
+      console.log('[MqttSettings] Could not push image settings:', error);
+    }
+  };
+
+  const handleScreenshotEnabledChange = async (value: boolean) => {
+    setScreenshotEnabled(value);
+    await StorageService.saveMqttScreenshotEnabled(value);
+    onSettingsChanged?.();
+    promptReconnectForDiscovery();
+  };
+
+  const handleScreenshotAutoChange = async (value: boolean) => {
+    setScreenshotAuto(value);
+    await StorageService.saveMqttScreenshotAuto(value);
+    await pushImageSettings();
+    onSettingsChanged?.();
+  };
+
+  const handleScreenshotIntervalChange = async (value: string) => {
+    setScreenshotInterval(value);
+    const seconds = parseInt(value, 10);
+    if (!isNaN(seconds) && seconds >= 5 && seconds <= 3600) {
+      await StorageService.saveMqttScreenshotInterval(seconds);
+      await pushImageSettings();
+      onSettingsChanged?.();
+    }
+  };
+
+  const handleScreenshotQualityChange = async (value: string) => {
+    setScreenshotQuality(value);
+    const quality = parseInt(value, 10);
+    if (!isNaN(quality) && quality >= 1 && quality <= 100) {
+      await StorageService.saveMqttScreenshotQuality(quality);
+      await pushImageSettings();
+      onSettingsChanged?.();
+    }
+  };
+
+  const handleScreenshotMaxWidthChange = async (value: string) => {
+    setScreenshotMaxWidth(value);
+    const width = parseInt(value, 10);
+    if (!isNaN(width) && width >= 0) {
+      await StorageService.saveMqttScreenshotMaxWidth(width);
+      await pushImageSettings();
+      onSettingsChanged?.();
+    }
+  };
+
+  const handleCameraEnabledChange = async (value: boolean) => {
+    if (value) {
+      // Snapshots are captured natively via Camera2, which needs the runtime permission
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CAMERA
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          Alert.alert(
+            t('components.mqtt.cameraPermissionTitle'),
+            t('components.mqtt.cameraPermissionMessage')
+          );
+          return;
+        }
+      } catch (error) {
+        console.error('[MqttSettings] Camera permission request failed:', error);
+        return;
+      }
+    }
+
+    setCameraEnabled(value);
+    await StorageService.saveMqttCameraEnabled(value);
+    onSettingsChanged?.();
+    promptReconnectForDiscovery();
+  };
+
+  const handleCameraAutoChange = async (value: boolean) => {
+    setCameraAuto(value);
+    await StorageService.saveMqttCameraAuto(value);
+    await pushImageSettings();
+    onSettingsChanged?.();
+  };
+
+  const handleCameraIntervalChange = async (value: string) => {
+    setCameraInterval(value);
+    const seconds = parseInt(value, 10);
+    if (!isNaN(seconds) && seconds >= 5 && seconds <= 3600) {
+      await StorageService.saveMqttCameraInterval(seconds);
+      await pushImageSettings();
+      onSettingsChanged?.();
+    }
+  };
+
+  const handleCameraQualityChange = async (value: string) => {
+    setCameraQuality(value);
+    const quality = parseInt(value, 10);
+    if (!isNaN(quality) && quality >= 1 && quality <= 100) {
+      await StorageService.saveMqttCameraQuality(quality);
+      await pushImageSettings();
+      onSettingsChanged?.();
+    }
   };
 
   const getStatusColor = () => {
@@ -544,6 +731,98 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
             icon="motion-sensor"
             hint={t('components.mqtt.motionAlwaysOnHint')}
           />
+
+          {/* Screenshot publishing */}
+          <SettingsSwitch
+            label={t('components.mqtt.publishScreenshot')}
+            value={screenshotEnabled}
+            onValueChange={handleScreenshotEnabledChange}
+            icon="monitor-screenshot"
+            hint={t('components.mqtt.publishScreenshotHint')}
+          />
+
+          {screenshotEnabled && (
+            <>
+              <SettingsSwitch
+                label={t('components.mqtt.screenshotAuto')}
+                value={screenshotAuto}
+                onValueChange={handleScreenshotAutoChange}
+                icon="refresh"
+                hint={t('components.mqtt.screenshotAutoHint')}
+              />
+
+              <SettingsInput
+                label={t('components.mqtt.screenshotInterval')}
+                value={screenshotInterval}
+                onChangeText={handleScreenshotIntervalChange}
+                placeholder="60"
+                keyboardType="numeric"
+                icon="timer-outline"
+                hint={t('components.mqtt.intervalHint')}
+              />
+
+              <SettingsInput
+                label={t('components.mqtt.screenshotQuality')}
+                value={screenshotQuality}
+                onChangeText={handleScreenshotQualityChange}
+                placeholder="70"
+                keyboardType="numeric"
+                icon="quality-high"
+                hint={t('components.mqtt.jpegQualityHint')}
+              />
+
+              <SettingsInput
+                label={t('components.mqtt.screenshotMaxWidth')}
+                value={screenshotMaxWidth}
+                onChangeText={handleScreenshotMaxWidthChange}
+                placeholder="1280"
+                keyboardType="numeric"
+                icon="arrow-expand-horizontal"
+                hint={t('components.mqtt.screenshotMaxWidthHint')}
+              />
+            </>
+          )}
+
+          {/* Camera publishing */}
+          <SettingsSwitch
+            label={t('components.mqtt.publishCamera')}
+            value={cameraEnabled}
+            onValueChange={handleCameraEnabledChange}
+            icon="camera"
+            hint={t('components.mqtt.publishCameraHint')}
+          />
+
+          {cameraEnabled && (
+            <>
+              <SettingsSwitch
+                label={t('components.mqtt.cameraAuto')}
+                value={cameraAuto}
+                onValueChange={handleCameraAutoChange}
+                icon="camera-retake"
+                hint={t('components.mqtt.cameraAutoHint')}
+              />
+
+              <SettingsInput
+                label={t('components.mqtt.cameraInterval')}
+                value={cameraInterval}
+                onChangeText={handleCameraIntervalChange}
+                placeholder="300"
+                keyboardType="numeric"
+                icon="timer-outline"
+                hint={t('components.mqtt.intervalHint')}
+              />
+
+              <SettingsInput
+                label={t('components.mqtt.cameraQuality')}
+                value={cameraQuality}
+                onChangeText={handleCameraQualityChange}
+                placeholder="70"
+                keyboardType="numeric"
+                icon="quality-high"
+                hint={t('components.mqtt.jpegQualityHint')}
+              />
+            </>
+          )}
 
           {/* Home Assistant Info Box */}
           <View style={styles.hintContainer}>

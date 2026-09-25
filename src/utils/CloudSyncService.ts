@@ -22,8 +22,49 @@ import {
 
 export const CONFIG_UPDATED_EVENT = 'FREEKIOSK_CONFIG_UPDATED';
 export const FORCE_UNENROLL_EVENT = 'FREEKIOSK_FORCE_UNENROLL';
+export const PROVISIONING_STATUS_EVENT = 'FREEKIOSK_PROVISIONING_STATUS';
+
+/**
+ * Where the zero-touch cloud enrolment of a QR-provisioned device stands.
+ *
+ * Provisioning has two halves that can come apart: Android makes FreeKiosk the Device
+ * Owner, and FreeKiosk then enrols with the cloud using the token the QR carried. A beta
+ * tester had a tablet finish the first half, sit on the welcome screen for good with a
+ * live connection to the server, and never appear in the dashboard, with four unused
+ * tokens on his tokens page and nothing anywhere saying which half had failed. This is
+ * what the welcome screen now shows instead of nothing.
+ */
+export type ProvisioningStatus =
+  | { state: 'none' }
+  | { state: 'enrolling'; attempts: number }
+  | { state: 'retrying'; attempts: number; error: string }
+  | { state: 'failed'; error: string };
+
+const PROVISIONING_RETRY_MS = 30_000;
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
+
+/**
+ * How long the cloud has to keep refusing this device's credentials before we believe it.
+ *
+ * A 401 or 403 on the heartbeat used to wipe the device's cloud credentials on the spot,
+ * on the assumption that it meant "removed from the cloud server-side". The app cannot
+ * tell that apart from any other 401 or 403, and the wipe is irreversible: the tablet
+ * then holds no credentials, can never reconnect, and survives a reboot in that state.
+ * Recovering it takes someone standing next to it with a fresh token, and a beta tester
+ * running kiosks across several remote sites described exactly that, twice.
+ *
+ * So the refusal has to persist, across several attempts and a real stretch of time,
+ * before the device gives up. A device genuinely deleted from the dashboard is refused on
+ * every beat and unenrols once this elapses; a transient refusal recovers on its own with
+ * nothing lost. The explicit path, force_unenroll in a successful heartbeat response, is
+ * unaffected and still wipes immediately.
+ */
+const AUTH_FAILURE_GRACE_MS = 30 * 60_000;
+const AUTH_FAILURE_MIN_ATTEMPTS = 5;
+// Deliberately outside KEYS so a settings import never touches it; cleared on success,
+// on unenrol, and implicitly on re-enrolment.
+const AUTH_FAILURE_KEY = '@cloud_auth_failure';
 
 /**
  * Shortest gap between two heartbeats, whichever clock asked for them. Comfortably below
@@ -63,6 +104,9 @@ async function simpleHash(str: string): Promise<string> {
 
 class CloudSyncServiceClass {
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private provisioningRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private provisioningAttempts = 0;
+  private provisioningStatus: ProvisioningStatus = { state: 'none' };
   private lastHeartbeatAtMs = 0;
   private isRunning = false;
 
@@ -162,6 +206,14 @@ class CloudSyncServiceClass {
             wifi_ssid: status.wifi.ssid,
             wifi_signal_dbm: status.wifi.signalStrength,
             ip_address: status.device.ip,
+            // Cellular, reported next to WiFi so a tablet on mobile data is not a
+            // blank row in the dashboard. network_type and signal_dbm are empty
+            // without READ_PHONE_STATE, which Play Store builds do not carry.
+            cellular_connected: status.cellular.connected,
+            cellular_carrier: status.cellular.carrier,
+            cellular_network_type: status.cellular.networkType,
+            cellular_signal_dbm: status.cellular.signalDbm,
+            airplane_mode: status.cellular.airplaneMode,
           },
           display: {
             screen_on: status.screen.on,
@@ -206,11 +258,17 @@ class CloudSyncServiceClass {
       );
 
       if (response.status === 401 || response.status === 403) {
-        // Device was removed from cloud server-side
-        await this._wipeAndUnenroll();
+        // Possibly removed from the cloud server-side, possibly not: wipe only once the
+        // refusal has persisted. See AUTH_FAILURE_GRACE_MS.
+        if (await this._authRefusalIsPersistent(response.status)) {
+          await this._wipeAndUnenroll();
+        }
         return;
       }
       if (!response.ok) return;
+
+      // Accepted: whatever refused us before is over.
+      await this._clearAuthRefusal();
 
       const data: HeartbeatResponse = await response.json();
 
@@ -307,11 +365,35 @@ class CloudSyncServiceClass {
    * enrolled and the native layer has a pending token, enroll automatically and
    * clear it. Best-effort and idempotent.
    */
+  getProvisioningStatus(): ProvisioningStatus {
+    return this.provisioningStatus;
+  }
+
+  private setProvisioningStatus(status: ProvisioningStatus): void {
+    this.provisioningStatus = status;
+    DeviceEventEmitter.emit(PROVISIONING_STATUS_EVENT, status);
+  }
+
   async consumePendingProvisioningEnrollment(): Promise<void> {
+    // One attempt per app launch used to be all there was. A network error kept the
+    // token for "the next launch", but a Device Owner kiosk locked in lock task is never
+    // relaunched, so a single attempt made before Wi-Fi was usable left the device on
+    // the welcome screen for good. Network errors now retry on a timer until the token
+    // is consumed or definitively refused.
+    if (this.provisioningRetryTimer) {
+      clearTimeout(this.provisioningRetryTimer);
+      this.provisioningRetryTimer = null;
+    }
     try {
-      if (await this.isEnrolled()) return;
+      if (await this.isEnrolled()) {
+        this.setProvisioningStatus({ state: 'none' });
+        return;
+      }
       const pending = await KioskModule.getPendingCloudEnrollment?.();
       if (!pending?.enroll_token || !pending?.cloud_url) return;
+
+      this.provisioningAttempts += 1;
+      this.setProvisioningStatus({ state: 'enrolling', attempts: this.provisioningAttempts });
 
       const PC = (NativeModules as any).PlatformConstants;
       const result = await this.enroll(pending.cloud_url, pending.enroll_token, {
@@ -334,6 +416,23 @@ class CloudSyncServiceClass {
       if (result.success || result.error !== 'Cannot reach server') {
         await KioskModule.clearPendingCloudEnrollment?.();
       }
+
+      if (result.success) {
+        this.provisioningAttempts = 0;
+        this.setProvisioningStatus({ state: 'none' });
+      } else if (result.error === 'Cannot reach server') {
+        this.setProvisioningStatus({
+          state: 'retrying', attempts: this.provisioningAttempts, error: result.error,
+        });
+        this.provisioningRetryTimer = setTimeout(() => {
+          this.provisioningRetryTimer = null;
+          this.consumePendingProvisioningEnrollment().catch(() => {});
+        }, PROVISIONING_RETRY_MS);
+      } else {
+        // Refused for good (expired or already used token, device limit reached...).
+        // The token is gone, so say why instead of leaving a silent welcome screen.
+        this.setProvisioningStatus({ state: 'failed', error: result.error ?? 'Enrollment failed' });
+      }
     } catch {
       // Never block startup on provisioning.
     }
@@ -354,11 +453,53 @@ class CloudSyncServiceClass {
     await this._wipeAndUnenroll();
   }
 
+  /**
+   * Record one refused heartbeat and say whether the refusal is now persistent enough to
+   * act on. See AUTH_FAILURE_GRACE_MS for why a single 401/403 is not.
+   */
+  private async _authRefusalIsPersistent(status: number): Promise<boolean> {
+    const now = Date.now();
+    let since = now;
+    let attempts = 0;
+    try {
+      const raw = await AsyncStorage.getItem(AUTH_FAILURE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        since = typeof parsed.since === 'number' ? parsed.since : now;
+        attempts = typeof parsed.attempts === 'number' ? parsed.attempts : 0;
+      }
+    } catch { /* malformed: start a fresh window */ }
+    attempts += 1;
+    try {
+      await AsyncStorage.setItem(AUTH_FAILURE_KEY, JSON.stringify({ since, attempts }));
+    } catch { /* best-effort */ }
+
+    const elapsed = now - since;
+    const persistent = attempts >= AUTH_FAILURE_MIN_ATTEMPTS && elapsed >= AUTH_FAILURE_GRACE_MS;
+    console.warn(
+      `[CloudSync] Heartbeat refused with ${status} (attempt ${attempts}, ` +
+      `${Math.round(elapsed / 60_000)} min). ` +
+      (persistent
+        ? 'Refused long enough: unenrolling.'
+        : 'Keeping the credentials and retrying; a transient refusal must not unenrol the device.'),
+    );
+    return persistent;
+  }
+
+  private async _clearAuthRefusal(): Promise<void> {
+    try {
+      if (await AsyncStorage.getItem(AUTH_FAILURE_KEY)) {
+        await AsyncStorage.removeItem(AUTH_FAILURE_KEY);
+        console.log('[CloudSync] Heartbeat accepted again after a refusal; credentials kept');
+      }
+    } catch { /* best-effort */ }
+  }
+
   private async _wipeAndUnenroll(): Promise<void> {
     this.stop();
 
-    // Clear all AsyncStorage settings
-    await AsyncStorage.multiRemove(Object.values(KEYS));
+    // Clear all AsyncStorage settings, and the refusal window that led here
+    await AsyncStorage.multiRemove([...Object.values(KEYS), AUTH_FAILURE_KEY]);
 
     // Clear all Keychain secrets
     await Promise.all([

@@ -10,14 +10,14 @@ import StatusBar from '../components/StatusBar';
 import MotionDetector from '../components/MotionDetector';
 import ProximityDetectionModule, { onProximityNear as onProximityNearEvent } from '../utils/ProximityDetectionModule';
 import ExternalAppOverlay from '../components/ExternalAppOverlay';
-import { StorageService } from '../utils/storage';
+import { StorageService, toPrintOrigins } from '../utils/storage';
 import { saveSecurePin, saveSecureMqttPassword, getSecureBasicAuthPassword } from '../utils/secureStorage';
 import KioskModule from '../utils/KioskModule';
 import AppLauncherModule from '../utils/AppLauncherModule';
 import OverlayServiceModule from '../utils/OverlayServiceModule';
 import BlockingOverlayModule from '../utils/BlockingOverlayModule';
 import AutoBrightnessModule from '../utils/AutoBrightnessModule';
-import { ApiService } from '../utils/ApiService';
+import { ApiService, MqttImageStream } from '../utils/ApiService';
 import { mqttClient } from '../utils/MqttModule';
 import DeviceControlService from '../services/DeviceControlService';
 import { ScheduledEvent, getActiveEvent } from '../types/planner';
@@ -28,6 +28,7 @@ import { ScreenScheduleRule, getNextWakeTime, getActiveSleepRule, getNextSleepTi
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import Icon from '../components/Icon';
+import RestartButton from '../components/RestartButton';
 import { revokeSettingsAccess } from '../utils/authState';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { CloudSyncService, CONFIG_UPDATED_EVENT, FORCE_UNENROLL_EVENT } from '../utils/CloudSyncService';
@@ -53,15 +54,28 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [screensaverEnabled, setScreensaverEnabled] = useState(false);
   const [isScreensaverActive, setIsScreensaverActive] = useState(false);
   const [defaultBrightness, setDefaultBrightness] = useState<number>(0.5);
+  // #242: what the panel is actually running at, as opposed to what we asked for.
+  // Status and MQTT used to report the target, which is exactly what hid the mismatch
+  // the reporter saw (status said 100 while the panel sat at 14/255).
+  const [effectiveBrightness, setEffectiveBrightness] = useState<number>(0.5);
   const [screensaverBrightness, setScreensaverBrightness] = useState<number>(0);
   const [screensaverType, setScreensaverType] = useState<'dim' | 'url' | 'video'>('dim');
   const [screensaverUrl, setScreensaverUrl] = useState<string>('');
   const [screensaverVideoItems, setScreensaverVideoItems] = useState<MediaItem[]>([]);
   const [screensaverVideoLoop, setScreensaverVideoLoop] = useState<boolean>(true);
+  const [screensaverKeepExternalApp, setScreensaverKeepExternalApp] = useState<boolean>(false);
   const [inactivityEnabled, setInactivityEnabled] = useState(true);
   const [inactivityDelay, setInactivityDelay] = useState(600000);
   const [motionEnabled, setMotionEnabled] = useState(false);
   const [motionAlwaysOn, setMotionAlwaysOn] = useState(false);
+  // A live MJPEG stream holds the camera: motion detection must stand down while it runs
+  const [cameraStreamActive, setCameraStreamActive] = useState(false);
+  // onMotionDetected is defined further down; the API callbacks are registered on mount and
+  // would otherwise capture a stale closure.
+  const onMotionDetectedRef = useRef<(() => void) | null>(null);
+  // Mirrors MotionDetector's own enabled condition, so movement coming from the camera stream
+  // wakes the screen in exactly the same situations.
+  const streamMotionAllowedRef = useRef(false);
   const [motionCameraPosition, setMotionCameraPosition] = useState<'front' | 'back'>('front');
   const [motionSensitivity, setMotionSensitivity] = useState<'low' | 'medium' | 'high'>('medium');
   const [proximityEnabled, setProximityEnabled] = useState(false);
@@ -189,6 +203,10 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [webViewBackButtonYPercent, setWebViewBackButtonYPercent] = useState<number>(10);
   const [canGoBack, setCanGoBack] = useState<boolean>(false);
 
+  // Restart Button (top-right overlay, long-press reloads the WebView)
+  const [restartButtonEnabled, setRestartButtonEnabled] = useState<boolean>(false);
+  const [restartButtonLongPressSeconds, setRestartButtonLongPressSeconds] = useState<number>(5);
+
   // URL Filtering states
   const [urlFilterEnabled, setUrlFilterEnabled] = useState<boolean>(false);
   const [urlFilterMode, setUrlFilterMode] = useState<'blacklist' | 'whitelist'>('blacklist');
@@ -203,8 +221,13 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [pdfViewerEnabled, setPdfViewerEnabled] = useState<boolean>(false);
   // #239: last value applied to the WebView, to know when a remount is actually needed.
   const pdfViewerEnabledRef = useRef<boolean>(false);
-  const [printEnabled, setPrintEnabled] = useState<boolean>(false);
+  const [windowPrintEnabled, setWindowPrintEnabled] = useState<boolean>(false);
   const [printPaperSize, setPrintPaperSize] = useState<string>('A4');
+  const [silentPrintEnabled, setSilentPrintEnabled] = useState<boolean>(false);
+  const [escPosWidthDots, setEscPosWidthDots] = useState<number>(384);
+  const [escPosCut, setEscPosCut] = useState<boolean>(false);
+  const [escPosFeedLines, setEscPosFeedLines] = useState<number>(0);
+  const [printOrigins, setPrintOrigins] = useState<string[] | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [zoomMode, setZoomMode] = useState<string>('standard');
   const [disableUserZoom, setDisableUserZoom] = useState<boolean>(false);
@@ -341,6 +364,33 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   // Keep the ref above in step with the state it mirrors.
   useEffect(() => { displayModeRef.current = displayMode; }, [displayMode]);
 
+  /**
+   * The settings that only exist inside the WebView's injectedJavaScript.
+   *
+   * React Native runs injectedJavaScript once per page load, not when the prop
+   * changes, so a config pushed from the cloud updated storage and state while the
+   * rendered page kept the old zoom, the old pinch-to-zoom rule and the old keyboard
+   * mode. Everything handled natively or through a React prop applied immediately,
+   * which is why only *some* settings looked ignored. Reported by a beta tester who
+   * applied a profile to a second tablet and found the zoom and the numeric keyboard
+   * untouched.
+   *
+   * Remounting the WebView re-runs the script. It also reloads the page, so it is done
+   * only when one of these four actually changed rather than on every config push,
+   * which would reload the kiosk every time the cloud syncs.
+   */
+  const injectedWebViewSettingsRef = useRef<string>('');
+
+  const readInjectedWebViewSettings = useCallback(async (): Promise<string> => {
+    const [level, mode, disableZoom, keyboard] = await Promise.all([
+      StorageService.getWebViewZoomLevel(),
+      StorageService.getWebViewZoomMode(),
+      StorageService.getDisableUserZoom(),
+      StorageService.getKeyboardMode(),
+    ]);
+    return JSON.stringify([level, mode, disableZoom, keyboard]);
+  }, []);
+
   // Cloud sync: start heartbeat loop on mount, reload settings on config push
   useEffect(() => {
     DeviceControlService.registerWebViewCallbacks(
@@ -357,10 +407,27 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       })();
     }
 
+    // Seed the signature so the first push compares against what is on screen now,
+    // not against an empty string that would remount for nothing.
+    readInjectedWebViewSettings()
+      .then(value => { injectedWebViewSettingsRef.current = value; })
+      .catch(() => {});
+
     const onConfigUpdated = CLOUD_ENABLED
       ? DeviceEventEmitter.addListener(CONFIG_UPDATED_EVENT, async () => {
           const previousMode = displayModeRef.current;
+          const previousInjected = injectedWebViewSettingsRef.current;
           await loadSettings();
+
+          // Storage already holds the pushed values by the time this event fires, so
+          // this reads the new ones and compares them with what the mounted page was
+          // built from. See injectedWebViewSettingsRef.
+          const nextInjected = await readInjectedWebViewSettings();
+          injectedWebViewSettingsRef.current = nextInjected;
+          if (previousInjected && previousInjected !== nextInjected) {
+            console.log('[KioskScreen] Injected WebView settings changed, remounting');
+            setWebViewKey(k => k + 1);
+          }
 
           // A pushed config that leaves external_app mode needs us back in front. The
           // launched app owns the screen and lives in its own task, so loadSettings()
@@ -540,11 +607,15 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
             
             // API sends 0-100, RNBrightness needs 0-1
             const normalizedValue = value / 100;
-            await RNBrightness.setBrightnessLevel(normalizedValue);
+            // #242: setDefaultBrightness, not setBrightnessLevel. This is a lasting
+            // choice, so it has to reach the SharedPreferences mirror the wake paths
+            // read and, where possible, Settings.System, or the next wake loses it.
+            const systemWrite = await RNBrightness.setDefaultBrightness(normalizedValue);
             setDefaultBrightness(normalizedValue);
+            setEffectiveBrightness(normalizedValue);
             // Persist to storage so Settings shows updated value
             await StorageService.saveDefaultBrightness(normalizedValue);
-            console.log('[API] Brightness set to', value);
+            console.log('[API] Brightness set to', value, systemWrite ? '(persisted system-wide)' : '(window override only)');
           } catch (error) {
             console.error('[API] Error setting brightness:', error);
           }
@@ -751,6 +822,18 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
             console.error('[API] Error disabling auto-brightness:', error);
           }
         },
+        onCameraStreamStateChanged: (streaming: boolean) => {
+          // Releases the camera for the stream, and picks detection back up afterwards
+          console.log('[API] Camera stream active:', streaming);
+          setCameraStreamActive(streaming);
+        },
+        onCameraStreamMotion: () => {
+          // Same wake path as the regular detector: while a stream holds the camera, movement
+          // is measured on its frames instead.
+          if (!streamMotionAllowedRef.current) return;
+          console.log('[API] Motion detected in camera stream');
+          onMotionDetectedRef.current?.();
+        },
         onSetMotionAlwaysOn: async (value: boolean) => {
           try {
             setMotionAlwaysOn(value);
@@ -758,6 +841,32 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
             console.log('[API] Motion always-on set to', value);
           } catch (error) {
             console.error('[API] Error setting motion always-on:', error);
+          }
+        },
+        // MQTT image publishing: the capture itself is done natively, we only persist the
+        // setting changed from Home Assistant so it survives an app restart.
+        onSetMqttImageAuto: async (stream: MqttImageStream, value: boolean) => {
+          try {
+            if (stream === 'screenshot') {
+              await StorageService.saveMqttScreenshotAuto(value);
+            } else {
+              await StorageService.saveMqttCameraAuto(value);
+            }
+            console.log(`[API] MQTT ${stream} auto-publish set to`, value);
+          } catch (error) {
+            console.error('[API] Error setting MQTT image auto-publish:', error);
+          }
+        },
+        onSetMqttImageInterval: async (stream: MqttImageStream, seconds: number) => {
+          try {
+            if (stream === 'screenshot') {
+              await StorageService.saveMqttScreenshotInterval(seconds);
+            } else {
+              await StorageService.saveMqttCameraInterval(seconds);
+            }
+            console.log(`[API] MQTT ${stream} publish interval set to`, seconds);
+          } catch (error) {
+            console.error('[API] Error setting MQTT image interval:', error);
           }
         },
         onSetMode: async (mode: 'webview' | 'external_app' | 'media_player', target?: string) => {
@@ -808,6 +917,9 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         },
       });
       
+      // Settings sent over ADB must be in storage before the server and MQTT read them
+      await applyPendingAdbConfig();
+
       // Auto-start the API server if enabled
       await ApiService.autoStart();
 
@@ -927,7 +1039,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   useEffect(() => {
     ApiService.updateStatus({
       currentUrl: url,
-      brightness: Math.round(defaultBrightness * 100),
+      brightness: Math.round(effectiveBrightness * 100),
       screensaverActive: isScreensaverActive,
       kioskMode: true, // Always in kiosk mode when this screen is active
       canGoBack: false,
@@ -940,8 +1052,42 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       autoBrightnessMin: autoBrightnessMin,
       autoBrightnessMax: autoBrightnessMax,
       motionAlwaysOn: motionAlwaysOn,
+      // Used by the stream-based motion detection, which takes over while a stream runs
+      motionSensitivity: motionSensitivity,
     });
-  }, [url, defaultBrightness, isScreensaverActive, urlRotationEnabled, urlRotationList, urlRotationInterval, currentUrlIndex, autoBrightnessEnabled, autoBrightnessMin, autoBrightnessMax, motionAlwaysOn]);
+  }, [url, effectiveBrightness, isScreensaverActive, urlRotationEnabled, urlRotationList, urlRotationInterval, currentUrlIndex, autoBrightnessEnabled, autoBrightnessMin, autoBrightnessMax, motionAlwaysOn, motionSensitivity]);
+
+  // #242: read back the brightness actually in effect, rather than reporting the target.
+  // getBrightnessLevel() now answers with the window override when one is set and the
+  // real system value otherwise. Refreshed on the transitions that used to produce the
+  // mismatch: a new target, and the screensaver going on or off.
+  //
+  // Bounded on purpose: there is no brightness-changed broadcast on Android, so a change
+  // made outside FreeKiosk between two of these transitions is still not picked up. A
+  // poll would cost a wake-up every few seconds on a battery-powered kiosk for a value
+  // that only moves when something asks it to.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const actual = await RNBrightness.getBrightnessLevel();
+        if (!cancelled) {
+          // Fall back to the target rather than to the 0.5 initialiser: on a device
+          // where the native read fails we would otherwise report a flat 50% where the
+          // old code at least reported what had been asked for.
+          setEffectiveBrightness(typeof actual === 'number' ? actual : defaultBrightness);
+        }
+      } catch (error) {
+        console.warn('[KioskScreen] Could not read effective brightness:', error);
+        if (!cancelled) {
+          setEffectiveBrightness(defaultBrightness);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [defaultBrightness, isScreensaverActive]);
 
   // Countdown timer effect (transparent - no UI)
   useEffect(() => {
@@ -1087,20 +1233,51 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
 
   // External App mode: bring FreeKiosk to foreground when screensaver activates so the full
   // screensaver (dim/URL/video) renders normally in React Native. On dismiss, re-launch the app.
+  // #266: opt-in ("Keep the app in front", Dim style only). OverlayService lays a dimming
+  // window over the external app instead, which stays in the foreground and does not
+  // reload on wake. The first tap is absorbed by that window, so waking never presses
+  // anything in the app. Falls back to bringToFront() when the overlay can't be shown
+  // (service not running, no overlay permission).
   const wasExternalAppScreensaverRef = useRef(false);
+  const dimOverExternalAppRef = useRef(false);
   useEffect(() => {
     if (displayMode !== 'external_app') return;
     if (!screensaverEnabled) return;
     if (isScreensaverActive) {
+      if (screensaverKeepExternalApp && screensaverType === 'dim') {
+        // -1 = FreeKiosk does not manage brightness: the overlay goes opaque black instead
+        const level = brightnessManagementEnabled ? screensaverBrightness : -1;
+        (async () => {
+          const shown = await OverlayServiceModule.showDimOverlay?.(level).catch(() => false);
+          if (shown) {
+            dimOverExternalAppRef.current = true;
+            // Woken while the call was in flight: take the overlay straight back down
+            if (!isScreensaverActiveRef.current) {
+              dimOverExternalAppRef.current = false;
+              OverlayServiceModule.hideDimOverlay?.().catch(() => {});
+            }
+            return;
+          }
+          console.warn('[KioskScreen] Dim overlay unavailable, bringing FreeKiosk to front instead');
+          if (!isScreensaverActiveRef.current) return;
+          wasExternalAppScreensaverRef.current = true;
+          KioskModule.bringToFront().catch(() => {});
+        })();
+        return;
+      }
       wasExternalAppScreensaverRef.current = true;
       KioskModule.bringToFront().catch(() => {});
+    } else if (dimOverExternalAppRef.current) {
+      // The external app never left the foreground: nothing to relaunch
+      dimOverExternalAppRef.current = false;
+      OverlayServiceModule.hideDimOverlay?.().catch(() => {});
     } else if (wasExternalAppScreensaverRef.current) {
       wasExternalAppScreensaverRef.current = false;
       if (externalAppPackage) {
         launchExternalApp(externalAppPackage);
       }
     }
-  }, [isScreensaverActive, screensaverEnabled, displayMode, externalAppPackage]);
+  }, [isScreensaverActive, screensaverEnabled, displayMode, externalAppPackage, screensaverKeepExternalApp, screensaverType, screensaverBrightness, brightnessManagementEnabled]);
 
   useEffect(() => {
     if (screensaverEnabled && inactivityEnabled) {
@@ -1480,40 +1657,85 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     };
   }, [autoRelaunchApp, displayMode, externalAppPackage, appCrashCount, navigation]);
 
-  const loadSettings = async (): Promise<void> => {
+  // Pending ADB config is written by MainActivity and moved into storage here. Both
+  // loadSettings() and the API start-up (REST server, MQTT client) read settings on launch
+  // and ran in parallel, so the API often read them before the config landed: a
+  // rest_api_enabled or mqtt_broker_url sent over ADB only took effect on the next launch.
+  // Whichever gets here first applies it; the other awaits the same run.
+  const pendingAdbApplyRef = useRef<Promise<void> | null>(null);
+  const applyPendingAdbConfig = (): Promise<void> => {
+    if (!pendingAdbApplyRef.current) {
+      pendingAdbApplyRef.current = applyPendingAdbConfigNow().finally(() => {
+        pendingAdbApplyRef.current = null;
+      });
+    }
+    return pendingAdbApplyRef.current;
+  };
+
+  const applyPendingAdbConfigNow = async (): Promise<void> => {
     try {
-      // Check for pending ADB config FIRST - apply to AsyncStorage before reading
-      try {
-        const pendingConfig = await KioskModule.getPendingAdbConfig();
-        if (pendingConfig) {
-          console.log('[KioskScreen] Found pending ADB config, applying to AsyncStorage...');
-          const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-          const entries: [string, string][] = [];
-          for (const [key, value] of Object.entries(pendingConfig)) {
-            if (typeof value === 'string') {
-              if (key === '@kiosk_pin') {
-                // PIN must be saved to Keystore (not just AsyncStorage)
-                await saveSecurePin(value);
+      const pendingConfig = await KioskModule.getPendingAdbConfig();
+      if (pendingConfig) {
+        console.log('[KioskScreen] Found pending ADB config, applying to AsyncStorage...');
+        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+        const entries: [string, string][] = [];
+        // Secrets that failed to reach secure storage. These used to be logged as
+        // successes: the save returned false, the return value was thrown away, and the
+        // line below said it had worked. On a device whose Keystore is broken (#258)
+        // that cost the reporter hours, because the app, the settings screen and the
+        // logs all agreed and only the MQTT broker disagreed.
+        const failedSecrets: string[] = [];
+        for (const [key, value] of Object.entries(pendingConfig)) {
+          if (typeof value === 'string') {
+            if (key === '@kiosk_pin') {
+              // PIN must be saved to Keystore (not just AsyncStorage)
+              if (await saveSecurePin(value)) {
                 console.log('[KioskScreen] PIN saved to secure Keystore via pending ADB config');
-              } else if (key === '@mqtt_password_pending') {
-                // MQTT password must be saved to Keychain (not AsyncStorage)
-                await saveSecureMqttPassword(value);
+              } else {
+                failedSecrets.push('PIN');
+                console.error('[KioskScreen] PIN could NOT be saved to secure storage (see #258)');
+              }
+            } else if (key === '@mqtt_password_pending') {
+              // MQTT password must be saved to Keychain (not AsyncStorage)
+              if (await saveSecureMqttPassword(value)) {
                 console.log('[KioskScreen] MQTT password saved to secure Keychain via pending ADB config');
               } else {
-                entries.push([key, value]);
+                failedSecrets.push('MQTT password');
+                console.error('[KioskScreen] MQTT password could NOT be saved to secure storage (see #258)');
               }
+            } else {
+              entries.push([key, value]);
             }
           }
-          if (entries.length > 0) {
-            await AsyncStorage.multiSet(entries);
-            console.log('[KioskScreen] Applied', entries.length, 'pending ADB config entries to AsyncStorage');
-          }
+        }
+        if (entries.length > 0) {
+          await AsyncStorage.multiSet(entries);
+          console.log('[KioskScreen] Applied', entries.length, 'pending ADB config entries to AsyncStorage');
+        }
+        // Only discard the pending config once everything in it landed. Clearing it
+        // unconditionally meant a failed save also threw away the value, so re-running
+        // the same ADB command produced the same silent failure with nothing left to
+        // retry from. Reported with the rest of #258.
+        if (failedSecrets.length > 0) {
+          console.error(
+            `[KioskScreen] Keeping the pending ADB config: ${failedSecrets.join(', ')} ` +
+            'could not be stored. Fix secure storage on this device and reboot, or set ' +
+            'the value from the settings screen.',
+          );
+        } else {
           await KioskModule.clearPendingAdbConfig();
           console.log('[KioskScreen] Pending ADB config cleared');
         }
-      } catch (pendingError) {
-        console.log('[KioskScreen] No pending ADB config or error:', pendingError);
       }
+    } catch (pendingError) {
+      console.log('[KioskScreen] No pending ADB config or error:', pendingError);
+    }
+  };
+
+  const loadSettings = async (): Promise<void> => {
+    try {
+      // Check for pending ADB config FIRST - apply to AsyncStorage before reading
+      await applyPendingAdbConfig();
 
       // Batch load ALL settings in a single multiGet call (1 bridge crossing instead of 50+)
       const settings = await StorageService.getAllSettings();
@@ -1561,6 +1783,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       const savedScreensaverUrl = str(K.SCREENSAVER_URL) ?? '';
       const savedScreensaverVideoItems = jsonParse(K.SCREENSAVER_VIDEO_ITEMS, []) as MediaItem[];
       const savedScreensaverVideoLoop = bool(K.SCREENSAVER_VIDEO_LOOP, true);
+      const savedScreensaverKeepExternalApp = bool(K.SCREENSAVER_KEEP_EXTERNAL_APP, false);
       const savedStatusBarEnabled = bool(K.STATUS_BAR_ENABLED, false);
       const savedStatusBarOnOverlay = bool(K.STATUS_BAR_ON_OVERLAY, true);
       const savedStatusBarOnReturn = bool(K.STATUS_BAR_ON_RETURN, true);
@@ -1615,6 +1838,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       setScreensaverUrl(savedScreensaverUrl);
       setScreensaverVideoItems(savedScreensaverVideoItems);
       setScreensaverVideoLoop(savedScreensaverVideoLoop);
+      setScreensaverKeepExternalApp(savedScreensaverKeepExternalApp);
       setStatusBarEnabled(savedStatusBarEnabled);
       setStatusBarOnOverlay(savedStatusBarOnOverlay);
       setStatusBarOnReturn(savedStatusBarOnReturn);
@@ -1716,6 +1940,11 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       setWebViewBackButtonEnabled(savedWebViewBackButtonEnabled);
       setWebViewBackButtonXPercent(savedWebViewBackButtonXPercent);
       setWebViewBackButtonYPercent(savedWebViewBackButtonYPercent);
+
+      const savedRestartButtonEnabled = bool(K.RESTART_BUTTON_ENABLED, false);
+      const savedRestartButtonLongPressSeconds = num(K.RESTART_BUTTON_LONG_PRESS_SECONDS, 5);
+      setRestartButtonEnabled(savedRestartButtonEnabled);
+      setRestartButtonLongPressSeconds(savedRestartButtonLongPressSeconds);
       
       // Load Auto-Brightness settings
       const savedAutoBrightnessEnabled = bool(K.AUTO_BRIGHTNESS_ENABLED, false);
@@ -1790,10 +2019,15 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       
       
       // Load Printing setting
-      const savedPrintEnabled = bool(K.PRINT_ENABLED, false);
-      setPrintEnabled(savedPrintEnabled);
+      const savedWindowPrintEnabled = bool(K.WINDOW_PRINT_ENABLED, false);
+      setWindowPrintEnabled(savedWindowPrintEnabled);
       const savedPrintPaperSize = str(K.PRINT_PAPER_SIZE) ?? 'A4';
       setPrintPaperSize(savedPrintPaperSize);
+      setSilentPrintEnabled(bool(K.SILENT_PRINT_ENABLED, false));
+      setEscPosWidthDots(num(K.ESC_POS_WIDTH_DOTS, 384));
+      setEscPosCut(bool(K.ESC_POS_CUT, false));
+      setEscPosFeedLines(num(K.ESC_POS_FEED_LINES, 0));
+      setPrintOrigins(toPrintOrigins(jsonParse(K.PRINT_ORIGINS, null)));
       
       // Load WebView Zoom Level
       const savedZoomLevel = num(K.WEBVIEW_ZOOM_LEVEL, 100);
@@ -2444,6 +2678,20 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     }
   }, [resetTimer, defaultBrightness, autoBrightnessEnabled, exitScheduledSleep]);
 
+  // #266: the dim overlay over the external app was tapped. It has already removed itself;
+  // run the same dismissal as a tap on FreeKiosk's own screensaver. Read through a ref:
+  // onScreensaverTap is rebuilt on every render (resetTimer is not memoised).
+  const onScreensaverTapRef = useRef(onScreensaverTap);
+  onScreensaverTapRef.current = onScreensaverTap;
+  useEffect(() => {
+    if (displayMode !== 'external_app') return;
+    const emitter = new NativeEventEmitter(NativeModules.DeviceEventManagerModule);
+    const sub = emitter.addListener('dimOverlayTouched', () => {
+      onScreensaverTapRef.current();
+    });
+    return () => sub.remove();
+  }, [displayMode]);
+
   const onMotionDetected = useCallback(async () => {
     // Report motion to API/MQTT
     ApiService.updateStatus({ motionDetected: true });
@@ -2487,6 +2735,19 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       resetTimer();
     }
   }, [defaultBrightness, resetTimer, autoBrightnessEnabled]);
+
+  // Expose the current handler to the API callbacks registered on mount, so motion coming from
+  // the camera stream wakes the screen exactly like the regular detector does.
+  useEffect(() => {
+    onMotionDetectedRef.current = onMotionDetected;
+  }, [onMotionDetected]);
+
+  // Same condition as the MotionDetector `enabled` prop below, minus the stream check: while a
+  // stream runs, its frames are the motion source instead of the detector.
+  useEffect(() => {
+    streamMotionAllowedRef.current =
+      motionAlwaysOn || (motionEnabled && (isPreCheckingMotion || isScreensaverActive));
+  }, [motionAlwaysOn, motionEnabled, isPreCheckingMotion, isScreensaverActive]);
 
   // Proximity wake: a hand/body moving close to the front sensor. Behaves like motion
   // (cancels the pre-check or wakes an active screensaver) but is a short-range, binary
@@ -2593,9 +2854,15 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     const isVoluntary = event?.voluntary ?? false;
     setIsAppLaunched(false);
 
-    // Stop OverlayService when returning to FreeKiosk
-    OverlayServiceModule.stopOverlayService()
-      .catch(error => console.warn('[KioskScreen] Failed to stop overlay:', error));
+    // Stop OverlayService only on a voluntary return (5-tap), matching MainActivity (#106).
+    // Involuntary returns include a transient resume while the external app is starting:
+    // on a cold boot FreeKiosk resumes for a moment after launching it, and stopping here
+    // left the app in front with no 5-tap escape. With FreeKiosk genuinely in front the
+    // running overlay is harmless: its foreground monitor ignores FreeKiosk's own package.
+    if (isVoluntary) {
+      OverlayServiceModule.stopOverlayService()
+        .catch(error => console.warn('[KioskScreen] Failed to stop overlay:', error));
+    }
 
     // On a voluntary return (5-tap), the native flag is already set by OverlayService
     if (isVoluntary) {
@@ -2746,8 +3013,13 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
               urlFilterPatterns={urlFilterEnabled ? urlFilterList : undefined}
               urlFilterShowFeedback={urlFilterShowFeedback}
               pdfViewerEnabled={pdfViewerEnabled}
-              printEnabled={printEnabled}
+              windowPrintEnabled={windowPrintEnabled}
               printPaperSize={printPaperSize}
+              silentPrintEnabled={silentPrintEnabled}
+              escPosWidthDots={escPosWidthDots}
+              escPosCut={escPosCut}
+              escPosFeedLines={escPosFeedLines}
+              printOrigins={printOrigins}
               zoomLevel={zoomLevel}
               zoomMode={zoomMode}
               disableUserZoom={disableUserZoom}
@@ -2815,7 +3087,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
 
       {/* Motion Detector - Active during pre-check OR when screensaver is ON (only if screen is focused) */}
       <MotionDetector
-        enabled={isFocused && (motionAlwaysOn || (motionEnabled && (isPreCheckingMotion || isScreensaverActive)))}
+        enabled={isFocused && !cameraStreamActive && (motionAlwaysOn || (motionEnabled && (isPreCheckingMotion || isScreensaverActive)))}
         onMotionDetected={onMotionDetected}
         sensitivity={motionSensitivity}
         cameraPosition={motionCameraPosition}
@@ -2857,6 +3129,19 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
             </View>
           </TouchableWithoutFeedback>
         </View>
+      )}
+
+      {/* Restart button - opt-in overlay over WebView content. Long-press remounts the
+          WebView (via webViewKey), which restarts it on the configured URL rather than
+          reloading whatever page the user navigated to: a remount also recovers a hung
+          render process, which is the case this was asked for. Top-right, grey, circular
+          reload arrow. A short tap does nothing (no onPress) so it can't be triggered
+          accidentally. Hidden on the dashboard grid, where no WebView is mounted. */}
+      {restartButtonEnabled && displayMode === 'webview' && !(dashboardModeEnabled && dashboardShowGrid) && (
+        <RestartButton
+          longPressSeconds={restartButtonLongPressSeconds}
+          onTrigger={() => setWebViewKey(prev => prev + 1)}
+        />
       )}
 
       {/* Screensaver overlay - dim mode uses black/transparent based on brightness; URL/video modes render content */}

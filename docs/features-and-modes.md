@@ -2,11 +2,11 @@
 
 **Understanding FreeKiosk's display modes and capabilities**
 
-[Docs Home](README) • [Installation](Installation) • [Integrations](Integrations)
+[Docs Home](README.md) • [Installation](installation.md) • [Integrations](INTEGRATIONS.md)
 
 
 > [!TIP]
-> Choose your operational mode first, then proceed to [Installation](Installation) and [Integrations](Integrations).
+> Choose your operational mode first, then proceed to [Installation](installation.md) and [Integrations](INTEGRATIONS.md).
 
 ## Table of Contents
 
@@ -86,7 +86,7 @@
 - Scheduled content rotation
 
 > [!NOTE]
-> See [Roadmap and Changelog](Roadmap-and-Changelog) for detailed release information.
+> See [Roadmap and Changelog](roadmap-and-changelog.md) for detailed release information.
 
 
 ## Security & Control
@@ -116,8 +116,8 @@
 
 | Method | Tools | Scale | Guide |
 |--------|-------|-------|-------|
-| **Manual** | Touch interface | Single device | [Installation](Installation) |
-| **ADB Script** | Command line | Small batches | [ADB Config](ADB-Configuration) |
+| **Manual** | Touch interface | Single device | [Installation](installation.md) |
+| **ADB Script** | Command line | Small batches | [ADB Config](adb-configuration.md) |
 | **MDM Integration** | Enterprise tools | Large fleets | Coming soon |
 
 ### Operational Features
@@ -136,12 +136,12 @@
 
 | Use Case | Recommended Mode | Setup Guide |
 |----------|------------------|-------------|
-| **Home Assistant Dashboard** | WebView Mode | [Installation](Installation) |
-| **Cloud Gaming Kiosk** | External App + Device Owner | [ADB Configuration](ADB-Configuration) |
-| **Corporate Kiosk** | External App + Device Owner | [Installation](Installation) |
-| **Multi-Dashboard** | Dashboard Mode | [Installation](Installation) |
-| **Media Display** | Media Mode | [Installation](Installation) |
-| **Custom Android App** | External App Mode | [ADB Configuration](ADB-Configuration) |
+| **Home Assistant Dashboard** | WebView Mode | [Installation](installation.md) |
+| **Cloud Gaming Kiosk** | External App + Device Owner | [ADB Configuration](adb-configuration.md) |
+| **Corporate Kiosk** | External App + Device Owner | [Installation](installation.md) |
+| **Multi-Dashboard** | Dashboard Mode | [Installation](installation.md) |
+| **Media Display** | Media Mode | [Installation](installation.md) |
+| **Custom Android App** | External App Mode | [ADB Configuration](adb-configuration.md) |
 
 ### Configuration Examples
 
@@ -171,7 +171,7 @@ adb shell am start -n com.freekiosk/.MainActivity \
 
 ## Next Steps
 
-- **Installation:** [Complete setup guide](Installation)
-- **Integrations:** [REST API and MQTT](Integrations)
-- **ADB Provisioning:** [Headless deployment](ADB-Configuration)
-- **FAQ:** [Common questions](FAQ)
+- **Installation:** [Complete setup guide](installation.md)
+- **Integrations:** [REST API and MQTT](INTEGRATIONS.md)
+- **ADB Provisioning:** [Headless deployment](adb-configuration.md)
+- **FAQ:** [Common questions](faq.md)

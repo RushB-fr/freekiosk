@@ -24,9 +24,40 @@ class ScreenStateReceiver : BroadcastReceiver() {
     companion object {
         private const val TAG = "ScreenStateReceiver"
         private const val WAKE_LOCK_TIMEOUT = 10_000L // 10 seconds
+        private const val PREFS = "FreeKioskSettings"
+        private const val DELIBERATE_OFF_KEY = "deliberate_screen_off_at"
+
+        /**
+         * How long after a requested screen-off we still treat an ACTION_SCREEN_OFF as that
+         * request rather than as the system sleeping the device. lockNow() is asynchronous:
+         * the broadcast arrives a beat later, so this cannot be an exact match. Wide enough
+         * to cover a slow device, short enough that a screen-off a few seconds later - the
+         * user walking away, the system timeout - still auto-wakes as configured.
+         */
+        private const val DELIBERATE_OFF_GRACE_MS = 5_000L
+
         @Volatile
         var isScreenOn = true  // Assume screen is on initially
             private set
+
+        /**
+         * Record that FreeKiosk itself is about to turn the screen off, so auto-wake does
+         * not immediately undo it.
+         *
+         * Auto-wake exists to bring the tablet back when *Android* sleeps it. It read
+         * ACTION_SCREEN_OFF with no idea who caused it, so an admin sending a screen-off
+         * over MQTT, REST or the cloud got the screen straight back on, with the two
+         * features fighting each other and no way to tell from the outside. Reported by a
+         * beta tester as "the screen just pops back on again".
+         */
+        fun markDeliberateScreenOff(context: Context) {
+            try {
+                context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit().putLong(DELIBERATE_OFF_KEY, System.currentTimeMillis()).apply()
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not mark a deliberate screen-off: ${e.message}")
+            }
+        }
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -47,9 +78,22 @@ class ScreenStateReceiver : BroadcastReceiver() {
                 dismissKeyboard(context)
 
                 // Check if auto-wake is enabled
-                val prefs = context.getSharedPreferences("FreeKioskSettings", Context.MODE_PRIVATE)
+                val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 val autoWakeEnabled = prefs.getBoolean("auto_wake_on_screen_off", false)
-                if (autoWakeEnabled) {
+
+                // Was this screen-off asked for, or did the system sleep the device? The
+                // marker is consumed either way, so the next unattributed screen-off
+                // auto-wakes as configured.
+                val requestedAt = prefs.getLong(DELIBERATE_OFF_KEY, 0L)
+                val wasRequested = requestedAt > 0L &&
+                    System.currentTimeMillis() - requestedAt < DELIBERATE_OFF_GRACE_MS
+                if (requestedAt > 0L) {
+                    prefs.edit().remove(DELIBERATE_OFF_KEY).apply()
+                }
+
+                if (autoWakeEnabled && wasRequested) {
+                    Log.d(TAG, "Auto-wake skipped: this screen-off was requested by FreeKiosk")
+                } else if (autoWakeEnabled) {
                     Log.d(TAG, "Auto-wake enabled — turning screen back ON")
                     wakeScreen(context)
                 }
@@ -135,10 +179,10 @@ class ScreenStateReceiver : BroadcastReceiver() {
                                     activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                                 }
 
-                                // Restore brightness to system default
-                                val layoutParams = activity.window.attributes
-                                layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-                                activity.window.attributes = layoutParams
+                                // #242: restore the requested brightness, not the system
+                                // default. This is the auto-wake path the reporter hit on every
+                                // charger plug and unplug.
+                                BrightnessPrefs.applyToWindow(context, activity.window)
 
                                 Log.d(TAG, "Auto-wake activity flags restored")
                             } catch (e: Exception) {

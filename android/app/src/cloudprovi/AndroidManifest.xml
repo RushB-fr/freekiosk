@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cloud provisioning manifest overlay.
+  Merged with higher priority than src/main when -Pcloudprovi is set.
+
+  This is the APK the cloud serves to the Android setup wizard during QR Device Owner
+  provisioning, so it is installed from a download URL rather than from Play. Play
+  Protect blocks a sideloaded install outright when the app declares any of four
+  permissions - RECEIVE_SMS, READ_SMS, a notification listener, or an accessibility
+  service - with "App blocked to protect your device / This app can request access to
+  sensitive data". A tester hit exactly that on a factory-reset tablet, mid-wizard,
+  with no way past it. We declare the fourth one.
+
+  So this overlay strips the AccessibilityService, and nothing else: unlike the Play
+  Store build, a provisioning APK still needs REQUEST_INSTALL_PACKAGES to self-update
+  and to install managed apps silently.
+
+  What that costs, on these devices only: screenshots of an *external* app in the
+  foreground, and remote key injection into one. Everything else has another path -
+  PixelCopy captures FreeKiosk's own window, dpm.lockNow() turns the screen off for a
+  Device Owner, and setPermittedAccessibilityServices governs *other* apps' services
+  and needs nothing of ours.
+
+  The cost is small in practice because a QR-provisioned device cannot enable the
+  service anyway: writing Settings.Secure needs WRITE_SECURE_SETTINGS, which is not
+  grantable to a Device Owner and only ever arrives through
+  `adb shell pm grant com.freekiosk android.permission.WRITE_SECURE_SETTINGS` (see
+  CHANGELOG #99). There is no ADB in a QR flow. Keep building with plain
+  `assembleRelease` for ADB provisioning, where the service does work.
+
+  Removing this does NOT guarantee provisioning succeeds: Play Protect also keeps an
+  allowlist of approved DPCs, a separate axis on which overlays and silent installs
+  also weigh. Verify on hardware before telling anyone it is fixed.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application>
+        <!-- Strip AccessibilityService (BIND_ACCESSIBILITY_SERVICE) -->
+        <service
+            android:name="com.freekiosk.FreeKioskAccessibilityService"
+            tools:node="remove" />
+    </application>
+
+</manifest>

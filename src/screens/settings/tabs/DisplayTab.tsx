@@ -104,6 +104,8 @@ interface DisplayTabProps {
   onScreensaverVideoItemsChange: (items: MediaItem[]) => void;
   screensaverVideoLoop: boolean;
   onScreensaverVideoLoopChange: (value: boolean) => void;
+  screensaverKeepExternalApp: boolean;
+  onScreensaverKeepExternalAppChange: (value: boolean) => void;
   onPickScreensaverMedia: (type: 'video' | 'image' | 'any') => void;
   pickingScreensaverMedia: boolean;
 
@@ -201,6 +203,8 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
   onScreensaverVideoItemsChange,
   screensaverVideoLoop,
   onScreensaverVideoLoopChange,
+  screensaverKeepExternalApp,
+  onScreensaverKeepExternalAppChange,
   onPickScreensaverMedia,
   pickingScreensaverMedia,
   motionEnabled,
@@ -248,6 +252,8 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
 
   // Check whether the selected camera is available on this device
   const selectedCameraAvailable = availableCameras.some(cam => cam.position === motionCameraPosition);
+  // #266: the screensaver dims over the external app; FreeKiosk stays in the background
+  const dimsOverExternalApp = displayMode === 'external_app' && screensaverType === 'dim' && screensaverKeepExternalApp;
 
   // Detect whether this device has a hardware proximity sensor (many tablets don't).
   const [proximityAvailable, setProximityAvailable] = React.useState<boolean | null>(null);
@@ -451,6 +457,16 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                   value={screensaverType}
                   onValueChange={(v) => onScreensaverTypeChange(v as 'dim' | 'url' | 'video')}
                 />
+
+                {/* #266: opt-in, External App + Dim only. Off keeps today's behaviour. */}
+                {displayMode === 'external_app' && screensaverType === 'dim' && (
+                  <SettingsSwitch
+                    label={t('display.screensaver.keepExternalApp')}
+                    hint={t('display.screensaver.keepExternalAppHint')}
+                    value={screensaverKeepExternalApp}
+                    onValueChange={onScreensaverKeepExternalAppChange}
+                  />
+                )}
 
                 {screensaverType === 'url' && (
                   <>
@@ -681,13 +697,15 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                 <Text style={styles.infoText}>
                   {t('display.screensaver.howItWorksAfter', { delay: inactivityDelay || '10' })}{`
 `}
-                  {displayMode === 'external_app'
+                  {dimsOverExternalApp
+                    ? t('display.screensaver.howItWorksDimOverApp') + '\n'
+                    : displayMode === 'external_app'
                     ? t('display.screensaver.howItWorksExternalApp') + '\n'
                     : ''}
                   {t('display.screensaver.howItWorksTouch')}{`
 `}
-                  {motionEnabled && t('display.screensaver.howItWorksMotion') + '\n'}
-                  {proximityEnabled && proximityAvailable !== false && t('display.screensaver.howItWorksProximity') + '\n'}
+                  {motionEnabled && !dimsOverExternalApp && t('display.screensaver.howItWorksMotion') + '\n'}
+                  {proximityEnabled && proximityAvailable !== false && !dimsOverExternalApp && t('display.screensaver.howItWorksProximity') + '\n'}
                   {t('display.screensaver.howItWorksBrightness')}
                 </Text>
               </View>

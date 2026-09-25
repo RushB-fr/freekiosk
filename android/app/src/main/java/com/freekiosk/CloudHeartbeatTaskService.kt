@@ -29,9 +29,15 @@ class CloudHeartbeatTaskService : HeadlessJsTaskService() {
             TASK_NAME,
             Arguments.createMap(),
             TASK_TIMEOUT_MS,
-            // Never run in the foreground: the JS interval already covers that case and
-            // two heartbeats at once would race on the config-sync hash.
-            false,
+            // Allowed in the foreground only so it cannot crash the process: the task
+            // itself returns at once when the app is active (index.js), since the JS
+            // interval covers that case and two heartbeats would race on the config-sync
+            // hash. With false, React Native throws when the task starts while the
+            // activity is resumed, which happens whenever the process dies (ADB config
+            // restart, OOM kill): Android restarts this service in the new process, the
+            // throw kills it again, the new activity is force-finished and the external
+            // app stays in front with no 5-tap overlay.
+            true,
         )
     }
 

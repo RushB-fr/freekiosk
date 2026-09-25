@@ -13,6 +13,23 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
     private val bitmapLock = Any()
     private val executor = Executors.newSingleThreadExecutor()
 
+    /**
+     * Comparisons made since the reference frame was taken.
+     *
+     * The reference is simply the first frame handed to us after a reset, and on an
+     * external UVC camera that frame is whatever the sensor produced before it
+     * stabilised: black, green, or half a picture. Comparing a real scene against it
+     * reports motion every single time, whatever the room contains, which is how a
+     * screensaver came to dismiss itself 9.2 seconds after activating in an empty room
+     * (issue #262).
+     *
+     * So the first comparison after a reset is discarded and its frame becomes the new
+     * reference. That costs one extra frame of latency at startup and nothing at all
+     * afterwards, which is why it is preferred to requiring two consecutive detections:
+     * that would have doubled the latency of every real detection for ever.
+     */
+    private var comparisonsSinceReset = 0
+
     override fun getName(): String {
         return "MotionDetectionModule"
     }
@@ -54,9 +71,21 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
                 val hasMotion: Boolean
                 synchronized(bitmapLock) {
                     hasMotion = if (previousBitmap != null && !previousBitmap!!.isRecycled) {
-                        detectMotion(previousBitmap!!, currentBitmap, threshold)
+                        val detected = detectMotion(previousBitmap!!, currentBitmap, threshold)
+                        comparisonsSinceReset++
+                        if (comparisonsSinceReset == 1) {
+                            // Warm-up: the reference was the camera's first frame, which is
+                            // not a picture of the room. See comparisonsSinceReset (#262).
+                            if (detected) {
+                                android.util.Log.d("MotionDetection", "Discarding motion on the first comparison after reset (camera warm-up)")
+                            }
+                            false
+                        } else {
+                            detected
+                        }
                     } else {
                         android.util.Log.d("MotionDetection", "First frame captured (${currentBitmap.width}x${currentBitmap.height}), storing reference")
+                        comparisonsSinceReset = 0
                         false // First image, no comparison
                     }
 
@@ -89,6 +118,7 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
                         }
                     }
                     previousBitmap = null
+                    comparisonsSinceReset = 0
                 }
                 promise.resolve(true)
             } catch (e: Exception) {

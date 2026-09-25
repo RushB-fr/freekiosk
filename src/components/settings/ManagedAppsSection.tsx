@@ -57,7 +57,7 @@ const ManagedAppsSection: React.FC<ManagedAppsSectionProps> = ({
     } finally {
       setLoadingApps(false);
     }
-  }, [managedApps]);
+  }, [managedApps, t]);
 
   // Derived list: filter by showAllPackages toggle
   const installedApps = showAllPackages
@@ -86,7 +86,7 @@ const ManagedAppsSection: React.FC<ManagedAppsSectionProps> = ({
         },
       ],
     );
-  }, [managedApps, onManagedAppsChange]);
+  }, [managedApps, onManagedAppsChange, t]);
 
   const handleToggle = useCallback((packageName: string, field: keyof ManagedApp) => {
     onManagedAppsChange(

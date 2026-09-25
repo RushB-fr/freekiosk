@@ -12,7 +12,7 @@ import { NativeModules, NativeEventEmitter, Platform } from 'react-native';
 import { httpServer } from './HttpServerModule';
 import { mqttClient } from './MqttModule';
 import { StorageService } from './storage';
-import { getSecureMqttPassword } from './secureStorage';
+import { getSecureMqttPassword, readSecureApiKey } from './secureStorage';
 
 const { HttpServerModule, MqttModule, SoundPlayer } = NativeModules;
 
@@ -39,6 +39,18 @@ export interface ApiCallbacks {
   onAutoBrightnessDisable?: () => void;
   onSetMotionAlwaysOn?: (value: boolean) => void;
   onSetMode?: (mode: 'webview' | 'external_app' | 'media_player', target?: string) => void;
+  /**
+   * A live camera stream started (true) or ended (false). Motion detection must release the
+   * camera while a stream is running: only one client can hold the sensor.
+   */
+  onCameraStreamStateChanged?: (streaming: boolean) => void;
+  /**
+   * Movement seen in the live camera stream. While a stream runs it is the only motion source:
+   * the regular detector cannot open the same sensor.
+   */
+  onCameraStreamMotion?: () => void;
+  onSetMqttImageAuto?: (stream: MqttImageStream, value: boolean) => void;
+  onSetMqttImageInterval?: (stream: MqttImageStream, seconds: number) => void;
 }
 
 /**
@@ -50,6 +62,9 @@ export interface ActionResult {
   result?: Record<string, unknown>;
   error?: string;
 }
+
+/** Image streams that can be published over MQTT. */
+export type MqttImageStream = 'screenshot' | 'camera';
 
 export interface AppStatus {
   currentUrl: string;
@@ -70,15 +85,23 @@ export interface AppStatus {
   scheduledSleep?: boolean;
   motionDetected?: boolean;
   motionAlwaysOn?: boolean;
+  /** Sensitivity used by the stream-based motion detection */
+  motionSensitivity?: 'low' | 'medium' | 'high';
 }
 
 const ok = (result?: Record<string, unknown>): ActionResult => ({ ok: true, result });
 const fail = (error: string): ActionResult => ({ ok: false, error });
 
+function isMqttImageStream(value: unknown): value is MqttImageStream {
+  return value === 'screenshot' || value === 'camera';
+}
+
 class ApiServiceClass {
   private callbacks: ApiCallbacks = {};
   private eventEmitter: NativeEventEmitter | null = null;
   private commandSubscription: any = null;
+  private cameraStreamSubscription: any = null;
+  private cameraStreamMotionSubscription: any = null;
   private appStatus: AppStatus = {
     currentUrl: '',
     canGoBack: false,
@@ -124,10 +147,39 @@ class ApiServiceClass {
         }
       );
 
+      // Camera arbitration: the native stream manager tells us when it needs the camera
+      this.cameraStreamSubscription = this.eventEmitter.addListener(
+        'onCameraStreamState',
+        (event: { streaming: boolean }) => {
+          console.log('ApiService: Camera stream state', event.streaming);
+          this.callbacks.onCameraStreamStateChanged?.(event.streaming === true);
+        }
+      );
+
+      this.cameraStreamMotionSubscription = this.eventEmitter.addListener(
+        'onCameraStreamMotion',
+        () => {
+          console.log('ApiService: Motion detected in camera stream');
+          this.callbacks.onCameraStreamMotion?.();
+        }
+      );
+
       console.log('ApiService: Initialized and listening for commands');
     }
 
     this.isInitialized = true;
+
+    // A stream may already be running (the kiosk screen remounts on settings reload, losing
+    // its state). Ask the native side for the truth so motion detection stays out of the way.
+    try {
+      const streaming = await httpServer.isCameraStreaming();
+      if (streaming) {
+        console.log('ApiService: A camera stream is already running');
+        this.callbacks.onCameraStreamStateChanged?.(true);
+      }
+    } catch (error) {
+      // Older native module without the method, or server not started yet
+    }
   }
 
   /**
@@ -142,13 +194,50 @@ class ApiServiceClass {
       }
 
       const port = await StorageService.getRestApiPort();
-      const apiKey = await StorageService.getRestApiKey();
+      const { value: apiKey, readFailed } = await readSecureApiKey();
       const allowControl = await StorageService.getRestApiAllowControl();
+
+      // Fail closed. KioskHttpServer skips its auth check entirely when no key is set,
+      // which is the right behaviour for someone who deliberately runs without one. But
+      // a key we could not read is not a key that is not there: on a device whose
+      // Keystore is broken (#258) every read throws, and starting here would put an
+      // unauthenticated server on the LAN for an owner who had set a key and had no way
+      // of knowing. Refusing to start is visible; serving everything is not.
+      if (readFailed) {
+        console.error(
+          'ApiService: refusing to start the REST server. The API key could not be read ' +
+          'from secure storage, and starting without it would serve every endpoint ' +
+          'unauthenticated on the local network. Re-enter the key in Settings > API, or ' +
+          'clear it to run deliberately without authentication.',
+        );
+        return;
+      }
 
       const result = await httpServer.startServer(port, apiKey || null, allowControl);
       console.log(`ApiService: Server started on ${result.ip}:${result.port}`);
+
+      await this.pushCameraStreamSettings();
     } catch (error) {
       console.error('ApiService: Failed to auto-start server', error);
+    }
+  }
+
+  /**
+   * Push the live camera stream settings to the running server. Called on start and whenever
+   * the settings change, so toggling the stream takes effect without restarting the server.
+   */
+  async pushCameraStreamSettings(): Promise<void> {
+    try {
+      await httpServer.updateCameraStreamSettings({
+        enabled: await StorageService.getCameraStreamEnabled(),
+        camera: await StorageService.getCameraStreamCamera(),
+        fps: await StorageService.getCameraStreamFps(),
+        quality: await StorageService.getCameraStreamQuality(),
+        width: await StorageService.getCameraStreamWidth(),
+        rotate: await StorageService.getCameraStreamRotate(),
+      });
+    } catch (error) {
+      console.log('ApiService: Could not push camera stream settings', error);
     }
   }
 
@@ -176,6 +265,17 @@ class ApiServiceClass {
     const allowControl = await StorageService.getMqttAllowControl();
     const deviceName = await StorageService.getMqttDeviceName();
 
+    // Image publishing (screenshot / camera snapshots) — all opt-in
+    const screenshotEnabled = await StorageService.getMqttScreenshotEnabled();
+    const screenshotAuto = await StorageService.getMqttScreenshotAuto();
+    const screenshotInterval = await StorageService.getMqttScreenshotInterval();
+    const screenshotQuality = await StorageService.getMqttScreenshotQuality();
+    const screenshotMaxWidth = await StorageService.getMqttScreenshotMaxWidth();
+    const cameraEnabled = await StorageService.getMqttCameraEnabled();
+    const cameraAuto = await StorageService.getMqttCameraAuto();
+    const cameraInterval = await StorageService.getMqttCameraInterval();
+    const cameraQuality = await StorageService.getMqttCameraQuality();
+
     await mqttClient.start({
       brokerUrl,
       port,
@@ -188,6 +288,15 @@ class ApiServiceClass {
       allowControl,
       deviceName: deviceName || undefined,
       useTls: port === 8883,
+      screenshotEnabled,
+      screenshotAuto,
+      screenshotInterval,
+      screenshotQuality,
+      screenshotMaxWidth,
+      cameraEnabled,
+      cameraAuto,
+      cameraInterval,
+      cameraQuality,
     });
 
     console.log(`ApiService: MQTT client started for ${brokerUrl}:${port}`);
@@ -361,6 +470,26 @@ class ApiServiceClass {
         cb.onSetMotionAlwaysOn(p.value === true);
         return ok();
 
+      // Image publishing (MQTT). The capture runs natively, so these only persist the
+      // setting changed from Home Assistant — same pattern as setMotionAlwaysOn.
+      case 'setImageAutoPublish':
+        if (!isMqttImageStream(p.stream)) return fail('Invalid image stream');
+        if (!cb.onSetMqttImageAuto) return fail('Handler unavailable');
+        cb.onSetMqttImageAuto(p.stream, p.value === true);
+        return ok();
+
+      case 'setImageInterval':
+        if (!isMqttImageStream(p.stream)) return fail('Invalid image stream');
+        if (typeof p.seconds !== 'number') return fail('Missing interval seconds');
+        if (!cb.onSetMqttImageInterval) return fail('Handler unavailable');
+        cb.onSetMqttImageInterval(p.stream, p.seconds);
+        return ok();
+
+      // Captured and published natively by MqttImagePublisher, nothing to do here.
+      case 'publishScreenshot':
+      case 'publishCameraPhoto':
+        return ok();
+
       case 'setMode':
         if (p.mode !== 'webview' && p.mode !== 'external_app' && p.mode !== 'media_player') return fail('Invalid mode');
         if (!cb.onSetMode) return fail('Handler unavailable');
@@ -430,6 +559,14 @@ class ApiServiceClass {
     if (this.commandSubscription) {
       this.commandSubscription.remove();
       this.commandSubscription = null;
+    }
+    if (this.cameraStreamSubscription) {
+      this.cameraStreamSubscription.remove();
+      this.cameraStreamSubscription = null;
+    }
+    if (this.cameraStreamMotionSubscription) {
+      this.cameraStreamMotionSubscription.remove();
+      this.cameraStreamMotionSubscription = null;
     }
     this.isInitialized = false;
     console.log('ApiService: Destroyed');
