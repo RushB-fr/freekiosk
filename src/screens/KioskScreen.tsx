@@ -68,6 +68,14 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [inactivityDelay, setInactivityDelay] = useState(600000);
   const [motionEnabled, setMotionEnabled] = useState(false);
   const [motionAlwaysOn, setMotionAlwaysOn] = useState(false);
+  // A live MJPEG stream holds the camera: motion detection must stand down while it runs
+  const [cameraStreamActive, setCameraStreamActive] = useState(false);
+  // onMotionDetected is defined further down; the API callbacks are registered on mount and
+  // would otherwise capture a stale closure.
+  const onMotionDetectedRef = useRef<(() => void) | null>(null);
+  // Mirrors MotionDetector's own enabled condition, so movement coming from the camera stream
+  // wakes the screen in exactly the same situations.
+  const streamMotionAllowedRef = useRef(false);
   const [motionCameraPosition, setMotionCameraPosition] = useState<'front' | 'back'>('front');
   const [motionSensitivity, setMotionSensitivity] = useState<'low' | 'medium' | 'high'>('medium');
   const [proximityEnabled, setProximityEnabled] = useState(false);
@@ -809,6 +817,18 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
             console.error('[API] Error disabling auto-brightness:', error);
           }
         },
+        onCameraStreamStateChanged: (streaming: boolean) => {
+          // Releases the camera for the stream, and picks detection back up afterwards
+          console.log('[API] Camera stream active:', streaming);
+          setCameraStreamActive(streaming);
+        },
+        onCameraStreamMotion: () => {
+          // Same wake path as the regular detector: while a stream holds the camera, movement
+          // is measured on its frames instead.
+          if (!streamMotionAllowedRef.current) return;
+          console.log('[API] Motion detected in camera stream');
+          onMotionDetectedRef.current?.();
+        },
         onSetMotionAlwaysOn: async (value: boolean) => {
           try {
             setMotionAlwaysOn(value);
@@ -1027,8 +1047,10 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       autoBrightnessMin: autoBrightnessMin,
       autoBrightnessMax: autoBrightnessMax,
       motionAlwaysOn: motionAlwaysOn,
+      // Used by the stream-based motion detection, which takes over while a stream runs
+      motionSensitivity: motionSensitivity,
     });
-  }, [url, effectiveBrightness, isScreensaverActive, urlRotationEnabled, urlRotationList, urlRotationInterval, currentUrlIndex, autoBrightnessEnabled, autoBrightnessMin, autoBrightnessMax, motionAlwaysOn]);
+  }, [url, effectiveBrightness, isScreensaverActive, urlRotationEnabled, urlRotationList, urlRotationInterval, currentUrlIndex, autoBrightnessEnabled, autoBrightnessMin, autoBrightnessMax, motionAlwaysOn, motionSensitivity]);
 
   // #242: read back the brightness actually in effect, rather than reporting the target.
   // getBrightnessLevel() now answers with the window override when one is set and the
@@ -2704,6 +2726,19 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     }
   }, [defaultBrightness, resetTimer, autoBrightnessEnabled]);
 
+  // Expose the current handler to the API callbacks registered on mount, so motion coming from
+  // the camera stream wakes the screen exactly like the regular detector does.
+  useEffect(() => {
+    onMotionDetectedRef.current = onMotionDetected;
+  }, [onMotionDetected]);
+
+  // Same condition as the MotionDetector `enabled` prop below, minus the stream check: while a
+  // stream runs, its frames are the motion source instead of the detector.
+  useEffect(() => {
+    streamMotionAllowedRef.current =
+      motionAlwaysOn || (motionEnabled && (isPreCheckingMotion || isScreensaverActive));
+  }, [motionAlwaysOn, motionEnabled, isPreCheckingMotion, isScreensaverActive]);
+
   // Proximity wake: a hand/body moving close to the front sensor. Behaves like motion
   // (cancels the pre-check or wakes an active screensaver) but is a short-range, binary
   // hardware signal, so no false positives from lighting/scene changes.
@@ -3037,7 +3072,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
 
       {/* Motion Detector - Active during pre-check OR when screensaver is ON (only if screen is focused) */}
       <MotionDetector
-        enabled={isFocused && (motionAlwaysOn || (motionEnabled && (isPreCheckingMotion || isScreensaverActive)))}
+        enabled={isFocused && !cameraStreamActive && (motionAlwaysOn || (motionEnabled && (isPreCheckingMotion || isScreensaverActive)))}
         onMotionDetected={onMotionDetected}
         sensitivity={motionSensitivity}
         cameraPosition={motionCameraPosition}

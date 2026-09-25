@@ -78,6 +78,39 @@ class HttpServerService {
   }
 
   /**
+   * Apply the live MJPEG stream settings. Streaming is refused until this is called with
+   * `enabled: true`; disabling it also drops any viewer currently connected.
+   *
+   * @param settings.rotate extra clockwise rotation in degrees, or -1 to derive it from the sensor
+   */
+  async updateCameraStreamSettings(settings: {
+    enabled: boolean;
+    camera: 'front' | 'back';
+    fps: number;
+    quality: number;
+    width: number;
+    rotate: number;
+  }): Promise<boolean> {
+    if (Platform.OS !== 'android' || !HttpServerModule?.updateCameraStreamSettings) {
+      return false;
+    }
+
+    return HttpServerModule.updateCameraStreamSettings(settings);
+  }
+
+  /**
+   * Whether a live camera stream is currently running natively. Used to resynchronise the
+   * JS state after a remount, so motion detection does not steal the camera from a stream.
+   */
+  async isCameraStreaming(): Promise<boolean> {
+    if (Platform.OS !== 'android' || !HttpServerModule?.isCameraStreaming) {
+      return false;
+    }
+
+    return HttpServerModule.isCameraStreaming();
+  }
+
+  /**
    * Get server info (running status and IP)
    */
   async getServerInfo(): Promise<ServerInfo> {
