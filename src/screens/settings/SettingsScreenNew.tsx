@@ -1330,11 +1330,21 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     let finalUrl = url.trim();
     if (displayMode === 'webview' && !dashboardModeEnabled) {
       const urlLower = finalUrl.toLowerCase();
-      if (urlLower.startsWith('file://') || urlLower.startsWith('javascript:') || urlLower.startsWith('data:')) {
-        Alert.alert('Security Error', 'This type of URL is not allowed. Use http:// or https://');
+      if (urlLower.startsWith('javascript:') || urlLower.startsWith('data:')) {
+        Alert.alert('Security Error', 'This type of URL is not allowed. Use http://, https:// or file://');
         return;
       }
-      if (!urlLower.startsWith('http://') && !urlLower.startsWith('https://')) {
+      // #239: local files are supported, but only the PDF Viewer setting gives the WebView
+      // file access. This check predates that and refused every file:// URL, so a local
+      // page could only be set over ADB.
+      if (urlLower.startsWith('file://') && !pdfViewerEnabled) {
+        Alert.alert(
+          'File access is off',
+          'To open a local file, turn on General > PDF Viewer > Inline PDF Viewer first. That setting is what gives the browser access to files on the device.',
+        );
+        return;
+      }
+      if (!urlLower.startsWith('http://') && !urlLower.startsWith('https://') && !urlLower.startsWith('file://')) {
         if (finalUrl.includes('.')) {
           finalUrl = 'https://' + finalUrl;
           setUrl(finalUrl);

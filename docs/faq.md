@@ -58,7 +58,8 @@
 **Q: Can I display local HTML files?**
 - **A:** Yes. Enter a `file://` URL in Website mode, for example
   `file:///storage/emulated/0/Android/data/com.freekiosk/files/dashboard/index.html`.
-  You must enable **Advanced > PDF Viewer** for it to work: that setting is what grants the
+  You must turn on **General > PDF Viewer > Inline PDF Viewer** first (the settings screen
+  refuses a `file://` URL until you do): that setting is what grants the
   WebView file access (`allowFileAccess`, `allowFileAccessFromFileURLs`,
   `allowUniversalAccessFromFileURLs` and the `file://` origin). Without it the page fails
   with `net::ERR_ACCESS_DENIED`.
