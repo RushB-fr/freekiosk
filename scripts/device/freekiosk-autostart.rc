@@ -1,0 +1,9 @@
+service freekiosk_autostart /system/bin/sh /system/bin/freekiosk-autostart.sh
+    user root
+    group root shell
+    seclabel u:r:su:s0
+    disabled
+    oneshot
+
+on property:sys.boot_completed=1
+    start freekiosk_autostart
