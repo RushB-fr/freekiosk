@@ -650,8 +650,8 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                             // Add all managed apps to the lock task whitelist
                             whitelist.addAll(getManagedAppPackages())
 
-                            // Add print spooler packages if printing is enabled
-                            if (isPrintEnabled()) {
+                            // Add print spooler packages if window.print() is enabled
+                            if (isWindowPrintEnabled()) {
                                 whitelist.addAll(getPrintSpoolerPackages())
                             }
 
@@ -1684,9 +1684,9 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
      * Used to add them to the lock task whitelist.
      */
     /**
-     * Check if printing is enabled in settings (read from AsyncStorage)
+     * Check if window.print() (Allow Printing) is enabled in settings (read from AsyncStorage)
      */
-    private fun isPrintEnabled(): Boolean {
+    private fun isWindowPrintEnabled(): Boolean {
         return try {
             val dbPath = reactApplicationContext.getDatabasePath("RKStorage").absolutePath
             val db = android.database.sqlite.SQLiteDatabase.openDatabase(dbPath, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY)

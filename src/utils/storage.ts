@@ -128,8 +128,15 @@ export const KEYS = {
   // PDF Viewer
   PDF_VIEWER_ENABLED: '@kiosk_pdf_viewer_enabled',
   // Printing
-  PRINT_ENABLED: '@kiosk_print_enabled',
+  WINDOW_PRINT_ENABLED: '@kiosk_print_enabled',
   PRINT_PAPER_SIZE: '@kiosk_print_paper_size',
+  // Silent Print: window.FreeKiosk.silentPrinter drives an ESC/POS printer, independent of window.print()
+  SILENT_PRINT_ENABLED: '@kiosk_silent_print_enabled',
+  // Origins allowed to use Silent Print (JSON): null = any page, [] = none
+  PRINT_ORIGINS: '@kiosk_print_origins',
+  ESC_POS_WIDTH_DOTS: '@kiosk_esc_pos_width_dots',
+  ESC_POS_CUT: '@kiosk_esc_pos_cut',
+  ESC_POS_FEED_LINES: '@kiosk_esc_pos_feed_lines',
   // WebView Zoom Level
   WEBVIEW_ZOOM_LEVEL: '@kiosk_webview_zoom_level',
   // WebView Zoom Mode ('standard' = CSS zoom | 'fit' = viewport reflow, #188)
@@ -235,6 +242,13 @@ const deepMerge = (base: unknown, overlay: unknown): unknown => {
   }
   return out;
 };
+
+/**
+ * Normalizes the silent-print origin allow-list: null = any page may print, [] = none may.
+ * Anything but an array reads as null.
+ */
+export const toPrintOrigins = (value: unknown): string[] | null =>
+  Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : null;
 
 export const StorageService = {
   //URL
@@ -521,7 +535,12 @@ export const StorageService = {
         // PDF Viewer
         KEYS.PDF_VIEWER_ENABLED,
         // Printing
-        KEYS.PRINT_ENABLED,
+        KEYS.WINDOW_PRINT_ENABLED,
+        KEYS.SILENT_PRINT_ENABLED,
+        KEYS.ESC_POS_WIDTH_DOTS,
+        KEYS.ESC_POS_CUT,
+        KEYS.ESC_POS_FEED_LINES,
+        KEYS.PRINT_ORIGINS,
         // WebView Zoom Level
         KEYS.WEBVIEW_ZOOM_LEVEL,
         KEYS.WEBVIEW_ZOOM_MODE,
@@ -2398,17 +2417,17 @@ export const StorageService = {
 
   // ============ PRINTING ============
 
-  savePrintEnabled: async (value: boolean): Promise<void> => {
+  saveWindowPrintEnabled: async (value: boolean): Promise<void> => {
     try {
-      await AsyncStorage.setItem(KEYS.PRINT_ENABLED, JSON.stringify(value));
+      await AsyncStorage.setItem(KEYS.WINDOW_PRINT_ENABLED, JSON.stringify(value));
     } catch (error) {
       console.error('Error saving print enabled:', error);
     }
   },
 
-  getPrintEnabled: async (): Promise<boolean> => {
+  getWindowPrintEnabled: async (): Promise<boolean> => {
     try {
-      const value = await AsyncStorage.getItem(KEYS.PRINT_ENABLED);
+      const value = await AsyncStorage.getItem(KEYS.WINDOW_PRINT_ENABLED);
       return value ? JSON.parse(value) : false;
     } catch (error) {
       console.error('Error getting print enabled:', error);
@@ -2431,6 +2450,98 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting print paper size:', error);
       return 'A4';
+    }
+  },
+
+  saveSilentPrintEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.SILENT_PRINT_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving silent print enabled:', error);
+    }
+  },
+
+  getSilentPrintEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.SILENT_PRINT_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting silent print enabled:', error);
+      return false;
+    }
+  },
+
+  saveEscPosWidthDots: async (value: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.ESC_POS_WIDTH_DOTS, String(value));
+    } catch (error) {
+      console.error('Error saving ESC/POS width:', error);
+    }
+  },
+
+  getEscPosWidthDots: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.ESC_POS_WIDTH_DOTS);
+      const parsed = value ? parseInt(value, 10) : NaN;
+      return Number.isFinite(parsed) ? parsed : 384;
+    } catch (error) {
+      console.error('Error getting ESC/POS width:', error);
+      return 384;
+    }
+  },
+
+  saveEscPosCut: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.ESC_POS_CUT, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving ESC/POS cut:', error);
+    }
+  },
+
+  getEscPosCut: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.ESC_POS_CUT);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting ESC/POS cut:', error);
+      return false;
+    }
+  },
+
+  saveEscPosFeedLines: async (value: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.ESC_POS_FEED_LINES, String(value));
+    } catch (error) {
+      console.error('Error saving ESC/POS feed lines:', error);
+    }
+  },
+
+  getEscPosFeedLines: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.ESC_POS_FEED_LINES);
+      const parsed = value ? parseInt(value, 10) : NaN;
+      return Number.isFinite(parsed) ? parsed : 0;
+    } catch (error) {
+      console.error('Error getting ESC/POS feed lines:', error);
+      return 0;
+    }
+  },
+
+  savePrintOrigins: async (value: string[] | null): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.PRINT_ORIGINS, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving print origins:', error);
+    }
+  },
+
+  getPrintOrigins: async (): Promise<string[] | null> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.PRINT_ORIGINS);
+      return toPrintOrigins(value ? JSON.parse(value) : null);
+    } catch (error) {
+      console.error('Error getting print origins:', error);
+      return null;
     }
   },
 
@@ -3315,8 +3426,13 @@ export const StorageService = {
         url: str(KEYS.URL),
         autoReload: bool(KEYS.AUTO_RELOAD),
         pdfViewerEnabled: bool(KEYS.PDF_VIEWER_ENABLED),
-        printEnabled: bool(KEYS.PRINT_ENABLED),
+        printEnabled: bool(KEYS.WINDOW_PRINT_ENABLED), // window.print(); name kept for existing exports
         printPaperSize: str(KEYS.PRINT_PAPER_SIZE, 'A4'),
+        silentPrintEnabled: bool(KEYS.SILENT_PRINT_ENABLED),
+        escPosWidthDots: num(KEYS.ESC_POS_WIDTH_DOTS, 384),
+        escPosCut: bool(KEYS.ESC_POS_CUT),
+        escPosFeedLines: num(KEYS.ESC_POS_FEED_LINES, 0),
+        printOrigins: toPrintOrigins(json(KEYS.PRINT_ORIGINS)),
         urlRotation: {
           enabled: bool(KEYS.URL_ROTATION_ENABLED),
           list: json(KEYS.URL_ROTATION_LIST, []),
@@ -3516,8 +3632,16 @@ export const StorageService = {
       set(KEYS.URL, g.url);
       set(KEYS.AUTO_RELOAD, g.autoReload);
       set(KEYS.PDF_VIEWER_ENABLED, g.pdfViewerEnabled);
-      set(KEYS.PRINT_ENABLED, g.printEnabled);
+      set(KEYS.WINDOW_PRINT_ENABLED, g.printEnabled);
       set(KEYS.PRINT_PAPER_SIZE, g.printPaperSize);
+      set(KEYS.SILENT_PRINT_ENABLED, g.silentPrintEnabled);
+      set(KEYS.ESC_POS_WIDTH_DOTS, g.escPosWidthDots);
+      set(KEYS.ESC_POS_CUT, g.escPosCut);
+      set(KEYS.ESC_POS_FEED_LINES, g.escPosFeedLines);
+      // Not through set(): it skips null, and null is what lifts the restriction.
+      if ('printOrigins' in g) {
+        pairs.push([KEYS.PRINT_ORIGINS, JSON.stringify(toPrintOrigins(g.printOrigins))]);
+      }
       const ur = g.urlRotation as Record<string, unknown> | undefined;
       if (ur) {
         set(KEYS.URL_ROTATION_ENABLED, ur.enabled);

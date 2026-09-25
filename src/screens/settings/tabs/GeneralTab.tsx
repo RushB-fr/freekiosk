@@ -17,6 +17,7 @@ import {
   ScheduleEventList,
   ManagedAppsSection,
   SettingsRadioGroup,
+  EscPosPrinterSection,
 } from '../../../components/settings';
 import { ManagedApp } from '../../../types/managedApps';
 import Icon from '../../../components/Icon';
@@ -82,10 +83,20 @@ interface GeneralTabProps {
   onPdfViewerEnabledChange: (value: boolean) => void;
   
   // Printing (webview only)
-  printEnabled: boolean;
-  onPrintEnabledChange: (value: boolean) => void;
+  windowPrintEnabled: boolean;
+  onWindowPrintEnabledChange: (value: boolean) => void;
   printPaperSize: string;
   onPrintPaperSizeChange: (value: string) => void;
+  silentPrintEnabled: boolean;
+  onSilentPrintEnabledChange: (value: boolean) => void;
+  escPosWidthDots: number;
+  onEscPosWidthDotsChange: (value: number) => void;
+  escPosCut: boolean;
+  onEscPosCutChange: (value: boolean) => void;
+  escPosFeedLines: number;
+  onEscPosFeedLinesChange: (value: number) => void;
+  printOrigins: string[] | null;
+  onPrintOriginsChange: (value: string[] | null) => void;
   
   // URL Rotation (webview only)
   urlRotationEnabled: boolean;
@@ -200,10 +211,20 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
   onAutoReloadChange,
   pdfViewerEnabled,
   onPdfViewerEnabledChange,
-  printEnabled,
-  onPrintEnabledChange,
+  windowPrintEnabled,
+  onWindowPrintEnabledChange,
   printPaperSize,
   onPrintPaperSizeChange,
+  silentPrintEnabled,
+  onSilentPrintEnabledChange,
+  escPosWidthDots,
+  onEscPosWidthDotsChange,
+  escPosCut,
+  onEscPosCutChange,
+  escPosFeedLines,
+  onEscPosFeedLinesChange,
+  printOrigins,
+  onPrintOriginsChange,
   urlRotationEnabled,
   onUrlRotationEnabledChange,
   urlRotationList,
@@ -966,14 +987,16 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
       {/* Printing - WebView only */}
       {displayMode === 'webview' && (
         <SettingsSection title="Printing" icon="printer">
+          {/* Window Printing (Android print dialog) */}
+          <Text style={[styles.subSectionTitle, styles.subSectionTitleFirst]}>Window Printing</Text>
           <SettingsSwitch
-            label="Allow Printing"
+            label="Enable Window Printing"
             hint="Enable window.print() support for web pages (label printers, receipts, etc.)"
-            value={printEnabled}
-            onValueChange={onPrintEnabledChange}
+            value={windowPrintEnabled}
+            onValueChange={onWindowPrintEnabledChange}
           />
-          
-          {printEnabled && (
+
+          {windowPrintEnabled && (
             <>
               <View style={styles.rotationSpacer} />
               <SettingsRadioGroup
@@ -991,7 +1014,7 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
             </>
           )}
 
-          {printEnabled && (
+          {windowPrintEnabled && (
             <SettingsInfoBox variant="info">
               <Text style={styles.infoText}>
                 {'Web pages can trigger the Android print dialog via window.print().\n\n'}
@@ -1000,6 +1023,30 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
               </Text>
             </SettingsInfoBox>
           )}
+
+          {/* Silent Printing (USB ESC/POS, no dialog) */}
+          <View style={styles.subSection}>
+            <Text style={styles.subSectionTitle}>Silent Printing</Text>
+            <SettingsSwitch
+              label="Enable Silent Printing"
+              hint="Let web pages print to a USB ESC/POS printer with no dialog, via window.FreeKiosk.silentPrinter"
+              value={silentPrintEnabled}
+              onValueChange={onSilentPrintEnabledChange}
+            />
+
+            {silentPrintEnabled && (
+              <EscPosPrinterSection
+                widthDots={escPosWidthDots}
+                onWidthDotsChange={onEscPosWidthDotsChange}
+                cut={escPosCut}
+                onCutChange={onEscPosCutChange}
+                feedLines={escPosFeedLines}
+                onFeedLinesChange={onEscPosFeedLinesChange}
+                origins={printOrigins}
+                onOriginsChange={onPrintOriginsChange}
+              />
+            )}
+          </View>
         </SettingsSection>
       )}
       
@@ -1141,6 +1188,21 @@ const styles = StyleSheet.create({
   },
   rotationSpacer: {
     height: Spacing.md,
+  },
+  subSection: {
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
+  },
+  subSectionTitle: {
+    ...Typography.labelSmall,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  subSectionTitleFirst: {
+    // Directly under the section header, which already provides the gap
+    marginTop: 0,
   },
   mediaItemCard: {
     backgroundColor: Colors.surfaceVariant,

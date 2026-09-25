@@ -10,7 +10,7 @@ import StatusBar from '../components/StatusBar';
 import MotionDetector from '../components/MotionDetector';
 import ProximityDetectionModule, { onProximityNear as onProximityNearEvent } from '../utils/ProximityDetectionModule';
 import ExternalAppOverlay from '../components/ExternalAppOverlay';
-import { StorageService } from '../utils/storage';
+import { StorageService, toPrintOrigins } from '../utils/storage';
 import { saveSecurePin, saveSecureMqttPassword, getSecureBasicAuthPassword } from '../utils/secureStorage';
 import KioskModule from '../utils/KioskModule';
 import AppLauncherModule from '../utils/AppLauncherModule';
@@ -221,8 +221,13 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [pdfViewerEnabled, setPdfViewerEnabled] = useState<boolean>(false);
   // #239: last value applied to the WebView, to know when a remount is actually needed.
   const pdfViewerEnabledRef = useRef<boolean>(false);
-  const [printEnabled, setPrintEnabled] = useState<boolean>(false);
+  const [windowPrintEnabled, setWindowPrintEnabled] = useState<boolean>(false);
   const [printPaperSize, setPrintPaperSize] = useState<string>('A4');
+  const [silentPrintEnabled, setSilentPrintEnabled] = useState<boolean>(false);
+  const [escPosWidthDots, setEscPosWidthDots] = useState<number>(384);
+  const [escPosCut, setEscPosCut] = useState<boolean>(false);
+  const [escPosFeedLines, setEscPosFeedLines] = useState<number>(0);
+  const [printOrigins, setPrintOrigins] = useState<string[] | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [zoomMode, setZoomMode] = useState<string>('standard');
   const [disableUserZoom, setDisableUserZoom] = useState<boolean>(false);
@@ -2014,10 +2019,15 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       
       
       // Load Printing setting
-      const savedPrintEnabled = bool(K.PRINT_ENABLED, false);
-      setPrintEnabled(savedPrintEnabled);
+      const savedWindowPrintEnabled = bool(K.WINDOW_PRINT_ENABLED, false);
+      setWindowPrintEnabled(savedWindowPrintEnabled);
       const savedPrintPaperSize = str(K.PRINT_PAPER_SIZE) ?? 'A4';
       setPrintPaperSize(savedPrintPaperSize);
+      setSilentPrintEnabled(bool(K.SILENT_PRINT_ENABLED, false));
+      setEscPosWidthDots(num(K.ESC_POS_WIDTH_DOTS, 384));
+      setEscPosCut(bool(K.ESC_POS_CUT, false));
+      setEscPosFeedLines(num(K.ESC_POS_FEED_LINES, 0));
+      setPrintOrigins(toPrintOrigins(jsonParse(K.PRINT_ORIGINS, null)));
       
       // Load WebView Zoom Level
       const savedZoomLevel = num(K.WEBVIEW_ZOOM_LEVEL, 100);
@@ -3003,8 +3013,13 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
               urlFilterPatterns={urlFilterEnabled ? urlFilterList : undefined}
               urlFilterShowFeedback={urlFilterShowFeedback}
               pdfViewerEnabled={pdfViewerEnabled}
-              printEnabled={printEnabled}
+              windowPrintEnabled={windowPrintEnabled}
               printPaperSize={printPaperSize}
+              silentPrintEnabled={silentPrintEnabled}
+              escPosWidthDots={escPosWidthDots}
+              escPosCut={escPosCut}
+              escPosFeedLines={escPosFeedLines}
+              printOrigins={printOrigins}
               zoomLevel={zoomLevel}
               zoomMode={zoomMode}
               disableUserZoom={disableUserZoom}
