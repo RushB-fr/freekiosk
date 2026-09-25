@@ -2,7 +2,7 @@
 
 **Complete setup from basic mode to full Device Owner lockdown**
 
-[Docs Home](README) • [Features](Features-and-Modes) • [ADB Config](ADB-Configuration)
+[Docs Home](README.md) • [Features](features-and-modes.md) • [ADB Config](adb-configuration.md)
 
 
 > [!TIP]
@@ -323,7 +323,7 @@ Should work, but not officially tested.
 
 ## Need Help?
 
-- **FAQ:** [Complete FAQ](FAQ)
+- **FAQ:** [Complete FAQ](faq.md)
 - **Community:** [GitHub Discussions](https://github.com/rushb-fr/freekiosk/discussions)
 - **Bug Reports:** [GitHub Issues](https://github.com/rushb-fr/freekiosk/issues)
 - **Email:** support@freekiosk.app

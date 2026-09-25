@@ -27,7 +27,7 @@
 
 
 > [!NOTE]
-> This page focuses on **contributor setup**. Operational deployment is documented in [`installation.md`](Installation).
+> This page focuses on **contributor setup**. Operational deployment is documented in [`installation.md`](installation.md).
 
 ## Prerequisites
 
@@ -145,7 +145,7 @@ the service for ADB provisioning, which is also the only way to grant the
 | **Contributing Guide** | [CONTRIBUTING.md](../CONTRIBUTING.md) |
 | **Issue Tracker** | [GitHub Issues](https://github.com/rushb-fr/freekiosk/issues) |
 | **Discussions** | [GitHub Discussions](https://github.com/rushb-fr/freekiosk/discussions) |
-| **FAQ** | [FAQ](FAQ) |
+| **FAQ** | [FAQ](faq.md) |
 
 
 
@@ -163,11 +163,11 @@ the service for ADB provisioning, which is also the only way to grant the
 
 | Documentation | Focus |
 |---|---|
-| **Install Guide** | [Installation](Installation) - Manual setup instructions |
-| **ADB Configuration** | [ADB-Configuration](ADB-Configuration) - Scripted provisioning |
-| **REST API** | [REST-API](REST-API) - HTTP endpoints and automation |
-| **MQTT** | [MQTT](MQTT) - Home Assistant integration |
-| **Roadmap** | [Roadmap-and-Changelog](Roadmap-and-Changelog) - Release planning |
+| **Install Guide** | [Installation](installation.md) - Manual setup instructions |
+| **ADB Configuration** | [ADB-Configuration](adb-configuration.md) - Scripted provisioning |
+| **REST API** | [REST-API](rest-api.md) - HTTP endpoints and automation |
+| **MQTT** | [MQTT](MQTT.md) - Home Assistant integration |
+| **Roadmap** | [Roadmap-and-Changelog](roadmap-and-changelog.md) - Release planning |
 
 
 

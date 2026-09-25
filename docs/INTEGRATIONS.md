@@ -2,7 +2,7 @@
 
 **Connect FreeKiosk to your automation stack**
 
-[Docs Home](README) • [REST API](REST-API) • [MQTT](MQTT)
+[Docs Home](README.md) • [REST API](rest-api.md) • [MQTT](MQTT.md)
 
 
 > [!IMPORTANT]
@@ -23,8 +23,8 @@ FreeKiosk offers two main integration methods:
 
 | Channel | Best For | Documentation |
 |---------|----------|---------------|
-| **REST API** | On-demand control via HTTP | [REST API Docs](REST-API) |
-| **MQTT** | Real-time telemetry + Home Assistant | [MQTT Docs](MQTT) |
+| **REST API** | On-demand control via HTTP | [REST API Docs](rest-api.md) |
+| **MQTT** | Real-time telemetry + Home Assistant | [MQTT Docs](MQTT.md) |
 
 ### Feature Comparison
 
@@ -73,7 +73,7 @@ curl -H "X-Api-Key: your-key" http://tablet-ip:8080/api/screenshot -o screenshot
 ```
 
 > [!TIP]
-> See the complete [REST API Reference](REST-API) for all endpoints.
+> See the complete [REST API Reference](rest-api.md) for all endpoints.
 
 
 ## MQTT
@@ -115,7 +115,7 @@ freekiosk/lobby/set/url              # Navigate to URL
 ```
 
 > [!TIP]
-> See the complete [MQTT Reference](MQTT) for topics and commands.
+> See the complete [MQTT Reference](MQTT.md) for topics and commands.
 
 
 ## Headless Setup
@@ -172,7 +172,7 @@ adb shell am start -n com.freekiosk/.MainActivity \
 ```
 
 > [!NOTE]
-> See the complete [ADB Configuration Guide](ADB-Configuration) for all parameters.
+> See the complete [ADB Configuration Guide](adb-configuration.md) for all parameters.
 
 
 ## Choosing Your Integration
@@ -201,8 +201,8 @@ Use both for maximum flexibility:
 
 ## Related Documentation
 
-- **REST API:** [Complete endpoint reference](REST-API)
-- **MQTT:** [Topics, discovery, and commands](MQTT)
-- **ADB Configuration:** [Headless provisioning](ADB-Configuration)
-- **Installation:** [Device setup guide](Installation)
-- **FAQ:** [Common questions](FAQ)
+- **REST API:** [Complete endpoint reference](rest-api.md)
+- **MQTT:** [Topics, discovery, and commands](MQTT.md)
+- **ADB Configuration:** [Headless provisioning](adb-configuration.md)
+- **Installation:** [Device setup guide](installation.md)
+- **FAQ:** [Common questions](faq.md)

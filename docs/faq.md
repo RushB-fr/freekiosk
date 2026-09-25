@@ -2,10 +2,10 @@
 
 **Common questions and troubleshooting for FreeKiosk**
 
-[Docs Home](README) • [Installation](Installation) • [Integrations](Integrations)
+[Docs Home](README.md) • [Installation](installation.md) • [Integrations](INTEGRATIONS.md)
 
 > [!TIP]
-> Start from [Installation Guide](Installation) for first deployment, then use this page for edge cases.
+> Start from [Installation Guide](installation.md) for first deployment, then use this page for edge cases.
 
 ## Installation
 
@@ -13,7 +13,7 @@
 - **A:** No! FreeKiosk uses Android's official Device Owner API. **No root required**.
 
 **Q: Do I need Android Studio?**
-- **A:** No! Just ADB tool (15 MB download). See [Installation Guide](Installation).
+- **A:** No! Just ADB tool (15 MB download). See [Installation Guide](installation.md).
 
 **Q: Can I install from Play Store?**
 - **A:** Yes! Search "FreeKiosk" on Google Play Store, or download APK from [Releases](https://github.com/rushb-fr/freekiosk/releases).
@@ -228,7 +228,7 @@
 **Q: Where can I get help?**
 | Resource | Link |
 |---|---|
-| **Installation Guide** | [Installation](Installation) |
+| **Installation Guide** | [Installation](installation.md) |
 | **GitHub Discussions** | [Discussions](https://github.com/rushb-fr/freekiosk/discussions) |
 | **Report Bug** | [Issues](https://github.com/rushb-fr/freekiosk/issues) |
 | **Email Support** | support@freekiosk.app |

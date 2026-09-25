@@ -71,7 +71,7 @@ adb shell am start -n com.freekiosk/.MainActivity \
 
 
 > [!NOTE]
-> See [ADB Configuration Guide](ADB-Configuration) for full headless provisioning.
+> See [ADB Configuration Guide](adb-configuration.md) for full headless provisioning.
 
 
 ## Endpoints Reference
@@ -369,7 +369,7 @@ curl http://TABLET_IP:8080/api/screenshot -o screenshot.png
 > {"success": false, "error": "Accessibility service is not enabled (required to capture another app)"}
 > ```
 
-> 💡 Home Assistant users can also get the screenshot as an auto-discovered `image` / `camera` entity over MQTT, without exposing the HTTP server — see [MQTT: Images (Screenshot & Camera)](MQTT#-images-screenshot--camera).
+> 💡 Home Assistant users can also get the screenshot as an auto-discovered `image` / `camera` entity over MQTT, without exposing the HTTP server — see [MQTT: Images (Screenshot & Camera)](MQTT.md#-images-screenshot--camera).
 
 #### `GET /api/camera/photo`
 
@@ -406,7 +406,7 @@ GET /api/camera/photo?camera=front&rotate=90
 - Higher quality values produce larger files
 - Capture fails while motion detection is using the camera
 
-> 💡 Camera snapshots can also be published over MQTT as auto-discovered `image` / `camera` entities (one per camera) with a capture button in Home Assistant — see [MQTT: Images (Screenshot & Camera)](MQTT#-images-screenshot--camera).
+> 💡 Camera snapshots can also be published over MQTT as auto-discovered `image` / `camera` entities (one per camera) with a capture button in Home Assistant — see [MQTT: Images (Screenshot & Camera)](MQTT.md#-images-screenshot--camera).
 
 #### `GET /api/camera/list`
 
@@ -1041,7 +1041,7 @@ they are two switches and not one.
 > the lag and costs one HTTP request per tablet per interval. If you want a toggle that
 > updates the instant the tablet changes, use MQTT instead: it publishes on the real
 > `ACTION_SCREEN_ON` / `ACTION_SCREEN_OFF` broadcast and Home Assistant discovers the
-> entities on its own. See [MQTT](MQTT). The two can coexist on the same tablet.
+> entities on its own. See [MQTT](MQTT.md). The two can coexist on the same tablet.
 
 ### Screenshot Camera
 
@@ -1185,9 +1185,8 @@ Common errors:
 
 ## See Also
 
-- [ADB Configuration Guide](ADB-Configuration) - Headless provisioning via ADB
-- [MDM Specification](MDM-SPEC) - Enterprise deployment
-- [Installation Guide](Installation) - Manual setup
+- [ADB Configuration Guide](adb-configuration.md) - Headless provisioning via ADB
+- [Installation Guide](installation.md) - Manual setup
 
 
 ## Changelog

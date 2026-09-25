@@ -427,7 +427,7 @@ Commands are sent by publishing to `{baseTopic}/{topicId}/set/{entity}`.
 
 
 > [!NOTE]
-> Commands have full parity with the [REST API](REST-API). Both interfaces dispatch through the same native command handler. Remote control and keyboard commands are handled natively via the AccessibilityService (cross-app) or Activity key dispatch (in-app). TTS and Toast are also handled natively (no JS round-trip).
+> Commands have full parity with the [REST API](rest-api.md). Both interfaces dispatch through the same native command handler. Remote control and keyboard commands are handled natively via the AccessibilityService (cross-app) or Activity key dispatch (in-app). TTS and Toast are also handled natively (no JS round-trip).
 
 
 ## Motion Detection
