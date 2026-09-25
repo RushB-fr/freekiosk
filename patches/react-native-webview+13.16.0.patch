@@ -1,8 +1,8 @@
 diff --git a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebChromeClient.java b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebChromeClient.java
-index 07f73fd..275f2cd 100644
+index 07f73fd..877e13e 100644
 --- a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebChromeClient.java
 +++ b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebChromeClient.java
-@@ -144,72 +144,32 @@ public class RNCWebChromeClient extends WebChromeClient implements LifecycleEven
+@@ -144,72 +144,66 @@ public class RNCWebChromeClient extends WebChromeClient implements LifecycleEven
  
      @Override
      public void onPermissionRequest(final PermissionRequest request) {
@@ -36,22 +36,6 @@ index 07f73fd..275f2cd 100644
 -                    grantedPermissions.add(requestedResource);
 -                } else {
 -                    requestedAndroidPermissions.add(androidPermission);
--                }
--            }
--        }
--
--        // If all the permissions are already granted, send the response to the WebView synchronously
--        if (requestedAndroidPermissions.isEmpty()) {
--            request.grant(grantedPermissions.toArray(new String[0]));
--            grantedPermissions = null;
--            return;
--        }
--
--        // Otherwise, ask to Android System for native permissions asynchronously
--
--        this.permissionRequest = request;
--
--        requestPermissions(requestedAndroidPermissions);
 +        /**
 +         * FreeKiosk: Auto-grant all WebView media permission requests (camera, microphone,
 +         * protected media) without going through the native Android permission dialog.
@@ -70,6 +54,52 @@ index 07f73fd..275f2cd 100644
 +         * Auto-granting is the correct behavior. The actual hardware access is still
 +         * gated by the Android-level permission (granted via pm grant or Device Owner).
 +         */
++        /**
++         * FreeKiosk #219: the grant above covers the web layer only. Chromium still needs
++         * the app to hold the matching Android runtime permission, and by removing the
++         * original requestPermissions() path this patch left nothing in FreeKiosk asking
++         * for CAMERA / RECORD_AUDIO outside the permission wizard: getUserMedia() failed
++         * with no prompt and no clue. Request whatever is missing, fire and forget, so the
++         * unconditional grant below keeps the Fire OS behaviour intact.
++         *
++         * Note: the system suppresses this dialog while the device is in lock task, so the
++         * permission has to be granted before Lock Mode is enabled, or via
++         * `adb shell pm grant com.freekiosk android.permission.CAMERA`.
++         */
++        try {
++            ArrayList<String> missingAndroidPermissions = new ArrayList<>();
++            for (String requestedResource : request.getResources()) {
++                String androidPermission = null;
++                if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(requestedResource)) {
++                    androidPermission = Manifest.permission.RECORD_AUDIO;
++                } else if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(requestedResource)) {
++                    androidPermission = Manifest.permission.CAMERA;
++                }
++                if (androidPermission != null && ContextCompat.checkSelfPermission(
++                        this.mWebView.getThemedReactContext(), androidPermission) != PackageManager.PERMISSION_GRANTED) {
++                    missingAndroidPermissions.add(androidPermission);
+                 }
+             }
++            if (!missingAndroidPermissions.isEmpty()) {
++                requestPermissions(missingAndroidPermissions);
++            }
++        } catch (Exception e) {
++            // getPermissionAwareActivity() throws when detached from an Activity. Never let
++            // that block the grant below.
+         }
+ 
+-        // If all the permissions are already granted, send the response to the WebView synchronously
+-        if (requestedAndroidPermissions.isEmpty()) {
+-            request.grant(grantedPermissions.toArray(new String[0]));
+-            grantedPermissions = null;
+-            return;
+-        }
+-
+-        // Otherwise, ask to Android System for native permissions asynchronously
+-
+-        this.permissionRequest = request;
+-
+-        requestPermissions(requestedAndroidPermissions);
 +        request.grant(request.getResources());
      }
  

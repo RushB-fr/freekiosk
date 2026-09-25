@@ -27,7 +27,7 @@
 
 
 > [!NOTE]
-> This page focuses on **contributor setup**. Operational deployment is documented in [`installation.md`](Installation).
+> This page focuses on **contributor setup**. Operational deployment is documented in [`installation.md`](installation.md).
 
 ## Prerequisites
 
@@ -103,12 +103,22 @@ npx react-native run-android --device <device_id>
 # Navigate to Android directory
 cd android
 
-# Build release APK
+# Build release APK (GitHub release, website download)
 ./gradlew assembleRelease
 
+# Build release APK for the cloud (accessibility service stripped, see below)
+./gradlew assembleRelease -Pcloudprovi
+
 # Build release AAB (for Play Store)
-./gradlew assembleBundle
+./gradlew bundleRelease -Pplaystore
 ```
+
+A release produces **two** APKs. The one uploaded to FreeKiosk Cloud must be the
+`-Pcloudprovi` build: the cloud serves it to the Android setup wizard during QR Device Owner
+provisioning, and Play Protect blocks a sideloaded install that declares an accessibility
+service, stopping the wizard with "App blocked to protect your device". The GitHub APK keeps
+the service for ADB provisioning, which is also the only way to grant the
+`WRITE_SECURE_SETTINGS` that lets it be enabled.
 
 
 
@@ -135,7 +145,7 @@ cd android
 | **Contributing Guide** | [CONTRIBUTING.md](../CONTRIBUTING.md) |
 | **Issue Tracker** | [GitHub Issues](https://github.com/rushb-fr/freekiosk/issues) |
 | **Discussions** | [GitHub Discussions](https://github.com/rushb-fr/freekiosk/discussions) |
-| **FAQ** | [FAQ](FAQ) |
+| **FAQ** | [FAQ](faq.md) |
 
 
 
@@ -153,11 +163,11 @@ cd android
 
 | Documentation | Focus |
 |---|---|
-| **Install Guide** | [Installation](Installation) - Manual setup instructions |
-| **ADB Configuration** | [ADB-Configuration](ADB-Configuration) - Scripted provisioning |
-| **REST API** | [REST-API](REST-API) - HTTP endpoints and automation |
-| **MQTT** | [MQTT](MQTT) - Home Assistant integration |
-| **Roadmap** | [Roadmap-and-Changelog](Roadmap-and-Changelog) - Release planning |
+| **Install Guide** | [Installation](installation.md) - Manual setup instructions |
+| **ADB Configuration** | [ADB-Configuration](adb-configuration.md) - Scripted provisioning |
+| **REST API** | [REST-API](rest-api.md) - HTTP endpoints and automation |
+| **MQTT** | [MQTT](MQTT.md) - Home Assistant integration |
+| **Roadmap** | [Roadmap-and-Changelog](roadmap-and-changelog.md) - Release planning |
 
 
 

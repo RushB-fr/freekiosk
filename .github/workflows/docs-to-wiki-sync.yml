@@ -59,6 +59,9 @@ jobs:
       - name: Sync files to wiki repository
         run: |
           rsync -av --delete --exclude='.git/' docs/ wiki-repo/
+          # docs/ links to sibling pages as `page.md` so they work when browsing the
+          # repository; the wiki wants the bare page name (`page.md` there serves the raw file)
+          sed -E -i 's/\]\(([A-Za-z0-9_-]+)\.md(#[^)]*)?\)/](\1\2)/g' wiki-repo/*.md
           if [ -f wiki-repo/README.md ]; then
             cp wiki-repo/README.md wiki-repo/Home.md
           fi

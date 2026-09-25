@@ -6,16 +6,26 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { Colors, Spacing, Typography } from '../../theme';
+import Icon, { IconName } from '../Icon';
 
 interface SettingsInfoBoxProps {
   title?: string;
+  icon?: IconName;
   children: React.ReactNode;
   variant?: 'info' | 'warning' | 'error' | 'success';
   style?: ViewStyle;
 }
 
+const DEFAULT_ICONS: Record<string, IconName> = {
+  info: 'information',
+  warning: 'alert',
+  error: 'alert-circle',
+  success: 'check-circle',
+};
+
 const SettingsInfoBox: React.FC<SettingsInfoBoxProps> = ({
   title,
+  icon,
   children,
   variant = 'info',
   style,
@@ -66,7 +76,12 @@ const SettingsInfoBox: React.FC<SettingsInfoBoxProps> = ({
         style,
       ]}
     >
-      {title && <Text style={[styles.title, { color: colors.title }]}>{title}</Text>}
+      {title && (
+        <View style={styles.titleRow}>
+          <Icon name={icon ?? DEFAULT_ICONS[variant]} size={18} color={colors.title} style={styles.titleIcon} />
+          <Text style={[styles.title, { color: colors.title }]}>{title}</Text>
+        </View>
+      )}
       {typeof children === 'string' ? (
         <Text style={[styles.text, { color: colors.text }]}>{children}</Text>
       ) : (
@@ -83,10 +98,18 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     marginTop: Spacing.sm,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  titleIcon: {
+    marginRight: Spacing.sm,
+  },
   title: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: Spacing.sm,
+    flex: 1,
   },
   text: {
     ...Typography.body,

@@ -111,6 +111,15 @@ adb shell am start -n com.freekiosk/.MainActivity [OPTIONS]
 
 
 
+> [!TIP]
+> **Types are interchangeable.** `--es kiosk_enabled "true"`, `--ez kiosk_enabled true` and
+> `--ei return_tap_count 5` all work; the value is stored as text either way. This was not
+> true before, and passing a boolean key with `--es` used to be silently ignored.
+>
+> **Unknown keys are reported.** A key FreeKiosk does not recognize is now named in a toast
+> on the device and in logcat (`adb logcat | grep FreeKiosk-ADB`) instead of being dropped in
+> silence. If a setting did not apply, look there first.
+
 ### Required Parameters
 
 | Parameter | Type | Description |
@@ -151,6 +160,150 @@ Each app in the array supports these fields:
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `--es url "https://..."` | String | URL to display in kiosk WebView |
+
+### Dashboard Parameters
+
+The dashboard is a grid of tiles, each opening its own URL. It lives inside the WebView
+display mode, so `--ez dashboard_mode true` sets `display_mode` to `webview` on its own
+unless `lock_package` says otherwise.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `--ez dashboard_mode true` | Boolean | Show the tile grid instead of a single URL |
+| `--es dashboard_tiles '[...]'` | String (JSON) | JSON array of tiles (see format below) |
+
+**Tile format:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `url` | String | **required** | URL the tile opens. A tile without one is skipped |
+| `label` | String | the URL | Text shown under the icon |
+| `id` | String | generated | Unique tile id. Let FreeKiosk generate it unless you are updating a specific tile |
+| `iconMode` | String | `favicon` | `favicon`, `image`, or `letter`. An unknown value falls back to `favicon` |
+| `iconValue` | String | - | Image URL, used when `iconMode` is `image` |
+| `order` | Number | list position | Display order in the grid |
+
+```bash
+adb shell am start -n com.freekiosk/.MainActivity   --es pin "1234"   --ez dashboard_mode true   --es dashboard_tiles '[{"label":"Main app","url":"https://myapp.eu"},{"label":"Reports","url":"https://reports.myapp.eu"}]'
+```
+
+The same two keys work inside `--es config` as `dashboard_mode` and `dashboard_tiles`.
+
+### Additional Settings
+
+Every key below is a straight passthrough: the value you pass is stored as-is.
+
+**Navigation and exit**
+
+| Parameter | Description |
+|-----------|-------------|
+| `--es return_mode "taps"` | How to reach settings: `taps` (hidden tap zone) or `button` (fixed button) |
+| `--es return_button_position "top-left"` | Fixed-button corner: `top-left`, `top-right`, `bottom-left`, `bottom-right` |
+| `--ei return_tap_count 5` | Number of taps to open settings |
+| `--ei return_tap_timeout 1500` | Milliseconds allowed between taps |
+| `--ez volume_up_5tap_enabled true` | Five presses of Volume Up opens settings |
+| `--ez webview_back_button_enabled true` | Show an in-page back button in WebView mode |
+| `--es back_button_timer_delay "10"` | Countdown in seconds when `back_button_mode` is `timer` |
+| `--ez overlay_button_visible true` | Show the floating return button in External App mode |
+| `--es overlay_button_position "bottom-right"` | Corner for that button |
+| `--ei pin_max_attempts 5` | Wrong-PIN attempts before lockout |
+| `--es keyboard_mode "default"` | On-screen keyboard behavior |
+
+**Lockdown**
+
+| Parameter | Description |
+|-----------|-------------|
+| `--ez allow_power_button true` | Allow the power menu in lock task |
+| `--ez allow_notifications false` | Allow the notification shade in lock task |
+| `--ez allow_system_info false` | Allow the status bar system info in lock task |
+| `--ez block_factory_reset false` | Apply the `DISALLOW_FACTORY_RESET` restriction |
+| `--ez keep_screen_on true` | Keep the display awake |
+
+**WebView behavior**
+
+| Parameter | Description |
+|-----------|-------------|
+| `--ez auto_reload true` | Periodically reload the page |
+| `--ez pdf_viewer_enabled true` | Open PDFs in the bundled viewer |
+| `--es webview_zoom_level "100"` | Page zoom, 50 to 200 |
+| `--es webview_zoom_mode "standard"` | `standard` (CSS zoom) or `fit` (reflow) |
+| `--ez disable_user_zoom false` | Block pinch and double-tap zoom |
+| `--ez inactivity_return_enabled false` | Return to the start URL after inactivity |
+| `--es inactivity_return_delay "60"` | That delay, in seconds |
+
+**Multiple URLs**
+
+| Parameter | Description |
+|-----------|-------------|
+| `--ez url_rotation_enabled true` | Cycle through a list of URLs |
+| `--es url_rotation_list '["https://a","https://b"]'` | The list, as a JSON array |
+| `--es url_rotation_interval "30"` | Seconds between changes, minimum 5 |
+| `--ez url_planner_enabled true` | Schedule URLs by day and time |
+| `--es url_planner_events '[...]'` | Planner events, as a JSON array |
+
+**URL filtering**
+
+| Parameter | Description |
+|-----------|-------------|
+| `--ez url_filter_enabled true` | Restrict which URLs may load |
+| `--es url_filter_mode "blacklist"` | `blacklist` or `whitelist` |
+| `--es url_filter_list '[]'` | Patterns, as a JSON array |
+| `--ez url_filter_show_feedback true` | Tell the user when a URL is blocked |
+
+**Screen and brightness**
+
+| Parameter | Description |
+|-----------|-------------|
+| `--ez brightness_management_enabled true` | Let FreeKiosk manage brightness |
+| `--es default_brightness "0.5"` | Brightness from 0 to 1 |
+| `--ez auto_brightness_enabled false` | Follow the ambient light sensor |
+| `--ez screen_scheduler_enabled false` | Turn the screen on and off on a schedule |
+| `--es screen_scheduler_rules '[]'` | Schedule rules, as a JSON array |
+| `--ez screen_scheduler_wake_on_touch true` | Touch wakes the screen outside scheduled hours |
+| `--es screensaver_delay "300"` | Inactivity before the screensaver, in seconds |
+| `--es screensaver_brightness "0"` | Brightness while the screensaver is showing |
+
+**Screen scheduler rule format**
+
+`screen_scheduler_rules` takes a JSON array of rules. Each rule:
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `id` | string | Any unique identifier |
+| `name` | string | Shown in the app's rule list |
+| `enabled` | boolean | A disabled rule is kept but ignored |
+| `days` | number[] | `0` = Sunday, `1` = Monday … `6` = Saturday |
+| `sleepTime` | `"HH:MM"` | 24-hour time the screen turns **off** |
+| `wakeTime` | `"HH:MM"` | 24-hour time the screen turns **on** |
+
+Times are in the tablet's own time zone.
+
+When `sleepTime` is **later** than `wakeTime`, the window runs overnight and `days` names
+the evening it **starts**. So `[1,2,3,4,5]` with `sleepTime "17:00"` and `wakeTime "07:00"`
+turns the screen off every weekday evening and back on the next morning, and leaves it on
+all weekend: Saturday is not listed, so no window starts on Saturday evening, and the one
+that started on Friday ends on Saturday at 07:00. List `0` and `6` as well for every night.
+
+When `sleepTime` is earlier than `wakeTime`, the window sits within the day (a lunch
+break, say) on the listed days. Equal times, or a time that is not `HH:MM`, and the rule is
+ignored.
+
+```bash
+adb shell am start -n com.freekiosk/.MainActivity   --es pin "1234"   --ez screen_scheduler_enabled true   --es screen_scheduler_rules '[{"id":"office","name":"Office hours","enabled":true,"days":[1,2,3,4,5],"sleepTime":"17:00","wakeTime":"07:00"}]'
+```
+
+This is the format `src/types/screenScheduler.ts` implements, and the one the app's own rule
+editor writes, so a rule built on a tablet and read back from the cloud is a valid example.
+
+**Status bar**
+
+| Parameter | Description |
+|-----------|-------------|
+| `--ez status_bar_enabled true` | Show FreeKiosk's own status bar |
+| `--ez status_bar_show_battery true` | Battery indicator |
+| `--ez status_bar_show_wifi true` | Wi-Fi indicator |
+| `--ez status_bar_show_time true` | Clock |
+| `--es status_bar_theme "dark"` | Status bar theme |
 
 ### Kiosk Mode Options
 
@@ -556,6 +709,146 @@ Write-Host "✅ Device provisioned!"
 
 ## Troubleshooting
 
+### Error: "Can't set package ... as device owner"
+
+```
+java.lang.RuntimeException: Can't set package ComponentInfo{com.freekiosk/com.freekiosk.DeviceAdminReceiver} as device owner.
+        at com.android.commands.dpm.Dpm.runSetDeviceOwner(Dpm.java:177)
+```
+
+`dpm` reports every provisioning failure with this same message, so it never tells
+you which precondition failed. Run the diagnostic script instead — it checks each
+one separately and names the blocker:
+
+```powershell
+# Windows
+.\scripts\set-device-owner.ps1
+```
+
+The preconditions it checks, and how to clear each:
+
+| Blocker | Fix |
+| --- | --- |
+| FreeKiosk not installed | `adb install app-release.apk` |
+| A device owner is already set | Factory reset. `-Remove` / `dpm remove-active-admin` only works if the APK was built `android:testOnly="true"` |
+| Secondary users exist | `adb shell pm remove-user <id>` |
+| Any account is on the device | Remove every account under Settings → Accounts, then retry |
+| `android.software.device_admin` missing | See below — the ROM has no device policy support |
+
+> [!WARNING]
+> `adb shell dpm set-active-admin` prints `Success:` even when it did nothing —
+> the tool never checks the return value. Confirm with
+> `adb shell dumpsys device_policy`, which lists the admin only if it really
+> was registered.
+
+#### ROM does not declare `android.software.device_admin`
+
+Many cheap Android TV boxes (MXQ, X96, H96 and similar) ship AOSP TV builds with
+the device admin feature stripped out. Check with:
+
+```bash
+adb shell pm list features | grep device_admin
+```
+
+If that prints nothing, `DevicePolicyManagerService` is running with
+`mHasFeature = false`: `setDeviceOwner()` returns `false` unconditionally and
+`setActiveAdmin()` is a no-op. **No change to FreeKiosk can work around this** —
+the feature has to be declared in the system image.
+
+On a `userdebug` or `eng` build that grants `adb root` (check with
+`adb shell getprop ro.build.type`), the script can declare it for you:
+
+```powershell
+.\scripts\set-device-owner.ps1 -Fix    # writes to /system, then REBOOTS the device
+```
+
+Equivalent manual steps:
+
+```bash
+adb root && adb remount
+adb shell 'cat > /system/etc/permissions/android.software.device_admin.xml <<EOF
+<permissions>
+    <feature name="android.software.device_admin" />
+</permissions>
+EOF'
+adb shell chmod 644 /system/etc/permissions/android.software.device_admin.xml
+adb shell restorecon /system/etc/permissions/android.software.device_admin.xml
+adb reboot                       # the feature list is only parsed at boot
+adb shell dpm set-device-owner com.freekiosk/.DeviceAdminReceiver
+```
+
+Notes:
+
+- The change survives reboots, but **not** a factory reset or an OTA that
+  rewrites `/system`. Reapply it after either.
+- On a `user` build without `adb root`, `/system` cannot be modified. Such a box
+  cannot be provisioned as Device Owner without reflashing it, so run FreeKiosk
+  in its non-Device-Owner mode instead (grant "Display over other apps" and
+  "Usage Access" by hand — see the sections below).
+- `android.software.managed_users` is usually missing on the same ROMs. Device
+  Owner and lock task do not need it; work profiles and secondary users do.
+
+### FreeKiosk does not start after a reboot
+
+First confirm it is really the boot path that is broken, not the app:
+
+```bash
+adb logcat -d | grep -E 'Start proc .*freekiosk|E/BootReceiver'
+```
+
+`BootReceiver` logs an error about `WRITE_SECURE_SETTINGS` on every `BOOT_COMPLETED`
+run (harmless in itself). **If that line is absent after a reboot, the receiver never
+received `BOOT_COMPLETED`** — the ROM dropped the broadcast, and no FreeKiosk setting
+can fix it. Verify the receiver itself still works by delivering an equivalent
+broadcast by hand:
+
+```bash
+adb root
+adb shell am broadcast -a android.intent.action.QUICKBOOT_POWERON -n com.freekiosk/.BootReceiver
+# FreeKiosk should appear ~4 s later
+```
+
+> [!NOTE]
+> `am broadcast -a android.intent.action.BOOT_COMPLETED` is silently dropped even as
+> root — it is a protected broadcast. It prints `Broadcast completed: result=0` and
+> starts nothing, which looks like a FreeKiosk bug but is not. Use
+> `QUICKBOOT_POWERON`, which `BootReceiver` also handles.
+
+Two ROM behaviours have been observed to break boot launch, both on Android TV boxes
+(Droidlogic/MXQ, Android 9):
+
+1. **`BOOT_COMPLETED` is never delivered to third-party manifest receivers**, so
+   "Launch on Boot" never fires.
+2. **The Home intent is resolved while user 0 is still locked.** `MainActivity` is not
+   `directBootAware`, so it is filtered out of that query and the OEM launcher wins
+   Home — the Device Owner default-launcher policy is registered correctly but is
+   never consulted. Android does not re-resolve Home after unlock, so the OEM launcher
+   keeps the screen for the rest of the session. `pm disable-user` on the OEM launcher
+   does not help: the ROM re-enables it at boot.
+
+Confirm (2) with:
+
+```bash
+adb shell pm resolve-activity -a android.intent.action.MAIN -c android.intent.category.HOME
+```
+
+If that returns `com.freekiosk.MainActivity` while the OEM launcher is nonetheless on
+screen after a reboot, the Home intent was resolved before FreeKiosk was eligible.
+
+**Workaround** (needs a `userdebug`/`eng` ROM that grants `adb root`):
+
+```powershell
+.\scripts\install-boot-autostart.ps1     # installs, reboots, verifies
+```
+
+It installs `/system/bin/freekiosk-autostart.sh` and an init `.rc` that runs it on
+`sys.boot_completed=1`; the script waits for user 0 to unlock, then starts
+`MainActivity`, retrying up to three times. Verified over three consecutive reboots on
+the MXQ box. Undo with `.\scripts\install-boot-autostart.ps1 -Uninstall` and a reboot.
+
+Like the `device_admin` patch above, this lives in `/system` and does not survive a
+factory reset or an OTA that rewrites `/system`.
+
 ### Error: "PIN required for first setup"
 
 **Cause**: Device has no PIN configured, but none was provided.
@@ -666,9 +959,8 @@ adb shell pm clear com.freekiosk
 
 
 
-- [REST API Documentation](REST-API) - Remote control via HTTP
-- [MDM Specification](MDM-SPEC) - Enterprise deployment
-- [Installation Guide](Installation) - Manual setup instructions
+- [REST API Documentation](rest-api.md) - Remote control via HTTP
+- [Installation Guide](installation.md) - Manual setup instructions
 
 
 

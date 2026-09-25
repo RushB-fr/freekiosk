@@ -13,6 +13,7 @@ import {
   Alert,
 } from 'react-native';
 import { Colors, Spacing, Typography } from '../../theme';
+import Icon from '../Icon';
 
 interface UrlListEditorProps {
   urls: string[];
@@ -163,7 +164,7 @@ const UrlListEditor: React.FC<UrlListEditorProps> = ({
                   style={[styles.actionButton, styles.deleteButton]}
                   onPress={() => handleRemoveUrl(index)}
                 >
-                  <Text style={styles.deleteButtonText}>✕</Text>
+                  <Icon name="close" size={18} color={Colors.error} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -171,7 +172,7 @@ const UrlListEditor: React.FC<UrlListEditorProps> = ({
         </View>
       ) : (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyStateIcon}>{patternMode ? '🔗' : '📋'}</Text>
+          <Icon name={patternMode ? 'link-variant' : 'format-list-bulleted'} size={36} color={Colors.textHint} style={styles.emptyStateIcon} />
           <Text style={styles.emptyStateText}>{emptyTitle || 'No URLs added yet'}</Text>
           <Text style={styles.emptyStateHint}>{emptyHint || 'Add URLs below to start rotation'}</Text>
         </View>

@@ -18,10 +18,31 @@ npm run lint                        # ESLint
 npm test                            # Jest unit tests
 npm test -- --testPathPattern=foo   # Run a single test file
 
-# Android build
-cd android && ./gradlew assembleRelease   # Release APK
-cd android && ./gradlew assembleBundle   # Release AAB (Play Store)
+# Android build - three variants, selected by a -P flag
+cd android && ./gradlew assembleRelease                 # APK for the GitHub release
+cd android && ./gradlew assembleRelease -Pcloudprovi    # APK uploaded to the cloud
+cd android && ./gradlew bundleRelease   -Pplaystore     # AAB for the Play Store
 ```
+
+| Build | Goes where | Self-update | AccessibilityService |
+|-------|-----------|-------------|----------------------|
+| `assembleRelease` | GitHub release, website download | yes | yes |
+| `assembleRelease -Pcloudprovi` | uploaded as the cloud's beta APK | yes | **stripped** |
+| `bundleRelease -Pplaystore` | Play Store | **no** | **stripped** |
+
+**A release needs two APK builds, not one.** The cloud serves its uploaded APK through two
+routes - the public `dpc-apk-download` the Android setup wizard fetches during QR
+provisioning, and the dashboard download a signed-in tester uses - so that one has to be the
+`-Pcloudprovi` build. Play Protect blocks a sideloaded install outright when the app declares
+an accessibility service ("App blocked to protect your device"), which kills QR provisioning
+mid-wizard with no way past it. The GitHub APK keeps the service, so anyone provisioning over
+ADB still gets it, and ADB is the only way to grant the `WRITE_SECURE_SETTINGS` it needs to
+turn on anyway.
+
+The two flags are mutually exclusive and the build fails if both are set. Each strips its
+service with `tools:node="remove"` in `android/app/src/<flag>/AndroidManifest.xml`, which
+removes the declaration rather than disabling it - Play Protect reads the manifest, so
+`android:enabled="false"` would not help.
 
 Output APK: `android/app/build/outputs/apk/release/app-release.apk`
 
@@ -76,7 +97,7 @@ Shared TypeScript types for complex features live in `src/types/` — important 
 `patches/` contains patch-package patches applied via `postinstall`. Do not upgrade patched dependencies without verifying the patches still apply.
 
 Current patches:
-- **`react-native-webview+13.16.0.patch`** — auto-grant camera/mic permissions in kiosk mode, SSL certificate handling for same-host redirects, a native `DownloadListener` hook routing PDFs to the bundled viewer, and a guard in `RNCWebViewManagerImpl.applyUserAgentString()` that catches the `IllegalArgumentException` Chromium throws for a custom User-Agent containing illegal header characters (it crashed the app on the Fabric mount thread) and falls back to the default UA.
+- **`react-native-webview+13.16.0.patch`** — auto-grant camera/mic permissions in kiosk mode (and, since #219, also request the matching Android runtime permission when it is missing: auto-granting only covers the web layer, and nothing else in the app asked for `CAMERA`/`RECORD_AUDIO` outside the permission wizard. The system suppresses that dialog in lock task, so it has to be granted before Lock Mode), SSL certificate handling for same-host redirects, a native `DownloadListener` hook routing PDFs to the bundled viewer, and a guard in `RNCWebViewManagerImpl.applyUserAgentString()` that catches the `IllegalArgumentException` Chromium throws for a custom User-Agent containing illegal header characters (it crashed the app on the Fabric mount thread) and falls back to the default UA.
 - **`@react-native-community+slider+5.1.1.patch`** — re-entrancy guard in `ReactSliderManager.onProgressChanged()` to stop a `StackOverflowError` when initializing a Slider on Android 8.x (#86).
 - **`@react-native-cookies+cookies+6.2.1.patch`** — build/compat fix.
 - **`react-native-vision-camera+4.7.3.patch`** — three fixes: (1) guard `CameraDevicesManager` against `getCameraIdList()` returning `null` on cameraless x86 / BlissOS devices, which otherwise throws an NPE during TurboModule init and crashes the app on launch (#187); (2) `runOnUiThreadAndWait()` now routes exceptions back to the suspended coroutine via `resumeWith(Result.failure(e))` instead of letting them escape as an uncaught exception on the UI Handler thread (which crashed the app); (3) `CameraViewModule.takePhoto()` calls `findCameraView()` inside `withPromise` so a `ViewNotFoundError` (CameraView unmounted mid-capture, e.g. motion detection) rejects the promise instead of crashing — the `backgroundCoroutineScope` has no exception handler. Together (2)+(3) fix the `ViewNotFoundError` crash from `findCameraView` reported on v1.2.19.

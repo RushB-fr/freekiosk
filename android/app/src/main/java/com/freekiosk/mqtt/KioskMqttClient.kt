@@ -31,7 +31,17 @@ data class MqttConfig(
     val statusInterval: Long = 30000, // 30 seconds
     val allowControl: Boolean = true,
     val deviceName: String? = null,
-    val useTls: Boolean = false
+    val useTls: Boolean = false,
+    // Image publishing (screenshot / camera snapshots over MQTT) — all disabled by default
+    val screenshotEnabled: Boolean = false,
+    val screenshotAuto: Boolean = false,
+    val screenshotIntervalMs: Long = 60000,
+    val screenshotQuality: Int = 70,
+    val screenshotMaxWidth: Int = 1280,
+    val cameraEnabled: Boolean = false,
+    val cameraAuto: Boolean = false,
+    val cameraIntervalMs: Long = 300000,
+    val cameraQuality: Int = 70
 )
 
 /**
@@ -52,6 +62,11 @@ class KioskMqttClient(
 
     companion object {
         private const val TAG = "KioskMqttClient"
+
+        // #155: delay before republishing the state after executing a command, so the
+        // action (brightness applied, screen locked, screensaver shown) has taken effect
+        // before the status is read back.
+        private const val COMMAND_STATE_PUBLISH_DELAY_MS = 600L
     }
 
     /** Device ID derived from Settings.Secure.ANDROID_ID (used for unique HA entity IDs). */
@@ -97,6 +112,14 @@ class KioskMqttClient(
 
     /**
      * Acquire WifiLock + WakeLock to keep MQTT alive when screen is off.
+     *
+     * Note (#234): the WifiLock does almost nothing here and must not be trusted.
+     * WIFI_MODE_FULL_HIGH_PERF is deprecated and the platform silently replaces it with
+     * WIFI_MODE_FULL_LOW_LATENCY, which per the SDK is "only active when the screen is on"
+     * and "only active when the acquiring app is running in the foreground". Switching the
+     * constant explicitly would change nothing. What actually keeps the connection alive
+     * with the screen off is the PARTIAL_WAKE_LOCK below, the process staying alive
+     * (KioskWatchdogService) and, on battery, the Doze exemption.
      */
     private fun acquireLocks() {
         try {
@@ -219,6 +242,9 @@ class KioskMqttClient(
     /** Optional MqttDiscovery instance for Home Assistant discovery config publishing. */
     var discovery: MqttDiscovery? = null
 
+    /** Publishes screenshot / camera snapshots. Null when no image stream is enabled. */
+    var imagePublisher: MqttImagePublisher? = null
+
     // ==================== Topic helpers ====================
 
     /** Base topic prefix for this device: {baseTopic}/{topicId} */
@@ -327,6 +353,8 @@ class KioskMqttClient(
     fun disconnect() {
         disconnectRequested = true
         stopStatusPublishing()
+        imagePublisher?.stop()
+        imagePublisher = null
         unregisterNetworkCallback()
         releaseLocks()
 
@@ -455,8 +483,18 @@ class KioskMqttClient(
         try {
             val currentIp = ipProvider?.invoke() ?: "0.0.0.0"
             discovery?.publishDiscoveryConfigs(this, currentIp)
+            // Remove entities of image streams that are no longer enabled
+            discovery?.publishImageDiscoveryRemovals(this)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to publish HA discovery configs: ${e.message}", e)
+        }
+
+        // 2b. Image streams: clear stale payloads, publish a first image, arm the timers
+        try {
+            imagePublisher?.clearDisabledTopics()
+            imagePublisher?.onConnected()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to initialize image publishing: ${e.message}", e)
         }
 
         // 3. Subscribe to command topics if control is allowed
@@ -524,11 +562,24 @@ class KioskMqttClient(
      * @param retained whether the message should be retained by the broker
      */
     fun publish(topic: String, payload: String, qos: Int = 0, retained: Boolean = false) {
+        publish(topic, payload.toByteArray(), qos, retained)
+    }
+
+    /**
+     * Publish a binary message to the given topic.
+     * Used for image payloads (JPEG screenshots and camera snapshots).
+     *
+     * @param topic    MQTT topic
+     * @param payload  raw message bytes
+     * @param qos      quality of service level (0 or 1)
+     * @param retained whether the message should be retained by the broker
+     */
+    fun publish(topic: String, payload: ByteArray, qos: Int = 0, retained: Boolean = false) {
         try {
             val mqttQos = if (qos >= 1) MqttQos.AT_LEAST_ONCE else MqttQos.AT_MOST_ONCE
             mqttClient?.publishWith()
                 ?.topic(topic)
-                ?.payload(payload.toByteArray())
+                ?.payload(payload)
                 ?.qos(mqttQos)
                 ?.retain(retained)
                 ?.send()
@@ -588,6 +639,8 @@ class KioskMqttClient(
             Log.d(TAG, "Status publishing stopped")
         }
         statusRunnable = null
+        // #155: drop a post-command publish still pending on the handler.
+        mainHandler.removeCallbacks(commandStatePublishRunnable)
     }
 
     // ==================== Incoming message handling ====================
@@ -623,10 +676,34 @@ class KioskMqttClient(
                     commandHandler?.invoke(command, params)
                 } catch (e: Exception) {
                     Log.e(TAG, "Error executing command $command: ${e.message}", e)
+                } finally {
+                    // #155: the state topic is retained, so without this the pre-command
+                    // value stands until the next periodic publish (up to 30s) and Home
+                    // Assistant's toggle snaps back to it.
+                    scheduleStatePublishAfterCommand()
                 }
             }
         } else {
             Log.w(TAG, "Unknown entity: $entity")
+        }
+    }
+
+    /**
+     * #155: republish the state shortly after a command, debounced so a burst of commands
+     * (an HA scene setting brightness and volume at once) results in a single publish.
+     */
+    private fun scheduleStatePublishAfterCommand() {
+        mainHandler.removeCallbacks(commandStatePublishRunnable)
+        mainHandler.postDelayed(commandStatePublishRunnable, COMMAND_STATE_PUBLISH_DELAY_MS)
+    }
+
+    private val commandStatePublishRunnable = Runnable {
+        try {
+            if (_isConnected && !disconnectRequested) {
+                statusProvider?.invoke()?.let { publishStatus(it) }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error publishing status after command: ${e.message}", e)
         }
     }
 
@@ -711,8 +788,41 @@ class KioskMqttClient(
             "keyboard_combo" -> "keyboardCombo" to JSONObject().put("map", payload)
             "keyboard_text" -> "keyboardText" to JSONObject().put("text", payload)
 
+            // Image publishing (screenshot / camera snapshots)
+            "screenshot_capture" -> "publishScreenshot" to null
+            "camera_capture_front" -> "publishCameraPhoto" to JSONObject().put("facing", "front")
+            "camera_capture_back" -> "publishCameraPhoto" to JSONObject().put("facing", "back")
+
+            "screenshot_auto" -> "setImageAutoPublish" to JSONObject()
+                .put("stream", "screenshot")
+                .put("value", payload.uppercase() == "ON")
+            "camera_auto" -> "setImageAutoPublish" to JSONObject()
+                .put("stream", "camera")
+                .put("value", payload.uppercase() == "ON")
+
+            // Home Assistant sends integers for integer steps, but tolerate "30.0" too
+            "screenshot_interval" -> imageIntervalCommand("screenshot", payload)
+            "camera_interval" -> imageIntervalCommand("camera", payload)
+
             else -> null to null
         }
+    }
+
+    /**
+     * Interval command for an image stream. Home Assistant sends integers for integer
+     * steps, but "30.0" is tolerated too. An unparseable payload yields no command at
+     * all: returning 0 would have been clamped up to the 5s minimum, so a typo on the
+     * topic put the device on the fastest possible capture loop instead of being ignored.
+     */
+    private fun imageIntervalCommand(stream: String, payload: String): Pair<String?, JSONObject?> {
+        val seconds = payload.toIntOrNull() ?: payload.toDoubleOrNull()?.toInt()
+        if (seconds == null) {
+            Log.w(TAG, "Ignoring $stream interval command: '$payload' is not a number")
+            return null to null
+        }
+        return "setImageInterval" to JSONObject()
+            .put("stream", stream)
+            .put("seconds", seconds)
     }
 
     // ==================== State queries ====================

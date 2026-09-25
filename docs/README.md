@@ -67,7 +67,7 @@ adb shell dpm set-device-owner com.freekiosk/.DeviceAdminReceiver
 ```
 
 > [!TIP]
-> See the complete [Installation Guide](Installation) for detailed setup instructions.
+> See the complete [Installation Guide](installation.md) for detailed setup instructions.
 
 
 ## Documentation Guide
@@ -76,26 +76,26 @@ adb shell dpm set-device-owner com.freekiosk/.DeviceAdminReceiver
 
 | Guide | Description | Link |
 |-------|-------------|------|
-| **Installation** | Complete setup guide from basic to Device Owner mode | [Read →](Installation) |
-| **Features & Modes** | Understand WebView, External App, Dashboard modes | [Read →](Features-and-Modes) |
-| **FAQ** | Common questions and troubleshooting | [Read →](FAQ) |
+| **Installation** | Complete setup guide from basic to Device Owner mode | [Read →](installation.md) |
+| **Features & Modes** | Understand WebView, External App, Dashboard modes | [Read →](features-and-modes.md) |
+| **FAQ** | Common questions and troubleshooting | [Read →](faq.md) |
 
 ### Integration & Automation
 
 | Guide | Description | Link |
 |-------|-------------|------|
-| **Integrations Overview** | Choose between REST API and MQTT | [Read →](Integrations) |
-| **REST API** | 40+ HTTP endpoints for device control | [Read →](REST-API) |
-| **MQTT** | Real-time telemetry and Home Assistant discovery | [Read →](MQTT) |
-| **ADB Configuration** | Headless provisioning and scripting | [Read →](ADB-Configuration) |
+| **Integrations Overview** | Choose between REST API and MQTT | [Read →](INTEGRATIONS.md) |
+| **REST API** | 40+ HTTP endpoints for device control | [Read →](rest-api.md) |
+| **MQTT** | Real-time telemetry and Home Assistant discovery | [Read →](MQTT.md) |
+| **ADB Configuration** | Headless provisioning and scripting | [Read →](adb-configuration.md) |
 
 ### Advanced Topics
 
 | Guide | Description | Link |
 |-------|-------------|------|
-| **Development** | Build and contribute to FreeKiosk | [Read →](Development) |
-| **Roadmap & Changelog** | Release notes and future plans | [Read →](Roadmap-and-Changelog) |
-| **Wiki Sync** | How documentation is published | [Read →](Pipeline-and-Wiki-Sync) |
+| **Development** | Build and contribute to FreeKiosk | [Read →](development.md) |
+| **Roadmap & Changelog** | Release notes and future plans | [Read →](roadmap-and-changelog.md) |
+| **Wiki Sync** | How documentation is published | [Read →](pipeline-and-wiki-sync.md) |
 
 
 ## Common Use Cases

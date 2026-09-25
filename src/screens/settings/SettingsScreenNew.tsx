@@ -16,7 +16,10 @@ import {
   Modal,
   StyleSheet,
   BackHandler,
+  DeviceEventEmitter,
 } from 'react-native';
+import { CLOUD_ENABLED } from '../../config/features';
+import { CONFIG_UPDATED_EVENT } from '../../utils/CloudSyncService';
 import CookieManager from '@react-native-cookies/cookies';
 import { Camera } from 'react-native-vision-camera';
 import { StorageService } from '../../utils/storage';
@@ -92,12 +95,14 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [motionEnabled, setMotionEnabled] = useState<boolean>(false);
   const [motionSensitivity, setMotionSensitivity] = useState<'low' | 'medium' | 'high'>('medium');
   const [motionCameraPosition, setMotionCameraPosition] = useState<'front' | 'back'>('front');
+  const [proximityEnabled, setProximityEnabled] = useState<boolean>(false);
   const [availableCameras, setAvailableCameras] = useState<Array<{position: 'front' | 'back', id: string}>>([]);
   const [screensaverBrightness, setScreensaverBrightness] = useState<number>(0);
   const [screensaverType, setScreensaverType] = useState<'dim' | 'url' | 'video'>('dim');
   const [screensaverUrl, setScreensaverUrl] = useState<string>('');
   const [screensaverVideoItems, setScreensaverVideoItems] = useState<MediaItem[]>([]);
   const [screensaverVideoLoop, setScreensaverVideoLoop] = useState<boolean>(true);
+  const [screensaverKeepExternalApp, setScreensaverKeepExternalApp] = useState<boolean>(false);
   const [pickingScreensaverMedia, setPickingScreensaverMedia] = useState<boolean>(false);
   const [defaultBrightness, setDefaultBrightness] = useState<number>(0.5);
   const [certificates, setCertificates] = useState<CertificateInfo[]>([]);
@@ -132,6 +137,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [keyboardMode, setKeyboardMode] = useState<string>('default');
   const [allowPowerButton, setAllowPowerButton] = useState<boolean>(true);
   const [blockFactoryReset, setBlockFactoryReset] = useState<boolean>(false);
+  const [allowRemoteScreenshot, setAllowRemoteScreenshot] = useState<boolean>(false);
   const [allowNotifications, setAllowNotifications] = useState<boolean>(false);
   const [allowSystemInfo, setAllowSystemInfo] = useState<boolean>(false);
   const [returnMode, setReturnMode] = useState<string>('tap_anywhere');
@@ -156,7 +162,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [webViewBackButtonEnabled, setWebViewBackButtonEnabled] = useState<boolean>(false);
   const [webViewBackButtonXPercent, setWebViewBackButtonXPercent] = useState<string>('2');
   const [webViewBackButtonYPercent, setWebViewBackButtonYPercent] = useState<string>('10');
-  
+  const [restartButtonEnabled, setRestartButtonEnabled] = useState<boolean>(false);
+  const [restartButtonLongPressSeconds, setRestartButtonLongPressSeconds] = useState<number>(5);
+
   // Auto-Brightness states
   const [autoBrightnessEnabled, setAutoBrightnessEnabled] = useState<boolean>(false);
   const [autoBrightnessMin, setAutoBrightnessMin] = useState<number>(0.1);
@@ -301,6 +309,27 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     checkLightSensor();
   }, []);
 
+  // A config pushed from the cloud while this screen is open used to leave it showing
+  // the old values, so an operator concluded the push had failed when it had not.
+  // Reloading in their back would throw away whatever they are typing, since this screen
+  // does not track unsaved edits, so ask. Keeping the edits and saving them later is a
+  // local edit like any other, and the regular sync takes it from there.
+  useEffect(() => {
+    if (!CLOUD_ENABLED) return;
+    const sub = DeviceEventEmitter.addListener(CONFIG_UPDATED_EVENT, () => {
+      Alert.alert(
+        'Configuration updated',
+        'FreeKiosk Cloud pushed a new configuration while this screen was open, so the values shown here are out of date.',
+        [
+          { text: 'Keep my edits', style: 'cancel' },
+          { text: 'Reload', onPress: () => { loadSettings(); } },
+        ],
+      );
+    });
+    return () => sub.remove();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Block Android back gesture/button on Settings screen to prevent PIN bypass (#93)
   useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -439,11 +468,13 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedMotionEnabled = await StorageService.getScreensaverMotionEnabled();
     const savedMotionSensitivity = await StorageService.getScreensaverMotionSensitivity();
     const savedMotionCameraPosition = await StorageService.getMotionCameraPosition();
+    const savedProximityEnabled = await StorageService.getScreensaverProximityEnabled();
     const savedScreensaverBrightness = await StorageService.getScreensaverBrightness();
     const savedScreensaverType = await StorageService.getScreensaverType();
     const savedScreensaverUrl = await StorageService.getScreensaverUrl();
     const savedScreensaverVideoItems = await StorageService.getScreensaverVideoItems<MediaItem>();
     const savedScreensaverVideoLoop = await StorageService.getScreensaverVideoLoop();
+    const savedScreensaverKeepExternalApp = await StorageService.getScreensaverKeepExternalApp();
     const hasPinConfigured = await hasSecurePin();
     
     setIsPinConfigured(hasPinConfigured);
@@ -469,11 +500,13 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setMotionEnabled(savedMotionEnabled ?? false);
     setMotionSensitivity((savedMotionSensitivity as 'low' | 'medium' | 'high') ?? 'medium');
     setMotionCameraPosition(savedMotionCameraPosition ?? 'front');
+    setProximityEnabled(savedProximityEnabled ?? false);
     setScreensaverBrightness(savedScreensaverBrightness ?? 0);
     setScreensaverType(savedScreensaverType);
     setScreensaverUrl(savedScreensaverUrl);
     setScreensaverVideoItems(savedScreensaverVideoItems);
     setScreensaverVideoLoop(savedScreensaverVideoLoop);
+    setScreensaverKeepExternalApp(savedScreensaverKeepExternalApp);
 
     // Detect available cameras (first attempt — may return [] on slow SoCs before
     // ProcessCameraProvider resolves; the CameraDevicesChanged listener handles the retry)
@@ -505,6 +538,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedKeyboardMode = await StorageService.getKeyboardMode();
     const savedAllowPowerButton = await StorageService.getAllowPowerButton();
     const savedBlockFactoryReset = await StorageService.getBlockFactoryReset();
+    const savedAllowRemoteScreenshot = await StorageService.getAllowRemoteScreenshot();
     const savedAllowNotifications = await StorageService.getAllowNotifications();
     const savedAllowSystemInfo = await StorageService.getAllowSystemInfo();
     const savedReturnMode = await StorageService.getReturnMode();
@@ -526,7 +560,11 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedWebViewBackButtonEnabled = await StorageService.getWebViewBackButtonEnabled();
     const savedWebViewBackButtonXPercent = await StorageService.getWebViewBackButtonXPercent();
     const savedWebViewBackButtonYPercent = await StorageService.getWebViewBackButtonYPercent();
-    
+
+    // Restart Button settings
+    const savedRestartButtonEnabled = await StorageService.getRestartButtonEnabled();
+    const savedRestartButtonLongPressSeconds = await StorageService.getRestartButtonLongPressSeconds();
+
     // Auto-Brightness settings
     const savedAutoBrightnessEnabled = await StorageService.getAutoBrightnessEnabled();
     const savedAutoBrightnessMin = await StorageService.getAutoBrightnessMin();
@@ -575,6 +613,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setKeyboardMode(savedKeyboardMode);
     setAllowPowerButton(savedAllowPowerButton);
     setBlockFactoryReset(savedBlockFactoryReset);
+    setAllowRemoteScreenshot(savedAllowRemoteScreenshot);
     setAllowNotifications(savedAllowNotifications);
     setAllowSystemInfo(savedAllowSystemInfo);
     setReturnMode(savedReturnMode);
@@ -590,6 +629,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     setWebViewBackButtonEnabled(savedWebViewBackButtonEnabled);
     setWebViewBackButtonXPercent(String(savedWebViewBackButtonXPercent));
     setWebViewBackButtonYPercent(String(savedWebViewBackButtonYPercent));
+    setRestartButtonEnabled(savedRestartButtonEnabled);
+    setRestartButtonLongPressSeconds(savedRestartButtonLongPressSeconds);
     setAutoBrightnessEnabled(savedAutoBrightnessEnabled);
     setAutoBrightnessMin(savedAutoBrightnessMin);
     setAutoBrightnessMax(savedAutoBrightnessMax);
@@ -1139,9 +1180,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
         // Latest version is newer than current
         setUpdateAvailable(true);
         setUpdateInfo(latestUpdate);
-        const betaTag = latestUpdate.isPrerelease ? ' 🧪 Beta' : '';
+        const betaTag = latestUpdate.isPrerelease ? ' Beta' : '';
         Alert.alert(
-          `🎉 Update Available${betaTag}`,
+          `Update Available${betaTag}`,
           `New version ${latestVer} available!${latestUpdate.isPrerelease ? ' (pre-release)' : ''}\n\nCurrent: ${currentVer}\n\nDo you want to download and install it?`,
           [
             { text: 'Later', style: 'cancel' },
@@ -1149,7 +1190,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
           ]
         );
       } else {
-        Alert.alert('✓ Up to Date', `You are using the latest version (${currentVer})`);
+        Alert.alert('Up to Date', `You are using the latest version (${currentVer})`);
       }
     } catch (error: any) {
       Alert.alert('Error', `Unable to check for updates: ${error.message || error.toString()}`);
@@ -1172,7 +1213,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       const canInstall = await UpdateModule.checkInstallPermission();
       if (!canInstall) {
         Alert.alert(
-          '⚠️ Permission Required',
+          'Permission Required',
           'FreeKiosk needs permission to install updates.\n\nPlease enable "Allow from this source" on the next screen, then come back and try the update again.',
           [
             { text: 'Cancel', style: 'cancel' },
@@ -1204,7 +1245,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       await UpdateModule.downloadAndInstall(updateData.downloadUrl, updateData.version);
       setDownloading(false);
       Alert.alert(
-        '✅ Update Ready',
+        'Update Ready',
         'The update has been downloaded successfully. The installation screen should appear shortly.\n\nIf nothing happens:\n• Check notification panel\n• Look for "Package installer"\n• Grant installation permission if prompted',
         [{ text: 'OK' }]
       );
@@ -1215,7 +1256,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       // Provide helpful message for install permission errors
       if (error?.code === 'INSTALL_PERMISSION' || errorMsg.includes('unknown sources')) {
         Alert.alert(
-          '⚠️ Install Permission Needed',
+          'Install Permission Needed',
           'The update was downloaded but cannot be installed.\n\nPlease enable "Install from unknown sources" for FreeKiosk in your device settings, then try again.\n\nOn restricted devices (e.g. Echo Show), use:\nadb install -r <apk>',
         );
       } else {
@@ -1289,11 +1330,21 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     let finalUrl = url.trim();
     if (displayMode === 'webview' && !dashboardModeEnabled) {
       const urlLower = finalUrl.toLowerCase();
-      if (urlLower.startsWith('file://') || urlLower.startsWith('javascript:') || urlLower.startsWith('data:')) {
-        Alert.alert('Security Error', 'This type of URL is not allowed. Use http:// or https://');
+      if (urlLower.startsWith('javascript:') || urlLower.startsWith('data:')) {
+        Alert.alert('Security Error', 'This type of URL is not allowed. Use http://, https:// or file://');
         return;
       }
-      if (!urlLower.startsWith('http://') && !urlLower.startsWith('https://')) {
+      // #239: local files are supported, but only the PDF Viewer setting gives the WebView
+      // file access. This check predates that and refused every file:// URL, so a local
+      // page could only be set over ADB.
+      if (urlLower.startsWith('file://') && !pdfViewerEnabled) {
+        Alert.alert(
+          'File access is off',
+          'To open a local file, turn on General > PDF Viewer > Inline PDF Viewer first. That setting is what gives the browser access to files on the device.',
+        );
+        return;
+      }
+      if (!urlLower.startsWith('http://') && !urlLower.startsWith('https://') && !urlLower.startsWith('file://')) {
         if (finalUrl.includes('.')) {
           finalUrl = 'https://' + finalUrl;
           setUrl(finalUrl);
@@ -1327,7 +1378,14 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
         return;
       }
     } else if (!isPinConfigured && !pin) {
-      Alert.alert('Error', 'Please enter a password');
+      // Save can be pressed from any tab, and the PIN lives on General. "Please enter a
+      // password" named neither, so an operator saving from Display had nothing to go
+      // on. Say where, and take them there.
+      Alert.alert(
+        'PIN required',
+        'Set the PIN in General > Password before saving. It protects the way out of kiosk mode.',
+        [{ text: 'Go to General', onPress: () => setActiveTab('general') }],
+      );
       return;
     }
 
@@ -1377,16 +1435,24 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.saveScreensaverInactivityDelay(inactivityDelayNumber * 60000);
     await StorageService.saveScreensaverMotionEnabled(motionEnabled);
     await StorageService.saveScreensaverMotionSensitivity(motionSensitivity);
+    await StorageService.saveScreensaverProximityEnabled(proximityEnabled);
     await StorageService.saveScreensaverBrightness(screensaverBrightness);
     await StorageService.saveScreensaverType(screensaverType);
     await StorageService.saveScreensaverUrl(screensaverUrl);
     await StorageService.saveScreensaverVideoItems(screensaverVideoItems);
     await StorageService.saveScreensaverVideoLoop(screensaverVideoLoop);
+    await StorageService.saveScreensaverKeepExternalApp(screensaverKeepExternalApp);
 
     if (displayMode === 'webview' || displayMode === 'media_player') {
       await StorageService.saveAutoReload(displayMode === 'webview' ? autoReload : false);
       await StorageService.saveKioskEnabled(kioskEnabled);
       await StorageService.saveDefaultBrightness(defaultBrightness);
+      // #242: also mirror it natively, so the wake paths and a reboot keep it.
+      try {
+        await AutoBrightnessModule.setDefaultBrightness(defaultBrightness);
+      } catch (error) {
+        console.warn('[Settings] Could not persist brightness natively:', error);
+      }
       
       // Auto-brightness settings
       await StorageService.saveAutoBrightnessEnabled(autoBrightnessEnabled);
@@ -1440,9 +1506,21 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.saveCustomUserAgent(customUserAgent);
     await StorageService.savePauseWebMediaWhenHidden(pauseWebMediaWhenHidden);
     await StorageService.saveHttpBasicAuthUsername(basicAuthUsername);
-    await saveSecureBasicAuthPassword(basicAuthPassword);
+    // Checked rather than discarded: on a device whose Keystore is broken (#258) this
+    // returns false, and saving the whole settings screen used to report success while
+    // the password had gone nowhere.
+    const basicAuthSaved = await saveSecureBasicAuthPassword(basicAuthPassword);
+    if (!basicAuthSaved && basicAuthPassword) {
+      Alert.alert(
+        'Password not saved',
+        'The HTTP Basic Auth password could not be written to secure storage on this ' +
+        'device. Every other setting on this screen was saved. This happens on firmwares ' +
+        'whose Android Keystore is broken.',
+      );
+    }
     await StorageService.saveAllowPowerButton(allowPowerButton);
     await StorageService.saveBlockFactoryReset(blockFactoryReset);
+    await StorageService.saveAllowRemoteScreenshot(allowRemoteScreenshot);
     await StorageService.saveAllowNotifications(allowNotifications);
     await StorageService.saveAllowSystemInfo(allowSystemInfo);
     await StorageService.saveReturnMode(returnMode);
@@ -1473,6 +1551,10 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       const yPercent = parseFloat(webViewBackButtonYPercent);
       await StorageService.saveWebViewBackButtonXPercent(isNaN(xPercent) ? 2 : Math.max(0, Math.min(100, xPercent)));
       await StorageService.saveWebViewBackButtonYPercent(isNaN(yPercent) ? 10 : Math.max(0, Math.min(100, yPercent)));
+
+      // Save Restart Button settings
+      await StorageService.saveRestartButtonEnabled(restartButtonEnabled);
+      await StorageService.saveRestartButtonLongPressSeconds(Math.max(1, Math.min(10, restartButtonLongPressSeconds)));
     } else {
       await StorageService.saveUrlRotationEnabled(false);
       await StorageService.saveUrlPlannerEnabled(false);
@@ -1730,7 +1812,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
 
   const handleRemoveDeviceOwner = async (): Promise<void> => {
     Alert.alert(
-      '⚠️ Remove Device Owner',
+      'Remove Device Owner',
       'WARNING: This will remove Device Owner privileges.\n\n' +
       'You will lose:\n' +
       '• Full kiosk mode\n' +
@@ -1886,6 +1968,10 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
               setWebViewBackButtonXPercent('2');
               setWebViewBackButtonYPercent('10');
             }}
+            restartButtonEnabled={restartButtonEnabled}
+            onRestartButtonEnabledChange={setRestartButtonEnabled}
+            restartButtonLongPressSeconds={restartButtonLongPressSeconds}
+            onRestartButtonLongPressSecondsChange={setRestartButtonLongPressSeconds}
             inactivityReturnEnabled={inactivityReturnEnabled}
             onInactivityReturnEnabledChange={setInactivityReturnEnabled}
             inactivityReturnDelay={inactivityReturnDelay}
@@ -2002,6 +2088,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             onScreensaverVideoItemsChange={setScreensaverVideoItems}
             screensaverVideoLoop={screensaverVideoLoop}
             onScreensaverVideoLoopChange={setScreensaverVideoLoop}
+            screensaverKeepExternalApp={screensaverKeepExternalApp}
+            onScreensaverKeepExternalAppChange={setScreensaverKeepExternalApp}
             onPickScreensaverMedia={handlePickScreensaverMediaFromDevice}
             pickingScreensaverMedia={pickingScreensaverMedia}
             inactivityDelay={inactivityDelay}
@@ -2012,6 +2100,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             onMotionSensitivityChange={setMotionSensitivity}
             motionCameraPosition={motionCameraPosition}
             onMotionCameraPositionChange={handleMotionCameraPositionChange}
+            proximityEnabled={proximityEnabled}
+            onProximityEnabledChange={setProximityEnabled}
             availableCameras={availableCameras}
             screenSchedulerEnabled={screenSchedulerEnabled}
             onScreenSchedulerEnabledChange={setScreenSchedulerEnabled}
@@ -2052,6 +2142,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             onAllowPowerButtonChange={setAllowPowerButton}
             blockFactoryReset={blockFactoryReset}
             onBlockFactoryResetChange={setBlockFactoryReset}
+            allowRemoteScreenshot={allowRemoteScreenshot}
+            onAllowRemoteScreenshotChange={setAllowRemoteScreenshot}
             allowNotifications={allowNotifications}
             onAllowNotificationsChange={setAllowNotifications}
             allowSystemInfo={allowSystemInfo}
@@ -2148,7 +2240,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       <Modal visible={downloading} transparent animationType="fade" onRequestClose={() => {}}>
         <View style={settingsStyles.modalOverlay}>
           <View style={settingsStyles.modalContent}>
-            <Text style={settingsStyles.modalTitle}>📥 Downloading</Text>
+            <Text style={settingsStyles.modalTitle}>Downloading</Text>
             <Text style={settingsStyles.modalText}>
               Please wait while downloading...
             </Text>
@@ -2161,18 +2253,25 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
 
       {/* Header */}
       <View style={settingsStyles.header}>
-        <Text style={settingsStyles.headerTitle}>⚙️ Settings</Text>
+        <Text style={settingsStyles.headerTitle}>Settings</Text>
         
         {/* Device Owner Badge */}
         <View style={[
           settingsStyles.deviceOwnerBadge,
+          settingsStyles.deviceOwnerBadgeRow,
           isDeviceOwner ? settingsStyles.deviceOwnerBadgeActive : settingsStyles.deviceOwnerBadgeInactive
         ]}>
+          <Icon
+            name={isDeviceOwner ? 'shield-check' : 'shield-off'}
+            size={16}
+            color={isDeviceOwner ? Colors.successDark : Colors.warningDark}
+            style={settingsStyles.deviceOwnerBadgeIcon}
+          />
           <Text style={[
             settingsStyles.deviceOwnerBadgeText,
             isDeviceOwner ? settingsStyles.deviceOwnerBadgeTextActive : settingsStyles.deviceOwnerBadgeTextInactive
           ]}>
-            {isDeviceOwner ? '🔒 Device Owner Active' : '🔓 Device Owner Inactive'}
+            {isDeviceOwner ? 'Device Owner Active' : 'Device Owner Inactive'}
           </Text>
         </View>
         
@@ -2212,8 +2311,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
         
         {/* Save Button - Always visible */}
         {activeTab !== 'advanced' && (
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-            <Text style={styles.saveButtonText}>💾 Save</Text>
+          <TouchableOpacity style={[styles.saveButton, styles.saveButtonRow]} onPress={handleSave}>
+            <Icon name="content-save" size={20} color={Colors.textOnPrimary} style={styles.saveButtonIcon} />
+            <Text style={styles.saveButtonText}>Save</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -2222,12 +2322,12 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       <Modal visible={showAppPicker} animationType="slide" onRequestClose={() => setShowAppPicker(false)}>
         <View style={settingsStyles.appPickerContainer}>
           <View style={settingsStyles.appPickerHeader}>
-            <Text style={settingsStyles.appPickerTitle}>📱 Select an App</Text>
+            <Text style={settingsStyles.appPickerTitle}>Select an App</Text>
             <TouchableOpacity
               style={settingsStyles.appPickerCloseButton}
               onPress={() => setShowAppPicker(false)}
             >
-              <Text style={settingsStyles.appPickerCloseText}>✕</Text>
+              <Icon name="close" size={24} color={Colors.textOnPrimary} />
             </TouchableOpacity>
           </View>
           <FlatList
@@ -2322,6 +2422,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 5,
+  },
+  saveButtonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButtonIcon: {
+    marginRight: 8,
   },
   saveButtonText: {
     color: Colors.textOnPrimary,

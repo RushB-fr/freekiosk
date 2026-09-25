@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.print.PrintAttributes
+import android.print.PrintJob
 import android.print.PrintManager
 import android.view.View
 import android.view.ViewGroup
@@ -36,13 +37,81 @@ class PrintModule(reactContext: ReactApplicationContext) :
         const val NAME = "PrintModule"
 
         /**
-         * Flag to indicate a print dialog is currently active.
-         * Used by MainActivity to suspend immersive mode re-application
-         * and avoid re-entering lock task while the print UI is shown.
+         * Nothing ever gets a callback when the system print dialog closes, so this used
+         * to be a boolean set before opening it and cleared by MainActivity the moment
+         * the activity regained window focus. That signal is not the dialog closing: a
+         * device that bounces focus while the spooler is opening cleared the flag with
+         * the dialog still on screen, and the next focus loss then re-entered lock task
+         * and dismissed it. MainActivity already carries a comment about devices "where
+         * onWindowFocusChanged fires rapidly", so this was guesswork resting on a signal
+         * known to be unreliable.
+         *
+         * PrintManager.print() hands back a PrintJob, and the job knows. It stays live
+         * while the dialog is up and turns completed, cancelled or failed when the user
+         * is done one way or the other, whatever the window focus did in between.
          */
         @Volatile
+        private var printJob: PrintJob? = null
+
+        /** Covers the moment between asking to print and holding the job. */
+        @Volatile
+        private var printStarting: Boolean = false
+
+        @Volatile
+        private var printStartedAt: Long = 0L
+
+        /**
+         * A job that never reaches a terminal state would pin this on for ever, so the
+         * old two-minute safety net is kept as a bound rather than as the mechanism.
+         */
+        private const val PRINT_MAX_LIFETIME_MS = 120_000L
+
+        /**
+         * True while a print dialog or job is live. Read by MainActivity to leave lock
+         * task alone and suspend immersive mode, and by KioskWatchdogService so it does
+         * not pull the kiosk back over the printer selection.
+         */
         @JvmStatic
-        var isPrintActive: Boolean = false
+        val isPrintActive: Boolean
+            get() {
+                if (printStarting) return true
+                val job = printJob ?: return false
+                if (System.currentTimeMillis() - printStartedAt > PRINT_MAX_LIFETIME_MS) {
+                    printJob = null
+                    return false
+                }
+                return try {
+                    if (job.isCompleted || job.isCancelled || job.isFailed) {
+                        printJob = null
+                        false
+                    } else {
+                        true
+                    }
+                } catch (e: Exception) {
+                    // Reading the job state is an IPC call into the print service. If it
+                    // throws there is no dialog left to protect, so stop claiming there is.
+                    printJob = null
+                    false
+                }
+            }
+
+        @JvmStatic
+        fun markPrintStarting() {
+            printStarting = true
+            printStartedAt = System.currentTimeMillis()
+        }
+
+        @JvmStatic
+        fun markPrintJob(job: PrintJob?) {
+            printJob = job
+            printStarting = false
+        }
+
+        @JvmStatic
+        fun clearPrintState() {
+            printJob = null
+            printStarting = false
+        }
     }
 
     override fun getName(): String = NAME
@@ -146,9 +215,9 @@ class PrintModule(reactContext: ReactApplicationContext) :
 
                     DebugLog.d(NAME, "Starting print job: $jobName for WebView at URL: ${webView.url}")
 
-                    // Set isPrintActive BEFORE opening the dialog so MainActivity knows
-                    // to suspend immersive mode re-application
-                    isPrintActive = true
+                    // Claimed before opening the dialog, so a focus change between here
+                    // and holding the job does not leave the window unguarded.
+                    markPrintStarting()
 
                     // Map paper size string to Android MediaSize constant
                     val mediaSize = when (paperSize?.uppercase()) {
@@ -170,29 +239,19 @@ class PrintModule(reactContext: ReactApplicationContext) :
                         .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
                         .build()
 
-                    printManager.print(jobName, printAdapter, printAttributes)
+                    val job = printManager.print(jobName, printAdapter, printAttributes)
+                    markPrintJob(job)
 
                     DebugLog.d(NAME, "Print dialog opened successfully")
                     promise.resolve(true)
-
-                    // Reset isPrintActive after a delay — the print dialog runs in a
-                    // separate system activity, so we can't get a direct callback when
-                    // it closes. Use onWindowFocusChanged in MainActivity as the primary
-                    // reset mechanism, but also set a safety timeout here.
-                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                        if (isPrintActive) {
-                            DebugLog.d(NAME, "Safety timeout: resetting isPrintActive")
-                            isPrintActive = false
-                        }
-                    }, 120_000L) // 2 minute safety net
                 } catch (e: Exception) {
-                    isPrintActive = false
+                    clearPrintState()
                     DebugLog.errorProduction(NAME, "Error during print: ${e.message}")
                     promise.reject("PRINT_ERROR", "Failed to print: ${e.message}", e)
                 }
             }
         } catch (e: Exception) {
-            isPrintActive = false
+            clearPrintState()
             DebugLog.errorProduction(NAME, "Error initiating print: ${e.message}")
             promise.reject("PRINT_ERROR", "Failed to initiate print: ${e.message}", e)
         }

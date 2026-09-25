@@ -36,7 +36,7 @@ const ScreenScheduleRuleCard: React.FC<ScreenScheduleRuleCardProps> = ({
             {rule.name || 'Unnamed Rule'}
           </Text>
           {sleepCrossesMidnight && (
-            <Text style={styles.midnightBadge}>🌙 overnight</Text>
+            <Text style={styles.midnightBadge}>overnight</Text>
           )}
         </View>
         <TouchableOpacity

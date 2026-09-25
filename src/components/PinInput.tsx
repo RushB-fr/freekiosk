@@ -6,6 +6,8 @@ import WifiDialog from './WifiDialog';
 import BluetoothDialog from './BluetoothDialog';
 import AudioOutputDialog from './AudioOutputDialog';
 import BrightnessDialog from './BrightnessDialog';
+import Icon from './Icon';
+import { Colors } from '../theme';
 
 const { KioskModule, AudioControlModule, FlashlightModule, RotationControlModule } = NativeModules;
 
@@ -130,7 +132,7 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
   const handleSubmit = async (): Promise<void> => {
     if (isLockedOut) {
       Alert.alert(
-        '🔒 Locked Out',
+        'Locked Out',
         `Too many failed attempts.\n\nTry again in ${Math.ceil(lockoutTimeRemaining / 60000)} minutes.`
       );
       return;
@@ -156,14 +158,14 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
           setIsLockedOut(true);
           setLockoutTimeRemaining(result.lockoutTimeRemaining);
           Alert.alert(
-            '🔒 Too Many Failed Attempts',
+            'Too Many Failed Attempts',
             result.message || 'Account locked for 15 minutes',
             [{ text: 'OK' }]
           );
         } else {
           setAttemptsRemaining(result.attemptsRemaining || 0);
           Alert.alert(
-            '❌ Incorrect PIN',
+            'Incorrect PIN',
             `${result.attemptsRemaining || 0} attempts remaining`,
             [{ text: 'Try Again' }]
           );
@@ -268,7 +270,7 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
       {isLockedOut ? (
         <>
           <View style={styles.lockoutContainer}>
-            <Text style={styles.lockoutIcon}>🔒</Text>
+            <Icon name="lock" size={40} color={Colors.error} style={styles.lockoutIcon} />
             <Text style={styles.lockoutTitle}>Account Locked</Text>
             <Text style={styles.lockoutText}>
               Too many failed attempts
@@ -287,7 +289,7 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
           {attemptsRemaining < 5 && (
             <View style={styles.warningContainer}>
               <Text style={styles.warningText}>
-                ⚠️ {attemptsRemaining} attempts remaining
+                {attemptsRemaining} attempts remaining
               </Text>
             </View>
           )}
@@ -328,21 +330,21 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
         <View style={styles.quickControls}>
           {showWifiButton && (
             <TouchableOpacity style={styles.quickBtn} onPress={() => setWifiDialogVisible(true)}>
-              <Text style={styles.quickBtnIcon}>📶</Text>
+              <Icon name="wifi" size={24} color={Colors.primary} style={styles.quickBtnIcon} />
               <Text style={styles.quickBtnLabel}>Wi-Fi</Text>
             </TouchableOpacity>
           )}
 
           {showBluetoothButton && (
             <TouchableOpacity style={styles.quickBtn} onPress={() => setBluetoothDialogVisible(true)}>
-              <Text style={styles.quickBtnIcon}>🔵</Text>
+              <Icon name="bluetooth" size={24} color={Colors.primary} style={styles.quickBtnIcon} />
               <Text style={styles.quickBtnLabel}>Bluetooth</Text>
             </TouchableOpacity>
           )}
 
           {showAudioControls && (
             <TouchableOpacity style={styles.quickBtn} onPress={handleAudioPress}>
-              <Text style={styles.quickBtnIcon}>🔊</Text>
+              <Icon name="volume-high" size={24} color={Colors.primary} style={styles.quickBtnIcon} />
               <Text style={styles.quickBtnLabel}>Audio</Text>
             </TouchableOpacity>
           )}
@@ -353,14 +355,14 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
               onPress={handleFlashlightPress}
               disabled={flashlightBusy}
             >
-              <Text style={styles.quickBtnIcon}>{flashlightOn ? '💡' : '🔦'}</Text>
+              <Icon name="flashlight" size={24} color={flashlightOn ? Colors.textOnPrimary : Colors.primary} style={styles.quickBtnIcon} />
               <Text style={styles.quickBtnLabel}>{flashlightOn ? 'Light Off' : 'Light On'}</Text>
             </TouchableOpacity>
           )}
 
           {showBrightnessButton && (
             <TouchableOpacity style={styles.quickBtn} onPress={() => setBrightnessDialogVisible(true)}>
-              <Text style={styles.quickBtnIcon}>☀️</Text>
+              <Icon name="white-balance-sunny" size={24} color={Colors.primary} style={styles.quickBtnIcon} />
               <Text style={styles.quickBtnLabel}>Brightness</Text>
             </TouchableOpacity>
           )}
@@ -371,14 +373,14 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
               onPress={handleRotationLockPress}
               disabled={rotationBusy}
             >
-              <Text style={styles.quickBtnIcon}>{rotationLocked ? '🔒' : '🔓'}</Text>
+              <Icon name="screen-rotation" size={24} color={rotationLocked ? Colors.textOnPrimary : Colors.primary} style={styles.quickBtnIcon} />
               <Text style={styles.quickBtnLabel}>Rotate</Text>
             </TouchableOpacity>
           )}
 
           {showEmergencyButton && (
             <TouchableOpacity style={[styles.quickBtn, styles.emergencyBtn]} onPress={handleEmergencyCall}>
-              <Text style={styles.quickBtnIcon}>🆘</Text>
+              <Icon name="phone" size={24} color={Colors.error} style={styles.quickBtnIcon} />
               <Text style={[styles.quickBtnLabel, styles.emergencyLabel]}>Emergency</Text>
             </TouchableOpacity>
           )}
@@ -416,7 +418,7 @@ const styles = StyleSheet.create({
     width: '80%',
     height: 60,
     borderWidth: 2,
-    borderColor: '#0066cc',
+    borderColor: '#2b7fff',
     borderRadius: 8,
     paddingHorizontal: 20,
     fontSize: 24,
@@ -432,7 +434,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   button: {
-    backgroundColor: '#0066cc',
+    backgroundColor: '#2b7fff',
     paddingHorizontal: 50,
     paddingVertical: 15,
     borderRadius: 8,

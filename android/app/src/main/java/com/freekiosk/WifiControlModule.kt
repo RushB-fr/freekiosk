@@ -271,6 +271,123 @@ class WifiControlModule(private val reactContext: ReactApplicationContext) :
         }
     }
 
+    /**
+     * Save a Wi-Fi network for later, without touching the one in use. Pushed from the
+     * cloud (add_wifi_network), so a planned network change can be staged on remote
+     * tablets while they are still online.
+     *
+     * Deliberately NOT connectToNetwork(), which disconnects and forces a switch: that is
+     * right for someone picking a network on the tablet, and wrong from a dashboard, where
+     * a wrong password would take a remote kiosk off the air with no way back.
+     *
+     * The rule is that this only ever ADDS a network under a name the device does not
+     * already know. Android keeps a single saved configuration per network name, so
+     * "the same name with a new password" cannot be staged ahead of time: saving it
+     * replaces the credentials the tablet is connected with, and it drops off right away,
+     * before the router has even changed. So a name that is in use, or already saved, is
+     * refused. When the saved networks cannot be read, it is refused too, since that is
+     * exactly the case where we could not tell.
+     */
+    @ReactMethod
+    fun saveNetworkForLater(ssid: String, password: String, promise: Promise) {
+        try {
+            val dpm = reactContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+            if (!dpm.isDeviceOwnerApp(reactContext.packageName)) {
+                promise.reject("NOT_DEVICE_OWNER", "Saving a Wi-Fi network remotely requires Device Owner mode")
+                return
+            }
+            val name = ssid.trim()
+            if (name.isEmpty() || name.toByteArray(Charsets.UTF_8).size > 32) {
+                promise.reject("INVALID_SSID", "The network name must be 1 to 32 bytes")
+                return
+            }
+            if (password.isNotEmpty() && (password.length < 8 || password.length > 63)) {
+                promise.reject("INVALID_PASSWORD", "A WPA2 password must be 8 to 63 characters")
+                return
+            }
+
+            val wifiManager = reactContext.applicationContext
+                .getSystemService(Context.WIFI_SERVICE) as WifiManager
+
+            // The network the tablet is on right now. Unreadable without location access,
+            // which a Device Owner grants itself at startup (MainActivity).
+            @Suppress("DEPRECATION")
+            val current = try {
+                wifiManager.connectionInfo?.ssid?.trim('"')
+            } catch (_: Exception) {
+                null
+            }
+            if (current != null && current == name) {
+                promise.reject(
+                    "NETWORK_IN_USE",
+                    "\"$name\" is the network this tablet is connected to. Changing its password " +
+                        "from here would disconnect the tablet before the router changes. Use a new " +
+                        "network name for the new credentials."
+                )
+                return
+            }
+
+            @Suppress("DEPRECATION")
+            val saved = try {
+                wifiManager.configuredNetworks ?: emptyList()
+            } catch (security: SecurityException) {
+                promise.reject(
+                    "CANNOT_READ_SAVED_NETWORKS",
+                    "Android refused to list the saved networks, so this tablet cannot confirm " +
+                        "\"$name\" is new. Refusing rather than risk replacing a network in use."
+                )
+                return
+            }
+            if (saved.any { it.SSID?.trim('"') == name }) {
+                promise.reject(
+                    "NETWORK_ALREADY_SAVED",
+                    "\"$name\" is already saved on this tablet. FreeKiosk only adds networks under " +
+                        "a new name, it never changes an existing one."
+                )
+                return
+            }
+            // An empty list cannot be told apart from a withheld one: a tablet on Wi-Fi always
+            // has at least the network it is on saved, and one that reads as empty is being
+            // denied the list, which is exactly when a name collision would go unseen. Refuse.
+            // It also refuses a tablet with genuinely nothing saved (on Ethernet, say), which is
+            // the price of never guessing.
+            if (saved.isEmpty()) {
+                promise.reject(
+                    "CANNOT_READ_SAVED_NETWORKS",
+                    "This tablet reports no saved networks, so it cannot confirm \"$name\" is new. " +
+                        "Refusing rather than risk replacing a network in use."
+                )
+                return
+            }
+
+            val config = buildWifiConfiguration(name, password)
+            val netId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val result = wifiManager.addNetworkPrivileged(config)
+                if (result.statusCode != WifiManager.AddNetworkResult.STATUS_SUCCESS) -1 else result.networkId
+            } else {
+                @Suppress("DEPRECATION")
+                wifiManager.addNetwork(config)
+            }
+            if (netId < 0) {
+                promise.reject("SAVE_FAILED", "Android did not save \"$name\"")
+                return
+            }
+            // Enabled for auto-join, without attempting a connection now: the tablet stays on
+            // its current network and falls over to this one when that one goes away.
+            @Suppress("DEPRECATION")
+            wifiManager.enableNetwork(netId, false)
+
+            val out = Arguments.createMap()
+            out.putBoolean("saved", true)
+            out.putString("ssid", name)
+            out.putInt("networkId", netId)
+            out.putBoolean("secured", password.isNotEmpty())
+            promise.resolve(out)
+        } catch (e: Exception) {
+            promise.reject("SAVE_ERROR", e.message, e)
+        }
+    }
+
     @ReactMethod
     fun disconnectFromCurrentNetwork(promise: Promise) {
         try {

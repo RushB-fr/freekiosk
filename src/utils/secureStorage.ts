@@ -11,6 +11,7 @@ const API_KEY_SERVICE = 'freekiosk_api_key';
 const MQTT_PASSWORD_SERVICE = 'freekiosk_mqtt_password';
 const WIFI_PASSWORD_SERVICE_PREFIX = 'freekiosk_wifi_password:';
 const BASIC_AUTH_PASSWORD_SERVICE = 'freekiosk_basic_auth_password';
+const CLOUD_CREDENTIALS_SERVICE = 'freekiosk_cloud';
 const LEGACY_API_KEY = '@kiosk_rest_api_key'; // Legacy AsyncStorage key for migration
 const ATTEMPTS_KEY = '@kiosk_pin_attempts';
 const LOCKOUT_KEY = '@kiosk_pin_lockout';
@@ -699,13 +700,26 @@ export async function saveSecureApiKey(apiKey: string): Promise<boolean> {
  * Get REST API key from secure storage
  * Supports migration from legacy AsyncStorage (backward compatibility)
  */
-export async function getSecureApiKey(): Promise<string> {
+/**
+ * The outcome of reading a secret, with the one distinction that matters for security:
+ * a secret that is not set is not the same thing as a secret we could not read.
+ *
+ * Both used to come back as an empty string. On a device whose Keystore HAL is broken
+ * (issue #258) every Keychain call throws, the REST API key read as "", and
+ * KioskHttpServer skips its auth check entirely when no key is set: the server then
+ * served every endpoint unauthenticated on the LAN, for a configuration whose owner had
+ * deliberately set a key. Nothing said so. Telling the two apart lets the caller fail
+ * closed on a read failure while leaving a deliberately keyless setup alone.
+ */
+export type SecureRead = { value: string; readFailed: boolean };
+
+export async function readSecureApiKey(): Promise<SecureRead> {
   try {
     // First, try to get from Keychain
     const credentials = await Keychain.getGenericPassword({ service: API_KEY_SERVICE });
 
     if (credentials && credentials.password) {
-      return credentials.password;
+      return { value: credentials.password, readFailed: false };
     }
 
     // If not in Keychain, check legacy AsyncStorage (migration)
@@ -715,15 +729,19 @@ export async function getSecureApiKey(): Promise<string> {
       // Migrate to Keychain
       await saveSecureApiKey(legacyKey);
       // Return the migrated key
-      return legacyKey;
+      return { value: legacyKey, readFailed: false };
     }
 
     // No key found anywhere
-    return '';
+    return { value: '', readFailed: false };
   } catch (error) {
     console.error('[SecureStorage] Error getting API key:', error);
-    return '';
+    return { value: '', readFailed: true };
   }
+}
+
+export async function getSecureApiKey(): Promise<string> {
+  return (await readSecureApiKey()).value;
 }
 
 /**
@@ -864,4 +882,90 @@ export async function clearSecureBasicAuthPassword(): Promise<void> {
   } catch (error) {
     console.error('[SecureStorage] Error clearing basic auth password:', error);
   }
+}
+
+// ============================================
+// CLOUD CREDENTIALS
+// ============================================
+
+export interface CloudCredentials {
+  deviceId: string;
+  apiKey: string;
+  cloudUrl: string;
+  organizationName: string;
+}
+
+export async function saveCloudCredentials(creds: CloudCredentials): Promise<void> {
+  try {
+    await Keychain.setGenericPassword(
+      'cloud',
+      JSON.stringify(creds),
+      { service: CLOUD_CREDENTIALS_SERVICE, accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED },
+    );
+  } catch (error) {
+    console.error('[SecureStorage] Error saving cloud credentials:', error);
+  }
+}
+
+export async function getCloudCredentials(): Promise<CloudCredentials | null> {
+  try {
+    const creds = await Keychain.getGenericPassword({ service: CLOUD_CREDENTIALS_SERVICE });
+    if (!creds) return null;
+    return JSON.parse(creds.password) as CloudCredentials;
+  } catch (error) {
+    console.error('[SecureStorage] Error getting cloud credentials:', error);
+    return null;
+  }
+}
+
+export async function clearCloudCredentials(): Promise<void> {
+  try {
+    await Keychain.resetGenericPassword({ service: CLOUD_CREDENTIALS_SERVICE });
+  } catch (error) {
+    console.error('[SecureStorage] Error clearing cloud credentials:', error);
+  }
+}
+
+// ============================================
+// SENSITIVE CONFIG EXPORT / IMPORT
+// ============================================
+
+export interface SensitiveConfig {
+  pin?: string | null;
+  mqttPassword?: string;
+  restApiKey?: string;
+  httpBasicAuthPassword?: string;
+}
+
+export async function exportSensitiveConfig(): Promise<SensitiveConfig> {
+  const [mqttPassword, restApiKey, httpBasicAuthPassword] = await Promise.all([
+    getSecureMqttPassword(),
+    getSecureApiKey(),
+    getSecureBasicAuthPassword(),
+  ]);
+  return {
+    pin: null, // Never exported — PIN is one-way (cloud → device only)
+    mqttPassword,
+    restApiKey,
+    httpBasicAuthPassword,
+  };
+}
+
+export async function importSensitiveConfig(sensitive: SensitiveConfig): Promise<void> {
+  const tasks: Promise<unknown>[] = [];
+
+  if (sensitive.pin && sensitive.pin.length > 0) {
+    tasks.push(saveSecurePin(sensitive.pin));
+  }
+  if (sensitive.mqttPassword !== undefined) {
+    tasks.push(saveSecureMqttPassword(sensitive.mqttPassword));
+  }
+  if (sensitive.restApiKey !== undefined) {
+    tasks.push(saveSecureApiKey(sensitive.restApiKey));
+  }
+  if (sensitive.httpBasicAuthPassword !== undefined) {
+    tasks.push(saveSecureBasicAuthPassword(sensitive.httpBasicAuthPassword));
+  }
+
+  await Promise.all(tasks);
 }

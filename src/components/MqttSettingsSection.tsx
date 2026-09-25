@@ -12,6 +12,7 @@ import {
   Alert,
   Clipboard,
   ActivityIndicator,
+  PermissionsAndroid,
 } from 'react-native';
 import SettingsSection from './settings/SettingsSection';
 import SettingsSwitch from './settings/SettingsSwitch';
@@ -21,6 +22,7 @@ import { StorageService } from '../utils/storage';
 import { mqttClient } from '../utils/MqttModule';
 import { getSecureMqttPassword, saveSecureMqttPassword } from '../utils/secureStorage';
 import { ApiService } from '../utils/ApiService';
+import KioskModule from '../utils/KioskModule';
 
 interface MqttSettingsSectionProps {
   onSettingsChanged?: () => void;
@@ -41,15 +43,50 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
   const [allowControl, setAllowControl] = useState(true);
   const [deviceName, setDeviceName] = useState('');
   const [motionAlwaysOn, setMotionAlwaysOn] = useState(false);
+  // Image publishing (screenshot / camera snapshots)
+  const [screenshotEnabled, setScreenshotEnabled] = useState(false);
+  const [screenshotAuto, setScreenshotAuto] = useState(false);
+  const [screenshotInterval, setScreenshotInterval] = useState('60');
+  const [screenshotQuality, setScreenshotQuality] = useState('70');
+  const [screenshotMaxWidth, setScreenshotMaxWidth] = useState('1280');
+  const [cameraEnabled, setCameraEnabled] = useState(false);
+  const [cameraAuto, setCameraAuto] = useState(false);
+  const [cameraInterval, setCameraInterval] = useState('300');
+  const [cameraQuality, setCameraQuality] = useState('70');
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const connectionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // #234: null while unknown, false when Android may doze the app off the broker.
+  const [batteryExempt, setBatteryExempt] = useState<boolean | null>(null);
 
   // Load settings on mount
   useEffect(() => {
     loadSettings();
+    checkBatteryExemption();
   }, []);
+
+  // #234: Doze defers MQTT's network once the device is idle, despite the wake lock the
+  // client holds, and the broker then drops it (unavailable in Home Assistant after a
+  // couple of hours). The exemption is the only reliable fix, so surface its state.
+  const checkBatteryExemption = async () => {
+    try {
+      setBatteryExempt(await KioskModule.isIgnoringBatteryOptimizations());
+    } catch {
+      setBatteryExempt(null);
+    }
+  };
+
+  const handleRequestBatteryExemption = async () => {
+    try {
+      await KioskModule.requestIgnoreBatteryOptimizations();
+    } catch (error) {
+      console.warn('[MqttSettings] Battery exemption request failed:', error);
+    }
+    // The system dialog is a separate activity, so re-check when we come back. Lock task
+    // no longer blocks it: KioskModule whitelists the dialog for the few seconds it is up.
+    setTimeout(checkBatteryExemption, 1000);
+  };
 
   // Check connection status periodically
   useEffect(() => {
@@ -108,6 +145,15 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
       mqttDeviceName,
       mqttPassword,
       mqttMotionAlwaysOn,
+      mqttScreenshotEnabled,
+      mqttScreenshotAuto,
+      mqttScreenshotInterval,
+      mqttScreenshotQuality,
+      mqttScreenshotMaxWidth,
+      mqttCameraEnabled,
+      mqttCameraAuto,
+      mqttCameraInterval,
+      mqttCameraQuality,
     ] = await Promise.all([
       StorageService.getMqttEnabled(),
       StorageService.getMqttBrokerUrl(),
@@ -121,6 +167,15 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
       StorageService.getMqttDeviceName(),
       getSecureMqttPassword(),
       StorageService.getMqttMotionAlwaysOn(),
+      StorageService.getMqttScreenshotEnabled(),
+      StorageService.getMqttScreenshotAuto(),
+      StorageService.getMqttScreenshotInterval(),
+      StorageService.getMqttScreenshotQuality(),
+      StorageService.getMqttScreenshotMaxWidth(),
+      StorageService.getMqttCameraEnabled(),
+      StorageService.getMqttCameraAuto(),
+      StorageService.getMqttCameraInterval(),
+      StorageService.getMqttCameraQuality(),
     ]);
 
     setMqttEnabled(enabled);
@@ -134,6 +189,15 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
     setAllowControl(control);
     setPassword(mqttPassword);
     setMotionAlwaysOn(mqttMotionAlwaysOn);
+    setScreenshotEnabled(mqttScreenshotEnabled);
+    setScreenshotAuto(mqttScreenshotAuto);
+    setScreenshotInterval(mqttScreenshotInterval.toString());
+    setScreenshotQuality(mqttScreenshotQuality.toString());
+    setScreenshotMaxWidth(mqttScreenshotMaxWidth.toString());
+    setCameraEnabled(mqttCameraEnabled);
+    setCameraAuto(mqttCameraAuto);
+    setCameraInterval(mqttCameraInterval.toString());
+    setCameraQuality(mqttCameraQuality.toString());
 
     // Pre-fill Device Name with Android model if never set
     if (!mqttDeviceName) {
@@ -192,6 +256,15 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
     setMqttEnabled(enabled);
     await StorageService.saveMqttEnabled(enabled);
 
+    // #234: ask for the Doze exemption at the moment the user turns MQTT on, which is the
+    // only point where the system dialog is expected. Best-effort, and a no-op when the
+    // exemption is already granted.
+    if (enabled) {
+      KioskModule.requestIgnoreBatteryOptimizations()
+        .catch(() => {/* best-effort */})
+        .finally(() => setTimeout(checkBatteryExemption, 1000));
+    }
+
     if (!enabled && isConnected) {
       setIsLoading(true);
       try {
@@ -230,7 +303,20 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
 
   const handlePasswordChange = async (value: string) => {
     setPassword(value);
-    await saveSecureMqttPassword(value);
+    // The return value used to be thrown away. When secure storage fails (#258) nothing
+    // was written, yet the field kept showing what had just been typed, so the password
+    // looked saved until the screen was reloaded and the broker answered NOT_AUTHORIZED.
+    const saved = await saveSecureMqttPassword(value);
+    if (!saved && value) {
+      Alert.alert(
+        'Password not saved',
+        'The MQTT password could not be written to secure storage on this device, so ' +
+        'the broker will refuse the connection. This happens on firmwares whose Android ' +
+        'Keystore is broken. The field is cleared so it does not show a password that ' +
+        'was never stored.',
+      );
+      setPassword('');
+    }
     onSettingsChanged?.();
   };
 
@@ -306,6 +392,145 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
     onSettingsChanged?.();
   };
 
+  /**
+   * Enabling or disabling an image stream changes the set of discovered entities, which is
+   * only published on connect — offer to reconnect right away.
+   */
+  const promptReconnectForDiscovery = () => {
+    if (!isConnected) return;
+    Alert.alert(
+      'Reconnect Required',
+      'Home Assistant entities are published when connecting. Reconnect now to apply this change?',
+      [
+        { text: 'Later', style: 'cancel' },
+        {
+          text: 'Reconnect',
+          onPress: async () => {
+            await handleDisconnect();
+            setTimeout(() => handleConnect(), 500);
+          },
+        },
+      ]
+    );
+  };
+
+  /**
+   * Push the stored image settings to the running MQTT client so a change applies immediately
+   * instead of on the next connect. No-op when MQTT is not running.
+   */
+  const pushImageSettings = async () => {
+    try {
+      await mqttClient.updateImageSettings({
+        screenshotAuto: await StorageService.getMqttScreenshotAuto(),
+        screenshotInterval: await StorageService.getMqttScreenshotInterval(),
+        screenshotQuality: await StorageService.getMqttScreenshotQuality(),
+        screenshotMaxWidth: await StorageService.getMqttScreenshotMaxWidth(),
+        cameraAuto: await StorageService.getMqttCameraAuto(),
+        cameraInterval: await StorageService.getMqttCameraInterval(),
+        cameraQuality: await StorageService.getMqttCameraQuality(),
+      });
+    } catch (error) {
+      console.log('[MqttSettings] Could not push image settings:', error);
+    }
+  };
+
+  const handleScreenshotEnabledChange = async (value: boolean) => {
+    setScreenshotEnabled(value);
+    await StorageService.saveMqttScreenshotEnabled(value);
+    onSettingsChanged?.();
+    promptReconnectForDiscovery();
+  };
+
+  const handleScreenshotAutoChange = async (value: boolean) => {
+    setScreenshotAuto(value);
+    await StorageService.saveMqttScreenshotAuto(value);
+    await pushImageSettings();
+    onSettingsChanged?.();
+  };
+
+  const handleScreenshotIntervalChange = async (value: string) => {
+    setScreenshotInterval(value);
+    const seconds = parseInt(value, 10);
+    if (!isNaN(seconds) && seconds >= 5 && seconds <= 3600) {
+      await StorageService.saveMqttScreenshotInterval(seconds);
+      await pushImageSettings();
+      onSettingsChanged?.();
+    }
+  };
+
+  const handleScreenshotQualityChange = async (value: string) => {
+    setScreenshotQuality(value);
+    const quality = parseInt(value, 10);
+    if (!isNaN(quality) && quality >= 1 && quality <= 100) {
+      await StorageService.saveMqttScreenshotQuality(quality);
+      await pushImageSettings();
+      onSettingsChanged?.();
+    }
+  };
+
+  const handleScreenshotMaxWidthChange = async (value: string) => {
+    setScreenshotMaxWidth(value);
+    const width = parseInt(value, 10);
+    if (!isNaN(width) && width >= 0) {
+      await StorageService.saveMqttScreenshotMaxWidth(width);
+      await pushImageSettings();
+      onSettingsChanged?.();
+    }
+  };
+
+  const handleCameraEnabledChange = async (value: boolean) => {
+    if (value) {
+      // Snapshots are captured natively via Camera2, which needs the runtime permission
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CAMERA
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          Alert.alert(
+            'Camera Permission Required',
+            'FreeKiosk needs camera access to publish camera snapshots over MQTT.'
+          );
+          return;
+        }
+      } catch (error) {
+        console.error('[MqttSettings] Camera permission request failed:', error);
+        return;
+      }
+    }
+
+    setCameraEnabled(value);
+    await StorageService.saveMqttCameraEnabled(value);
+    onSettingsChanged?.();
+    promptReconnectForDiscovery();
+  };
+
+  const handleCameraAutoChange = async (value: boolean) => {
+    setCameraAuto(value);
+    await StorageService.saveMqttCameraAuto(value);
+    await pushImageSettings();
+    onSettingsChanged?.();
+  };
+
+  const handleCameraIntervalChange = async (value: string) => {
+    setCameraInterval(value);
+    const seconds = parseInt(value, 10);
+    if (!isNaN(seconds) && seconds >= 5 && seconds <= 3600) {
+      await StorageService.saveMqttCameraInterval(seconds);
+      await pushImageSettings();
+      onSettingsChanged?.();
+    }
+  };
+
+  const handleCameraQualityChange = async (value: string) => {
+    setCameraQuality(value);
+    const quality = parseInt(value, 10);
+    if (!isNaN(quality) && quality >= 1 && quality <= 100) {
+      await StorageService.saveMqttCameraQuality(quality);
+      await pushImageSettings();
+      onSettingsChanged?.();
+    }
+  };
+
   const getStatusColor = () => {
     if (isLoading) return '#FF9800';
     return isConnected ? '#4CAF50' : '#F44336';
@@ -372,6 +597,31 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
               </View>
             )}
           </View>
+
+          {/* #234: Doze warning */}
+          {batteryExempt === false && (
+            <View style={styles.dozeWarning}>
+              <View style={styles.dozeHeader}>
+                <Icon name="power-sleep" size={18} color="#E65100" />
+                <Text style={styles.dozeTitle}>Battery optimization is active</Text>
+              </View>
+              <Text style={styles.dozeText}>
+                Android may suspend FreeKiosk's network once the tablet has been idle for a
+                while, so the broker drops the connection and Home Assistant shows the device
+                as unavailable after a couple of hours. Exempting FreeKiosk keeps MQTT alive.
+              </Text>
+              <TouchableOpacity style={styles.dozeButton} onPress={handleRequestBatteryExemption}>
+                <Icon name="shield-check" size={16} color="#FFF" />
+                <Text style={styles.connectButtonText}>Exempt FreeKiosk</Text>
+              </TouchableOpacity>
+              <Text style={styles.dozeText}>
+                If the dialog does not appear, grant it over ADB instead:
+              </Text>
+              <Text style={styles.dozeCommand}>
+                adb shell dumpsys deviceidle whitelist +com.freekiosk
+              </Text>
+            </View>
+          )}
 
           {/* Broker URL */}
           <SettingsInput
@@ -485,6 +735,98 @@ export const MqttSettingsSection: React.FC<MqttSettingsSectionProps> = ({
             hint="Run camera-based motion detection continuously (higher battery usage). Without this, motion is only detected during screensaver."
           />
 
+          {/* Screenshot publishing */}
+          <SettingsSwitch
+            label="Publish Screenshot"
+            value={screenshotEnabled}
+            onValueChange={handleScreenshotEnabledChange}
+            icon="monitor-screenshot"
+            hint="Expose the kiosk screen in Home Assistant as an image/camera entity, with a capture button. The screen is published to the broker, in clear text unless the port is 8883, and anyone who can read the topic can see it."
+          />
+
+          {screenshotEnabled && (
+            <>
+              <SettingsSwitch
+                label="Screenshot Auto-publish"
+                value={screenshotAuto}
+                onValueChange={handleScreenshotAutoChange}
+                icon="refresh"
+                hint="Publish a screenshot periodically. Can also be toggled from Home Assistant."
+              />
+
+              <SettingsInput
+                label="Screenshot Interval (seconds)"
+                value={screenshotInterval}
+                onChangeText={handleScreenshotIntervalChange}
+                placeholder="60"
+                keyboardType="numeric"
+                icon="timer-outline"
+                hint="5-3600 seconds (only used when auto-publish is on)"
+              />
+
+              <SettingsInput
+                label="Screenshot JPEG Quality"
+                value={screenshotQuality}
+                onChangeText={handleScreenshotQualityChange}
+                placeholder="70"
+                keyboardType="numeric"
+                icon="quality-high"
+                hint="1-100. Lower values mean smaller MQTT messages."
+              />
+
+              <SettingsInput
+                label="Screenshot Max Width (px)"
+                value={screenshotMaxWidth}
+                onChangeText={handleScreenshotMaxWidthChange}
+                placeholder="1280"
+                keyboardType="numeric"
+                icon="arrow-expand-horizontal"
+                hint="Downscale before publishing. 0 keeps the native resolution."
+              />
+            </>
+          )}
+
+          {/* Camera publishing */}
+          <SettingsSwitch
+            label="Publish Camera Snapshots"
+            value={cameraEnabled}
+            onValueChange={handleCameraEnabledChange}
+            icon="camera"
+            hint="Expose each device camera in Home Assistant as an image/camera entity. Photos are published to the broker, in clear text unless the port is 8883, and anyone who can read the topic can see whoever is in front of the device. Snapshots fail while motion detection is using the camera."
+          />
+
+          {cameraEnabled && (
+            <>
+              <SettingsSwitch
+                label="Camera Auto-publish"
+                value={cameraAuto}
+                onValueChange={handleCameraAutoChange}
+                icon="camera-retake"
+                hint="Publish a snapshot periodically (higher battery usage). Can also be toggled from Home Assistant."
+              />
+
+              <SettingsInput
+                label="Camera Interval (seconds)"
+                value={cameraInterval}
+                onChangeText={handleCameraIntervalChange}
+                placeholder="300"
+                keyboardType="numeric"
+                icon="timer-outline"
+                hint="5-3600 seconds (only used when auto-publish is on)"
+              />
+
+              <SettingsInput
+                label="Camera JPEG Quality"
+                value={cameraQuality}
+                onChangeText={handleCameraQualityChange}
+                placeholder="70"
+                keyboardType="numeric"
+                icon="quality-high"
+                hint="1-100. Lower values mean smaller MQTT messages."
+              />
+            </>
+          )}
+
           {/* Home Assistant Info Box */}
           <View style={styles.hintContainer}>
             <Icon name="home-assistant" size={20} color="#41BDF5" />
@@ -549,6 +891,45 @@ const styles = StyleSheet.create({
     color: '#999',
     fontStyle: 'italic',
   },
+  dozeWarning: {
+    backgroundColor: '#FFF3E0',
+    borderRadius: 8,
+    padding: 12,
+    marginVertical: 8,
+  },
+  dozeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dozeTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#E65100',
+  },
+  dozeText: {
+    fontSize: 13,
+    color: '#5D4037',
+    marginTop: 6,
+  },
+  dozeCommand: {
+    fontSize: 12,
+    color: '#5D4037',
+    fontFamily: 'monospace',
+    marginTop: 2,
+  },
+  dozeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#E65100',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginTop: 10,
+    alignSelf: 'flex-start',
+  },
   errorText: {
     fontSize: 13,
     color: '#F44336',
@@ -566,7 +947,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
     fontSize: 13,
-    color: '#1565C0',
+    color: '#1e63d6',
     lineHeight: 18,
   },
 });

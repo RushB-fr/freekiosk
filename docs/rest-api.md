@@ -71,7 +71,7 @@ adb shell am start -n com.freekiosk/.MainActivity \
 
 
 > [!NOTE]
-> See [ADB Configuration Guide](ADB-Configuration) for full headless provisioning.
+> See [ADB Configuration Guide](adb-configuration.md) for full headless provisioning.
 
 
 ## Endpoints Reference
@@ -356,6 +356,20 @@ curl http://TABLET_IP:8080/api/screenshot -o screenshot.png
 
 
 > 💡 The screenshot is captured from the app's root view. It works even when the screensaver overlay is active.
+>
+> **Capturing another app (multi-app / external app mode)** *(v1.2.20+)*: when a managed app is in the
+> foreground, FreeKiosk's own window is off screen and cannot be copied, so the capture goes through the
+> **accessibility service** instead (`Settings > Accessibility > FreeKiosk`, Android 11+ required). In addition,
+> Lock Mode as Device Owner blocks screen capture device-wide (this is what disables the Power+Volume Down
+> combo), which also blacks out that capture: enable **Security > Allow Remote Screenshots** to let FreeKiosk
+> lift the block for the fraction of a second the capture takes. When a capture is not possible the endpoint
+> answers `503` with the reason, for example:
+>
+> ```json
+> {"success": false, "error": "Accessibility service is not enabled (required to capture another app)"}
+> ```
+
+> 💡 Home Assistant users can also get the screenshot as an auto-discovered `image` / `camera` entity over MQTT, without exposing the HTTP server — see [MQTT: Images (Screenshot & Camera)](MQTT.md#-images-screenshot--camera).
 
 #### `GET /api/camera/photo`
 
@@ -368,6 +382,7 @@ Take a photo using the device camera. **(v1.2.5+)**
 |---|---|---|
 | **camera** | `back` | Camera to use: `front` or `back` |
 | **quality** | `80` | JPEG compression quality (1-100) |
+| **rotate** | `auto` | Clockwise rotation: `auto`, `0`, `90`, `180` or `270`. `auto` turns the photo upright from the camera and screen orientation; use a fixed value when a camera still comes out rotated, or for a wall-mounted tablet. `0` returns the raw sensor frame, as versions before 2.0.0 did. **(2.0.0+)** |
 
 
 
@@ -377,6 +392,7 @@ Take a photo using the device camera. **(v1.2.5+)**
 ```
 GET /api/camera/photo?camera=back&quality=80
 GET /api/camera/photo?camera=front&quality=60
+GET /api/camera/photo?camera=front&rotate=90
 ```
 
 
@@ -388,6 +404,9 @@ GET /api/camera/photo?camera=front&quality=60
 - Camera permission must be granted (already included in app permissions)
 - Photo resolution is automatically optimized (~1.2MP) for fast HTTP transfer
 - Higher quality values produce larger files
+- Capture fails while motion detection is using the camera
+
+> 💡 Camera snapshots can also be published over MQTT as auto-discovered `image` / `camera` entities (one per camera) with a capture button in Home Assistant — see [MQTT: Images (Screenshot & Camera)](MQTT.md#-images-screenshot--camera).
 
 #### `GET /api/camera/stream`
 
@@ -1053,6 +1072,44 @@ rest_command:
     payload: '{"text": "{{ text }}"}'
 ```
 
+### Switches with state
+
+A `rest_command` is a *service*, not an entity: calling it works, but it has nothing to
+show, which is why the commands above give you buttons and never a toggle that reflects
+what the tablet is actually doing. Pair one with the matching sensor from **Basic
+Sensors** above and you get a real switch.
+
+```yaml
+template:
+  - switch:
+      - name: "Tablet screen"
+        state: "{{ is_state('binary_sensor.tablet_screen', 'on') }}"
+        turn_on:
+          service: rest_command.tablet_screen_on
+        turn_off:
+          service: rest_command.tablet_screen_off
+
+      - name: "Tablet screensaver"
+        state: "{{ is_state('binary_sensor.tablet_screensaver', 'on') }}"
+        turn_on:
+          service: rest_command.tablet_screensaver_on
+        turn_off:
+          service: rest_command.tablet_screensaver_off
+```
+
+`binary_sensor.tablet_screen` reads `screen.on`, which is the **physical** screen state
+from `PowerManager`, while `screen.screensaverActive` is separate: the screensaver is an
+overlay drawn by the app, so it can be showing while the panel is still on. That is why
+they are two switches and not one.
+
+> ⚠️ **REST state is polled, MQTT state is pushed.** The sensors above use
+> `scan_interval: 30`, so a switch built this way can be up to 30 seconds behind the
+> tablet, including right after you flip it yourself. Lowering `scan_interval` shortens
+> the lag and costs one HTTP request per tablet per interval. If you want a toggle that
+> updates the instant the tablet changes, use MQTT instead: it publishes on the real
+> `ACTION_SCREEN_ON` / `ACTION_SCREEN_OFF` broadcast and Home Assistant discovers the
+> entities on its own. See [MQTT](MQTT.md). The two can coexist on the same tablet.
+
 ### Screenshot Camera
 
 ```yaml
@@ -1195,9 +1252,8 @@ Common errors:
 
 ## See Also
 
-- [ADB Configuration Guide](ADB-Configuration) - Headless provisioning via ADB
-- [MDM Specification](MDM-SPEC) - Enterprise deployment
-- [Installation Guide](Installation) - Manual setup
+- [ADB Configuration Guide](adb-configuration.md) - Headless provisioning via ADB
+- [Installation Guide](installation.md) - Manual setup
 
 
 ## Changelog

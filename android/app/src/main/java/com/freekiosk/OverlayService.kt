@@ -108,6 +108,26 @@ class OverlayService : Service() {
             }
         }
 
+        /**
+         * #266: show the screensaver as a window over the external app, which stays in the
+         * foreground. [level] is the screen brightness to apply (0..1), or a negative value
+         * for an opaque black overlay at unchanged brightness. Calling it again while shown
+         * updates the level. [done] receives false when nothing could be shown.
+         */
+        fun showDimOverlay(level: Float, done: (Boolean) -> Unit) {
+            val service = instance
+            if (service == null) {
+                done(false)
+                return
+            }
+            Handler(Looper.getMainLooper()).post { done(service.addDimOverlay(level)) }
+        }
+
+        fun hideDimOverlay() {
+            val service = instance ?: return
+            Handler(Looper.getMainLooper()).post { service.removeDimOverlay() }
+        }
+
     }
 
     private var windowManager: WindowManager? = null
@@ -115,6 +135,7 @@ class OverlayService : Service() {
     private var indicatorView: View? = null  // Visual indicator in tap_anywhere mode
     private var returnButton: View? = null  // Changed from Button to View (now a FrameLayout)
     private var statusBarView: View? = null
+    private var dimOverlayView: View? = null  // #266: screensaver over the external app
     private var batteryText: TextView? = null
     private var batteryChargingIcon: android.widget.ImageView? = null
     private var wifiStatusIcon: android.widget.ImageView? = null
@@ -1151,6 +1172,83 @@ class OverlayService : Service() {
     }
 
     /**
+     * #266: screensaver window over the external app. Full screen and touchable: it absorbs
+     * the waking tap so nothing in the app underneath gets pressed, then removes itself and
+     * tells JS, which runs the normal screensaver dismissal. The re-pin loop only moves the
+     * 5-tap overlay, so that one stays above this window and the escape keeps working.
+     */
+    private fun addDimOverlay(level: Float): Boolean {
+        val hasOverlayPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this)
+        val wm = windowManager
+        if (!hasOverlayPermission || wm == null) return false
+
+        // Level >= 0: FreeKiosk manages brightness, the window's brightness override dims
+        // the backlight and the window itself stays see-through (same look as the dim
+        // screensaver in FreeKiosk). Level 0, or brightness not managed: opaque black.
+        val opaque = level <= 0f
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            else
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_SYSTEM_ALERT,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            screenBrightness = if (level >= 0f) level.coerceIn(0f, 1f) else
+                WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        }
+
+        dimOverlayView?.let { existing ->
+            // Already shown: only the level changed
+            existing.setBackgroundColor(if (opaque) Color.BLACK else Color.TRANSPARENT)
+            return try {
+                wm.updateViewLayout(existing, params)
+                true
+            } catch (e: Exception) {
+                DebugLog.e("OverlayService", "Dim overlay update failed: ${e.message}")
+                false
+            }
+        }
+
+        val view = View(this).apply {
+            setBackgroundColor(if (opaque) Color.BLACK else Color.TRANSPARENT)
+            setOnTouchListener { _, event ->
+                if (event.action == android.view.MotionEvent.ACTION_UP) {
+                    removeDimOverlay()
+                    try { KioskModule.sendEventFromNative("dimOverlayTouched", null) } catch (e: Exception) {}
+                }
+                true // Swallow the whole gesture: the app underneath must not see it
+            }
+        }
+        return try {
+            wm.addView(view, params)
+            dimOverlayView = view
+            DebugLog.d("OverlayService", "Dim overlay shown over external app (level=$level)")
+            true
+        } catch (e: Exception) {
+            DebugLog.e("OverlayService", "Dim overlay could not be shown: ${e.message}")
+            false
+        }
+    }
+
+    private fun removeDimOverlay() {
+        val view = dimOverlayView ?: return
+        dimOverlayView = null
+        try {
+            windowManager?.removeView(view)
+            DebugLog.d("OverlayService", "Dim overlay removed")
+        } catch (e: Exception) {
+            DebugLog.d("OverlayService", "Dim overlay already detached: ${e.message}")
+        }
+    }
+
+    /**
      * Lightweight re-pin: removes and immediately re-adds the button/tap-anywhere overlay
      * so it lands at the top of the TYPE_APPLICATION_OVERLAY stack.
      * Camera apps whose SurfaceView draws over the overlay (#121) will be briefly eclipsed
@@ -1473,6 +1571,9 @@ class OverlayService : Service() {
             // #190 — Stop the native inactivity countdown so it can't fire after teardown
             inactivityEnabled = false
             inactivityHandler.removeCallbacks(inactivityRunnable)
+
+            // #266: never leave a dimming window behind once the service is gone
+            removeDimOverlay()
 
             // Stop MQTT watchdog
             stopMqttWatchdog()

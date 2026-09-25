@@ -10,17 +10,22 @@ import {
   ScrollView,
   Linking,
   NativeModules,
-  findNodeHandle
+  findNodeHandle,
+  DeviceEventEmitter,
 } from 'react-native';
 
 const { HttpServerModule } = NativeModules;
 
 import KioskModule from '../utils/KioskModule';
 import UpdateModule from '../utils/UpdateModule';
+import Icon, { IconName } from './Icon';
 import { WebView } from 'react-native-webview';
 import type { WebViewErrorEvent, ShouldStartLoadRequest, WebViewRenderProcessGoneEvent } from 'react-native-webview/lib/WebViewTypes';
 import { useNavigation } from '@react-navigation/native';
 import PrintModule from '../utils/PrintModule';
+import { CLOUD_ENABLED } from '../config/features';
+import { CloudSyncService, PROVISIONING_STATUS_EVENT } from '../utils/CloudSyncService';
+import type { ProvisioningStatus } from '../utils/CloudSyncService';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
@@ -105,6 +110,18 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   const blockedUrlTimerRef = useRef<any>(null);
   const isGoingBackRef = useRef<boolean>(false); // Prevent goBack loop for URL filter
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Zero-touch cloud enrolment state, shown on the welcome screen. A QR-provisioned tablet
+  // that is Device Owner but failed to enrol used to sit here in silence; see
+  // ProvisioningStatus in CloudSyncService.
+  const [provisioning, setProvisioning] = useState<ProvisioningStatus>(
+    () => (CLOUD_ENABLED ? CloudSyncService.getProvisioningStatus() : { state: 'none' }),
+  );
+  React.useEffect(() => {
+    if (!CLOUD_ENABLED) return;
+    const sub = DeviceEventEmitter.addListener(PROVISIONING_STATUS_EVENT, setProvisioning);
+    return () => sub.remove();
+  }, []);
   const loadingTimeoutRef = useRef<any>(null);
   // Last top-frame (main document) URL requested — used to distinguish a fatal
   // main-page HTTP error from a harmless sub-resource error (favicon, analytics…).
@@ -183,7 +200,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
     // Extract hostname from URL using regex (avoid URL constructor type issues in RN)
     const hostMatch = blockedUrl.match(/^https?:\/\/([^/]+)/);
     const hostname = hostMatch ? hostMatch[1] : blockedUrl;
-    setBlockedUrlMessage(`🚫 ${hostname}`);
+    setBlockedUrlMessage(hostname);
     if (blockedUrlTimerRef.current) clearTimeout(blockedUrlTimerRef.current);
     blockedUrlTimerRef.current = setTimeout(() => setBlockedUrlMessage(null), 2000);
   }, [urlFilterShowFeedback]);
@@ -879,45 +896,60 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
             {/* Features List */}
             <View style={styles.featuresList}>
               <FeatureItem
-                icon="🔒"
+                icon="shield-check"
                 text="Secure kiosk mode"
               />
               <FeatureItem
-                icon="⚡"
+                icon="flash"
                 text="Optimal performance"
               />
               <FeatureItem
-                icon="🎯"
+                icon="github"
                 text="100% free & open source"
               />
             </View>
 
+            {/* Cloud enrolment state for a QR-provisioned device */}
+            {provisioning.state !== 'none' && (
+              <View style={styles.provisioningBox}>
+                <Text style={styles.provisioningText}>
+                  {provisioning.state === 'enrolling'
+                    ? `Connecting to FreeKiosk Cloud… (attempt ${provisioning.attempts})`
+                    : provisioning.state === 'retrying'
+                      ? `Cannot reach FreeKiosk Cloud yet. Retrying every 30 seconds (attempt ${provisioning.attempts}).`
+                      : `Cloud enrollment failed: ${provisioning.error}. Enter a new token in Settings > Cloud.`}
+                </Text>
+              </View>
+            )}
+
             {/* Action Button */}
             <TouchableOpacity
-              style={styles.setupButton}
+              style={[styles.setupButton, styles.rowCenter]}
               onPress={handleNavigateToSettings}
               activeOpacity={0.8}
             >
+              <Icon name="rocket-launch" size={20} color="#2b7fff" style={styles.buttonLeadingIcon} />
               <Text style={styles.setupButtonText}>
-                🚀 Start Configuration
+                Start Configuration
               </Text>
             </TouchableOpacity>
 
             {/* GitHub Support Button */}
             <TouchableOpacity
-              style={styles.githubButton}
+              style={[styles.githubButton, styles.rowCenter]}
               onPress={handleOpenGitHub}
               activeOpacity={0.7}
             >
+              <Icon name="github" size={20} color="#fff" style={styles.buttonLeadingIcon} />
               <Text style={styles.githubButtonText}>
-                ⭐ Support us on GitHub
+                Support us on GitHub
               </Text>
             </TouchableOpacity>
 
             {/* Hint */}
             <View style={styles.hintContainer}>
               <Text style={styles.hintText}>
-                💡 Tip: Tap 5× anywhere on the screen to access settings
+                Tip: Tap 5× anywhere on the screen to access settings
               </Text>
             </View>
 
@@ -1183,7 +1215,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
       
       {loading && !error && (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#0066cc" />
+          <ActivityIndicator size="large" color="#2b7fff" />
           <Text style={styles.loadingText}>Loading...</Text>
           {/* Fallback settings button inside loading overlay */}
           <TouchableOpacity
@@ -1195,14 +1227,14 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
               }
             }}
           >
-            <Text style={styles.fallbackSettingsButtonText}>⚙️</Text>
+            <Icon name="cog" size={24} color="#333" />
           </TouchableOpacity>
         </View>
       )}
 
       {error && (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorIcon}>⚠️</Text>
+          <Icon name="alert" size={48} color="#f59e0b" style={styles.errorIcon} />
           <Text style={styles.errorText}>Loading Error</Text>
           <Text style={styles.errorSubtext}>URL: {url}</Text>
           {autoReload && (
@@ -1210,12 +1242,13 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
               Automatic reload in 5 seconds...
             </Text>
           )}
-          <TouchableOpacity style={styles.reloadButton} onPress={handleReload}>
-            <Text style={styles.reloadText}>🔄 Reload Now</Text>
+          <TouchableOpacity style={[styles.reloadButton, styles.rowCenter]} onPress={handleReload}>
+            <Icon name="refresh" size={18} color="#fff" style={styles.buttonLeadingIcon} />
+            <Text style={styles.reloadText}>Reload Now</Text>
           </TouchableOpacity>
           {/* Fallback settings button inside error overlay */}
           <Text style={styles.fallbackSettingsHint}>
-            Tap ⚙️ button 5× to return to settings
+            Tap the settings button 5× to return to settings
           </Text>
           <TouchableOpacity
             style={styles.fallbackSettingsButton}
@@ -1226,13 +1259,14 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
               }
             }}
           >
-            <Text style={styles.fallbackSettingsButtonText}>⚙️</Text>
+            <Icon name="cog" size={24} color="#333" />
           </TouchableOpacity>
         </View>
       )}
 
       {blockedUrlMessage && (
-        <View style={styles.blockedToast}>
+        <View style={[styles.blockedToast, styles.rowCenter]}>
+          <Icon name="block-helper" size={15} color="#fff" style={styles.buttonLeadingIcon} />
           <Text style={styles.blockedToastText}>{blockedUrlMessage}</Text>
         </View>
       )}
@@ -1241,9 +1275,9 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
 });
 
 
-const FeatureItem: React.FC<{ icon: string; text: string }> = ({ icon, text }) => (
+const FeatureItem: React.FC<{ icon: IconName; text: string }> = ({ icon, text }) => (
   <View style={styles.featureItem}>
-    <Text style={styles.featureIcon}>{icon}</Text>
+    <Icon name={icon} size={22} color="#2b7fff" style={styles.featureIcon} />
     <Text style={styles.featureText}>{text}</Text>
   </View>
 );
@@ -1253,7 +1287,7 @@ const styles = StyleSheet.create({
   // WELCOME SCREEN STYLES
   welcomeContainer: {
     flex: 1,
-    backgroundColor: '#0066cc',
+    backgroundColor: '#2b7fff',
   },
   scrollContent: {
     flexGrow: 1,
@@ -1312,14 +1346,34 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   featureIcon: {
-    fontSize: 24,
     marginRight: 16,
+  },
+  rowCenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonLeadingIcon: {
+    marginRight: 10,
   },
   featureText: {
     fontSize: 16,
     color: '#fff',
     fontWeight: '500',
     flex: 1,
+  },
+  provisioningBox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginBottom: 16,
+    maxWidth: 480,
+  },
+  provisioningText: {
+    color: '#ffffff',
+    fontSize: 14,
+    textAlign: 'center',
   },
   setupButton: {
     backgroundColor: '#fff',
@@ -1336,7 +1390,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   setupButtonText: {
-    color: '#0066cc',
+    color: '#2b7fff',
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -1429,7 +1483,7 @@ const styles = StyleSheet.create({
     textAlign: 'center' 
   },
   reloadButton: { 
-    backgroundColor: '#0066cc', 
+    backgroundColor: '#2b7fff', 
     paddingHorizontal: 30, 
     paddingVertical: 15, 
     borderRadius: 8,

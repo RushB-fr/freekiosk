@@ -73,6 +73,20 @@ class OverlayServiceModule(reactContext: ReactApplicationContext) :
         }
     }
 
+    // #266: dim over the external app instead of bringing FreeKiosk to the front.
+    // Resolves false when the service isn't running or can't draw overlays; JS then
+    // falls back to bringToFront().
+    @ReactMethod
+    fun showDimOverlay(level: Double, promise: Promise) {
+        OverlayService.showDimOverlay(level.toFloat()) { shown -> promise.resolve(shown) }
+    }
+
+    @ReactMethod
+    fun hideDimOverlay(promise: Promise) {
+        OverlayService.hideDimOverlay()
+        promise.resolve(true)
+    }
+
     @ReactMethod
     fun stopOverlayService(promise: Promise) {
         try {

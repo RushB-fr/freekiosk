@@ -7,6 +7,8 @@ import android.os.BatteryManager
 import android.Manifest
 import android.content.pm.PackageManager
 import android.location.LocationManager
+import android.provider.Settings
+import android.telephony.TelephonyManager
 import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.net.ConnectivityManager
@@ -41,6 +43,10 @@ class SystemInfoModule(reactContext: ReactApplicationContext) : ReactContextBase
             // WiFi info
             val wifiInfo = getWiFiInfo()
             systemInfo.putMap("wifi", wifiInfo)
+
+            // Cellular info, reported alongside WiFi so the dashboard can show both
+            val cellularInfo = getCellularInfo()
+            systemInfo.putMap("cellular", cellularInfo)
 
             // Bluetooth info
             val bluetoothInfo = getBluetoothInfo()
@@ -102,6 +108,127 @@ class SystemInfoModule(reactContext: ReactApplicationContext) : ReactContextBase
         }
 
         return batteryInfo
+    }
+
+    /**
+     * Cellular state, shaped like getWiFiInfo so the two read the same in the payload.
+     *
+     * Three of the four values cost nothing: TRANSPORT_CELLULAR, the SIM operator name
+     * and airplane mode are all readable with no permission. The network generation and
+     * the signal in dBm need READ_PHONE_STATE, which is declared in the main manifest
+     * and stripped from Play Store builds by the src/playstore overlay, so both are
+     * guarded rather than assumed: without the permission they come back empty and the
+     * rest still reports.
+     *
+     * Requested by a beta tester running tablets on mobile data, who had a device hang
+     * on startup after someone enabled airplane mode with nothing on screen to say so.
+     */
+    /**
+     * Cellular only, so the 30-second heartbeat does not pay for battery, WiFi,
+     * bluetooth and audio just to read one section.
+     */
+    @ReactMethod
+    fun getCellularInfo(promise: Promise) {
+        try {
+            promise.resolve(getCellularInfo())
+        } catch (e: Exception) {
+            promise.reject("CELLULAR_INFO_ERROR", e.message, e)
+        }
+    }
+
+    private fun getCellularInfo(): WritableMap {
+        val cellularInfo = Arguments.createMap()
+
+        try {
+            val connectivityManager = reactApplicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val network = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) connectivityManager.activeNetwork else null
+            val capabilities = if (network != null) connectivityManager.getNetworkCapabilities(network) else null
+
+            val isConnected = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true
+            } else {
+                @Suppress("DEPRECATION")
+                connectivityManager.getNetworkInfo(ConnectivityManager.TYPE_MOBILE)?.isConnected == true
+            }
+            cellularInfo.putBoolean("isConnected", isConnected)
+
+            val telephonyManager = reactApplicationContext.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+            cellularInfo.putString("carrier", telephonyManager.simOperatorName ?: "")
+
+            cellularInfo.putString("networkType", getCellularGeneration(telephonyManager))
+            val dbm = getCellularSignalDbm(telephonyManager)
+            if (dbm != null) cellularInfo.putInt("signalDbm", dbm) else cellularInfo.putNull("signalDbm")
+
+            cellularInfo.putBoolean("airplaneMode", isAirplaneModeOn())
+        } catch (e: Exception) {
+            DebugLog.errorProduction("SystemInfo", "Cellular error: ${e.message}")
+            cellularInfo.putBoolean("isConnected", false)
+            cellularInfo.putString("carrier", "")
+            cellularInfo.putString("networkType", "")
+            cellularInfo.putNull("signalDbm")
+            cellularInfo.putBoolean("airplaneMode", false)
+        }
+
+        return cellularInfo
+    }
+
+    /** Whether READ_PHONE_STATE is actually held; a Play Store build never has it. */
+    private fun hasPhoneStatePermission(): Boolean =
+        reactApplicationContext.checkSelfPermission(Manifest.permission.READ_PHONE_STATE) ==
+            PackageManager.PERMISSION_GRANTED
+
+    /**
+     * "5G", "4G", "3G", "2G", or "" when unknown or unreadable.
+     *
+     * Note a known limit rather than hiding it: on a 5G non-standalone network the data
+     * network type reads LTE while the device is in fact on 5G, because the anchor is
+     * LTE. Reading through ServiceState to catch that needs more privilege than this is
+     * worth, so a NSA device reports 4G.
+     */
+    private fun getCellularGeneration(telephonyManager: TelephonyManager): String {
+        if (!hasPhoneStatePermission()) return ""
+        return try {
+            val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                telephonyManager.dataNetworkType
+            } else {
+                @Suppress("DEPRECATION")
+                telephonyManager.networkType
+            }
+            when (type) {
+                TelephonyManager.NETWORK_TYPE_NR -> "5G"
+                TelephonyManager.NETWORK_TYPE_LTE, TelephonyManager.NETWORK_TYPE_IWLAN -> "4G"
+                TelephonyManager.NETWORK_TYPE_HSPAP, TelephonyManager.NETWORK_TYPE_HSPA,
+                TelephonyManager.NETWORK_TYPE_HSDPA, TelephonyManager.NETWORK_TYPE_HSUPA,
+                TelephonyManager.NETWORK_TYPE_UMTS, TelephonyManager.NETWORK_TYPE_EVDO_A,
+                TelephonyManager.NETWORK_TYPE_EVDO_B, TelephonyManager.NETWORK_TYPE_EHRPD -> "3G"
+                TelephonyManager.NETWORK_TYPE_EDGE, TelephonyManager.NETWORK_TYPE_GPRS,
+                TelephonyManager.NETWORK_TYPE_CDMA, TelephonyManager.NETWORK_TYPE_1xRTT,
+                TelephonyManager.NETWORK_TYPE_GSM -> "2G"
+                else -> ""
+            }
+        } catch (e: SecurityException) {
+            ""
+        }
+    }
+
+    /** Signal in dBm, or null without READ_PHONE_STATE or on Android below 10. */
+    private fun getCellularSignalDbm(telephonyManager: TelephonyManager): Int? {
+        if (!hasPhoneStatePermission()) return null
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
+        return try {
+            telephonyManager.signalStrength?.cellSignalStrengths?.firstOrNull()?.dbm
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /** Airplane mode. Readable with no permission, and the point of the request. */
+    private fun isAirplaneModeOn(): Boolean = try {
+        Settings.Global.getInt(
+            reactApplicationContext.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0
+        ) == 1
+    } catch (e: Exception) {
+        false
     }
 
     private fun getWiFiInfo(): WritableMap {

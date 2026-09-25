@@ -51,6 +51,10 @@ export default function BrightnessDialog({ visible, onClose }: Props) {
     if (Math.abs(value - lastPersisted.current) < 0.01) return;
     lastPersisted.current = value;
     try {
+      // #242: the drag itself goes through setBrightnessLevel (transient); releasing the
+      // slider is the lasting choice, so it also has to reach the SharedPreferences
+      // mirror the native wake paths read, and Settings.System where allowed.
+      await BrightnessModule.setDefaultBrightness(value);
       await StorageService.saveDefaultBrightness(value);
     } catch (e) {
       console.warn('[BrightnessDialog] saveDefaultBrightness error:', e);
@@ -74,9 +78,9 @@ export default function BrightnessDialog({ visible, onClose }: Props) {
             minimumValue={0.05}
             maximumValue={1}
             step={0.01}
-            minimumTrackTintColor="#0066cc"
+            minimumTrackTintColor="#2b7fff"
             maximumTrackTintColor="#d0d0d0"
-            thumbTintColor="#0066cc"
+            thumbTintColor="#2b7fff"
             onValueChange={applyBrightness}
             onSlidingComplete={persistBrightness}
           />
@@ -124,7 +128,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   value: {
-    color: '#0066cc',
+    color: '#2b7fff',
     fontSize: 24,
     fontWeight: '700',
     marginBottom: 12,
