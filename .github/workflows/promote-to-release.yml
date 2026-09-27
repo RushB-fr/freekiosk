@@ -1,0 +1,114 @@
+name: Promote Nightly to Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (example: 1.2.18)'
+        required: true
+        type: string
+      nightly_run_id:
+        description: 'GitHub Actions run ID from Nightly Android Build'
+        required: true
+        type: string
+      prerelease:
+        description: 'Publish as pre-release'
+        required: true
+        default: false
+        type: boolean
+      release_notes:
+        description: 'Optional extra release notes'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: promote-to-release
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Validate version format
+        run: |
+          if ! [[ "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z]+)?$ ]]; then
+            echo "Invalid version: ${{ inputs.version }}"
+            echo "Expected format: MAJOR.MINOR.PATCH (optionally with suffix, e.g. 1.2.18-rc1)"
+            exit 1
+          fi
+
+      - name: Download nightly APK artifact
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          workflow: nightly-android-build.yml
+          run_id: ${{ inputs.nightly_run_id }}
+          name: freekiosk-nightly-apk
+          path: dist/apk
+
+      - name: Download nightly AAB artifact
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          workflow: nightly-android-build.yml
+          run_id: ${{ inputs.nightly_run_id }}
+          name: freekiosk-nightly-aab
+          path: dist/aab
+
+      - name: Download nightly checksums artifact
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          workflow: nightly-android-build.yml
+          run_id: ${{ inputs.nightly_run_id }}
+          name: freekiosk-nightly-checksums
+          path: dist/checksums
+
+      - name: Resolve nightly commit SHA
+        id: nightly
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          HEAD_SHA=$(gh api \
+            repos/${{ github.repository }}/actions/runs/${{ inputs.nightly_run_id }} \
+            --jq '.head_sha')
+
+          if [ -z "${HEAD_SHA}" ] || [ "${HEAD_SHA}" = "null" ]; then
+            echo "Unable to resolve head SHA from run ${{ inputs.nightly_run_id }}"
+            exit 1
+          fi
+
+          echo "head_sha=${HEAD_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure release tag does not already exist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ inputs.version }}"
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "Release ${TAG} already exists"
+            exit 1
+          fi
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          target_commitish: ${{ steps.nightly.outputs.head_sha }}
+          name: FreeKiosk v${{ inputs.version }}
+          prerelease: ${{ inputs.prerelease }}
+          generate_release_notes: true
+          body: |
+            Promoted from nightly run #${{ inputs.nightly_run_id }}.
+
+            ${{ inputs.release_notes }}
+          files: |
+            dist/apk/**/*.apk
+            dist/aab/**/*.aab
+            dist/checksums/SHA256SUMS.txt

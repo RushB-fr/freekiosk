@@ -1,0 +1,128 @@
+name: Nightly Android Build
+
+on:
+  schedule:
+    - cron: '15 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nightly-android-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      FREEKIOSK_UPLOAD_STORE_FILE_B64: ${{ secrets.FREEKIOSK_UPLOAD_STORE_FILE_B64 }}
+      FREEKIOSK_UPLOAD_STORE_PASSWORD: ${{ secrets.FREEKIOSK_UPLOAD_STORE_PASSWORD }}
+      FREEKIOSK_UPLOAD_KEY_ALIAS: ${{ secrets.FREEKIOSK_UPLOAD_KEY_ALIAS }}
+      FREEKIOSK_UPLOAD_KEY_PASSWORD: ${{ secrets.FREEKIOSK_UPLOAD_KEY_PASSWORD }}
+      GRADLE_OPTS: '-Xmx4096m -XX:MaxMetaspaceSize=1024m'
+      JAVA_OPTS: '-Xmx4096m -XX:MaxMetaspaceSize=1024m'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-cleanup: always
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure Gradle properties
+        working-directory: android
+        run: |
+          echo "android.useAndroidX=true" >> gradle.properties
+          echo "android.enableJetifier=true" >> gradle.properties
+          echo "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m" >> gradle.properties
+          echo "org.gradle.daemon=true" >> gradle.properties
+          echo "org.gradle.parallel=true" >> gradle.properties
+          echo "org.gradle.configureondemand=true" >> gradle.properties
+
+      - name: Configure production signing (optional)
+        if: ${{ env.FREEKIOSK_UPLOAD_STORE_FILE_B64 != '' }}
+        working-directory: android
+        run: |
+          echo "${FREEKIOSK_UPLOAD_STORE_FILE_B64}" | base64 -d > app/ci-upload.keystore
+          {
+            echo "FREEKIOSK_UPLOAD_STORE_FILE=ci-upload.keystore"
+            echo "FREEKIOSK_UPLOAD_STORE_PASSWORD=${FREEKIOSK_UPLOAD_STORE_PASSWORD}"
+            echo "FREEKIOSK_UPLOAD_KEY_ALIAS=${FREEKIOSK_UPLOAD_KEY_ALIAS}"
+            echo "FREEKIOSK_UPLOAD_KEY_PASSWORD=${FREEKIOSK_UPLOAD_KEY_PASSWORD}"
+          } >> gradle.properties
+
+      - name: Build release APK and Play Store AAB
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease :app:bundleRelease -Pplaystore
+
+      - name: Generate checksums
+        run: |
+          mkdir -p dist/checksums
+          sha256sum android/app/build/outputs/apk/release/app-release.apk > dist/checksums/SHA256SUMS.txt
+          sha256sum android/app/build/outputs/bundle/release/app-release.aab >> dist/checksums/SHA256SUMS.txt
+
+      - name: Upload nightly APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: freekiosk-nightly-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Upload nightly AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: freekiosk-nightly-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Upload nightly checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: freekiosk-nightly-checksums
+          path: dist/checksums/SHA256SUMS.txt
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Create or update nightly release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          name: "Nightly Build"
+          body: |
+            🚀 **Nightly Build** - Auto-generated build from latest main branch
+            
+            📅 **Build Date:** ${{ github.event.head_commit.timestamp }}
+            📝 **Commit:** [${{ github.sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+            
+            ⚠️ **Note:** This is an automated nightly build. Use at your own risk.
+          files: |
+            android/app/build/outputs/apk/release/app-release.apk
+            android/app/build/outputs/bundle/release/app-release.aab
+            dist/checksums/SHA256SUMS.txt
+          draft: false
+          prerelease: true
+          overwrite_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
