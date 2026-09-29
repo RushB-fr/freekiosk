@@ -499,17 +499,10 @@ class MainActivity : ReactActivity() {
     if (!devicePolicyManager.isDeviceOwnerApp(packageName)) return
     val enabled = getAsyncStorageValue("@kiosk_default_launcher", "false") == "true"
     try {
-      // Only ever clears persistent preferences set by THIS admin (we set none other than HOME),
-      // so this is safe and idempotent — it prevents duplicate entries accumulating.
-      devicePolicyManager.clearPackagePersistentPreferredActivities(adminComponent, packageName)
+      // Idempotent: clears our persistent Home preference, re-adds it when enabled. When
+      // disabled it only hands Home back if this policy took it, so a user's own pick stays.
+      HomeLauncherPolicy.apply(this, enabled, forceHandBack = false)
       if (enabled) {
-        val filter = IntentFilter(Intent.ACTION_MAIN).apply {
-          addCategory(Intent.CATEGORY_HOME)
-          addCategory(Intent.CATEGORY_DEFAULT)
-        }
-        devicePolicyManager.addPersistentPreferredActivity(
-          adminComponent, filter, ComponentName(this, MainActivity::class.java)
-        )
         DebugLog.d("MainActivity", "Default launcher policy applied (FreeKiosk = persistent Home)")
       } else {
         DebugLog.d("MainActivity", "Default launcher policy off — persistent Home cleared")
