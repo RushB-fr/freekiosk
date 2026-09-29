@@ -24,7 +24,11 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      # The action's default package list includes the legacy "tools" package, which
+      # the SDK repository no longer serves, so sdkmanager exits 1 before the build.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Install SDK packages pinned by android/build.gradle
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;27.1.12297006"
