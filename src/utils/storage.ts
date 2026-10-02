@@ -3569,6 +3569,10 @@ export const StorageService = {
         dashboardTiles: json(KEYS.DASHBOARD_TILES, []),
         dashboardIconSize: parseDashboardIconSize(str(KEYS.DASHBOARD_ICON_SIZE)),
         pauseWebMediaWhenHidden: bool(KEYS.PAUSE_WEB_MEDIA_WHEN_HIDDEN, true),
+        restartButton: {
+          enabled: bool(KEYS.RESTART_BUTTON_ENABLED),
+          longPressSeconds: num(KEYS.RESTART_BUTTON_LONG_PRESS_SECONDS, 5),
+        },
         intercomMode: bool(KEYS.INTERCOM_MODE),
       },
       display: {
@@ -3656,6 +3660,7 @@ export const StorageService = {
         overlayButtonPosition: str(KEYS.OVERLAY_BUTTON_POSITION, 'bottom-right'),
         blockFactoryReset: bool(KEYS.BLOCK_FACTORY_RESET),
         allowHardwareScreenshot: bool(KEYS.ALLOW_HARDWARE_SCREENSHOT),
+        allowRemoteScreenshot: bool(KEYS.ALLOW_REMOTE_SCREENSHOT),
         defaultLauncher: bool(KEYS.DEFAULT_LAUNCHER),
         screenLockCompat: bool(KEYS.SCREEN_LOCK_COMPAT),
         lockscreen: {
@@ -3675,6 +3680,14 @@ export const StorageService = {
           port: num(KEYS.REST_API_PORT, 8080),
           allowControl: bool(KEYS.REST_API_ALLOW_CONTROL, true),
         },
+        cameraStream: {
+          enabled: bool(KEYS.CAMERA_STREAM_ENABLED),
+          camera: str(KEYS.CAMERA_STREAM_CAMERA, 'front'),
+          fps: num(KEYS.CAMERA_STREAM_FPS, 10),
+          quality: num(KEYS.CAMERA_STREAM_QUALITY, 60),
+          width: num(KEYS.CAMERA_STREAM_WIDTH, 1280),
+          rotate: num(KEYS.CAMERA_STREAM_ROTATE, -1),
+        },
         mqtt: {
           enabled: bool(KEYS.MQTT_ENABLED),
           brokerUrl: str(KEYS.MQTT_BROKER_URL),
@@ -3687,6 +3700,19 @@ export const StorageService = {
           allowControl: bool(KEYS.MQTT_ALLOW_CONTROL, true),
           deviceName: str(KEYS.MQTT_DEVICE_NAME),
           motionAlwaysOn: bool(KEYS.MQTT_MOTION_ALWAYS_ON),
+          screenshot: {
+            enabled: bool(KEYS.MQTT_SCREENSHOT_ENABLED),
+            auto: bool(KEYS.MQTT_SCREENSHOT_AUTO),
+            interval: num(KEYS.MQTT_SCREENSHOT_INTERVAL, 60),
+            quality: num(KEYS.MQTT_SCREENSHOT_QUALITY, 70),
+            maxWidth: num(KEYS.MQTT_SCREENSHOT_MAX_WIDTH, 1280),
+          },
+          camera: {
+            enabled: bool(KEYS.MQTT_CAMERA_ENABLED),
+            auto: bool(KEYS.MQTT_CAMERA_AUTO),
+            interval: num(KEYS.MQTT_CAMERA_INTERVAL, 300),
+            quality: num(KEYS.MQTT_CAMERA_QUALITY, 70),
+          },
         },
       },
     };
@@ -3789,6 +3815,11 @@ export const StorageService = {
         set(KEYS.DASHBOARD_ICON_SIZE, parseDashboardIconSize(g.dashboardIconSize));
       }
       set(KEYS.PAUSE_WEB_MEDIA_WHEN_HIDDEN, g.pauseWebMediaWhenHidden);
+      const rb = g.restartButton as Record<string, unknown> | undefined;
+      if (rb) {
+        set(KEYS.RESTART_BUTTON_ENABLED, rb.enabled);
+        set(KEYS.RESTART_BUTTON_LONG_PRESS_SECONDS, rb.longPressSeconds);
+      }
       set(KEYS.INTERCOM_MODE, g.intercomMode);
     }
 
@@ -3889,6 +3920,7 @@ export const StorageService = {
       set(KEYS.OVERLAY_BUTTON_POSITION, sec.overlayButtonPosition);
       set(KEYS.BLOCK_FACTORY_RESET, sec.blockFactoryReset);
       set(KEYS.ALLOW_HARDWARE_SCREENSHOT, sec.allowHardwareScreenshot);
+      set(KEYS.ALLOW_REMOTE_SCREENSHOT, sec.allowRemoteScreenshot);
       set(KEYS.DEFAULT_LAUNCHER, sec.defaultLauncher);
       set(KEYS.SCREEN_LOCK_COMPAT, sec.screenLockCompat);
       const ls = sec.lockscreen as Record<string, unknown> | undefined;
@@ -3911,6 +3943,15 @@ export const StorageService = {
         set(KEYS.REST_API_PORT, ra.port);
         set(KEYS.REST_API_ALLOW_CONTROL, ra.allowControl);
       }
+      const cs = adv.cameraStream as Record<string, unknown> | undefined;
+      if (cs) {
+        set(KEYS.CAMERA_STREAM_ENABLED, cs.enabled);
+        set(KEYS.CAMERA_STREAM_CAMERA, cs.camera);
+        set(KEYS.CAMERA_STREAM_FPS, cs.fps);
+        set(KEYS.CAMERA_STREAM_QUALITY, cs.quality);
+        set(KEYS.CAMERA_STREAM_WIDTH, cs.width);
+        set(KEYS.CAMERA_STREAM_ROTATE, cs.rotate);
+      }
       const mq = adv.mqtt as Record<string, unknown> | undefined;
       if (mq) {
         set(KEYS.MQTT_ENABLED, mq.enabled);
@@ -3924,6 +3965,21 @@ export const StorageService = {
         set(KEYS.MQTT_ALLOW_CONTROL, mq.allowControl);
         set(KEYS.MQTT_DEVICE_NAME, mq.deviceName);
         set(KEYS.MQTT_MOTION_ALWAYS_ON, mq.motionAlwaysOn);
+        const ms = mq.screenshot as Record<string, unknown> | undefined;
+        if (ms) {
+          set(KEYS.MQTT_SCREENSHOT_ENABLED, ms.enabled);
+          set(KEYS.MQTT_SCREENSHOT_AUTO, ms.auto);
+          set(KEYS.MQTT_SCREENSHOT_INTERVAL, ms.interval);
+          set(KEYS.MQTT_SCREENSHOT_QUALITY, ms.quality);
+          set(KEYS.MQTT_SCREENSHOT_MAX_WIDTH, ms.maxWidth);
+        }
+        const mc = mq.camera as Record<string, unknown> | undefined;
+        if (mc) {
+          set(KEYS.MQTT_CAMERA_ENABLED, mc.enabled);
+          set(KEYS.MQTT_CAMERA_AUTO, mc.auto);
+          set(KEYS.MQTT_CAMERA_INTERVAL, mc.interval);
+          set(KEYS.MQTT_CAMERA_QUALITY, mc.quality);
+        }
       }
     }
 
