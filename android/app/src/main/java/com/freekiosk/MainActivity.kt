@@ -35,6 +35,9 @@ import androidx.core.content.ContextCompat
 class MainActivity : ReactActivity() {
 
   companion object {
+    /** #280: delay before the alarm relaunches the app after an ADB config restart. */
+    private const val ADB_RESTART_DELAY_MS = 1500L
+
     /**
      * #238: how long JS may take to finish starting before we release screen pinning.
      * Generous on purpose: React Native legitimately takes one to two minutes on the
@@ -1802,12 +1805,23 @@ class MainActivity : ReactActivity() {
         android.util.Log.i("FreeKiosk-ADB", "App will auto-start after restart via normal loadSettings flow")
       }
       
-      // Start the new instance
+      // Relaunch through AlarmManager a moment after this process is gone. Starting the
+      // new instance before the kill made it bind a WebView renderer slot while the
+      // system was still tearing down the old one, and on slow devices that bind stayed
+      // pending forever (blank "Loading..." until reboot, #280).
       if (restartIntent != null) {
-        startActivity(restartIntent)
+        val pending = android.app.PendingIntent.getActivity(
+          this, 0, restartIntent,
+          android.app.PendingIntent.FLAG_CANCEL_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+        alarmManager.set(
+          android.app.AlarmManager.RTC,
+          System.currentTimeMillis() + ADB_RESTART_DELAY_MS,
+          pending
+        )
       }
       
-      // Kill immediately
       android.os.Process.killProcess(android.os.Process.myPid())
       System.exit(0)
     }, 500) // Wait 500ms for toast to show
