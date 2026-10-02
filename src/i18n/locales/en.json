@@ -665,6 +665,15 @@
     "iconMode": "Icon Mode",
     "imageUrl": "Image URL",
     "imageUrlPlaceholder": "https://example.com/icon.png",
+    "iconSize": {
+      "title": "Icon Size",
+      "small": "Small",
+      "medium": "Medium",
+      "large": "Large",
+      "xlarge": "Extra large"
+    },
+    "iconColor": "Icon Color",
+    "colorAuto": "Auto",
     "preview": "Preview",
     "cancel": "Cancel",
     "update": "Update",

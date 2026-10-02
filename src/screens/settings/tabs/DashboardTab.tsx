@@ -7,8 +7,13 @@ import {
   SettingsButton,
 } from '../../../components/settings';
 import { Colors, Spacing, Typography } from '../../../theme';
-import { DashboardTile } from '../../../types/dashboard';
-import { getColorForLabel } from '../../../utils/dashboardColors';
+import {
+  DashboardTile,
+  DashboardIconSize,
+  DASHBOARD_ICON_SIZES,
+  DEFAULT_DASHBOARD_ICON_SIZE,
+} from '../../../types/dashboard';
+import { getTileColor, MATERIAL_PALETTE } from '../../../utils/dashboardColors';
 import { StorageService } from '../../../utils/storage';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTranslation } from 'react-i18next';
@@ -35,10 +40,18 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ dashboardModeEnabled }) => 
   const [editUrl, setEditUrl] = useState('');
   const [editIconMode, setEditIconMode] = useState<DashboardTile['iconMode']>('favicon');
   const [editIconValue, setEditIconValue] = useState('');
+  const [editIconColor, setEditIconColor] = useState<string | undefined>(undefined);
+  const [iconSize, setIconSize] = useState<DashboardIconSize>(DEFAULT_DASHBOARD_ICON_SIZE);
 
   useEffect(() => {
     loadTiles();
+    StorageService.getDashboardIconSize().then(setIconSize);
   }, []);
+
+  const handleIconSizeChange = async (size: DashboardIconSize) => {
+    setIconSize(size);
+    await StorageService.saveDashboardIconSize(size);
+  };
 
   const loadTiles = async () => {
     const saved = await StorageService.getDashboardTiles();
@@ -57,6 +70,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ dashboardModeEnabled }) => 
     setEditUrl('');
     setEditIconMode('favicon');
     setEditIconValue('');
+    setEditIconColor(undefined);
     setShowEditor(true);
   };
 
@@ -66,6 +80,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ dashboardModeEnabled }) => 
     setEditUrl(tile.url);
     setEditIconMode(tile.iconMode);
     setEditIconValue(tile.iconValue || '');
+    setEditIconColor(tile.iconColor);
     setShowEditor(true);
   };
 
@@ -97,7 +112,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ dashboardModeEnabled }) => 
       // Update existing
       const updated = tiles.map(t =>
         t.id === editingTile.id
-          ? { ...t, label: editLabel.trim(), url: finalUrl, iconMode: editIconMode, iconValue: editIconMode === 'image' ? editIconValue.trim() : undefined }
+          ? { ...t, label: editLabel.trim(), url: finalUrl, iconMode: editIconMode, iconValue: editIconMode === 'image' ? editIconValue.trim() : undefined, iconColor: editIconColor }
           : t,
       );
       await saveTiles(updated);
@@ -109,6 +124,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ dashboardModeEnabled }) => 
         url: finalUrl,
         iconMode: editIconMode,
         iconValue: editIconMode === 'image' ? editIconValue.trim() : undefined,
+        iconColor: editIconColor,
         order: tiles.length,
       };
       await saveTiles([...tiles, newTile]);
@@ -151,7 +167,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ dashboardModeEnabled }) => 
 
   const renderTilePreview = (tile: DashboardTile) => {
     if (tile.iconMode === 'letter') {
-      const color = getColorForLabel(tile.label);
+      const color = getTileColor(tile);
       const letter = tile.label ? tile.label[0].toUpperCase() : '?';
       return (
         <View style={[styles.previewCircle, { backgroundColor: color }]}>
@@ -160,14 +176,14 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ dashboardModeEnabled }) => 
       );
     }
     if (tile.iconMode === 'image' && tile.iconValue) {
-      return <Image source={{ uri: tile.iconValue }} style={styles.previewImage} />;
+      return <Image source={{ uri: tile.iconValue }} style={[styles.previewImage, tile.iconColor ? { backgroundColor: getTileColor(tile) } : null]} />;
     }
     // favicon
     const domain = tile.url.replace(/^https?:\/\//, '').split('/')[0];
     return (
       <Image
         source={{ uri: `https://www.google.com/s2/favicons?domain=${domain}&sz=64` }}
-        style={styles.previewImage}
+        style={[styles.previewImage, tile.iconColor ? { backgroundColor: getTileColor(tile) } : null]}
       />
     );
   };
@@ -186,6 +202,22 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ dashboardModeEnabled }) => 
 
   return (
     <View>
+      <SettingsSection title={t('dashboard.iconSize.title')} icon="view-dashboard">
+        <View style={styles.iconModeRow}>
+          {DASHBOARD_ICON_SIZES.map(size => (
+            <TouchableOpacity
+              key={size}
+              style={[styles.iconModeButton, iconSize === size && styles.iconModeButtonActive]}
+              onPress={() => handleIconSizeChange(size)}
+            >
+              <Text style={[styles.iconModeText, iconSize === size && styles.iconModeTextActive]}>
+                {t(`dashboard.iconSize.${size}`)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </SettingsSection>
+
       <SettingsSection title={t('dashboard.tilesTitle')} icon="view-dashboard">
         {tiles.map((tile, index) => (
           <View key={tile.id} style={styles.tileRow}>
@@ -285,6 +317,31 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ dashboardModeEnabled }) => 
             </>
           )}
 
+          {/* Icon color */}
+          <View style={styles.editorSpacer} />
+          <Text style={styles.fieldLabel}>{t('dashboard.iconColor')}</Text>
+          <View style={styles.colorRow}>
+            <TouchableOpacity
+              style={[styles.autoColorButton, !editIconColor && styles.iconModeButtonActive]}
+              onPress={() => setEditIconColor(undefined)}
+            >
+              <Text style={[styles.iconModeText, !editIconColor && styles.iconModeTextActive]}>
+                {t('dashboard.colorAuto')}
+              </Text>
+            </TouchableOpacity>
+            {MATERIAL_PALETTE.map(color => (
+              <TouchableOpacity
+                key={color}
+                style={[
+                  styles.colorSwatch,
+                  { backgroundColor: color },
+                  editIconColor === color && styles.colorSwatchActive,
+                ]}
+                onPress={() => setEditIconColor(color)}
+              />
+            ))}
+          </View>
+
           {/* Preview */}
           {editLabel.trim() && (
             <View style={styles.previewRow}>
@@ -296,6 +353,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ dashboardModeEnabled }) => 
                   url: editUrl,
                   iconMode: editIconMode,
                   iconValue: editIconValue,
+                  iconColor: editIconColor,
                   order: 0,
                 })}
                 <Text style={styles.previewLabel}>{editLabel}</Text>
@@ -407,6 +465,29 @@ const styles = StyleSheet.create({
   iconModeTextActive: {
     color: Colors.primary,
     fontWeight: '600',
+  },
+  colorRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  autoColorButton: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  colorSwatch: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  colorSwatchActive: {
+    borderColor: Colors.textPrimary,
   },
   previewRow: {
     marginTop: Spacing.md,

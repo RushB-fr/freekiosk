@@ -1,7 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlockingRegion } from '../types/blockingOverlay';
 import { ScreenScheduleRule } from '../types/screenScheduler';
-import { DashboardTile } from '../types/dashboard';
+import {
+  DashboardTile,
+  DashboardIconSize,
+  DEFAULT_DASHBOARD_ICON_SIZE,
+  parseDashboardIconSize,
+} from '../types/dashboard';
 import { ManagedApp } from '../types/managedApps';
 import { MediaItem, MediaFitMode } from '../types/mediaPlayer';
 import { saveSecureApiKey, getSecureApiKey, clearSecureApiKey, clearSecureMqttPassword } from './secureStorage';
@@ -194,6 +199,7 @@ export const KEYS = {
   // Dashboard
   DASHBOARD_MODE_ENABLED: '@kiosk_dashboard_mode_enabled',
   DASHBOARD_TILES: '@kiosk_dashboard_tiles',
+  DASHBOARD_ICON_SIZE: '@kiosk_dashboard_icon_size',
   // Lock Screen Controls
   LOCKSCREEN_CONTROLS_ENABLED: '@kiosk_lockscreen_controls_enabled',
   LOCKSCREEN_WIFI_ENABLED: '@kiosk_lockscreen_wifi_enabled',
@@ -572,6 +578,7 @@ export const StorageService = {
         // Dashboard
         KEYS.DASHBOARD_MODE_ENABLED,
         KEYS.DASHBOARD_TILES,
+        KEYS.DASHBOARD_ICON_SIZE,
         // Lock Screen Controls
         KEYS.LOCKSCREEN_CONTROLS_ENABLED,
         KEYS.LOCKSCREEN_WIFI_ENABLED,
@@ -3300,6 +3307,23 @@ export const StorageService = {
     }
   },
 
+  saveDashboardIconSize: async (size: DashboardIconSize): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.DASHBOARD_ICON_SIZE, size);
+    } catch (error) {
+      console.error('Error saving dashboard icon size:', error);
+    }
+  },
+
+  getDashboardIconSize: async (): Promise<DashboardIconSize> => {
+    try {
+      return parseDashboardIconSize(await AsyncStorage.getItem(KEYS.DASHBOARD_ICON_SIZE));
+    } catch (error) {
+      console.error('Error getting dashboard icon size:', error);
+      return DEFAULT_DASHBOARD_ICON_SIZE;
+    }
+  },
+
   saveHttpBasicAuthUsername: async (username: string): Promise<void> => {
     try {
       await AsyncStorage.setItem(KEYS.HTTP_BASIC_AUTH_USERNAME, username);
@@ -3494,6 +3518,7 @@ export const StorageService = {
         managedApps: json(KEYS.MANAGED_APPS, []),
         dashboardMode: bool(KEYS.DASHBOARD_MODE_ENABLED),
         dashboardTiles: json(KEYS.DASHBOARD_TILES, []),
+        dashboardIconSize: parseDashboardIconSize(str(KEYS.DASHBOARD_ICON_SIZE)),
         pauseWebMediaWhenHidden: bool(KEYS.PAUSE_WEB_MEDIA_WHEN_HIDDEN, true),
         intercomMode: bool(KEYS.INTERCOM_MODE),
       },
@@ -3710,6 +3735,9 @@ export const StorageService = {
       set(KEYS.MANAGED_APPS, g.managedApps);
       set(KEYS.DASHBOARD_MODE_ENABLED, g.dashboardMode);
       set(KEYS.DASHBOARD_TILES, g.dashboardTiles);
+      if (g.dashboardIconSize !== undefined) {
+        set(KEYS.DASHBOARD_ICON_SIZE, parseDashboardIconSize(g.dashboardIconSize));
+      }
       set(KEYS.PAUSE_WEB_MEDIA_WHEN_HIDDEN, g.pauseWebMediaWhenHidden);
       set(KEYS.INTERCOM_MODE, g.intercomMode);
     }

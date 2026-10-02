@@ -21,7 +21,12 @@ import { ApiService, MqttImageStream } from '../utils/ApiService';
 import { mqttClient } from '../utils/MqttModule';
 import DeviceControlService from '../services/DeviceControlService';
 import { ScheduledEvent, getActiveEvent } from '../types/planner';
-import { DashboardTile } from '../types/dashboard';
+import {
+  DashboardTile,
+  DashboardIconSize,
+  DEFAULT_DASHBOARD_ICON_SIZE,
+  parseDashboardIconSize,
+} from '../types/dashboard';
 import DashboardGrid from '../components/DashboardGrid';
 import type { MediaItem, MediaFitMode } from '../types/mediaPlayer';
 import { ScreenScheduleRule, getNextWakeTime, getActiveSleepRule, getNextSleepTime } from '../types/screenScheduler';
@@ -216,6 +221,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   // Dashboard states
   const [dashboardModeEnabled, setDashboardModeEnabled] = useState<boolean>(false);
   const [dashboardTiles, setDashboardTiles] = useState<DashboardTile[]>([]);
+  const [dashboardIconSize, setDashboardIconSize] = useState<DashboardIconSize>(DEFAULT_DASHBOARD_ICON_SIZE);
   const [dashboardShowGrid, setDashboardShowGrid] = useState<boolean>(true);
   const [navState, setNavState] = useState<{ canGoBack: boolean; canGoForward: boolean; title: string }>({ canGoBack: false, canGoForward: false, title: '' });
   const [pdfViewerEnabled, setPdfViewerEnabled] = useState<boolean>(false);
@@ -1926,6 +1932,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       const savedDashboardTiles = jsonParse(K.DASHBOARD_TILES, []) as DashboardTile[];
       setDashboardModeEnabled(savedDashboardMode);
       setDashboardTiles(savedDashboardTiles);
+      setDashboardIconSize(parseDashboardIconSize(str(K.DASHBOARD_ICON_SIZE)));
       if (savedDashboardMode) {
         setDashboardShowGrid(true);
       }
@@ -2979,6 +2986,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           {dashboardModeEnabled && dashboardShowGrid ? (
             <DashboardGrid
               tiles={dashboardTiles}
+              iconSize={dashboardIconSize}
               onTilePress={(tile) => {
                 setUrl(tile.url);
                 setDashboardShowGrid(false);

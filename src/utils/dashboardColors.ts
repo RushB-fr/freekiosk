@@ -1,4 +1,4 @@
-const MATERIAL_PALETTE = [
+export const MATERIAL_PALETTE = [
   '#E53935', // Red
   '#D81B60', // Pink
   '#8E24AA', // Purple
@@ -32,4 +32,13 @@ export function getColorForLabel(label: string): string {
   if (!label) return MATERIAL_PALETTE[0];
   const index = djb2Hash(label) % MATERIAL_PALETTE.length;
   return MATERIAL_PALETTE[index];
+}
+
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+/** Chosen color if valid, otherwise the label-based color. */
+export function getTileColor(tile: { label: string; iconColor?: string }): string {
+  return tile.iconColor && HEX_COLOR.test(tile.iconColor)
+    ? tile.iconColor
+    : getColorForLabel(tile.label);
 }

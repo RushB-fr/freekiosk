@@ -665,6 +665,15 @@
     "iconMode": "Mode d'icône",
     "imageUrl": "URL d'image",
     "imageUrlPlaceholder": "https://exemple.com/icone.png",
+    "iconSize": {
+      "title": "Taille des icônes",
+      "small": "Petite",
+      "medium": "Moyenne",
+      "large": "Grande",
+      "xlarge": "Très grande"
+    },
+    "iconColor": "Couleur de l'icône",
+    "colorAuto": "Auto",
     "preview": "Aperçu",
     "cancel": "Annuler",
     "update": "Mettre à jour",

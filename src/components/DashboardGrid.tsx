@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,22 +9,34 @@ import {
   useWindowDimensions,
   GestureResponderEvent,
 } from 'react-native';
-import { DashboardTile } from '../types/dashboard';
-import { getColorForLabel } from '../utils/dashboardColors';
+import {
+  DashboardTile,
+  DashboardIconSize,
+  DASHBOARD_ICON_METRICS,
+  DEFAULT_DASHBOARD_ICON_SIZE,
+  DashboardIconMetrics,
+} from '../types/dashboard';
+import { getTileColor } from '../utils/dashboardColors';
 import { useTranslation } from 'react-i18next';
 
 interface DashboardGridProps {
   tiles: DashboardTile[];
   onTilePress: (tile: DashboardTile) => void;
   onUserInteraction?: (event?: { isTap?: boolean; x?: number; y?: number }) => void;
+  iconSize?: DashboardIconSize;
 }
 
-const TILE_WIDTH = 80;
 const TILE_GAP = 16;
-const ICON_SIZE = 56;
 
-const TileIcon: React.FC<{ tile: DashboardTile }> = ({ tile }) => {
+const TileIcon: React.FC<{ tile: DashboardTile; m: DashboardIconMetrics }> = ({ tile, m }) => {
   const [imageError, setImageError] = useState(false);
+  const circle = { width: m.icon, height: m.icon, borderRadius: m.icon / 2 };
+  // Image/favicon keep their translucent backdrop unless a color was chosen
+  const imageStyle = [
+    styles.iconImage,
+    circle,
+    tile.iconColor ? { backgroundColor: getTileColor(tile) } : null,
+  ];
 
   if (tile.iconMode === 'favicon' && !imageError) {
     const domain = tile.url.replace(/^https?:\/\//, '').split('/')[0];
@@ -32,7 +44,7 @@ const TileIcon: React.FC<{ tile: DashboardTile }> = ({ tile }) => {
     return (
       <Image
         source={{ uri: faviconUrl }}
-        style={styles.iconImage}
+        style={imageStyle}
         onError={() => setImageError(true)}
       />
     );
@@ -42,26 +54,37 @@ const TileIcon: React.FC<{ tile: DashboardTile }> = ({ tile }) => {
     return (
       <Image
         source={{ uri: tile.iconValue }}
-        style={styles.iconImage}
+        style={imageStyle}
         onError={() => setImageError(true)}
       />
     );
   }
 
   // Letter mode (default / fallback)
-  const color = getColorForLabel(tile.label);
+  const color = getTileColor(tile);
   const letter = tile.label ? tile.label[0].toUpperCase() : '?';
   return (
-    <View style={[styles.letterCircle, { backgroundColor: color }]}>
-      <Text style={styles.letterText}>{letter}</Text>
+    <View style={[styles.letterCircle, circle, { backgroundColor: color }]}>
+      <Text style={[styles.letterText, { fontSize: m.letter }]}>{letter}</Text>
     </View>
   );
 };
 
-const DashboardGrid: React.FC<DashboardGridProps> = ({ tiles, onTilePress, onUserInteraction }) => {
+const DashboardGrid: React.FC<DashboardGridProps> = ({
+  tiles,
+  onTilePress,
+  onUserInteraction,
+  iconSize = DEFAULT_DASHBOARD_ICON_SIZE,
+}) => {
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
-  const numColumns = Math.max(1, Math.floor(width / (TILE_WIDTH + TILE_GAP)));
+  const m = DASHBOARD_ICON_METRICS[iconSize] ?? DASHBOARD_ICON_METRICS[DEFAULT_DASHBOARD_ICON_SIZE];
+  const numColumns = Math.max(1, Math.floor(width / (m.tileWidth + TILE_GAP)));
+  const tileStyle = useMemo(() => ({ width: m.tileWidth }), [m.tileWidth]);
+  const labelStyle = useMemo(
+    () => ({ fontSize: m.label, lineHeight: Math.round(m.label * 1.35) }),
+    [m.label],
+  );
 
   const sortedTiles = [...tiles].sort((a, b) => a.order - b.order);
 
@@ -92,14 +115,14 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ tiles, onTilePress, onUse
 
   const renderTile = ({ item }: { item: DashboardTile }) => (
     <TouchableOpacity
-      style={styles.tileContainer}
+      style={[styles.tileContainer, tileStyle]}
       onPress={() => {
         onTilePress(item);
       }}
       activeOpacity={0.7}
     >
-      <TileIcon key={item.url + item.iconMode} tile={item} />
-      <Text style={styles.tileLabel} numberOfLines={2}>
+      <TileIcon key={item.url + item.iconMode + iconSize} tile={item} m={m} />
+      <Text style={[styles.tileLabel, labelStyle]} numberOfLines={2}>
         {item.label}
       </Text>
     </TouchableOpacity>
@@ -150,33 +173,23 @@ const styles = StyleSheet.create({
     marginBottom: TILE_GAP,
   },
   tileContainer: {
-    width: TILE_WIDTH,
     alignItems: 'center',
   },
   iconImage: {
-    width: ICON_SIZE,
-    height: ICON_SIZE,
-    borderRadius: ICON_SIZE / 2,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   letterCircle: {
-    width: ICON_SIZE,
-    height: ICON_SIZE,
-    borderRadius: ICON_SIZE / 2,
     justifyContent: 'center',
     alignItems: 'center',
   },
   letterText: {
     color: '#FFFFFF',
-    fontSize: 24,
     fontWeight: 'bold',
   },
   tileLabel: {
     color: '#FFFFFF',
-    fontSize: 12,
     textAlign: 'center',
     marginTop: 6,
-    lineHeight: 16,
   },
   emptyContainer: {
     flex: 1,
