@@ -19,6 +19,7 @@ export const KEYS = {
   AUTO_LAUNCH: '@kiosk_auto_launch',
   SCREEN_LOCK_COMPAT: '@kiosk_screen_lock_compat',
   ALLOW_REMOTE_SCREENSHOT: '@kiosk_allow_remote_screenshot',
+  ALLOW_HARDWARE_SCREENSHOT: '@kiosk_allow_hardware_screenshot',
   DEFAULT_LAUNCHER: '@kiosk_default_launcher',
   INTERCOM_MODE: '@kiosk_intercom_mode',
   SCREENSAVER_ENABLED: '@screensaver_enabled',
@@ -393,6 +394,26 @@ export const StorageService = {
     }
   },
 
+  // HARDWARE SCREENSHOT (#277) - opt-in; default false so Lock Mode keeps blocking
+  // Power+Volume Down (#172) unless the admin asked for it.
+  saveAllowHardwareScreenshot: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.ALLOW_HARDWARE_SCREENSHOT, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving allow hardware screenshot:', error);
+    }
+  },
+
+  getAllowHardwareScreenshot: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.ALLOW_HARDWARE_SCREENSHOT);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting allow hardware screenshot:', error);
+      return false;
+    }
+  },
+
   //DEFAULT LAUNCHER (#199) — opt-in, Device Owner only; default false → behavior unchanged
   saveDefaultLauncher: async (value: boolean): Promise<void> => {
     try {
@@ -488,6 +509,7 @@ export const StorageService = {
         KEYS.REST_API_ALLOW_CONTROL,
         // Power Button
         KEYS.ALLOW_POWER_BUTTON,
+        KEYS.ALLOW_HARDWARE_SCREENSHOT,
         // Notifications
         KEYS.ALLOW_NOTIFICATIONS,
         // System Info (audio fix)
@@ -3606,6 +3628,7 @@ export const StorageService = {
         },
         overlayButtonPosition: str(KEYS.OVERLAY_BUTTON_POSITION, 'bottom-right'),
         blockFactoryReset: bool(KEYS.BLOCK_FACTORY_RESET),
+        allowHardwareScreenshot: bool(KEYS.ALLOW_HARDWARE_SCREENSHOT),
         defaultLauncher: bool(KEYS.DEFAULT_LAUNCHER),
         screenLockCompat: bool(KEYS.SCREEN_LOCK_COMPAT),
         lockscreen: {
@@ -3838,6 +3861,7 @@ export const StorageService = {
       }
       set(KEYS.OVERLAY_BUTTON_POSITION, sec.overlayButtonPosition);
       set(KEYS.BLOCK_FACTORY_RESET, sec.blockFactoryReset);
+      set(KEYS.ALLOW_HARDWARE_SCREENSHOT, sec.allowHardwareScreenshot);
       set(KEYS.DEFAULT_LAUNCHER, sec.defaultLauncher);
       set(KEYS.SCREEN_LOCK_COMPAT, sec.screenLockCompat);
       const ls = sec.lockscreen as Record<string, unknown> | undefined;

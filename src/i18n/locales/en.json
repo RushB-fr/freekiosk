@@ -416,7 +416,9 @@
       "blockFactoryResetHint": "Removes the 'Factory reset' option from the system Settings app (Device Owner restriction). Useful when the Settings app is on your multi-app whitelist, so locked users can't wipe the device. Persists across reboots. Takes effect immediately, even outside Lock Mode.",
       "allowRemoteScreenshots": "Allow Remote Screenshots",
       "allowRemoteScreenshotsHint": "Lock Mode blocks screen capture device-wide (Power+Volume Down), which also blocks the REST /api/screenshot and cloud screenshot commands from capturing an app other than FreeKiosk (multi-app mode). Enable this to let FreeKiosk lift that block for the fraction of a second a remote capture takes, then restore it. Requires the FreeKiosk accessibility service and Android 11+.",
-      "remoteScreenshotWarning": "While a remote screenshot is being taken, the hardware screenshot combo is briefly available to anyone in front of the device."
+      "remoteScreenshotWarning": "While a remote screenshot is being taken, the hardware screenshot combo is briefly available to anyone in front of the device.",
+      "allowHardwareScreenshots": "Allow Screenshots With Hardware Buttons",
+      "allowHardwareScreenshotsHint": "Lock Mode blocks the Power+Volume Down screenshot combo for everyone using the device. Enable this to allow it again while Lock Mode is on. Anyone in front of the device can then capture the screen. Takes effect the next time Lock Mode starts."
     },
     "autoLaunch": {
       "title": "Auto Launch",

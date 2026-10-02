@@ -416,6 +416,8 @@
       "blockFactoryResetHint": "Retire l'option « Réinitialisation d'usine » de l'application Réglages système (restriction Device Owner). Utile quand l'application Réglages est dans votre liste blanche multi-applications, pour que les utilisateurs verrouillés ne puissent pas effacer l'appareil. Persiste après redémarrage. Prend effet immédiatement, même hors du mode verrouillé.",
       "allowRemoteScreenshots": "Autoriser les captures d'écran à distance",
       "allowRemoteScreenshotsHint": "Le mode verrouillé bloque la capture d'écran sur tout l'appareil (Alimentation+Volume bas), ce qui empêche aussi l'API REST /api/screenshot et les commandes de capture cloud de capturer une autre application que FreeKiosk (mode multi-applications). Activez ceci pour laisser FreeKiosk lever ce blocage le temps d'une capture à distance, puis le rétablir. Nécessite le service d'accessibilité FreeKiosk et Android 11+.",
+      "allowHardwareScreenshots": "Autoriser les captures d'écran avec les boutons",
+      "allowHardwareScreenshotsHint": "Le mode verrouillé bloque la combinaison de capture d'écran Alimentation+Volume bas pour toute personne utilisant l'appareil. Activez ceci pour l'autoriser à nouveau quand le mode verrouillé est actif. Toute personne devant l'appareil peut alors capturer l'écran. Prend effet au prochain démarrage du mode verrouillé.",
       "remoteScreenshotWarning": "Pendant qu'une capture d'écran à distance est prise, la combinaison matérielle de capture d'écran est brièvement disponible pour quiconque se trouve devant l'appareil."
     },
     "autoLaunch": {

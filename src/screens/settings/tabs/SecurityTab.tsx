@@ -38,6 +38,8 @@ interface SecurityTabProps {
   // Allow remote screenshots (Device Owner only) (#229)
   allowRemoteScreenshot: boolean;
   onAllowRemoteScreenshotChange: (value: boolean) => void;
+  allowHardwareScreenshot: boolean;
+  onAllowHardwareScreenshotChange: (value: boolean) => void;
   
   // Notifications (NFC support)
   allowNotifications: boolean;
@@ -124,6 +126,8 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
   onBlockFactoryResetChange,
   allowRemoteScreenshot,
   onAllowRemoteScreenshotChange,
+  allowHardwareScreenshot,
+  onAllowHardwareScreenshotChange,
   allowNotifications,
   onAllowNotificationsChange,
   allowSystemInfo,
@@ -293,6 +297,14 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
                 </Text>
               </SettingsInfoBox>
             )}
+            <View style={styles.divider} />
+            <SettingsSwitch
+              label={t('security.lockMode.allowHardwareScreenshots')}
+              icon="monitor-screenshot"
+              hint={t('security.lockMode.allowHardwareScreenshotsHint')}
+              value={allowHardwareScreenshot}
+              onValueChange={onAllowHardwareScreenshotChange}
+            />
           </>
         )}
       </SettingsSection>

@@ -114,6 +114,7 @@ class MainActivity : ReactActivity() {
       "allow_notifications" to "@kiosk_allow_notifications",
       "allow_system_info" to "@kiosk_allow_system_info",
       "block_factory_reset" to "@kiosk_block_factory_reset",
+      "allow_hardware_screenshot" to "@kiosk_allow_hardware_screenshot",
       "url_rotation_enabled" to "@kiosk_url_rotation_enabled",
       "url_rotation_list" to "@kiosk_url_rotation_list",
       "url_rotation_interval" to "@kiosk_url_rotation_interval",

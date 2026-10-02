@@ -104,6 +104,31 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
         }
 
         /**
+         * #277 — Has the admin allowed Power+Volume Down screenshots while Lock Mode is on?
+         * Read straight from the AsyncStorage database, like ScreenCapture does for #229:
+         * lock task can start while JS is not around to be asked.
+         */
+        fun isHardwareScreenshotAllowed(context: Context): Boolean {
+            return try {
+                val dbPath = context.getDatabasePath("RKStorage").absolutePath
+                val db = android.database.sqlite.SQLiteDatabase.openDatabase(
+                    dbPath, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY
+                )
+                val cursor = db.rawQuery(
+                    "SELECT value FROM catalystLocalStorage WHERE key = ?",
+                    arrayOf("@kiosk_allow_hardware_screenshot")
+                )
+                val result = if (cursor.moveToFirst()) cursor.getString(0) == "true" else false
+                cursor.close()
+                db.close()
+                result
+            } catch (e: Exception) {
+                android.util.Log.w("KioskModule", "Could not read hardware screenshot setting: ${e.message}")
+                false
+            }
+        }
+
+        /**
          * #229 — Toggle the screen-capture policy. Used to lift it for the few hundred
          * milliseconds a remote screenshot takes, then put it straight back; callers MUST
          * restore it in a finally block. Returns true when the policy was actually changed.
@@ -701,7 +726,8 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
 
                             dpm.setLockTaskPackages(adminComponent, uniqueWhitelist.toTypedArray())
                             activity.startLockTask()
-                            dpm.setScreenCaptureDisabled(adminComponent, true)
+                            // #277: blocked unless the admin allowed hardware screenshots
+                            dpm.setScreenCaptureDisabled(adminComponent, !isHardwareScreenshotAllowed(reactApplicationContext))
                             android.util.Log.d("KioskModule", "Full lock task started (Device Owner) with whitelist: $uniqueWhitelist")
                             // Update DE boot flag so the next LOCKED_BOOT_COMPLETED also locks immediately
                             BootReceiver.updateDeBootFlag(reactApplicationContext, true)

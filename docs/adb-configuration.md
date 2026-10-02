@@ -217,6 +217,7 @@ Every key below is a straight passthrough: the value you pass is stored as-is.
 | `--ez allow_notifications false` | Allow the notification shade in lock task |
 | `--ez allow_system_info false` | Allow the status bar system info in lock task |
 | `--ez block_factory_reset false` | Apply the `DISALLOW_FACTORY_RESET` restriction |
+| `--ez allow_hardware_screenshot true` | Allow the Power + Volume Down screenshot while Lock Mode is on (Device Owner only, off by default, applies the next time Lock Mode starts) |
 | `--ez keep_screen_on true` | Keep the display awake |
 
 **WebView behavior**

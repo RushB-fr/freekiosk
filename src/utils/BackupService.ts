@@ -190,6 +190,7 @@ const BACKUP_KEYS = [
   '@kiosk_language',
   '@kiosk_screen_lock_compat',
   '@kiosk_allow_remote_screenshot',
+  '@kiosk_allow_hardware_screenshot',
   '@kiosk_status_bar_theme',
 ];
 
