@@ -188,9 +188,12 @@ class OverlayService : Service() {
     private val foregroundMonitorHandler = Handler(Looper.getMainLooper())
     private val FOREGROUND_CHECK_INTERVAL = 5000L // Check every 5 seconds (was 2s, reduced for low-end device performance)
     // Periodic re-pin: removes and re-adds the overlay so it lands at the top of the
-    // TYPE_APPLICATION_OVERLAY stack, recovering from camera/SurfaceView Z-order issues (#121)
+    // TYPE_APPLICATION_OVERLAY stack, recovering from camera/SurfaceView Z-order issues (#121).
+    // Every cycle creates a new window, and the system keeps a Binder proxy to it until the
+    // app next garbage-collects. At 3 s that was 1200 per hour, enough on Android 15 for the
+    // system to kill the process for "Too many Binders sent to SYSTEM" after ~16-20 h (#281).
     private val overlayRepinHandler = Handler(Looper.getMainLooper())
-    private val OVERLAY_REPIN_INTERVAL = 3000L
+    private val OVERLAY_REPIN_INTERVAL = 30000L
     private var cachedLauncherPackages: Set<String>? = null // Cached list of launcher packages for Home detection
     private var cachedManagedPackages: Set<String>? = null // Cached list of managed app packages (keep-alive, etc.)
     // BroadcastReceiver pour détecter quand l'écran s'allume
@@ -1255,6 +1258,11 @@ class OverlayService : Service() {
      * each cycle. Does NOT touch the status bar.
      */
     private fun repinOverlay() {
+        // #281: nothing is on screen to be eclipsed while the display is off, and the
+        // SCREEN_ON receiver already restores the overlay on wake.
+        val powerManager = getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+        if (powerManager?.isInteractive == false) return
+
         // #203 — Each removeView is guarded individually: if a view is already detached
         // (a previous addView failed), removeView throws. Aborting here would leave
         // overlayView non-null and never call createOverlay(), so every subsequent
