@@ -1,6 +1,7 @@
 package com.freekiosk
 
 import android.app.ActivityManager
+import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.app.Notification
 import android.app.NotificationChannel
@@ -44,6 +45,7 @@ class KioskWatchdogService : Service() {
         private const val NOTIFICATION_ID = 2002
         private const val CHECK_INTERVAL_MS = 10_000L  // check every 10 s
         private const val RELAUNCH_COOLDOWN_MS = 15_000L // min 15 s between relaunches
+        private const val FOREGROUND_LOOKBACK_MS = 24 * 60 * 60 * 1000L // #282
 
         /** Matches the JS heartbeat interval in CloudSyncService. */
         private const val CLOUD_HEARTBEAT_INTERVAL_MS = 30_000L
@@ -254,6 +256,15 @@ class KioskWatchdogService : Service() {
             // the launcher, and relaunching on a guess would hijack the app the user is on.
             if (foreground == null) return
             if (foreground in getAllowedForegroundPackages()) return
+        } else {
+            // #282: a managed app opened from the page (geo:, tg:, tel:) is allowed by lock
+            // task, so it is not a reason to drag the kiosk back over it. Narrower than the
+            // external-app guard on purpose: unknown foreground still relaunches (#96 relies
+            // on that), FreeKiosk's own package does not count (another of our screens being
+            // up is not a managed app), and a stale external-app package does not either.
+            val foreground = getForegroundPackageFromEvents()
+            if (foreground != null && foreground != packageName &&
+                foreground in getManagedAppPackages()) return
         }
 
         val now = System.currentTimeMillis()
@@ -381,6 +392,42 @@ class KioskWatchdogService : Service() {
         }
     }
 
+    private var lastEventQueryMs = 0L
+    private var lastResumedPackage: String? = null
+
+    /**
+     * #282: the package of the last activity that was resumed, from usage events.
+     *
+     * getForegroundPackage() looks at the last 5 seconds only, so it reports nothing as soon
+     * as an app has been in front for longer than that without a new event. Here the last
+     * RESUMED package is kept between checks and only replaced by a newer one. Returns null
+     * when usage access is not granted or nothing was seen yet, which callers treat as
+     * "unknown".
+     */
+    @Suppress("DEPRECATION")
+    private fun getForegroundPackageFromEvents(): String? {
+        return try {
+            val usm = getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
+                ?: return lastResumedPackage
+            val now = System.currentTimeMillis()
+            val from = if (lastEventQueryMs == 0L) now - FOREGROUND_LOOKBACK_MS
+                       else maxOf(lastEventQueryMs - 1_000, now - FOREGROUND_LOOKBACK_MS)
+            val events = usm.queryEvents(from, now) ?: return lastResumedPackage
+            val event = UsageEvents.Event()
+            while (events.hasNextEvent()) {
+                events.getNextEvent(event)
+                if (event.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND) {
+                    lastResumedPackage = event.packageName
+                }
+            }
+            lastEventQueryMs = now
+            lastResumedPackage
+        } catch (e: Exception) {
+            DebugLog.d(TAG, "Cannot read usage events: ${e.message}")
+            null
+        }
+    }
+
     /**
      * #197 follow-up: packages the kiosk is allowed to be showing instead of MainActivity.
      * Reads the managed-apps list so multi-app mode is covered, where
@@ -389,6 +436,13 @@ class KioskWatchdogService : Service() {
     private fun getAllowedForegroundPackages(): List<String> {
         val packages = mutableListOf(packageName)
         getExternalAppPackage()?.let { packages.add(it) }
+        packages.addAll(getManagedAppPackages())
+        return packages.distinct()
+    }
+
+    /** Packages of the managed apps, read from @kiosk_managed_apps. Empty when unreadable. */
+    private fun getManagedAppPackages(): List<String> {
+        val packages = mutableListOf<String>()
         try {
             val dbPath = getDatabasePath("RKStorage").absolutePath
             val db = SQLiteDatabase.openDatabase(dbPath, null, SQLiteDatabase.OPEN_READONLY)
