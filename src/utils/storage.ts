@@ -201,6 +201,10 @@ export const KEYS = {
   DASHBOARD_MODE_ENABLED: '@kiosk_dashboard_mode_enabled',
   DASHBOARD_TILES: '@kiosk_dashboard_tiles',
   DASHBOARD_ICON_SIZE: '@kiosk_dashboard_icon_size',
+  DASHBOARD_NAV_AUTO_HIDE: '@kiosk_dashboard_nav_auto_hide',
+  DASHBOARD_NAV_AUTO_HIDE_SECONDS: '@kiosk_dashboard_nav_auto_hide_seconds',
+  DASHBOARD_SWIPE_BETWEEN_TILES: '@kiosk_dashboard_swipe_between_tiles',
+  DASHBOARD_KEEP_TILES_LOADED: '@kiosk_dashboard_keep_tiles_loaded',
   // Lock Screen Controls
   LOCKSCREEN_CONTROLS_ENABLED: '@kiosk_lockscreen_controls_enabled',
   LOCKSCREEN_WIFI_ENABLED: '@kiosk_lockscreen_wifi_enabled',
@@ -628,6 +632,10 @@ export const StorageService = {
         KEYS.DASHBOARD_MODE_ENABLED,
         KEYS.DASHBOARD_TILES,
         KEYS.DASHBOARD_ICON_SIZE,
+        KEYS.DASHBOARD_NAV_AUTO_HIDE,
+        KEYS.DASHBOARD_NAV_AUTO_HIDE_SECONDS,
+        KEYS.DASHBOARD_SWIPE_BETWEEN_TILES,
+        KEYS.DASHBOARD_KEEP_TILES_LOADED,
         // Lock Screen Controls
         KEYS.LOCKSCREEN_CONTROLS_ENABLED,
         KEYS.LOCKSCREEN_WIFI_ENABLED,
@@ -3373,6 +3381,79 @@ export const StorageService = {
     }
   },
 
+  saveDashboardNavAutoHide: async (enabled: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.DASHBOARD_NAV_AUTO_HIDE, JSON.stringify(enabled));
+    } catch (error) {
+      console.error('Error saving dashboard nav auto-hide:', error);
+    }
+  },
+
+  getDashboardNavAutoHide: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.DASHBOARD_NAV_AUTO_HIDE);
+      // Off by default so the navigation bar keeps its current always-visible behaviour.
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting dashboard nav auto-hide:', error);
+      return false;
+    }
+  },
+
+  saveDashboardNavAutoHideSeconds: async (value: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.DASHBOARD_NAV_AUTO_HIDE_SECONDS, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving dashboard nav auto-hide seconds:', error);
+    }
+  },
+
+  getDashboardNavAutoHideSeconds: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.DASHBOARD_NAV_AUTO_HIDE_SECONDS);
+      return value ? JSON.parse(value) : 4; // hide 4s after the last interaction by default
+    } catch (error) {
+      console.error('Error getting dashboard nav auto-hide seconds:', error);
+      return 4;
+    }
+  },
+
+  saveDashboardSwipeBetweenTiles: async (enabled: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.DASHBOARD_SWIPE_BETWEEN_TILES, JSON.stringify(enabled));
+    } catch (error) {
+      console.error('Error saving dashboard swipe between tiles:', error);
+    }
+  },
+
+  getDashboardSwipeBetweenTiles: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.DASHBOARD_SWIPE_BETWEEN_TILES);
+      return value ? JSON.parse(value) : false; // off by default
+    } catch (error) {
+      console.error('Error getting dashboard swipe between tiles:', error);
+      return false;
+    }
+  },
+
+  saveDashboardKeepTilesLoaded: async (enabled: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.DASHBOARD_KEEP_TILES_LOADED, JSON.stringify(enabled));
+    } catch (error) {
+      console.error('Error saving dashboard keep tiles loaded:', error);
+    }
+  },
+
+  getDashboardKeepTilesLoaded: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.DASHBOARD_KEEP_TILES_LOADED);
+      return value ? JSON.parse(value) : false; // off by default: uses more memory
+    } catch (error) {
+      console.error('Error getting dashboard keep tiles loaded:', error);
+      return false;
+    }
+  },
+
   saveHttpBasicAuthUsername: async (username: string): Promise<void> => {
     try {
       await AsyncStorage.setItem(KEYS.HTTP_BASIC_AUTH_USERNAME, username);
@@ -3568,6 +3649,12 @@ export const StorageService = {
         dashboardMode: bool(KEYS.DASHBOARD_MODE_ENABLED),
         dashboardTiles: json(KEYS.DASHBOARD_TILES, []),
         dashboardIconSize: parseDashboardIconSize(str(KEYS.DASHBOARD_ICON_SIZE)),
+        dashboardNavAutoHide: {
+          enabled: bool(KEYS.DASHBOARD_NAV_AUTO_HIDE),
+          seconds: num(KEYS.DASHBOARD_NAV_AUTO_HIDE_SECONDS, 4),
+        },
+        dashboardSwipeBetweenTiles: bool(KEYS.DASHBOARD_SWIPE_BETWEEN_TILES),
+        dashboardKeepTilesLoaded: bool(KEYS.DASHBOARD_KEEP_TILES_LOADED),
         pauseWebMediaWhenHidden: bool(KEYS.PAUSE_WEB_MEDIA_WHEN_HIDDEN, true),
         restartButton: {
           enabled: bool(KEYS.RESTART_BUTTON_ENABLED),
@@ -3814,6 +3901,13 @@ export const StorageService = {
       if (g.dashboardIconSize !== undefined) {
         set(KEYS.DASHBOARD_ICON_SIZE, parseDashboardIconSize(g.dashboardIconSize));
       }
+      const dn = g.dashboardNavAutoHide as Record<string, unknown> | undefined;
+      if (dn) {
+        set(KEYS.DASHBOARD_NAV_AUTO_HIDE, dn.enabled);
+        set(KEYS.DASHBOARD_NAV_AUTO_HIDE_SECONDS, dn.seconds);
+      }
+      set(KEYS.DASHBOARD_SWIPE_BETWEEN_TILES, g.dashboardSwipeBetweenTiles);
+      set(KEYS.DASHBOARD_KEEP_TILES_LOADED, g.dashboardKeepTilesLoaded);
       set(KEYS.PAUSE_WEB_MEDIA_WHEN_HIDDEN, g.pauseWebMediaWhenHidden);
       const rb = g.restartButton as Record<string, unknown> | undefined;
       if (rb) {

@@ -674,6 +674,17 @@
       "large": "Large",
       "xlarge": "Extra large"
     },
+    "tilePages": {
+      "title": "Tile Pages",
+      "autoHide": "Auto-hide navigation bar",
+      "autoHideHint": "On a tile page, hide the navigation bar so the page fills the screen. Swipe down with two fingers to show it, and up to hide it again.",
+      "hideAfter": "Hide after (seconds)",
+      "hideAfterHint": "How long the bar stays visible after it is shown or last touched.",
+      "swipeBetweenTiles": "Swipe between tiles",
+      "swipeBetweenTilesHint": "On a tile page, swipe left with two fingers for the next tile and right for the previous one.",
+      "keepTilesLoaded": "Keep tiles loaded",
+      "keepTilesLoadedHint": "Load your tiles (up to 5) in the background as soon as the dashboard starts, and keep them running, so opening or switching tiles is instant and each page keeps its state. Uses more memory."
+    },
     "iconColor": "Icon Color",
     "colorAuto": "Auto",
     "preview": "Preview",

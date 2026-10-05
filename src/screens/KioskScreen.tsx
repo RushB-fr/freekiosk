@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, NativeEventEmitter, NativeModules, AppState, DeviceEventEmitter, Dimensions, Pressable, BackHandler, Keyboard } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { View, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, NativeEventEmitter, NativeModules, AppState, DeviceEventEmitter, Dimensions, Pressable, BackHandler, Keyboard, Animated } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RNBrightness from '../utils/BrightnessModule';
 import { useIsFocused, useFocusEffect } from '@react-navigation/native';
 import WebViewComponent, { WebViewComponentRef } from '../components/WebViewComponent';
+import { isNavGestureDirection, navAutoHideSeconds, nextTileIndex, NavGestureDirection } from '../utils/dashboardNavigation';
 import { WebView } from 'react-native-webview';
 import MediaPlayerComponent from '../components/MediaPlayerComponent';
 import StatusBar from '../components/StatusBar';
@@ -223,6 +224,26 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [dashboardTiles, setDashboardTiles] = useState<DashboardTile[]>([]);
   const [dashboardIconSize, setDashboardIconSize] = useState<DashboardIconSize>(DEFAULT_DASHBOARD_ICON_SIZE);
   const [dashboardShowGrid, setDashboardShowGrid] = useState<boolean>(true);
+  // Dashboard nav auto-hide: on a tile page the nav bar is hidden until a two-finger
+  // swipe down, then shown as an overlay (no reflow) and hidden again after N s.
+  const [dashboardNavAutoHide, setDashboardNavAutoHide] = useState<boolean>(false);
+  const [dashboardNavAutoHideSeconds, setDashboardNavAutoHideSeconds] = useState<number>(4);
+  const [dashboardNavRevealed, setDashboardNavRevealed] = useState<boolean>(false);
+  const [dashboardNavHeight, setDashboardNavHeight] = useState<number>(0);
+  const dashboardNavHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dashboardNavAnim = useRef(new Animated.Value(0)).current;
+  // Two-finger swipe left/right moves to the next/previous tile (wraps around).
+  const [dashboardSwipeBetweenTiles, setDashboardSwipeBetweenTiles] = useState<boolean>(false);
+  const dashboardTileIndexRef = useRef<number>(-1);
+  // Keep tiles loaded: every recently opened tile keeps its own WebView, hidden when not
+  // shown, so switching is instant and pages keep their state. webViewRef always points at
+  // the tile on screen, so everything that drives "the" WebView keeps working unchanged.
+  const [dashboardKeepTilesLoaded, setDashboardKeepTilesLoaded] = useState<boolean>(false);
+  const [keptTileIds, setKeptTileIds] = useState<string[]>([]); // least recently opened first
+  const [activeTileId, setActiveTileId] = useState<string | null>(null);
+  const tileWebViewRefs = useRef<Record<string, WebViewComponentRef | null>>({});
+  const tileNavStatesRef = useRef<Record<string, { canGoBack: boolean; canGoForward: boolean; title: string }>>({});
+  const keptTileHandlersRef = useRef<Record<string, KeptTileHandlers>>({});
   const [navState, setNavState] = useState<{ canGoBack: boolean; canGoForward: boolean; title: string }>({ canGoBack: false, canGoForward: false, title: '' });
   const [pdfViewerEnabled, setPdfViewerEnabled] = useState<boolean>(false);
   // #239: last value applied to the WebView, to know when a remount is actually needed.
@@ -1933,6 +1954,10 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       setDashboardModeEnabled(savedDashboardMode);
       setDashboardTiles(savedDashboardTiles);
       setDashboardIconSize(parseDashboardIconSize(str(K.DASHBOARD_ICON_SIZE)));
+      setDashboardNavAutoHide(bool(K.DASHBOARD_NAV_AUTO_HIDE, false));
+      setDashboardNavAutoHideSeconds(navAutoHideSeconds(num(K.DASHBOARD_NAV_AUTO_HIDE_SECONDS, 4)));
+      setDashboardSwipeBetweenTiles(bool(K.DASHBOARD_SWIPE_BETWEEN_TILES, false));
+      setDashboardKeepTilesLoaded(bool(K.DASHBOARD_KEEP_TILES_LOADED, false));
       if (savedDashboardMode) {
         setDashboardShowGrid(true);
       }
@@ -2465,6 +2490,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           console.log(`[InactivityReturn] 🔄 RETURNING to dashboard grid NOW`);
           setDashboardShowGrid(true);
           setWebViewKey(prev => prev + 1);
+          setKeptTileIds([]);
         } else if (baseUrl) {
           const currentUrl = currentWebViewUrlRef.current || url;
           const normalizedCurrent = currentUrl.replace(/\/+$/, '').toLowerCase();
@@ -2960,85 +2986,366 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     }, returnTapTimeout - (now - lastTapTimeRef.current));
   };
 
+  // Only a tile page auto-hides; the grid keeps its always-visible bar.
+  const dashboardNavAutoHideActive = displayMode === 'webview' && dashboardModeEnabled && !dashboardShowGrid && dashboardNavAutoHide;
+
+  const scheduleDashboardNavHide = useCallback(() => {
+    if (dashboardNavHideTimerRef.current) {
+      clearTimeout(dashboardNavHideTimerRef.current);
+    }
+    dashboardNavHideTimerRef.current = setTimeout(() => {
+      dashboardNavHideTimerRef.current = null;
+      setDashboardNavRevealed(false);
+    }, dashboardNavAutoHideSeconds * 1000);
+  }, [dashboardNavAutoHideSeconds]);
+
+  const revealDashboardNav = useCallback(() => {
+    setDashboardNavRevealed(true);
+    scheduleDashboardNavHide();
+  }, [scheduleDashboardNavHide]);
+
+  // Tiles in the order the grid shows them.
+  const orderedDashboardTiles = useMemo(
+    () => [...dashboardTiles].sort((a, b) => a.order - b.order),
+    [dashboardTiles],
+  );
+
+  const openDashboardTile = useCallback((tile: DashboardTile, index: number) => {
+    dashboardTileIndexRef.current = index;
+    setActiveTileId(tile.id);
+    if (dashboardKeepTilesLoaded) {
+      setKeptTileIds(prev => [...prev.filter(id => id !== tile.id), tile.id].slice(-MAX_KEPT_TILES));
+      // A tile not loaded yet reports its own state once it is; until then, a blank one
+      // rather than the previous tile's title and back/forward.
+      const saved = tileNavStatesRef.current[tile.id] ?? { canGoBack: false, canGoForward: false, title: '' };
+      setNavState(saved);
+      setCanGoBack(saved.canGoBack);
+    }
+    setUrl(tile.url);
+    setDashboardShowGrid(false);
+  }, [dashboardKeepTilesLoaded]);
+
+  const keepTilesActive = displayMode === 'webview' && dashboardModeEnabled && dashboardKeepTilesLoaded;
+  // The kept tile on screen (null on the grid or when tiles are not kept). Mirrored in a ref
+  // for the per-tile handlers, which stay stable and read it when they run.
+  // A URL set from elsewhere (REST/MQTT setUrl, URL planner) is not a tile's: no tile shows.
+  const activeTileUrl = dashboardTiles.find(t => t.id === activeTileId)?.url;
+  const shownTileId = keepTilesActive && !dashboardShowGrid && activeTileUrl === url ? activeTileId : null;
+  const shownTileIdRef = useRef<string | null>(null);
+  shownTileIdRef.current = shownTileId;
+  const previousShownTileIdRef = useRef<string | null>(null);
+
+  // Point webViewRef at the tile on screen; pause the one just hidden, resume the one shown.
+  // Tiles loading in the background pause themselves once mounted (see getKeptTileHandlers).
+  useEffect(() => {
+    if (!keepTilesActive) {
+      previousShownTileIdRef.current = null;
+      return;
+    }
+    // With no tile shown, the grid has no WebView, and singleWebView sets the ref itself.
+    if (shownTileId) {
+      (webViewRef as React.MutableRefObject<WebViewComponentRef | null>).current =
+        tileWebViewRefs.current[shownTileId] ?? null;
+    } else if (dashboardShowGrid) {
+      (webViewRef as React.MutableRefObject<WebViewComponentRef | null>).current = null;
+    }
+    const previous = previousShownTileIdRef.current;
+    if (previous !== shownTileId) {
+      if (previous) tileWebViewRefs.current[previous]?.pauseMedia();
+      if (shownTileId) tileWebViewRefs.current[shownTileId]?.resumeMedia();
+      previousShownTileIdRef.current = shownTileId;
+    }
+  }, [keepTilesActive, shownTileId, dashboardShowGrid]);
+
+  // Load every tile (up to MAX_KEPT_TILES, in grid order) hidden as soon as the dashboard is
+  // up, so even the first open of a tile is instant. Also runs again after the inactivity
+  // return released them, which recreates them fresh.
+  useEffect(() => {
+    if (!keepTilesActive || keptTileIds.length > 0 || orderedDashboardTiles.length === 0) return;
+    setKeptTileIds(orderedDashboardTiles.slice(0, MAX_KEPT_TILES).map(t => t.id));
+  }, [keepTilesActive, keptTileIds.length, orderedDashboardTiles]);
+
+  // Forget the refs and handlers of tiles that are no longer kept.
+  useEffect(() => {
+    const kept = new Set(keptTileIds);
+    for (const store of [tileWebViewRefs.current, tileNavStatesRef.current, keptTileHandlersRef.current]) {
+      Object.keys(store).forEach(id => {
+        if (!kept.has(id)) delete store[id];
+      });
+    }
+  }, [keptTileIds]);
+
+  // Turning the option off (or leaving dashboard mode) releases the kept tiles.
+  useEffect(() => {
+    if (!keepTilesActive) setKeptTileIds([]);
+  }, [keepTilesActive]);
+
+  const onDashboardNavGesture = useCallback((direction: NavGestureDirection) => {
+    if (direction === 'down') {
+      if (dashboardNavAutoHideActive) revealDashboardNav();
+      return;
+    }
+    if (direction === 'up') {
+      // Hide the auto-hidden bar now instead of waiting for its timer.
+      if (dashboardNavAutoHideActive) {
+        if (dashboardNavHideTimerRef.current) {
+          clearTimeout(dashboardNavHideTimerRef.current);
+          dashboardNavHideTimerRef.current = null;
+        }
+        setDashboardNavRevealed(false);
+      }
+      return;
+    }
+    if (!dashboardSwipeBetweenTiles) return;
+    const current = dashboardTileIndexRef.current;
+    const next = nextTileIndex(current, orderedDashboardTiles.length, direction);
+    if (next === current) return;
+    openDashboardTile(orderedDashboardTiles[next], next);
+    markUserInteraction();
+  }, [dashboardNavAutoHideActive, revealDashboardNav, dashboardSwipeBetweenTiles, orderedDashboardTiles, openDashboardTile, markUserInteraction]);
+
+  // Two-finger swipes are recognised natively (MainActivity), so nothing is injected into the
+  // tile pages and they work whatever state a page is in. Only while a tile is on screen and
+  // one of the gesture options is on.
+  const navGestureActive = isFocused && displayMode === 'webview' && dashboardModeEnabled
+    && !dashboardShowGrid && !isScreensaverActive && (dashboardNavAutoHide || dashboardSwipeBetweenTiles);
+  useEffect(() => {
+    KioskModule.setNavGestureEnabled?.(navGestureActive).catch(() => {});
+  }, [navGestureActive]);
+  useEffect(() => () => { KioskModule.setNavGestureEnabled?.(false).catch(() => {}); }, []);
+
+  const onDashboardNavGestureRef = useRef(onDashboardNavGesture);
+  onDashboardNavGestureRef.current = onDashboardNavGesture;
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('onNavGesture', (direction: unknown) => {
+      if (isNavGestureDirection(direction)) onDashboardNavGestureRef.current(direction);
+    });
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    if (!dashboardNavAutoHideActive) {
+      if (dashboardNavHideTimerRef.current) {
+        clearTimeout(dashboardNavHideTimerRef.current);
+        dashboardNavHideTimerRef.current = null;
+      }
+      setDashboardNavRevealed(false);
+    }
+  }, [dashboardNavAutoHideActive]);
+
+  useEffect(() => {
+    Animated.timing(dashboardNavAnim, {
+      toValue: dashboardNavRevealed ? 1 : 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  }, [dashboardNavRevealed, dashboardNavAnim]);
+
+  useEffect(() => () => {
+    if (dashboardNavHideTimerRef.current) {
+      clearTimeout(dashboardNavHideTimerRef.current);
+    }
+  }, []);
+
+  const webViewStatusBar = (
+    <StatusBar
+      showBattery={statusBarEnabled && showBattery}
+      showWifi={statusBarEnabled && showWifi}
+      showBluetooth={statusBarEnabled && showBluetooth}
+      showVolume={statusBarEnabled && showVolume}
+      showTime={statusBarEnabled && showTime}
+      theme={statusBarTheme}
+      dashboardMode={dashboardModeEnabled}
+      navCanGoBack={navState.canGoBack}
+      navCanGoForward={navState.canGoForward}
+      navTitle={dashboardShowGrid ? 'Dashboard' : navState.title}
+      showNavBar={!dashboardShowGrid}
+      onNavBack={() => webViewRef.current?.goBack()}
+      onNavForward={() => webViewRef.current?.goForward()}
+      onNavRefresh={() => webViewRef.current?.reload()}
+      onNavHome={() => setDashboardShowGrid(true)}
+    />
+  );
+
+  // WebView props shared by the single WebView and the kept tiles. Memoized so the kept
+  // tiles (a memoized WebViewComponent) only re-render when one of these really changes.
+  const onJsExecuted = useCallback(() => setJsToExecute(''), []);
+  const basicAuthCredential = useMemo(
+    () => (basicAuthUsername ? { username: basicAuthUsername, password: basicAuthPassword } : undefined),
+    [basicAuthUsername, basicAuthPassword],
+  );
+  const sharedWebViewProps = useMemo(() => ({
+    autoReload,
+    keyboardMode,
+    onJsExecuted,
+    showBackButton: webViewBackButtonEnabled,
+    urlFilterMode: urlFilterEnabled ? urlFilterMode : undefined,
+    urlFilterPatterns: urlFilterEnabled ? urlFilterList : undefined,
+    urlFilterShowFeedback,
+    pdfViewerEnabled,
+    windowPrintEnabled,
+    printPaperSize,
+    silentPrintEnabled,
+    escPosWidthDots,
+    escPosCut,
+    escPosFeedLines,
+    printOrigins,
+    zoomLevel,
+    zoomMode,
+    disableUserZoom,
+    customUserAgent,
+    basicAuthCredential,
+    onRenderProcessGone: handleWebViewRenderProcessGone,
+  }), [autoReload, keyboardMode, onJsExecuted, webViewBackButtonEnabled, urlFilterEnabled, urlFilterMode,
+    urlFilterList, urlFilterShowFeedback, pdfViewerEnabled, windowPrintEnabled, printPaperSize,
+    silentPrintEnabled, escPosWidthDots, escPosCut, escPosFeedLines, printOrigins, zoomLevel, zoomMode,
+    disableUserZoom, customUserAgent, basicAuthCredential, handleWebViewRenderProcessGone]);
+
+  // Latest callbacks for the kept tiles' handlers, which are created once per tile.
+  const keptTileCallbacksRef = useRef({ onUserInteraction, markUserInteraction });
+  keptTileCallbacksRef.current = { onUserInteraction, markUserInteraction };
+
+  // One stable set of handlers per kept tile; only the tile on screen acts on its page.
+  const getKeptTileHandlers = (id: string): KeptTileHandlers => {
+    const cached = keptTileHandlersRef.current[id];
+    if (cached) return cached;
+    const handlers: KeptTileHandlers = {
+      ref: (instance) => {
+        tileWebViewRefs.current[id] = instance;
+        if (!instance) return;
+        if (shownTileIdRef.current === id) {
+          (webViewRef as React.MutableRefObject<WebViewComponentRef | null>).current = instance;
+        } else {
+          instance.pauseMedia(); // loading in the background
+        }
+      },
+      onNavigationStateChange: (state) => {
+        tileNavStatesRef.current[id] = state;
+        if (shownTileIdRef.current !== id) return;
+        setCanGoBack(state.canGoBack);
+        setNavState(state);
+      },
+      onPageNavigated: (navUrl) => {
+        if (shownTileIdRef.current !== id) return;
+        currentWebViewUrlRef.current = navUrl;
+        // A tile on screen always resets the inactivity timer on navigation, as before.
+        keptTileCallbacksRef.current.markUserInteraction();
+      },
+      onUserInteraction: (event) => keptTileCallbacksRef.current.onUserInteraction(event),
+    };
+    keptTileHandlersRef.current[id] = handlers;
+    return handlers;
+  };
+
+  // The one WebView of the non-kept path. With tiles kept it also shows a URL that is not
+  // the open tile's (REST/MQTT setUrl, URL planner), over the hidden tiles.
+  const singleWebView = (
+    <WebViewComponent
+      ref={webViewRef}
+      key={webViewKey}
+      url={url}
+      {...sharedWebViewProps}
+      onUserInteraction={onUserInteraction}
+      jsToExecute={jsToExecute}
+      onNavigationStateChange={(state) => {
+        setCanGoBack(state.canGoBack);
+        setNavState(state);
+      }}
+      onPageNavigated={(navUrl: string) => {
+        currentWebViewUrlRef.current = navUrl;
+        // In dashboard mode (viewing a tile), always reset the inactivity timer on
+        // any page navigation so self-refreshing pages don't trigger an unexpected
+        // return to the grid. For non-dashboard mode, respect the user setting.
+        if (inactivityReturnResetOnNav || (dashboardModeEnabled && !dashboardShowGrid)) {
+          markUserInteraction();
+        }
+      }}
+    />
+  );
+
   return (
     <View style={styles.container}>
       {displayMode === 'webview' ? (
         <>
-          {(statusBarEnabled || dashboardModeEnabled) && (
-            <StatusBar
-              showBattery={statusBarEnabled && showBattery}
-              showWifi={statusBarEnabled && showWifi}
-              showBluetooth={statusBarEnabled && showBluetooth}
-              showVolume={statusBarEnabled && showVolume}
-              showTime={statusBarEnabled && showTime}
-              theme={statusBarTheme}
-              dashboardMode={dashboardModeEnabled}
-              navCanGoBack={navState.canGoBack}
-              navCanGoForward={navState.canGoForward}
-              navTitle={dashboardShowGrid ? 'Dashboard' : navState.title}
-              showNavBar={!dashboardShowGrid}
-              onNavBack={() => webViewRef.current?.goBack()}
-              onNavForward={() => webViewRef.current?.goForward()}
-              onNavRefresh={() => webViewRef.current?.reload()}
-              onNavHome={() => setDashboardShowGrid(true)}
-            />
-          )}
-          {dashboardModeEnabled && dashboardShowGrid ? (
+          {(statusBarEnabled || dashboardModeEnabled) && !dashboardNavAutoHideActive && webViewStatusBar}
+          {keepTilesActive ? (
+            <View style={styles.keptTiles}>
+              {keptTileIds.map(id => {
+                const tile = dashboardTiles.find(t => t.id === id);
+                if (!tile) return null;
+                const active = id === shownTileId;
+                return (
+                  <View
+                    key={`${id}-${webViewKey}`}
+                    style={[StyleSheet.absoluteFill, !active && styles.hiddenTile]}
+                    pointerEvents={active ? 'auto' : 'none'}
+                  >
+                    {(() => {
+                      const handlers = getKeptTileHandlers(id);
+                      return (
+                        <WebViewComponent
+                          ref={handlers.ref}
+                          url={tile.url}
+                          {...sharedWebViewProps}
+                          inactive={!active}
+                          jsToExecute={active ? jsToExecute : ''}
+                          onUserInteraction={active ? handlers.onUserInteraction : undefined}
+                          onNavigationStateChange={handlers.onNavigationStateChange}
+                          onPageNavigated={handlers.onPageNavigated}
+                        />
+                      );
+                    })()}
+                  </View>
+                );
+              })}
+              {!dashboardShowGrid && !shownTileId && (
+                <View style={StyleSheet.absoluteFill}>{singleWebView}</View>
+              )}
+              {dashboardShowGrid && (
+                <View style={styles.gridOverKeptTiles}>
+                  <DashboardGrid
+                    tiles={dashboardTiles}
+                    iconSize={dashboardIconSize}
+                    onTilePress={(tile) => {
+                      openDashboardTile(tile, orderedDashboardTiles.findIndex(t => t.id === tile.id));
+                    }}
+                    onUserInteraction={onUserInteraction}
+                  />
+                </View>
+              )}
+            </View>
+          ) : dashboardModeEnabled && dashboardShowGrid ? (
             <DashboardGrid
               tiles={dashboardTiles}
               iconSize={dashboardIconSize}
               onTilePress={(tile) => {
-                setUrl(tile.url);
-                setDashboardShowGrid(false);
+                openDashboardTile(tile, orderedDashboardTiles.findIndex(t => t.id === tile.id));
               }}
               onUserInteraction={onUserInteraction}
             />
-          ) : (
-            <WebViewComponent
-              ref={webViewRef}
-              key={webViewKey}
-              url={url}
-              autoReload={autoReload}
-              keyboardMode={keyboardMode}
-              onUserInteraction={onUserInteraction}
-              jsToExecute={jsToExecute}
-              onJsExecuted={() => setJsToExecute('')}
-              showBackButton={webViewBackButtonEnabled}
-              onNavigationStateChange={(state) => {
-                setCanGoBack(state.canGoBack);
-                setNavState(state);
-              }}
-              onPageNavigated={(navUrl: string) => {
-                currentWebViewUrlRef.current = navUrl;
-                // In dashboard mode (viewing a tile), always reset the inactivity timer on
-                // any page navigation so self-refreshing pages don't trigger an unexpected
-                // return to the grid. For non-dashboard mode, respect the user setting.
-                if (inactivityReturnResetOnNav || (dashboardModeEnabled && !dashboardShowGrid)) {
-                  markUserInteraction();
-                }
-              }}
-              urlFilterMode={urlFilterEnabled ? urlFilterMode : undefined}
-              urlFilterPatterns={urlFilterEnabled ? urlFilterList : undefined}
-              urlFilterShowFeedback={urlFilterShowFeedback}
-              pdfViewerEnabled={pdfViewerEnabled}
-              windowPrintEnabled={windowPrintEnabled}
-              printPaperSize={printPaperSize}
-              silentPrintEnabled={silentPrintEnabled}
-              escPosWidthDots={escPosWidthDots}
-              escPosCut={escPosCut}
-              escPosFeedLines={escPosFeedLines}
-              printOrigins={printOrigins}
-              zoomLevel={zoomLevel}
-              zoomMode={zoomMode}
-              disableUserZoom={disableUserZoom}
-              customUserAgent={customUserAgent}
-              basicAuthCredential={
-                basicAuthUsername
-                  ? { username: basicAuthUsername, password: basicAuthPassword }
-                  : undefined
-              }
-              onRenderProcessGone={handleWebViewRenderProcessGone}
-            />
+          ) : singleWebView}
+          {dashboardNavAutoHideActive && (
+            // Overlay on top of the page: the WebView keeps the full screen, so revealing
+            // the bar causes no reflow. Any touch on the bar restarts the hide timer.
+            <Animated.View
+              pointerEvents={dashboardNavRevealed ? 'auto' : 'none'}
+              onTouchStart={scheduleDashboardNavHide}
+              onLayout={(e) => setDashboardNavHeight(e.nativeEvent.layout.height)}
+              style={[
+                styles.dashboardNavOverlay,
+                {
+                  opacity: dashboardNavAnim,
+                  transform: [{
+                    translateY: dashboardNavAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-(dashboardNavHeight || 100), 0],
+                    }),
+                  }],
+                },
+              ]}
+            >
+              {webViewStatusBar}
+            </Animated.View>
           )}
         </>
       ) : displayMode === 'media_player' ? (
@@ -3211,9 +3518,40 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   );
 };
 
+// Most tiles kept loaded at once when 'Keep tiles loaded' is on; the least recently opened goes first.
+const MAX_KEPT_TILES = 5;
+
+type KeptTileHandlers = {
+  ref: (instance: WebViewComponentRef | null) => void;
+  onNavigationStateChange: (state: { canGoBack: boolean; canGoForward: boolean; title: string }) => void;
+  onPageNavigated: (url: string) => void;
+  onUserInteraction: (event?: { isTap?: boolean; x?: number; y?: number; fromFallbackButton?: boolean }) => void;
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  keptTiles: {
+    flex: 1,
+  },
+  // Invisible but still full size, so a tile loaded in the background is already laid out
+  // when shown (display: 'none' would leave it at zero size until then). Touches are
+  // blocked with pointerEvents on the wrapper.
+  hiddenTile: {
+    opacity: 0,
+  },
+  gridOverKeptTiles: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000', // the grid itself is slightly translucent
+  },
+  dashboardNavOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    elevation: 10,
   },
   visualIndicator: {
     position: 'absolute',
