@@ -1811,9 +1811,18 @@ class MainActivity : ReactActivity() {
       // system was still tearing down the old one, and on slow devices that bind stayed
       // pending forever (blank "Loading..." until reboot, #280).
       if (restartIntent != null) {
+        // From Android 14 the creator of a PendingIntent must opt in to let it start an
+        // activity from the background, and the process is gone when the alarm fires: without
+        // this the system blocks the relaunch and the app stays closed after provisioning.
+        val launchOptions = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+          android.app.ActivityOptions.makeBasic().setPendingIntentCreatorBackgroundActivityStartMode(
+            android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+          ).toBundle()
+        } else null
         val pending = android.app.PendingIntent.getActivity(
           this, 0, restartIntent,
-          android.app.PendingIntent.FLAG_CANCEL_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+          android.app.PendingIntent.FLAG_CANCEL_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
+          launchOptions
         )
         val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
         alarmManager.set(
