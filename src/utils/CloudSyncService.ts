@@ -45,6 +45,21 @@ const PROVISIONING_RETRY_MS = 30_000;
 const HEARTBEAT_INTERVAL_MS = 30_000;
 
 /**
+ * Telling the cloud that this device left: how hard to try before wiping anyway.
+ *
+ * The call used to be a bare fetch with no timeout and no second chance. A connection that
+ * hangs would have kept the Unenroll button spinning for ever, and a tablet that was briefly
+ * offline never told the cloud, which then kept listing a device that was gone. Each try is
+ * now bounded, and only a network failure or a server error is worth another one: any
+ * answer below 500 is final (2xx done; 401, 403 and 404 mean the cloud will not take it,
+ * for instance an older version that does not know this URL, and retrying changes nothing).
+ * Whatever happens, the local wipe still follows: the user asked to leave.
+ */
+const UNENROLL_ATTEMPTS = 3;
+const UNENROLL_TIMEOUT_MS = 8_000;
+const UNENROLL_RETRY_DELAY_MS = 1_500;
+
+/**
  * How long the cloud has to keep refusing this device's credentials before we believe it.
  *
  * A 401 or 403 on the heartbeat used to wipe the device's cloud credentials on the spot,
@@ -443,14 +458,31 @@ class CloudSyncServiceClass {
   async unenroll(): Promise<void> {
     const creds = await getCloudCredentials();
     if (creds) {
-      try {
-        await fetch(`${creds.cloudUrl}/api/v1/devices/${creds.deviceId}/unenroll/`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${creds.apiKey}` },
-        });
-      } catch {} // best-effort, proceed regardless
+      await this._tellCloudWeLeft(creds); // best-effort, proceed regardless
     }
     await this._wipeAndUnenroll();
+  }
+
+  private async _tellCloudWeLeft(creds: CloudCredentials): Promise<void> {
+    for (let attempt = 1; attempt <= UNENROLL_ATTEMPTS; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), UNENROLL_TIMEOUT_MS);
+      try {
+        const response = await fetch(`${creds.cloudUrl}/api/v1/devices/${creds.deviceId}/unenroll/`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${creds.apiKey}` },
+          signal: controller.signal,
+        });
+        if (response.status < 500) return;
+      } catch {
+        // Network failure or timeout: worth another try.
+      } finally {
+        clearTimeout(timer);
+      }
+      if (attempt < UNENROLL_ATTEMPTS) {
+        await new Promise<void>(resolve => setTimeout(resolve, UNENROLL_RETRY_DELAY_MS));
+      }
+    }
   }
 
   /**
