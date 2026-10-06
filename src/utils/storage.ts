@@ -3501,9 +3501,15 @@ export const StorageService = {
       const v = s.get(key);
       return v !== null && v !== undefined ? JSON.parse(v as string) : def;
     };
+    // A stored 0 is a real value (camera rotation 0, "no limit" for a width, a button at
+    // the left edge): only a missing or unreadable value falls back to the default.
+    // `parseFloat(v) || def` turned every 0 into the default, so the cloud saw a config
+    // that differed from the one it had pushed and kept pushing it.
     const num = (key: string, def = 0): number => {
       const v = s.get(key);
-      return v !== null && v !== undefined ? parseFloat(v as string) || def : def;
+      if (v === null || v === undefined) return def;
+      const n = parseFloat(v as string);
+      return Number.isNaN(n) ? def : n;
     };
     const json = (key: string, def: unknown = null): unknown => {
       const v = s.get(key);
