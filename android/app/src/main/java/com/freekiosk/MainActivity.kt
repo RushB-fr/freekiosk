@@ -67,6 +67,9 @@ class MainActivity : ReactActivity() {
     // Flag partagé pour bloquer le relaunch - accessible depuis OverlayService
     @Volatile
     var blockAutoRelaunch = false
+    // Static on purpose (#289): the JS focus signal can arrive before the Activity is attached
+    // (slow cold boot), so it must not depend on reactApplicationContext.currentActivity.
+    @Volatile var kioskScreenActive = false
 
     // Set before bringToFront() when the screensaver activates in External App mode.
     // Tells onResume() to skip auto-relaunch and stay in the foreground for the screensaver.
@@ -1169,7 +1172,6 @@ class MainActivity : ReactActivity() {
   // (Kiosk, Pin, Settings…). Without this gate, 5 grouped taps while *inside*
   // Settings would also fire navigateToPin and kick the user out. Defaults false
   // (fail-safe: no false positives if the focus signal never arrives).
-  @Volatile var kioskScreenActive = false
 
   private var tapSettingsCount = 0
   private var tapSettingsFirstTapTime = 0L
