@@ -1538,7 +1538,9 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   }
 
   return (
-    <View style={styles.container} ref={containerViewRef}>
+    // Not flattened away: pauseMedia/resumeMedia resolve the native WebView through this view's
+    // tag, and a collapsed View has no native view, so the renderer was never paused (#177/#190).
+    <View style={styles.container} ref={containerViewRef} collapsable={false}>
       <WebView
         ref={webViewRef}
         nativeConfig={{ component: NativeWebViewWithRef as any }}
