@@ -177,10 +177,7 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     @ReactMethod
     fun setKioskScreenActive(active: Boolean, promise: Promise) {
         try {
-            val activity = reactApplicationContext.currentActivity
-            if (activity is MainActivity) {
-                activity.kioskScreenActive = active
-            }
+            MainActivity.kioskScreenActive = active
             promise.resolve(true)
         } catch (e: Exception) {
             promise.resolve(false)
