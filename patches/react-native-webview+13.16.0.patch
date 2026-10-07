@@ -717,3 +717,55 @@ index f83033b..74f265d 100644
      fun setBasicAuthCredential(viewWrapper: RNCWebViewWrapper, credential: ReadableMap?) {
          var basicAuthCredential: RNCBasicAuthCredential? = null
          if (credential != null) {
+diff --git a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewWrapper.kt b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewWrapper.kt
+index 9f9d6f3..b68d263 100644
+--- a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewWrapper.kt
++++ b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewWrapper.kt
+@@ -13,7 +13,31 @@ import android.widget.FrameLayout
+  * The WebView will then create an empty offscreen surface and NPE.
+  */
+ class RNCWebViewWrapper(context: Context, webView: RNCWebView) : FrameLayout(context) {
++  // React Native's ReactViewGroup swallows requestLayout() (UIManager lays out RN views
++  // itself), so a view the WebView engine adds natively never gets a layout pass. The
++  // <select> popup is anchored on such a view, placed at the element's position: left
++  // unlaid-out (0,0-0,0), the list opened at the top-left corner, as wide as the screen
++  // instead of under the field. Lay this wrapper out again ourselves whenever a layout is
++  // requested below it.
++  //
++  // requestLayout() is first called from ViewGroup's own constructor, before any field of
++  // this class exists: the runnable is therefore nullable and assigned in init, and an
++  // early call does nothing.
++  private var measureAndLayout: Runnable? = null
++  private var layoutPosted = false
++
+   init {
++    measureAndLayout = Runnable {
++      layoutPosted = false
++      // Nothing to lay out before React Native has given this view a size.
++      if (width == 0 || height == 0) return@Runnable
++      measure(
++        MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
++        MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY)
++      )
++      layout(left, top, right, bottom)
++    }
++
+     // We make the WebView as transparent on top of the container,
+     // and let React Native sets background color for the container.
+     webView.setBackgroundColor(Color.TRANSPARENT)
+@@ -22,6 +46,15 @@ class RNCWebViewWrapper(context: Context, webView: RNCWebView) : FrameLayout(con
+ 
+   val webView: RNCWebView = getChildAt(0) as RNCWebView
+ 
++  override fun requestLayout() {
++    super.requestLayout()
++    val runnable = measureAndLayout ?: return
++    if (!layoutPosted) {
++      layoutPosted = true
++      post(runnable)
++    }
++  }
++
+   companion object {
+     /**
+      * A helper to get react tag id by given WebView
