@@ -25,6 +25,7 @@ const BACKUP_KEYS = [
   '@kiosk_display_mode',
   '@kiosk_external_app_package',
   '@kiosk_external_app_mode',
+  '@kiosk_multi_app_appearance',
   '@kiosk_auto_relaunch_app',
   '@kiosk_overlay_button_visible',
   '@kiosk_overlay_button_position',

@@ -1,6 +1,24 @@
 {
   "common": {},
   "general": {
+    "appearance": {
+      "title": "Apparence multi-applications",
+      "background": "Couleur de fond",
+      "customColor": "Couleur personnalisée",
+      "invalidColor": "Saisissez une couleur au format #RRGGBB, par exemple #2b7fff.",
+      "colorHint": "Le titre et les noms des applications utilisent automatiquement un texte contrasté.",
+      "showTitle": "Afficher le titre",
+      "heading": "Texte du titre",
+      "showLogo": "Afficher le logo",
+      "chooseLogo": "Choisir un logo sur cet appareil",
+      "defaultLogo": "Utiliser le logo par défaut",
+      "logoHint": "L’image sélectionnée est enregistrée sur cet appareil. Les sauvegardes conservent le paramètre mais ne contiennent pas le fichier image.",
+      "preview": "Aperçu",
+      "sampleApp": "Nom de l’application",
+      "reset": "Rétablir l’apparence par défaut",
+      "logoErrorTitle": "Impossible de sélectionner le logo",
+      "logoError": "Veuillez essayer de sélectionner une autre image."
+    },
     "language": {
       "title": "Langue",
       "label": "Langue de l'application"

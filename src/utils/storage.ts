@@ -8,6 +8,7 @@ import {
   parseDashboardIconSize,
 } from '../types/dashboard';
 import { ManagedApp } from '../types/managedApps';
+import { MultiAppAppearance, normalizeMultiAppAppearance, parseMultiAppAppearance } from '../types/multiAppAppearance';
 import { MediaItem, MediaFitMode } from '../types/mediaPlayer';
 import { saveSecureApiKey, getSecureApiKey, clearSecureApiKey, clearSecureMqttPassword } from './secureStorage';
 
@@ -39,6 +40,7 @@ export const KEYS = {
   DISPLAY_MODE: '@kiosk_display_mode',
   EXTERNAL_APP_PACKAGE: '@kiosk_external_app_package',
   EXTERNAL_APP_MODE: '@kiosk_external_app_mode', // 'single' | 'multi'
+  MULTI_APP_APPEARANCE: '@kiosk_multi_app_appearance',
   AUTO_RELAUNCH_APP: '@kiosk_auto_relaunch_app',
   OVERLAY_BUTTON_VISIBLE: '@kiosk_overlay_button_visible',
   OVERLAY_BUTTON_POSITION: '@kiosk_overlay_button_position',
@@ -477,6 +479,7 @@ export const StorageService = {
         KEYS.DISPLAY_MODE,
         KEYS.EXTERNAL_APP_PACKAGE,
         KEYS.EXTERNAL_APP_MODE,
+        KEYS.MULTI_APP_APPEARANCE,
         KEYS.AUTO_RELAUNCH_APP,
         KEYS.OVERLAY_BUTTON_VISIBLE,
         KEYS.OVERLAY_BUTTON_POSITION,
@@ -1065,6 +1068,14 @@ export const StorageService = {
       console.error('Error getting external app mode:', error);
       return 'single';
     }
+  },
+
+  saveMultiAppAppearance: async (value: MultiAppAppearance): Promise<void> => {
+    await AsyncStorage.setItem(KEYS.MULTI_APP_APPEARANCE, JSON.stringify(normalizeMultiAppAppearance(value)));
+  },
+
+  getMultiAppAppearance: async (): Promise<MultiAppAppearance> => {
+    return parseMultiAppAppearance(await AsyncStorage.getItem(KEYS.MULTI_APP_APPEARANCE));
   },
 
   //AUTO RELAUNCH APP
@@ -3568,6 +3579,7 @@ export const StorageService = {
         externalApp: {
           package: str(KEYS.EXTERNAL_APP_PACKAGE),
           mode: str(KEYS.EXTERNAL_APP_MODE, 'single'),
+          appearance: normalizeMultiAppAppearance(json(KEYS.MULTI_APP_APPEARANCE)),
           testMode: bool(KEYS.EXTERNAL_APP_TEST_MODE, true),
         },
         managedApps: json(KEYS.MANAGED_APPS, []),
@@ -3812,6 +3824,9 @@ export const StorageService = {
       if (ea) {
         set(KEYS.EXTERNAL_APP_PACKAGE, ea.package);
         set(KEYS.EXTERNAL_APP_MODE, ea.mode);
+        if (ea.appearance !== undefined) {
+          set(KEYS.MULTI_APP_APPEARANCE, normalizeMultiAppAppearance(ea.appearance));
+        }
         if (ea.testMode !== undefined) set(KEYS.EXTERNAL_APP_TEST_MODE, ea.testMode);
       }
       set(KEYS.MANAGED_APPS, g.managedApps);
