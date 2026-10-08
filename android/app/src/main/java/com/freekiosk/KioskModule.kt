@@ -465,6 +465,9 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                         }
                         activity.disableKioskRestrictions()
                         activity.stopLockTask()
+                        // Otherwise Home relaunches FreeKiosk straight after the exit. The
+                        // setting stays on, so the next FreeKiosk launch pins Home again.
+                        HomeLauncherPolicy.releaseForSession(reactApplicationContext)
                         activity.finish()
                         promise.resolve(true)
                     } catch (e: Exception) {
@@ -507,22 +510,12 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     fun setDefaultLauncherMode(enabled: Boolean, promise: Promise) {
         try {
             val dpm = reactApplicationContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-            val admin = ComponentName(reactApplicationContext, DeviceAdminReceiver::class.java)
             if (!dpm.isDeviceOwnerApp(reactApplicationContext.packageName)) {
                 promise.reject("NOT_DEVICE_OWNER", "Default launcher mode requires Device Owner")
                 return
             }
-            // Clear our own persistent preferences first (idempotent), then re-add when enabling.
-            dpm.clearPackagePersistentPreferredActivities(admin, reactApplicationContext.packageName)
-            if (enabled) {
-                val filter = android.content.IntentFilter(Intent.ACTION_MAIN).apply {
-                    addCategory(Intent.CATEGORY_HOME)
-                    addCategory(Intent.CATEGORY_DEFAULT)
-                }
-                dpm.addPersistentPreferredActivity(
-                    admin, filter, ComponentName(reactApplicationContext, MainActivity::class.java)
-                )
-            }
+            // Turning it off must also hand the Home role back, or Home keeps opening FreeKiosk.
+            HomeLauncherPolicy.apply(reactApplicationContext, enabled, forceHandBack = true)
             android.util.Log.d("KioskModule", "Default launcher mode set: $enabled")
             promise.resolve(true)
         } catch (e: Exception) {
