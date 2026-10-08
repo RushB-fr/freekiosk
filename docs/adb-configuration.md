@@ -62,6 +62,28 @@ This security model ensures:
 
 
 
+## Quoting JSON values
+
+`adb shell` joins its arguments and the **device's** shell parses them a second time, which
+strips the double quotes of a JSON value: `--es dashboard_tiles '[{"label":"A"}]'` typed as
+is reaches FreeKiosk as `[{label:A}]`, and the app logs `Invalid dashboard tiles JSON` (or
+shows an "Invalid ... JSON" toast). Wrap the whole `am start ...` in double quotes, keep the
+JSON in single quotes inside it, and put a backslash before each double quote of the JSON:
+
+```
+adb shell "am start -n com.freekiosk/.MainActivity --es pin 1234 --es config '{\"lock_package\":\"com.app\"}'"
+```
+
+Same line in bash, zsh, PowerShell and cmd.exe. In PowerShell it is easier to keep the JSON in
+a variable that already carries the backslashes:
+`$tiles = '[{\"label\":\"A\",\"url\":\"https://a.eu\"}]'` then
+`adb shell "am start -n com.freekiosk/.MainActivity --es dashboard_tiles '$tiles'"`.
+
+Checked with the Android SDK platform-tools on Windows (Git Bash, PowerShell 5.1, cmd.exe);
+Linux and macOS go through the same mechanism but were not tried. Also watch for curly quotes
+(`’` instead of `'`) when copying a command from an email or a word processor: the shell does
+not read them as quotes. Simple values (`--es url "https://..."`) need none of this.
+
 ## Quick Start
 
 ### First-Time Setup (New Device)
@@ -184,7 +206,7 @@ unless `lock_package` says otherwise.
 | `order` | Number | list position | Display order in the grid |
 
 ```bash
-adb shell am start -n com.freekiosk/.MainActivity   --es pin "1234"   --ez dashboard_mode true   --es dashboard_tiles '[{"label":"Main app","url":"https://myapp.eu"},{"label":"Reports","url":"https://reports.myapp.eu"}]'
+adb shell "am start -n com.freekiosk/.MainActivity --es pin 1234 --ez dashboard_mode true --es dashboard_tiles '[{\"label\":\"Main app\",\"url\":\"https://myapp.eu\"},{\"label\":\"Reports\",\"url\":\"https://reports.myapp.eu\"}]'"
 ```
 
 The same two keys work inside `--es config` as `dashboard_mode` and `dashboard_tiles`.
@@ -247,7 +269,7 @@ Every key below is a straight passthrough: the value you pass is stored as-is.
 `url_planner_events` takes a JSON array. The planner only runs in Website mode with `url_planner_enabled true`; outside an event the tablet shows the normal URL. Requires 2.0.0-beta.2 or later: earlier builds ignore both keys without a warning.
 
 ```bash
-adb shell am start -n com.freekiosk/.MainActivity   --es pin "YOUR_PIN"   --ez url_planner_enabled true   --es url_planner_events '[{"id":"advert-1","type":"oneTime","name":"Autumn advert","url":"https://example.com/advert.html","enabled":true,"priority":1,"startDate":"2026-10-12","endDate":"2026-10-25","allDay":true}]'
+adb shell "am start -n com.freekiosk/.MainActivity --es pin YOUR_PIN --ez url_planner_enabled true --es url_planner_events '[{\"id\":\"advert-1\",\"type\":\"oneTime\",\"name\":\"Autumn advert\",\"url\":\"https://example.com/advert.html\",\"enabled\":true,\"priority\":1,\"startDate\":\"2026-10-12\",\"endDate\":\"2026-10-25\",\"allDay\":true}]'"
 ```
 
 | Field | Description |
@@ -311,7 +333,7 @@ break, say) on the listed days. Equal times, or a time that is not `HH:MM`, and 
 ignored.
 
 ```bash
-adb shell am start -n com.freekiosk/.MainActivity   --es pin "1234"   --ez screen_scheduler_enabled true   --es screen_scheduler_rules '[{"id":"office","name":"Office hours","enabled":true,"days":[1,2,3,4,5],"sleepTime":"17:00","wakeTime":"07:00"}]'
+adb shell "am start -n com.freekiosk/.MainActivity --es pin 1234 --ez screen_scheduler_enabled true --es screen_scheduler_rules '[{\"id\":\"office\",\"name\":\"Office hours\",\"enabled\":true,\"days\":[1,2,3,4,5],\"sleepTime\":\"17:00\",\"wakeTime\":\"07:00\"}]'"
 ```
 
 This is the format `src/types/screenScheduler.ts` implements, and the one the app's own rule
@@ -543,16 +565,16 @@ adb shell am start -n com.freekiosk/.MainActivity \
 Configure a home screen grid with multiple apps:
 
 ```bash
-adb shell am start -n com.freekiosk/.MainActivity \
-    --es external_app_mode "multi" \
-    --es managed_apps '[{"packageName":"com.spotify.music"},{"packageName":"com.netflix.mediaclient"},{"packageName":"com.youtube","launchOnBoot":true,"keepAlive":true}]' \
-    --es pin "1234" \
-    --es test_mode "false"
+adb shell "am start -n com.freekiosk/.MainActivity \
+    --es external_app_mode multi \
+    --es managed_apps '[{\"packageName\":\"com.spotify.music\"},{\"packageName\":\"com.netflix.mediaclient\"},{\"packageName\":\"com.youtube\",\"launchOnBoot\":true,\"keepAlive\":true}]' \
+    --es pin 1234 \
+    --es test_mode false"
 ```
 
 > **Tip**: Display names are auto-resolved from the system. You can override them:
 > ```bash
-> --es managed_apps '[{"packageName":"com.app","displayName":"My Custom Name"}]'
+> --es managed_apps '[{\"packageName\":\"com.app\",\"displayName\":\"My Custom Name\"}]'
 > ```
 
 ### 5. Full JSON Configuration
@@ -562,10 +584,10 @@ For complex setups, use a JSON config. Note that shell escaping can be tricky - 
 
 
 ```bash
-# Linux/Mac - use single quotes for JSON
-adb shell am start -n com.freekiosk/.MainActivity \
-    --es pin "1234" \
-    --es config '{"lock_package":"com.app","auto_relaunch":"true"}'
+# JSON goes in single quotes inside the double-quoted command (see "Quoting JSON values")
+adb shell "am start -n com.freekiosk/.MainActivity \
+    --es pin 1234 \
+    --es config '{\"lock_package\":\"com.app\",\"auto_relaunch\":\"true\"}'"
 
 # Or use individual parameters (recommended for shell scripts)
 adb shell am start -n com.freekiosk/.MainActivity \
