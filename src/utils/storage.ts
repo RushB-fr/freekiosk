@@ -3637,6 +3637,7 @@ export const StorageService = {
           longPressSeconds: num(KEYS.RESTART_BUTTON_LONG_PRESS_SECONDS, 5),
         },
         intercomMode: bool(KEYS.INTERCOM_MODE),
+        sessionResetButtonEnabled: bool(KEYS.SESSION_RESET_BUTTON_ENABLED),
       },
       display: {
         brightnessManagement: bool(KEYS.BRIGHTNESS_MANAGEMENT_ENABLED, true),
@@ -3665,6 +3666,7 @@ export const StorageService = {
           mode: str(KEYS.WEBVIEW_ZOOM_MODE, 'standard'),
           disableUserZoom: bool(KEYS.DISABLE_USER_ZOOM),
         },
+        disableOverscroll: bool(KEYS.DISABLE_OVERSCROLL),
         customUserAgent: str(KEYS.CUSTOM_USER_AGENT),
         screensaver: {
           enabled: bool(KEYS.SCREENSAVER_ENABLED),
@@ -3884,6 +3886,7 @@ export const StorageService = {
         set(KEYS.RESTART_BUTTON_LONG_PRESS_SECONDS, rb.longPressSeconds);
       }
       set(KEYS.INTERCOM_MODE, g.intercomMode);
+      set(KEYS.SESSION_RESET_BUTTON_ENABLED, g.sessionResetButtonEnabled);
     }
 
     if (d) {
@@ -3916,6 +3919,7 @@ export const StorageService = {
         set(KEYS.WEBVIEW_ZOOM_MODE, z.mode);
         set(KEYS.DISABLE_USER_ZOOM, z.disableUserZoom);
       }
+      set(KEYS.DISABLE_OVERSCROLL, d.disableOverscroll);
       set(KEYS.CUSTOM_USER_AGENT, d.customUserAgent);
       const ss = d.screensaver as Record<string, unknown> | undefined;
       if (ss) {
