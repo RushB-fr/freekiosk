@@ -168,8 +168,8 @@
     "pdfViewer": {
       "title": "PDF Viewer",
       "enable": "Inline PDF Viewer",
-      "enableHint": "Display PDF files directly in the browser instead of downloading them",
-      "info": "PDF links will open in a built-in viewer with page navigation and zoom controls.\n\nEnabling this feature allows file access in the WebView for the local PDF renderer. Only enable if your kiosk website links to PDF files."
+      "enableHint": "Display PDF files directly in the browser instead of downloading them. Also required to open local pages (file:// URLs).",
+      "info": "PDF links will open in a built-in viewer with page navigation and zoom controls.\n\nEnabling this feature allows file access in the WebView: for the local PDF renderer, and for a local page opened with a file:// URL (without it, such a page fails to load). Only enable it if your kiosk links to PDF files or shows a local page."
     },
     "printing": {
       "title": "Printing",

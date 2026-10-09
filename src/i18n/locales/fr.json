@@ -168,8 +168,8 @@
     "pdfViewer": {
       "title": "Lecteur PDF",
       "enable": "Lecteur PDF intégré",
-      "enableHint": "Afficher les fichiers PDF directement dans le navigateur au lieu de les télécharger",
-      "info": "Les liens PDF s'ouvriront dans un lecteur intégré avec navigation de page et zoom.\n\nActiver cette fonction autorise l'accès aux fichiers dans la WebView pour le lecteur PDF local. À activer uniquement si votre site kiosque contient des liens PDF."
+      "enableHint": "Afficher les fichiers PDF directement dans le navigateur au lieu de les télécharger. Nécessaire aussi pour ouvrir des pages locales (URL file://).",
+      "info": "Les liens PDF s'ouvriront dans un lecteur intégré avec navigation de page et zoom.\n\nActiver cette fonction autorise l'accès aux fichiers dans la WebView : pour le lecteur PDF local, et pour une page locale ouverte avec une URL file:// (sans cela, elle ne se charge pas). À activer uniquement si votre site kiosque contient des liens PDF ou affiche une page locale."
     },
     "printing": {
       "title": "Impression",
