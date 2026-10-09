@@ -38,6 +38,15 @@ class MainActivity : ReactActivity() {
     /** #280: delay before the alarm relaunches the app after an ADB config restart. */
     private const val ADB_RESTART_DELAY_MS = 1500L
 
+    /** A swipe starting this close to the top or bottom edge may have shown transient system bars. */
+    private const val EDGE_TOUCH_DP = 32f
+
+    /** How far a touch that started at an edge must move inward to count as an edge swipe. */
+    private const val EDGE_SWIPE_MIN_DP = 16f
+
+    /** When to clear transient bars after an edge touch; the system normally hides them in about 3 s. */
+    private val STUCK_TRANSIENT_BARS_CHECKS_MS = longArrayOf(4_000L, 10_000L)
+
     /**
      * #238: how long JS may take to finish starting before we release screen pinning.
      * Generous on purpose: React Native legitimately takes one to two minutes on the
@@ -207,6 +216,10 @@ class MainActivity : ReactActivity() {
   // Debounce handler for hideSystemUI to avoid dismissing the power menu (GlobalActions)
   // on devices where onWindowFocusChanged fires rapidly (e.g. TECNO/HiOS on Android 14)
   private val hideSystemUIHandler = Handler(Looper.getMainLooper())
+  private val stuckBarsHandler = Handler(Looper.getMainLooper())
+  // Edge swipe tracking: which edge the current gesture started at (0 = none, -1 top, 1 bottom).
+  private var edgeSwipeStartEdge = 0
+  private var edgeSwipeStartY = 0f
   private var lastFocusLostTime = 0L
 
   // #248: a re-lock deferred because the power menu is probably open. Consumed when
@@ -1050,6 +1063,60 @@ class MainActivity : ReactActivity() {
     }
   }
 
+  /**
+   * Clear "transient" system bars that Android leaves on screen.
+   *
+   * An edge swipe in immersive mode shows the bars transiently: the system shows them
+   * over the app and hides them again on its own timer. Pulling down on that transient
+   * status bar while the shade cannot open (screen pinning without Device Owner) cancels
+   * the timer, and on some devices nothing restarts it, so the bars stay for good.
+   * hideSystemUI() cannot clear them, because the app already requests them hidden, and
+   * the app cannot see them either: its insets still report the bars as hidden. Asking
+   * for them to be shown and hidden again in the same frame ends the transient state.
+   *
+   * The first swipe of that gesture starts on our window (the bars are hidden then), so
+   * a swipe that starts at the top or bottom edge and moves inward schedules the clean-up.
+   * Taps near an edge (page or nav bar buttons) do not, which keeps the show + hide away
+   * from normal use, when the bars are hidden.
+   */
+  private fun onEdgeTouchMaybeShowingTransientBars(ev: android.view.MotionEvent) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+    val density = resources.displayMetrics.density
+    when (ev.actionMasked) {
+      android.view.MotionEvent.ACTION_DOWN -> {
+        // Only a swipe that starts at the top or bottom edge reveals transient bars; a tap
+        // there (a page button, a nav bar button) must not schedule anything.
+        val edge = EDGE_TOUCH_DP * density
+        val height = window.decorView.height
+        edgeSwipeStartEdge = when {
+          ev.rawY <= edge -> -1
+          ev.rawY >= height - edge -> 1
+          else -> 0
+        }
+        edgeSwipeStartY = ev.rawY
+      }
+      android.view.MotionEvent.ACTION_MOVE -> {
+        if (edgeSwipeStartEdge == 0) return
+        // Inward = down from the top edge, up from the bottom edge.
+        val inward = (ev.rawY - edgeSwipeStartY) * -edgeSwipeStartEdge
+        if (inward < EDGE_SWIPE_MIN_DP * density) return
+        edgeSwipeStartEdge = 0 // once per gesture
+        stuckBarsHandler.removeCallbacksAndMessages(null)
+        for (delay in STUCK_TRANSIENT_BARS_CHECKS_MS) {
+          stuckBarsHandler.postDelayed({ clearTransientSystemBars() }, delay)
+        }
+      }
+      android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> edgeSwipeStartEdge = 0
+    }
+  }
+
+  private fun clearTransientSystemBars() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+    if (!hasWindowFocus() || PrintModule.isPrintActive) return
+    window.insetsController?.show(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
+    hideSystemUI()
+  }
+
   private fun hideSystemUI() {
     // Pour Android 11+ (API 30+), utiliser la nouvelle API WindowInsetsController
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -1247,6 +1314,9 @@ class MainActivity : ReactActivity() {
 
   override fun dispatchTouchEvent(ev: android.view.MotionEvent?): Boolean {
     // Observe (never consume) the initial press of each gesture.
+    if (ev != null) {
+      onEdgeTouchMaybeShowingTransientBars(ev)
+    }
     if (ev != null && ev.actionMasked == android.view.MotionEvent.ACTION_DOWN && kioskScreenActive) {
       refreshTapSettingsConfig()
       if (tapSettingsEnabled) {
