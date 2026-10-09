@@ -52,6 +52,26 @@
 - Media players
 - Custom Android apps
 
+### Multi-App Home Screen Appearance
+
+In **Settings → General**, select **External App → Multi-App** and use **Multi-App appearance** to:
+
+- Choose a preset background colour or enter a custom `#RRGGBB` colour.
+- Replace the FreeKiosk heading with your own text.
+- Choose a logo image from the device; its proportions are preserved.
+- Show or hide the heading and logo independently.
+- Preview the result and reset appearance to the default branding.
+
+Heading and app labels automatically switch between black and white for contrast.
+Save the settings to apply the changes. Appearance survives app restarts and is included
+in backup/restore and configuration export/import at `general.externalApp.appearance`.
+Older configurations without this field leave existing appearance settings unchanged.
+
+Custom logo files are stored locally. Backups and configuration exports contain the
+image path, not the image file. On another device, choose the logo again. If an image
+cannot be loaded, FreeKiosk displays its bundled logo. These options apply to the
+Multi-App home screen only.
+
 ### Dashboard Mode
 
 **Multi-URL tile grid for quick navigation between multiple dashboards.**

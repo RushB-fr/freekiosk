@@ -51,6 +51,7 @@ import ScreenScheduleRuleEditor from '../../components/settings/ScreenScheduleRu
 import { ScheduledEvent } from '../../types/planner';
 import { ScreenScheduleRule } from '../../types/screenScheduler';
 import { ManagedApp } from '../../types/managedApps';
+import { DEFAULT_MULTI_APP_APPEARANCE, MultiAppAppearance, isHexColor } from '../../types/multiAppAppearance';
 import { MediaItem, MediaFitMode, generateMediaItemId, detectMediaType } from '../../types/mediaPlayer';
 import FilePickerModule from '../../utils/FilePickerModule';
 
@@ -128,6 +129,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [isDeviceOwner, setIsDeviceOwner] = useState<boolean>(false);
   const [managedApps, setManagedApps] = useState<ManagedApp[]>([]);
   const [externalAppMode, setExternalAppMode] = useState<'single' | 'multi'>('single');
+  const [multiAppAppearance, setMultiAppAppearance] = useState<MultiAppAppearance>({ ...DEFAULT_MULTI_APP_APPEARANCE });
   const [statusBarEnabled, setStatusBarEnabled] = useState<boolean>(false);
   const [statusBarOnOverlay, setStatusBarOnOverlay] = useState<boolean>(true);
   const [statusBarOnReturn, setStatusBarOnReturn] = useState<boolean>(true);
@@ -611,6 +613,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     // External app sub-mode
     const savedExternalAppMode = await StorageService.getExternalAppMode();
     setExternalAppMode(savedExternalAppMode);
+    setMultiAppAppearance(await StorageService.getMultiAppAppearance());
 
     setOverlayButtonVisible(savedOverlayButtonVisible);
     setPinMaxAttempts(savedPinMaxAttempts);
@@ -1345,6 +1348,10 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   // ============ SAVE FUNCTION ============
 
   const handleSave = async (): Promise<void> => {
+    if (displayMode === 'external_app' && externalAppMode === 'multi' && !isHexColor(multiAppAppearance.backgroundColor)) {
+      Alert.alert(t('screens.settingsMain.error'), t('general.appearance.invalidColor'));
+      return;
+    }
     // Validation
     if (displayMode === 'webview' && !url && !dashboardModeEnabled) {
       Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.enterUrl'));
@@ -1559,6 +1566,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.saveDisplayMode(displayMode);
     await StorageService.saveExternalAppPackage(externalAppPackage);
     await StorageService.saveExternalAppMode(externalAppMode);
+    await StorageService.saveMultiAppAppearance(multiAppAppearance);
     await StorageService.saveAutoRelaunchApp(autoRelaunchApp);
     await StorageService.saveManagedApps(managedApps);
     await StorageService.saveOverlayButtonVisible(overlayButtonVisible);
@@ -1807,6 +1815,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
               setDisplayMode('webview');
               setExternalAppPackage('');
               setExternalAppMode('single');
+              setMultiAppAppearance({ ...DEFAULT_MULTI_APP_APPEARANCE });
               setAutoRelaunchApp(true);
               setOverlayButtonVisible(false);
               setStatusBarEnabled(false);
@@ -1976,6 +1985,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             loadingApps={loadingApps}
             managedApps={managedApps}
             onManagedAppsChange={setManagedApps}
+            multiAppAppearance={multiAppAppearance}
+            onMultiAppAppearanceChange={setMultiAppAppearance}
             externalAppMode={externalAppMode}
             onExternalAppModeChange={setExternalAppMode}
             hasOverlayPermission={hasOverlayPermission}

@@ -34,6 +34,7 @@ export type IconName =
   | 'weather-night'
   | 'eye'
   | 'eye-off'
+  | 'palette'
   // Web & URL
   | 'web'
   | 'earth'
