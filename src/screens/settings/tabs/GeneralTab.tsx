@@ -133,6 +133,8 @@ interface GeneralTabProps {
   // Restart Button (webview only): long-press reloads the WebView
   restartButtonEnabled: boolean;
   onRestartButtonEnabledChange: (value: boolean) => void;
+  sessionResetButtonEnabled: boolean;
+  onSessionResetButtonEnabledChange: (value: boolean) => void;
   restartButtonLongPressSeconds: number;
   onRestartButtonLongPressSecondsChange: (value: number) => void;
 
@@ -255,6 +257,8 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
   onResetWebViewBackButtonPosition,
   restartButtonEnabled,
   onRestartButtonEnabledChange,
+  sessionResetButtonEnabled,
+  onSessionResetButtonEnabledChange,
   restartButtonLongPressSeconds,
   onRestartButtonLongPressSecondsChange,
   inactivityReturnEnabled,
@@ -1128,6 +1132,18 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
               />
             </>
           )}
+        </SettingsSection>
+      )}
+
+      {/* Session reset button - WebView only, for shared tablets (#156) */}
+      {displayMode === 'webview' && (
+        <SettingsSection title={t('general.sessionReset.title')} icon="account">
+          <SettingsSwitch
+            label={t('general.sessionReset.enable')}
+            hint={t('general.sessionReset.enableHint')}
+            value={sessionResetButtonEnabled}
+            onValueChange={onSessionResetButtonEnabledChange}
+          />
         </SettingsSection>
       )}
 

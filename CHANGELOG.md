@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- 🔐 **Optional Reset Session button for shared tablets** (#156). Settings > General > **Session Reset Button** (WebView mode, off by default) shows a small button in the bottom-left corner. After a confirmation it clears cookies, cache, form data and web storage (localStorage, IndexedDB), then reloads the start URL on a clean WebView. Tested on an Android 15 emulator: a cookie and a localStorage value set by a page were gone after the reset, twice in a row. The wipe waits for the cookies to be removed and then 3 seconds for the HTTP cache: loading the page sooner failed once with `ERR_CONTENT_LENGTH_MISMATCH` on the emulator. Also available over ADB (`session_reset_button_enabled`). Not tested on a physical tablet. Not part of the cloud config sync yet, so it cannot be set from the dashboard.
+- 📜 **Option to remove the elastic stretch at the edges of a page** (#233). Settings > Display > **Page Edges > Disable Overscroll Effect** (WebView mode, off by default, so nothing changes unless you turn it on). Checked on an Android 15 emulator by holding a drag on a short page: the content stretched by default and stayed still with the option on. Also available over ADB (`disable_overscroll`). Not part of the cloud config sync yet.
+- ☁️ **FreeKiosk Cloud is now offered on the welcome screen and in Settings.** The welcome screen (shown until a URL is set) has a **Connect this tablet** / **Discover the cloud** block, and the GitHub button becomes a small footer link. Settings shows a dismissible banner while the tablet is not enrolled; closing it is final. **Connect** opens Settings > Advanced, after the PIN. Both disappear once the tablet is enrolled.
+
+### Documentation
+- 📖 **ADB guide: every key is now documented** (#250). Added `cloud_token` / `cloud_url` (new *Cloud Enrollment* section), the `auto_relaunch_app` synonym and the two keys above. New section **Scripting the settings gesture**: `return_tap_timeout` is the total window for all the taps, counted from the first one, not a delay between two taps (confirmed on the emulator: with 2 seconds between taps, 1500 ms and 5000 ms both reset the count, 10000 ms opened the PIN screen). The Settings screen only accepts 500 to 5000 and clamps on save; ADB accepts more. `pdf_viewer_enabled` now says it is what allows `file://` URLs (confirmed: `ERR_ACCESS_DENIED` without it, page loaded with it).
+- 🛠️ **ADB guide: `return_mode` takes `tap_anywhere` or `button`, not `taps`.** The old value was accepted over ADB but matched neither mode, which left no way into the settings. Values of `keyboard_mode` and `status_bar_theme` are listed too.
+
 ***
 
 ## [2.0.0-beta.5] - 2026-10-07

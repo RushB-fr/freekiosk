@@ -204,6 +204,11 @@
       "enableHint": "Show a grey button in the top-right corner. Long-press it to restart the WebView on the configured URL.",
       "longPress": "Long-press Duration",
       "longPressHint": "How long the button must be held before the WebView restarts."
+    },
+    "sessionReset": {
+      "title": "Session Reset Button",
+      "enable": "Enable Session Reset Button",
+      "enableHint": "Show a small button in the bottom-left corner for shared tablets. After a confirmation it clears cookies, cache and web storage, then returns to the start URL."
     }
   },
   "display": {
@@ -370,6 +375,11 @@
       "currentInfo": "Zoom is set to {{value}}%. Tap the \"100%\" preset to reset to default.",
       "disableUserZoom": "Disable User Zoom",
       "disableUserZoomHint": "Prevent pinch-to-zoom and double-tap zoom on the web page. The admin zoom level above still applies."
+    },
+    "overscroll": {
+      "title": "Page Edges",
+      "disable": "Disable Overscroll Effect",
+      "disableHint": "Remove the elastic stretch shown when dragging past the top or bottom of a page, even on pages that do not scroll."
     },
     "userAgent": {
       "title": "User Agent",
@@ -682,6 +692,12 @@
     "add": "Add"
   },
   "components": {
+    "sessionReset": {
+      "title": "End the current session?",
+      "message": "This clears cookies, cache and stored data of the web page, then returns to the start page.",
+      "cancel": "Cancel",
+      "confirm": "Reset session"
+    },
     "cloudPromo": {
       "title": "Manage your tablets from FreeKiosk Cloud",
       "body": "Remote settings, commands and fleet overview.",

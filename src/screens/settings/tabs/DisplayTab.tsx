@@ -78,6 +78,8 @@ interface DisplayTabProps {
   onZoomModeChange: (value: string) => void;
   disableUserZoom: boolean;
   onDisableUserZoomChange: (value: boolean) => void;
+  disableOverscroll: boolean;
+  onDisableOverscrollChange: (value: boolean) => void;
   
   // Custom User Agent
   customUserAgent: string;
@@ -183,6 +185,8 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
   onZoomModeChange,
   disableUserZoom,
   onDisableUserZoomChange,
+  disableOverscroll,
+  onDisableOverscrollChange,
   customUserAgent,
   onCustomUserAgentChange,
   pauseWebMediaWhenHidden,
@@ -983,6 +987,18 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
             hint={t('display.zoom.disableUserZoomHint')}
             value={disableUserZoom}
             onValueChange={onDisableUserZoomChange}
+          />
+        </SettingsSection>
+      )}
+
+      {/* Page edges - Only in WebView mode (#233) */}
+      {displayMode === 'webview' && (
+        <SettingsSection title={t('display.overscroll.title')} icon="gesture-tap">
+          <SettingsSwitch
+            label={t('display.overscroll.disable')}
+            hint={t('display.overscroll.disableHint')}
+            value={disableOverscroll}
+            onValueChange={onDisableOverscrollChange}
           />
         </SettingsSection>
       )}

@@ -104,6 +104,10 @@ export const KEYS = {
   // Restart Button (WebView reload via long-press, top-right)
   RESTART_BUTTON_ENABLED: '@kiosk_restart_button_enabled',
   RESTART_BUTTON_LONG_PRESS_SECONDS: '@kiosk_restart_button_long_press_seconds',
+  // WebView elastic stretch at the edges of the page (#233)
+  DISABLE_OVERSCROLL: '@kiosk_disable_overscroll',
+  // Floating "Reset session" button: wipes cookies and web storage, back to the start URL (#156)
+  SESSION_RESET_BUTTON_ENABLED: '@kiosk_session_reset_button_enabled',
   // Auto-Brightness
   AUTO_BRIGHTNESS_ENABLED: '@kiosk_auto_brightness_enabled',
   AUTO_BRIGHTNESS_MIN: '@kiosk_auto_brightness_min',
@@ -562,6 +566,8 @@ export const StorageService = {
         // Restart Button
         KEYS.RESTART_BUTTON_ENABLED,
         KEYS.RESTART_BUTTON_LONG_PRESS_SECONDS,
+        KEYS.DISABLE_OVERSCROLL,
+        KEYS.SESSION_RESET_BUTTON_ENABLED,
         // Auto-Brightness
         KEYS.AUTO_BRIGHTNESS_ENABLED,
         KEYS.AUTO_BRIGHTNESS_MIN,
@@ -2077,6 +2083,45 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting restart button long-press seconds:', error);
       return 5;
+    }
+  },
+
+  // WebView overscroll (#233). Off by default: the stretch is Android's standard behaviour.
+  saveDisableOverscroll: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.DISABLE_OVERSCROLL, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving disable overscroll:', error);
+    }
+  },
+
+  getDisableOverscroll: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.DISABLE_OVERSCROLL);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting disable overscroll:', error);
+      return false;
+    }
+  },
+
+  // Session reset button (#156). Opt-in: it draws a control over the page and lets anyone
+  // in front of the screen wipe the web session, so it is off by default.
+  saveSessionResetButtonEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.SESSION_RESET_BUTTON_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving session reset button enabled:', error);
+    }
+  },
+
+  getSessionResetButtonEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.SESSION_RESET_BUTTON_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting session reset button enabled:', error);
+      return false;
     }
   },
 

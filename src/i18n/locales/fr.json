@@ -204,6 +204,11 @@
       "enableHint": "Affiche un bouton gris en haut à droite. Un appui long redémarre la WebView sur l'URL configurée.",
       "longPress": "Durée de l'appui long",
       "longPressHint": "Temps pendant lequel le bouton doit rester appuyé avant que la WebView redémarre."
+    },
+    "sessionReset": {
+      "title": "Bouton de réinitialisation de session",
+      "enable": "Activer le bouton de réinitialisation",
+      "enableHint": "Affiche un petit bouton en bas à gauche pour les tablettes partagées. Après confirmation, il efface les cookies, le cache et les données web, puis revient à l'URL de départ."
     }
   },
   "display": {
@@ -370,6 +375,11 @@
       "currentInfo": "Le zoom est réglé à {{value}} %. Appuyez sur le préréglage « 100 % » pour réinitialiser.",
       "disableUserZoom": "Désactiver le zoom utilisateur",
       "disableUserZoomHint": "Empêche le pincement et le double-tap pour zoomer sur la page web. Le niveau de zoom administrateur ci-dessus reste appliqué."
+    },
+    "overscroll": {
+      "title": "Bords de la page",
+      "disable": "Désactiver l'effet d'étirement",
+      "disableHint": "Supprime l'effet élastique affiché quand on tire au-delà du haut ou du bas d'une page, même si elle ne défile pas."
     },
     "userAgent": {
       "title": "User-Agent",
@@ -682,6 +692,12 @@
     "add": "Ajouter"
   },
   "components": {
+    "sessionReset": {
+      "title": "Terminer la session en cours ?",
+      "message": "Cela efface les cookies, le cache et les données stockées de la page web, puis revient à la page de départ.",
+      "cancel": "Annuler",
+      "confirm": "Réinitialiser la session"
+    },
     "cloudPromo": {
       "title": "Gérez vos tablettes depuis FreeKiosk Cloud",
       "body": "Réglages à distance, commandes et vue d'ensemble de la flotte.",

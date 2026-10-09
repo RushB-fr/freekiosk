@@ -152,6 +152,7 @@ const BACKUP_KEYS = [
   '@kiosk_dashboard_mode_enabled',
   '@kiosk_dashboard_tiles',
   '@kiosk_default_launcher',
+  '@kiosk_disable_overscroll',
   '@kiosk_disable_user_zoom',
   '@kiosk_http_basic_auth_username',
   '@kiosk_intercom_mode',
@@ -194,6 +195,7 @@ const BACKUP_KEYS = [
   '@screensaver_proximity_enabled',
   '@kiosk_restart_button_enabled',
   '@kiosk_restart_button_long_press_seconds',
+  '@kiosk_session_reset_button_enabled',
   '@kiosk_dashboard_icon_size',
   '@kiosk_status_bar_theme',
 ];

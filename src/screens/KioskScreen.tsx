@@ -34,6 +34,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import Icon from '../components/Icon';
 import RestartButton from '../components/RestartButton';
+import SessionResetButton from '../components/SessionResetButton';
 import { revokeSettingsAccess } from '../utils/authState';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { CloudSyncService, CONFIG_UPDATED_EVENT, FORCE_UNENROLL_EVENT } from '../utils/CloudSyncService';
@@ -237,6 +238,8 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [zoomMode, setZoomMode] = useState<string>('standard');
   const [disableUserZoom, setDisableUserZoom] = useState<boolean>(false);
+  const [disableOverscroll, setDisableOverscroll] = useState<boolean>(false);
+  const [sessionResetButtonEnabled, setSessionResetButtonEnabled] = useState<boolean>(false);
   const [customUserAgent, setCustomUserAgent] = useState<string>('');
   const [basicAuthUsername, setBasicAuthUsername] = useState<string>('');
   const [basicAuthPassword, setBasicAuthPassword] = useState<string>('');
@@ -396,6 +399,22 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     ]);
     return JSON.stringify([level, mode, disableZoom, keyboard]);
   }, []);
+
+  // #156: end the current visitor's session. The native call wipes the WebView cache,
+  // cookies and web storage and resolves once the cookies are really gone; only then does
+  // the remount load the start URL, so the new page cannot read the old session.
+  const handleResetSession = useCallback(async (): Promise<void> => {
+    try {
+      await HttpServerModule?.clearWebViewSession?.();
+    } catch (error) {
+      console.error('[KioskScreen] Session reset: native clear failed:', error);
+    }
+    // The HTTP cache is wiped on a background thread that the native call does not wait
+    // for. A page requested during that window fails with ERR_CONTENT_LENGTH_MISMATCH.
+    await new Promise<void>(resolve => setTimeout(resolve, 3000));
+    setUrl(baseUrl);
+    setWebViewKey(prev => prev + 1);
+  }, [baseUrl]);
 
   // Cloud sync: start heartbeat loop on mount, reload settings on config push
   useEffect(() => {
@@ -2047,6 +2066,8 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       // Load Disable User Zoom
       const savedDisableUserZoom = bool(K.DISABLE_USER_ZOOM, false);
       setDisableUserZoom(savedDisableUserZoom);
+      setDisableOverscroll(bool(K.DISABLE_OVERSCROLL, false));
+      setSessionResetButtonEnabled(bool(K.SESSION_RESET_BUTTON_ENABLED, false));
 
       // Load Custom User Agent
       const savedCustomUserAgent = str(K.CUSTOM_USER_AGENT) ?? '';
@@ -2213,7 +2234,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
             if (bootCount > 0) {
               console.log(`[KioskScreen] Launched ${bootCount} boot app(s)`);
               // Give boot apps time to initialize before the primary app is overlaid
-              await new Promise<void>(resolve => setTimeout(resolve, 1000));
+              await new Promise<void>(resolve => setTimeout(resolve, 3000));
             }
           } catch (e) {
             console.warn('[KioskScreen] Failed to launch boot apps:', e);
@@ -3031,6 +3052,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
               zoomLevel={zoomLevel}
               zoomMode={zoomMode}
               disableUserZoom={disableUserZoom}
+              disableOverscroll={disableOverscroll}
               customUserAgent={customUserAgent}
               basicAuthCredential={
                 basicAuthUsername
@@ -3150,6 +3172,13 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           longPressSeconds={restartButtonLongPressSeconds}
           onTrigger={() => setWebViewKey(prev => prev + 1)}
         />
+      )}
+
+      {/* Session reset button (#156) - opt-in, for shared tablets. Asks for confirmation,
+          wipes cookies / cache / web storage natively (the same path as the clearCache
+          command), then goes back to the start URL. */}
+      {sessionResetButtonEnabled && displayMode === 'webview' && !(dashboardModeEnabled && dashboardShowGrid) && (
+        <SessionResetButton onConfirm={handleResetSession} />
       )}
 
       {/* Screensaver overlay - dim mode uses black/transparent based on brightness; URL/video modes render content */}

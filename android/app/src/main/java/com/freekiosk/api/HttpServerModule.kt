@@ -2093,7 +2093,14 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
 
     // ==================== WebView Cache Clearing ====================
 
-    private fun clearWebViewCache() {
+    /**
+     * Wipes the WebView cache, form data, history, cookies and web storage.
+     *
+     * [onDone] runs once the cookies are gone. Cookie removal is asynchronous, so a page
+     * loaded straight after this call can still read the old session: callers that
+     * reload the page (the "Reset session" button, #156) wait for it.
+     */
+    private fun clearWebViewCache(onDone: (() -> Unit)? = null) {
         UiThreadUtil.runOnUiThread {
             try {
                 // Clear WebView cache and data
@@ -2103,16 +2110,31 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                     clearHistory()
                     destroy()
                 }
-                // Also clear cookies
-                android.webkit.CookieManager.getInstance().removeAllCookies(null)
-                android.webkit.CookieManager.getInstance().flush()
-                // Clear WebStorage
+                // Clear WebStorage (localStorage, IndexedDB, WebSQL)
                 android.webkit.WebStorage.getInstance().deleteAllData()
-                Log.d(TAG, "WebView cache, cookies, and storage cleared")
+                // Also clear cookies; done once they are really gone
+                val cookies = android.webkit.CookieManager.getInstance()
+                cookies.removeAllCookies {
+                    cookies.flush()
+                    Log.d(TAG, "WebView cache, cookies, and storage cleared")
+                    onDone?.invoke()
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to clear WebView cache: ${e.message}")
+                onDone?.invoke()
             }
         }
+    }
+
+    /**
+     * Wipes the WebView session for the "Reset session" button (#156) and resolves when
+     * done. Unlike the `clearCache` command it does not ask JS to remount the WebView:
+     * the caller does that once this has resolved, so the new page cannot read the old
+     * cookies.
+     */
+    @ReactMethod
+    fun clearWebViewSession(promise: Promise) {
+        clearWebViewCache { promise.resolve(true) }
     }
 
     // ==================== Screenshot Method ====================

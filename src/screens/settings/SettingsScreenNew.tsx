@@ -234,6 +234,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [zoomMode, setZoomMode] = useState<string>('standard');
   const [disableUserZoom, setDisableUserZoom] = useState<boolean>(false);
+  const [disableOverscroll, setDisableOverscroll] = useState<boolean>(false);
+  const [sessionResetButtonEnabled, setSessionResetButtonEnabled] = useState<boolean>(false);
 
   // Custom User Agent
   const [customUserAgent, setCustomUserAgent] = useState<string>('');
@@ -742,6 +744,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
     setZoomMode(savedZoomMode);
     const savedDisableUserZoom = await StorageService.getDisableUserZoom();
     setDisableUserZoom(savedDisableUserZoom);
+    setDisableOverscroll(await StorageService.getDisableOverscroll());
+    setSessionResetButtonEnabled(await StorageService.getSessionResetButtonEnabled());
 
     // Custom User Agent
     const savedCustomUserAgent = await StorageService.getCustomUserAgent();
@@ -1584,6 +1588,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
     await StorageService.saveWebViewZoomLevel(zoomLevel);
     await StorageService.saveWebViewZoomMode(zoomMode);
     await StorageService.saveDisableUserZoom(disableUserZoom);
+    await StorageService.saveDisableOverscroll(disableOverscroll);
+    await StorageService.saveSessionResetButtonEnabled(sessionResetButtonEnabled);
     await StorageService.saveCustomUserAgent(customUserAgent);
     await StorageService.savePauseWebMediaWhenHidden(pauseWebMediaWhenHidden);
     await StorageService.saveHttpBasicAuthUsername(basicAuthUsername);
@@ -2065,6 +2071,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
             }}
             restartButtonEnabled={restartButtonEnabled}
             onRestartButtonEnabledChange={setRestartButtonEnabled}
+            sessionResetButtonEnabled={sessionResetButtonEnabled}
+            onSessionResetButtonEnabledChange={setSessionResetButtonEnabled}
             restartButtonLongPressSeconds={restartButtonLongPressSeconds}
             onRestartButtonLongPressSecondsChange={setRestartButtonLongPressSeconds}
             inactivityReturnEnabled={inactivityReturnEnabled}
@@ -2165,6 +2173,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
             onZoomModeChange={setZoomMode}
             disableUserZoom={disableUserZoom}
             onDisableUserZoomChange={setDisableUserZoom}
+            disableOverscroll={disableOverscroll}
+            onDisableOverscrollChange={setDisableOverscroll}
             customUserAgent={customUserAgent}
             onCustomUserAgentChange={setCustomUserAgent}
             pauseWebMediaWhenHidden={pauseWebMediaWhenHidden}

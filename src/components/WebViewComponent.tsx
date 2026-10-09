@@ -59,6 +59,7 @@ interface WebViewComponentProps {
   zoomLevel?: number; // Zoom level percentage (50-200, default 100)
   zoomMode?: string; // 'standard' (CSS zoom) | 'fit' (viewport reflow, #188)
   disableUserZoom?: boolean; // Prevent pinch-to-zoom and double-tap zoom
+  disableOverscroll?: boolean; // Remove the elastic stretch at the edges of the page (#233)
   customUserAgent?: string; // Custom User-Agent string (empty = default modern Chrome UA)
   basicAuthCredential?: { username: string; password: string };
   onRenderProcessGone?: (didCrash: boolean) => void; // #198 — renderer process died, ask parent to remount
@@ -107,6 +108,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   zoomLevel = 100,
   zoomMode = 'standard',
   disableUserZoom = false,
+  disableOverscroll = false,
   customUserAgent = '',
   basicAuthCredential,
   onRenderProcessGone,
@@ -1174,6 +1176,8 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
         
         originWhitelist={pdfViewerEnabled ? ['http://*', 'https://*', 'file://*'] : ['http://*', 'https://*']}
         mixedContentMode="always"
+        // Left undefined when off, so the library default ('always') applies as before.
+        overScrollMode={disableOverscroll ? 'never' : undefined}
         onHttpError={handleHttpError}
         basicAuthCredential={basicAuthCredential}
 

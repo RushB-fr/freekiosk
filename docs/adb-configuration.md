@@ -219,17 +219,17 @@ Every key below is a straight passthrough: the value you pass is stored as-is.
 
 | Parameter | Description |
 |-----------|-------------|
-| `--es return_mode "taps"` | How to reach settings: `taps` (hidden tap zone) or `button` (fixed button) |
+| `--es return_mode "tap_anywhere"` | How to reach settings: `tap_anywhere` (tap the screen `return_tap_count` times, the default) or `button` (fixed button). Any other value leaves no way in |
 | `--es return_button_position "top-left"` | Fixed-button corner: `top-left`, `top-right`, `bottom-left`, `bottom-right` |
 | `--ei return_tap_count 5` | Number of taps to open settings |
-| `--ei return_tap_timeout 1500` | Milliseconds allowed between taps |
+| `--ei return_tap_timeout 1500` | Time window, in milliseconds, to complete **all** the taps, counted from the first one (default 1500). The Settings screen accepts 500 to 5000; over ADB any value works. Raise it before you drive the gesture from a script, see [Scripting the settings gesture](#scripting-the-settings-gesture) |
 | `--ez volume_up_5tap_enabled true` | Five presses of Volume Up opens settings |
 | `--ez webview_back_button_enabled true` | Show an in-page back button in WebView mode |
 | `--es back_button_timer_delay "10"` | Countdown in seconds when `back_button_mode` is `timer` |
 | `--ez overlay_button_visible true` | Show the floating return button in External App mode |
 | `--es overlay_button_position "bottom-right"` | Corner for that button |
 | `--ei pin_max_attempts 5` | Wrong-PIN attempts before lockout |
-| `--es keyboard_mode "default"` | On-screen keyboard behavior |
+| `--es keyboard_mode "default"` | On-screen keyboard: `default`, `force_numeric` or `smart` |
 
 **Lockdown**
 
@@ -247,7 +247,9 @@ Every key below is a straight passthrough: the value you pass is stored as-is.
 | Parameter | Description |
 |-----------|-------------|
 | `--ez auto_reload true` | Periodically reload the page |
-| `--ez pdf_viewer_enabled true` | Open PDFs in the bundled viewer |
+| `--ez pdf_viewer_enabled true` | Open PDFs in the bundled viewer. **This is also what allows `file://` URLs**: without it the WebView refuses to load a local file, whatever the label says (see the [FAQ](faq.md)) |
+| `--ez disable_overscroll true` | Remove the elastic stretch at the top and bottom of the page. Off by default (Android's standard behaviour) |
+| `--ez session_reset_button_enabled true` | Show a small button, bottom-left, that clears cookies, cache and web storage after a confirmation, then returns to the start URL. Meant for shared tablets. Off by default |
 | `--es webview_zoom_level "100"` | Page zoom, 50 to 200 |
 | `--es webview_zoom_mode "standard"` | `standard` (CSS zoom) or `fit` (reflow) |
 | `--ez disable_user_zoom false` | Block pinch and double-tap zoom |
@@ -347,7 +349,7 @@ editor writes, so a rule built on a tablet and read back from the cloud is a val
 | `--ez status_bar_show_battery true` | Battery indicator |
 | `--ez status_bar_show_wifi true` | Wi-Fi indicator |
 | `--ez status_bar_show_time true` | Clock |
-| `--es status_bar_theme "dark"` | Status bar theme |
+| `--es status_bar_theme "dark"` | Status bar theme: `dark` or `light` |
 
 ### Kiosk Mode Options
 
@@ -356,7 +358,7 @@ editor writes, so a rule built on a tablet and read back from the cloud is a val
 | `--ez kiosk_enabled true` | Boolean | `true` | Enable/disable kiosk mode |
 | `--ez auto_start true` | Boolean | - | Auto-launch the locked app after config |
 | `--es auto_launch "true"` | String | - | Auto-launch on boot (alternative to `auto_start`) |
-| `--es auto_relaunch "true"` | String | - | Auto-relaunch if app crashes/exits |
+| `--es auto_relaunch "true"` | String | - | Auto-relaunch if app crashes/exits. `auto_relaunch_app` is accepted as a synonym |
 | `--es test_mode "false"` | String | `"true"` | `"false"` = production (sets `back_button_mode` to `immediate`). `"true"` = testing (sets `back_button_mode` to `test`). Shortcut for `back_button_mode` |
 | `--es back_button_mode "immediate"` | String | `"test"` | Behavior when returning to FreeKiosk via Android back button: `"test"` (stay on FreeKiosk, back button allowed), `"timer"` (countdown then relaunch app), `"immediate"` (instantly relaunch app). If `test_mode` is also set, `back_button_mode` takes priority |
 | `--es status_bar "true"` | String | - | Show custom status bar |
@@ -396,6 +398,45 @@ editor writes, so a rule built on a tablet and read back from the cloud is a val
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `--es screensaver_enabled "true"` | String | Enable screensaver on inactivity |
+
+### Cloud Enrollment
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `--es cloud_token "TOKEN"` | String | One-time enrollment token from the FreeKiosk Cloud *Add device* page. The tablet enrolls itself once the app is running |
+| `--es cloud_url "https://..."` | String | Cloud address. Optional: it defaults to `https://cloud.freekiosk.app`, so only a self-hosted cloud needs it |
+
+```bash
+adb shell am start -n com.freekiosk/.MainActivity --es pin "1234" --es cloud_token "TOKEN"
+```
+
+The token is never written to logcat. The enrollment runs the next time the app starts, and
+only on a tablet that is not enrolled yet: sent to a tablet that is already enrolled, the
+token is queued and then ignored (unenroll it first from Settings, Advanced, Cloud). If the
+tablet cannot reach the cloud yet, it retries every 30 seconds; a token that was refused
+(expired, already used, device limit reached) is reported on the welcome screen.
+
+### Scripting the settings gesture
+
+Opening the settings takes `return_tap_count` taps (5 by default) on the same spot, all
+completed within `return_tap_timeout` (1500 ms by default). The window starts at the **first**
+tap, it is not a delay between two taps. A script that taps with `adb shell input tap` has to
+fit every call into that window. On an emulator over USB a call took about 0.12 s, so the
+default is enough there; over wireless adb or from a slow host, a call can take a second or
+more (the reporter in [#250](https://github.com/RushB-fr/freekiosk/issues/250) measured about
+one second), and the counter resets before the fifth tap. Raise the window first, then tap:
+
+```bash
+adb shell am start -n com.freekiosk/.MainActivity --es pin "1234" --ei return_tap_timeout 15000
+for i in 1 2 3 4 5; do adb shell input tap 540 960; done
+```
+
+Taps must land within 80 px of the first one, so use the same coordinates for all of them.
+The Settings screen only accepts 500 to 5000 and clamps to that range when it saves, so a
+larger value set over ADB lasts until someone saves the settings by hand. Set it back to `1500`
+afterwards if the tablet will be used by the public. Requires 2.0.0-beta.2 or later: from
+1.2.19 to 2.0.0-beta.1 every `return_*` key was dropped in silence, which is why editing the
+stored settings by hand looked like the only way.
 
 
 ## Waiting for Configuration Completion
