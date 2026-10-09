@@ -60,6 +60,7 @@ interface WebViewComponentProps {
   customUserAgent?: string; // Custom User-Agent string (empty = default modern Chrome UA)
   basicAuthCredential?: { username: string; password: string };
   onRenderProcessGone?: (didCrash: boolean) => void; // #198 — renderer process died, ask parent to remount
+  inactive?: boolean; // Kept loaded but hidden (dashboard): no speech, no print
 }
 
 export interface WebViewComponentRef {
@@ -76,6 +77,9 @@ export interface WebViewComponentRef {
 // complement to the native WebView.onPause() (which alone doesn't stop <audio> on every
 // OEM WebView). Ends with `true;` to silence react-native-webview's injection warning.
 const MEDIA_PAUSE_JS = `(function(){try{document.querySelectorAll('audio,video').forEach(function(m){try{m.pause();}catch(e){}});}catch(e){}})();true;`;
+
+// Page messages ignored from a dashboard tile kept loaded in the background.
+const HIDDEN_TILE_IGNORED_MESSAGES = ['SPEECH_SYNTH_SPEAK', 'SPEECH_SYNTH_CANCEL', 'PRINT_REQUEST'];
 
 // Only has to be unguessable to the page, which cannot observe this generator.
 const makePrinterNonce = (): string =>
@@ -108,6 +112,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   customUserAgent = '',
   basicAuthCredential,
   onRenderProcessGone,
+  inactive = false,
 }, ref) => {
   const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp>();
@@ -893,6 +898,9 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
       // Parse JSON message
       try {
         const data = JSON.parse(message);
+        // A dashboard tile kept loaded in the background must not reach what the tile on
+        // screen shares: native TTS, or a print (which prints the page on screen).
+        if (inactive && HIDDEN_TILE_IGNORED_MESSAGES.includes(data.type)) return;
         if (data.type === 'FIVE_TAP_CLICK' && onUserInteraction) {
           onUserInteraction({ isTap: true, x: data.x, y: data.y });
         } else if (data.type === 'SPEECH_SYNTH_SPEAK') {
@@ -1708,4 +1716,6 @@ const styles = StyleSheet.create({
 
 WebViewComponent.displayName = 'WebViewComponent';
 
-export default WebViewComponent;
+// Memoized so a dashboard tile kept loaded in the background (KioskScreen passes it stable
+// props) does not re-render on every KioskScreen update.
+export default React.memo(WebViewComponent);

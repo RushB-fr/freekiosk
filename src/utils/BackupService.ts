@@ -195,6 +195,10 @@ const BACKUP_KEYS = [
   '@kiosk_restart_button_enabled',
   '@kiosk_restart_button_long_press_seconds',
   '@kiosk_dashboard_icon_size',
+  '@kiosk_dashboard_nav_auto_hide',
+  '@kiosk_dashboard_nav_auto_hide_seconds',
+  '@kiosk_dashboard_swipe_between_tiles',
+  '@kiosk_dashboard_keep_tiles_loaded',
   '@kiosk_status_bar_theme',
 ];
 

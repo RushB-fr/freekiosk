@@ -171,6 +171,20 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
         android.util.Log.d("KioskModule", "Module invalidated, WakeLock released")
     }
 
+    // Dashboard: report two-finger swipes as "onNavGesture" events (MainActivity).
+    @ReactMethod
+    fun setNavGestureEnabled(enabled: Boolean, promise: Promise) {
+        try {
+            val activity = reactApplicationContext.currentActivity
+            if (activity is MainActivity) {
+                activity.navGestureEnabled = enabled
+            }
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.resolve(false)
+        }
+    }
+
     // #180 — Tells MainActivity whether the Kiosk screen is the active route, so the
     // native tap-to-settings fallback (dispatchTouchEvent) only fires on the kiosk
     // screen and not while the user is inside Pin/Settings. Revert: delete this method.

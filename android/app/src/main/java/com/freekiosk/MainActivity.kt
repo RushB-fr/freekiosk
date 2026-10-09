@@ -1251,9 +1251,39 @@ class MainActivity : ReactActivity() {
         handleTapForSettings(ev.rawX, ev.rawY)
       }
     }
-    return super.dispatchTouchEvent(ev)
+    // Dashboard tile navigation (not part of #180; keep if #180 is reverted).
+    val swipe = if (ev != null && navGestureEnabled) feedNavGesture(ev) else null
+    val handled = super.dispatchTouchEvent(ev)
+    // After super, so the page has already had the final ACTION_UP when the tile switches.
+    if (swipe != null) KioskModule.sendEventFromNative("onNavGesture", swipe.jsName)
+    return handled
   }
   // ===== END #180 native tap-to-settings fallback =====
+
+  // ===== Dashboard tile navigation =====
+  // Two-finger swipes, observed here so nothing is injected into
+  // the page and they work whatever state it is in. KioskScreen turns this on only while a
+  // tile is on screen. See TwoFingerSwipeDetector.
+  @Volatile var navGestureEnabled = false
+  private val navGestureDetector by lazy {
+    val density = resources.displayMetrics.density
+    TwoFingerSwipeDetector(
+      TwoFingerSwipeDetector.MIN_DRAG_DP * density,
+      TwoFingerSwipeDetector.MAX_GAP_CHANGE_DP * density,
+    )
+  }
+  private val navGestureXs = FloatArray(2)
+  private val navGestureYs = FloatArray(2)
+
+  private fun feedNavGesture(ev: android.view.MotionEvent): TwoFingerSwipeDetector.Direction? {
+    val count = minOf(ev.pointerCount, 2)
+    for (i in 0 until count) {
+      navGestureXs[i] = ev.getX(i)
+      navGestureYs[i] = ev.getY(i)
+    }
+    return navGestureDetector.onTouch(ev.actionMasked, ev.pointerCount, navGestureXs, navGestureYs)
+  }
+  // ===== END Dashboard tile navigation =====
 
   override fun onBackPressed() {
     val prefs = getSharedPreferences("FreeKioskSettings", Context.MODE_PRIVATE)

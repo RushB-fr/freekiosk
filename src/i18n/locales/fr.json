@@ -674,6 +674,17 @@
       "large": "Grande",
       "xlarge": "Très grande"
     },
+    "tilePages": {
+      "title": "Pages des tuiles",
+      "autoHide": "Masquer automatiquement la barre de navigation",
+      "autoHideHint": "Sur une page de tuile, masque la barre de navigation pour que la page occupe tout l'écran. Balayez vers le bas avec deux doigts pour l'afficher, et vers le haut pour la masquer.",
+      "hideAfter": "Masquer après (secondes)",
+      "hideAfterHint": "Durée pendant laquelle la barre reste visible après son affichage ou le dernier toucher.",
+      "swipeBetweenTiles": "Balayer entre les tuiles",
+      "swipeBetweenTilesHint": "Sur une page de tuile, balayez vers la gauche avec deux doigts pour la tuile suivante et vers la droite pour la précédente.",
+      "keepTilesLoaded": "Garder les tuiles chargées",
+      "keepTilesLoadedHint": "Charge vos tuiles (jusqu'à 5) en arrière-plan dès le démarrage du tableau de bord et les garde actives : ouvrir ou changer de tuile est instantané et chaque page garde son état. Utilise plus de mémoire."
+    },
     "iconColor": "Couleur de l'icône",
     "colorAuto": "Auto",
     "preview": "Aperçu",

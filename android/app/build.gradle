@@ -234,4 +234,7 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    // Plain JVM unit tests (android/app/src/test)
+    testImplementation("junit:junit:4.13.2")
 }
