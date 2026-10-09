@@ -9,8 +9,9 @@ import BlockingOverlaysScreen from '../screens/settings/BlockingOverlaysScreen';
 
 export type RootStackParamList = {
   Kiosk: undefined;
-  Pin: undefined;
-  Settings: undefined;
+  // initialTab: the Settings tab to open once the PIN is entered (e.g. 'advanced' for Cloud)
+  Pin: { initialTab?: string } | undefined;
+  Settings: { initialTab?: string } | undefined;
   BlockingOverlays: undefined;
 };
 

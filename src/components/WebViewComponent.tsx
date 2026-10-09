@@ -33,6 +33,8 @@ import { useTranslation } from 'react-i18next';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
+const CLOUD_URL = 'https://cloud.freekiosk.app';
+
 interface WebViewComponentProps {
   url: string;
   autoReload: boolean;
@@ -139,6 +141,13 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
     const sub = DeviceEventEmitter.addListener(PROVISIONING_STATUS_EVENT, setProvisioning);
     return () => sub.remove();
   }, []);
+  // A tablet enrolled from Settings with no URL yet also lands on the welcome screen.
+  const [cloudEnrolled, setCloudEnrolled] = useState<boolean | null>(null);
+  React.useEffect(() => {
+    if (!CLOUD_ENABLED) return;
+    CloudSyncService.isEnrolled().then(setCloudEnrolled).catch(() => setCloudEnrolled(true));
+  }, []);
+  const showCloudPromo = CLOUD_ENABLED && cloudEnrolled === false && provisioning.state === 'none';
   const loadingTimeoutRef = useRef<any>(null);
   // Last top-frame (main document) URL requested — used to distinguish a fatal
   // main-page HTTP error from a harmless sub-resource error (favicon, analytics…).
@@ -1020,6 +1029,17 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
     navigation.navigate('Pin');
   };
 
+  // The PIN screen forwards the tab, so Settings opens on Advanced, where Cloud lives.
+  const handleConnectCloud = (): void => {
+    navigation.navigate('Pin', { initialTab: 'advanced' });
+  };
+
+  const handleDiscoverCloud = (): void => {
+    Linking.openURL(CLOUD_URL).catch(err =>
+      console.error('[FreeKiosk] Failed to open Cloud URL:', err)
+    );
+  };
+
   const handleOpenGitHub = (): void => {
     Linking.openURL('https://github.com/rushb-fr/freekiosk').catch(err =>
       console.error('[FreeKiosk] Failed to open GitHub URL:', err)
@@ -1093,17 +1113,32 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
               </Text>
             </TouchableOpacity>
 
-            {/* GitHub Support Button */}
-            <TouchableOpacity
-              style={[styles.githubButton, styles.rowCenter]}
-              onPress={handleOpenGitHub}
-              activeOpacity={0.7}
-            >
-              <Icon name="github" size={20} color="#fff" style={styles.buttonLeadingIcon} />
-              <Text style={styles.githubButtonText}>
-                {t('components.webView.supportOnGithub')}
-              </Text>
-            </TouchableOpacity>
+            {/* FreeKiosk Cloud: not shown once enrolled or while a QR enrolment is running */}
+            {showCloudPromo && (
+              <View style={styles.cloudPromoBox} testID="welcome-cloud-promo">
+                <View style={styles.cloudPromoHeader}>
+                  <Icon name="cloud-cog" size={22} color="#fff" style={styles.buttonLeadingIcon} />
+                  <Text style={styles.cloudPromoTitle}>{t('components.webView.cloudTitle')}</Text>
+                </View>
+                <Text style={styles.cloudPromoText}>{t('components.webView.cloudText')}</Text>
+                <View style={styles.cloudPromoActions}>
+                  <TouchableOpacity
+                    style={styles.cloudPromoPrimary}
+                    onPress={handleConnectCloud}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.cloudPromoPrimaryText}>{t('components.webView.cloudConnect')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.cloudPromoSecondary}
+                    onPress={handleDiscoverCloud}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.cloudPromoSecondaryText}>{t('components.webView.cloudDiscover')}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
 
             {/* Hint */}
             <View style={styles.hintContainer}>
@@ -1113,6 +1148,10 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
             </View>
 
             {/* Footer */}
+            <TouchableOpacity onPress={handleOpenGitHub} activeOpacity={0.7} style={styles.githubLink}>
+              <Icon name="github" size={16} color="rgba(255, 255, 255, 0.85)" style={styles.githubLinkIcon} />
+              <Text style={styles.githubLinkText}>{t('components.webView.supportOnGithub')}</Text>
+            </TouchableOpacity>
             <Text style={styles.footerText}>
               {appVersion ? t('components.webView.footerVersion', { version: appVersion }) : t('components.webView.footerByRushb')}
             </Text>
@@ -1573,24 +1612,75 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
   },
-  githubButton: {
-    marginTop: 20,
-    marginBottom: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-    alignItems: 'center',
+  cloudPromoBox: {
+    width: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.35)',
+    padding: 16,
+    marginBottom: 16,
   },
-  githubButtonText: {
+  cloudPromoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  cloudPromoTitle: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
+  cloudPromoText: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  cloudPromoActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  cloudPromoPrimary: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginRight: 12,
+  },
+  cloudPromoPrimaryText: {
+    color: '#fff',
+    fontSize: 14,
     fontWeight: '600',
   },
+  cloudPromoSecondary: {
+    paddingVertical: 10,
+  },
+  cloudPromoSecondaryText: {
+    color: '#fff',
+    fontSize: 14,
+    textDecorationLine: 'underline',
+  },
+  githubLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 24,
+  },
+  githubLinkIcon: {
+    marginRight: 6,
+  },
+  githubLinkText: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 13,
+    textDecorationLine: 'underline',
+  },
   footerText: {
-    marginTop: 32,
+    marginTop: 12,
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.6)',
     textAlign: 'center',

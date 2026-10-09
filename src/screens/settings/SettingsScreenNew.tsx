@@ -46,7 +46,7 @@ import {
   AdvancedTab,
   DashboardTab,
 } from './tabs';
-import { RecurringEventEditor, OneTimeEventEditor } from '../../components/settings';
+import { RecurringEventEditor, OneTimeEventEditor, CloudPromoBanner } from '../../components/settings';
 import ScreenScheduleRuleEditor from '../../components/settings/ScreenScheduleRuleEditor';
 import { ScheduledEvent } from '../../types/planner';
 import { ScreenScheduleRule } from '../../types/screenScheduler';
@@ -60,6 +60,7 @@ type SettingsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList
 
 interface SettingsScreenProps {
   navigation: SettingsScreenNavigationProp;
+  route?: { params?: { initialTab?: string } };
 }
 
 // Import Icon types
@@ -74,10 +75,13 @@ const TABS: { id: string; label: string; icon: IconName }[] = [
   { id: 'advanced', label: 'Advanced', icon: 'cog' },
 ];
 
-const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
+const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route }) => {
   const { t } = useTranslation();
-  // Active tab
-  const [activeTab, setActiveTab] = useState('general');
+  // Active tab: the welcome screen can open Settings straight on a given tab
+  const [activeTab, setActiveTab] = useState(() => {
+    const requested = route?.params?.initialTab;
+    return TABS.some((tab) => tab.id === requested) ? (requested as string) : 'general';
+  });
   
   // All state from original SettingsScreen
   const [url, setUrl] = useState<string>('');
@@ -2400,6 +2404,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
           ))}
         </View>
       </View>
+
+      {/* Cloud banner: hidden once the tablet is enrolled or the banner is closed */}
+      <CloudPromoBanner onConnect={() => setActiveTab('advanced')} refreshKey={activeTab} />
 
       {/* Tab Content */}
       <ScrollView 

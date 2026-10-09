@@ -231,6 +231,8 @@ export const KEYS = {
   // themselves live encrypted in the Keychain and KioskWatchdogService reads its flags
   // straight out of the AsyncStorage SQLite file, with no JS bridge available.
   CLOUD_ENROLLED: '@cloud_enrolled',
+  // Set once the user closes the "manage your tablets from the cloud" banner in Settings.
+  CLOUD_PROMO_DISMISSED: '@cloud_promo_dismissed',
 };
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> =>
@@ -3460,6 +3462,16 @@ export const StorageService = {
   saveCloudEnrolled: async (value: boolean): Promise<void> => {
     try { await AsyncStorage.setItem(KEYS.CLOUD_ENROLLED, JSON.stringify(value)); }
     catch (error) { console.error('Error saving cloud enrolled flag:', error); }
+  },
+
+  isCloudPromoDismissed: async (): Promise<boolean> => {
+    try { return (await AsyncStorage.getItem(KEYS.CLOUD_PROMO_DISMISSED)) === 'true'; }
+    catch (error) { console.error('Error reading cloud promo flag:', error); return false; }
+  },
+
+  dismissCloudPromo: async (): Promise<void> => {
+    try { await AsyncStorage.setItem(KEYS.CLOUD_PROMO_DISMISSED, 'true'); }
+    catch (error) { console.error('Error saving cloud promo flag:', error); }
   },
 
   // ============ CLOUD COMMAND DELIVERY ============

@@ -13,9 +13,11 @@ type PinScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Pi
 
 interface PinScreenProps {
   navigation: PinScreenNavigationProp;
+  route?: { params?: { initialTab?: string } };
 }
 
-const PinScreen: React.FC<PinScreenProps> = ({ navigation }) => {
+const PinScreen: React.FC<PinScreenProps> = ({ navigation, route }) => {
+  const initialTab = route?.params?.initialTab;
   const { t } = useTranslation();
   const [storedPin, setStoredPin] = useState<string>('1234');
   const [migrationDone, setMigrationDone] = useState<boolean>(false);
@@ -73,7 +75,7 @@ const PinScreen: React.FC<PinScreenProps> = ({ navigation }) => {
 
   const handleSuccess = (): void => {
     grantSettingsAccess();
-    navigation.navigate('Settings');
+    navigation.navigate('Settings', initialTab ? { initialTab } : undefined);
   };
 
   const handleBack = async (): Promise<void> => {

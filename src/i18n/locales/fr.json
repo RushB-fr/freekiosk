@@ -682,6 +682,12 @@
     "add": "Ajouter"
   },
   "components": {
+    "cloudPromo": {
+      "title": "Gérez vos tablettes depuis FreeKiosk Cloud",
+      "body": "Réglages à distance, commandes et vue d'ensemble de la flotte.",
+      "connect": "Connecter",
+      "dismiss": "Fermer"
+    },
     "backupRestore": {
       "exportFailed": "Échec de l'export",
       "prepareFailedMessage": "Échec de la préparation des données de sauvegarde",
@@ -1209,7 +1215,11 @@
       "footerByRushb": "par Rushb",
       "provisioningEnrolling": "Connexion à FreeKiosk Cloud… (tentative {{attempts}})",
       "provisioningRetrying": "FreeKiosk Cloud est injoignable pour le moment. Nouvel essai toutes les 30 secondes (tentative {{attempts}}).",
-      "provisioningFailed": "Échec de l'enrôlement cloud : {{error}}. Saisissez un nouveau jeton dans Réglages > Cloud."
+      "provisioningFailed": "Échec de l'enrôlement cloud : {{error}}. Saisissez un nouveau jeton dans Réglages > Cloud.",
+      "cloudTitle": "Gérez vos tablettes avec FreeKiosk Cloud",
+      "cloudText": "Modifiez les réglages, envoyez des commandes et suivez toute votre flotte depuis un seul tableau de bord.",
+      "cloudConnect": "Connecter cette tablette",
+      "cloudDiscover": "Découvrir le cloud"
     },
     "mediaPlayer": {
       "title": "Lecteur multimédia",

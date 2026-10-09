@@ -682,6 +682,12 @@
     "add": "Add"
   },
   "components": {
+    "cloudPromo": {
+      "title": "Manage your tablets from FreeKiosk Cloud",
+      "body": "Remote settings, commands and fleet overview.",
+      "connect": "Connect",
+      "dismiss": "Close"
+    },
     "backupRestore": {
       "exportFailed": "Export Failed",
       "prepareFailedMessage": "Failed to prepare backup data",
@@ -1209,7 +1215,11 @@
       "footerByRushb": "by Rushb",
       "provisioningEnrolling": "Connecting to FreeKiosk Cloud… (attempt {{attempts}})",
       "provisioningRetrying": "Cannot reach FreeKiosk Cloud yet. Retrying every 30 seconds (attempt {{attempts}}).",
-      "provisioningFailed": "Cloud enrollment failed: {{error}}. Enter a new token in Settings > Cloud."
+      "provisioningFailed": "Cloud enrollment failed: {{error}}. Enter a new token in Settings > Cloud.",
+      "cloudTitle": "Manage your tablets with FreeKiosk Cloud",
+      "cloudText": "Change settings, send commands and watch your whole fleet from one dashboard.",
+      "cloudConnect": "Connect this tablet",
+      "cloudDiscover": "Discover the cloud"
     },
     "mediaPlayer": {
       "title": "Media Player",
