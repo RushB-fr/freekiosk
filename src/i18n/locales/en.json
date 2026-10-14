@@ -1,6 +1,24 @@
 {
   "common": {},
   "general": {
+    "appearance": {
+      "title": "Multi-App appearance",
+      "background": "Background colour",
+      "customColor": "Custom colour",
+      "invalidColor": "Enter a colour in #RRGGBB format, for example #2b7fff.",
+      "colorHint": "Heading and app labels automatically use contrasting text.",
+      "showTitle": "Show heading",
+      "heading": "Heading text",
+      "showLogo": "Show logo",
+      "chooseLogo": "Choose logo from device",
+      "defaultLogo": "Use default logo",
+      "logoHint": "The selected image is stored on this device. Backups retain the setting but do not include the image file.",
+      "preview": "Preview",
+      "sampleApp": "Application name",
+      "reset": "Reset appearance to defaults",
+      "logoErrorTitle": "Could not select logo",
+      "logoError": "Please try selecting a different image."
+    },
     "language": {
       "title": "Language",
       "label": "App Language"
