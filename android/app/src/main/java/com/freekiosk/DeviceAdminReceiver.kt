@@ -102,14 +102,9 @@ class DeviceAdminReceiver : android.app.admin.DeviceAdminReceiver() {
                     Log.w(TAG, "Not Device Owner — cannot pin FreeKiosk as Home.")
                     return
                 }
-                val admin = ComponentName(context, DeviceAdminReceiver::class.java)
-                val filter = IntentFilter(Intent.ACTION_MAIN).apply {
-                    addCategory(Intent.CATEGORY_HOME)
-                    addCategory(Intent.CATEGORY_DEFAULT)
-                }
-                dpm.addPersistentPreferredActivity(
-                    admin, filter, ComponentName(context, MainActivity::class.java)
-                )
+                // Through the policy helper so the displaced launcher is remembered and
+                // turning the setting off later can hand Home back to it.
+                HomeLauncherPolicy.apply(context, enabled = true, forceHandBack = false)
                 Log.i(TAG, "FreeKiosk pinned as the persistent Home launcher.")
             } catch (e: Exception) {
                 Log.e(TAG, "Could not pin FreeKiosk as Home: ${e.message}", e)
