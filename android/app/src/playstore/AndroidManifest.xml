@@ -31,6 +31,13 @@
         android:name="android.permission.WRITE_SETTINGS"
         tools:node="remove" />
 
+    <!-- Strip USE_FULL_SCREEN_INTENT: Play restricts it to calling and alarm apps. Without
+         it the wake notification of ScreenController.turnScreenOn is shown as a heads-up
+         instead of a full-screen intent, and the activity is still started directly. -->
+    <uses-permission
+        android:name="android.permission.USE_FULL_SCREEN_INTENT"
+        tools:node="remove" />
+
     <!-- Strip READ_MEDIA_* (photo/video policy) -->
     <uses-permission
         android:name="android.permission.READ_MEDIA_VIDEO"
