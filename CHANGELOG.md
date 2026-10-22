@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ***
 
+## [2.0.0] - 2026-10-22
+
+### Changed
+- 🏷️ **2.0.0-beta.6 is promoted to a stable release, with no code change.** The only differences from `v2.0.0-beta.6` are the version name (`2.0.0`) and the version code (52, so devices on the beta see it as an update). The fixes merged since the beta are not in this release.
+
+***
+
 ## [2.0.0-beta.6] - 2026-10-14
 
 ### Added
