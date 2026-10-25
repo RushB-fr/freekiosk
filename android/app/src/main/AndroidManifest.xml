@@ -85,6 +85,11 @@
         android:usesPermissionFlags="neverForLocation"
         tools:targetApi="s" />
     <queries>
+        <!-- Android 11+ package visibility: the WebView's Web Speech API (SpeechRecognition)
+             binds the system speech recognition service, which the app must be able to see. -->
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.MAIN" />
         </intent>
