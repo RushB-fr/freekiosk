@@ -28,6 +28,8 @@ class AutoBrightnessModule(private val reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext), SensorEventListener {
 
     companion object {
+        // #314: a pending request older than this is not trusted (the UI thread never applied it)
+        private const val PENDING_BRIGHTNESS_MAX_AGE_MS = 3000L
         private const val TAG = "AutoBrightnessModule"
         private const val NAME = "AutoBrightnessModule"
         
@@ -52,6 +54,18 @@ class AutoBrightnessModule(private val reactContext: ReactApplicationContext) :
     private var updateInterval = 1000 // ms
     
     private var lastBrightnessValue = -1f
+
+    /**
+     * #314: the window override requested by applyBrightness() and not yet applied.
+     *
+     * The override is written on the UI thread, a moment after applyBrightness() returns. On a
+     * slow tablet that moment can be long enough for the read that follows a set (the
+     * kiosk screen reads the brightness back right after changing it) to see the previous
+     * value, and REST /api/brightness then reported the value from before the last change.
+     * While a request is pending, the read answers with it.
+     */
+    private class PendingBrightness(val level: Float, val requestedAtMs: Long)
+    private val pendingBrightness = java.util.concurrent.atomic.AtomicReference<PendingBrightness?>(null)
     private var currentLightLevel = 0f
     private var smoothedBrightness = -1f
     
@@ -190,6 +204,13 @@ class AutoBrightnessModule(private val reactContext: ReactApplicationContext) :
             // asked for. The old fallback to lastBrightnessValue is exactly what hid the
             // mismatch: after a wake blanked the window override, this returned the
             // requested 80% while the panel sat at the system value of 14/255.
+            // #314: a request that the UI thread has not applied yet is what the panel is about to run at
+            pendingBrightness.get()?.let { pending ->
+                if (System.currentTimeMillis() - pending.requestedAtMs < PENDING_BRIGHTNESS_MAX_AGE_MS) {
+                    promise.resolve(pending.level.toDouble())
+                    return
+                }
+            }
             val activity = reactContext.currentActivity
             if (activity == null) {
                 promise.resolve(effectiveLevel(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE).toDouble())
@@ -331,6 +352,8 @@ class AutoBrightnessModule(private val reactContext: ReactApplicationContext) :
                 promise.resolve(createResultMap(false, "No activity"))
                 return
             }
+            // #314: nothing is pending any more once the override is dropped
+            pendingBrightness.set(null)
             activity.runOnUiThread {
                 try {
                     val window = activity.window
@@ -418,15 +441,22 @@ class AutoBrightnessModule(private val reactContext: ReactApplicationContext) :
     private fun applyBrightness(brightness: Float) {
         try {
             val activity = reactContext.currentActivity ?: return
+            val target = brightness.coerceIn(0.01f, 1f)
+            // #314: visible to getBrightnessLevel() from this moment, until the UI thread has applied it
+            val pending = PendingBrightness(target, System.currentTimeMillis())
+            pendingBrightness.set(pending)
             
             activity.runOnUiThread {
                 try {
                     val window = activity.window
                     val layoutParams = window.attributes
-                    layoutParams.screenBrightness = brightness.coerceIn(0.01f, 1f)
+                    layoutParams.screenBrightness = target
                     window.attributes = layoutParams
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to apply brightness", e)
+                } finally {
+                    // Only clears this request: a newer one stays pending
+                    pendingBrightness.compareAndSet(pending, null)
                 }
             }
         } catch (e: Exception) {
