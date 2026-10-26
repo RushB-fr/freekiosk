@@ -787,22 +787,40 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
         try { if (obj instanceof Blob) fkBlobs[u] = obj; } catch (e) {}
         return u;
       };
+      function fkIsPdf(blob) {
+        return !!blob && String(blob.type || '').toLowerCase().indexOf('pdf') !== -1;
+      }
       URL.revokeObjectURL = function(u) {
         // The page often revokes right after clicking: the FileReader below already holds the Blob.
-        setTimeout(function() { delete fkBlobs[u]; }, 0);
+        // A PDF is kept for a minute: when the click did not go through the hooks below (#311),
+        // the native download listener only asks for it a moment later, and the URL is gone.
+        setTimeout(function() { delete fkBlobs[u]; }, fkIsPdf(fkBlobs[u]) ? 60000 : 0);
         return fkRevokeObjectURL.apply(URL, arguments);
       };
-      function fkSendPdfBlob(url) {
-        var blob = fkBlobs[url];
-        if (!blob || String(blob.type || '').toLowerCase().indexOf('pdf') === -1) return false;
+      function fkPostPdfBlob(blob) {
         var reader = new FileReader();
         reader.onload = function() {
           var s = String(reader.result);
           window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'PDF_BLOB', data: s.slice(s.indexOf(',') + 1) }));
         };
         reader.readAsDataURL(blob);
+      }
+      function fkSendPdfBlob(url) {
+        var blob = fkBlobs[url];
+        if (!fkIsPdf(blob)) return false;
+        fkPostPdfBlob(blob);
         return true;
       }
+      // Called by the native download listener (#311) for a blob: PDF that none of the hooks
+      // below saw, e.g. a FileSaver.js style save (a click dispatched on a detached anchor,
+      // which reaches neither HTMLAnchorElement.click nor the document listener).
+      window.__fkOpenBlobPdf = function(url) {
+        if (fkSendPdfBlob(url)) return;
+        // Not tracked (created before this script ran): read it back from its URL
+        fetch(url).then(function(r) { return r.blob(); }).then(function(b) {
+          if (fkIsPdf(b)) fkPostPdfBlob(b);
+        }).catch(function() {});
+      };
       // Programmatic anchor.click() (even on a detached element) and real taps on a link
       var fkAnchorClick = HTMLAnchorElement.prototype.click;
       HTMLAnchorElement.prototype.click = function() {

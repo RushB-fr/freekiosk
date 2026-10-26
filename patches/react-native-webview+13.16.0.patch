@@ -627,10 +627,10 @@ index 0287e1c..88d1fa8 100644
          event.putBoolean("loading", !mLastLoadFailed && webView.getProgress() != 100);
          event.putString("title", webView.getTitle());
 diff --git a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewManagerImpl.kt b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewManagerImpl.kt
-index f83033b..74f265d 100644
+index f83033b..a6616e3 100644
 --- a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewManagerImpl.kt
 +++ b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewManagerImpl.kt
-@@ -92,14 +92,42 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
+@@ -92,14 +92,53 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
              WebView.setWebContentsDebuggingEnabled(true)
          }
          webView.setDownloadListener(DownloadListener { url, userAgent, contentDisposition, mimetype, contentLength ->
@@ -652,6 +652,17 @@ index f83033b..74f265d 100644
 +                val isPdf = mimetype?.lowercase()?.contains("pdf") == true ||
 +                            cleanUrl.lowercase().split("?")[0].split("#")[0].endsWith(".pdf")
 +                if (isPdf && webView.settings.allowFileAccess) {
++                    // #311: a blob: URL only exists in the page that created it, and the viewer is
++                    // another page, so it cannot open it. When the page triggered the download in a
++                    // way the injected hooks did not see (a FileSaver.js style save), ask the page,
++                    // which is still alive, to hand the bytes over: the app then opens them.
++                    if (cleanUrl.startsWith("blob:")) {
++                        Log.i(TAG, "[FreeKiosk] PDF blob download intercepted, asking the page for its bytes: $cleanUrl")
++                        val script = "(function(u){ try { if (window.__fkOpenBlobPdf) window.__fkOpenBlobPdf(u); } catch (e) {} })(" +
++                            org.json.JSONObject.quote(cleanUrl) + ");"
++                        webView.post { webView.evaluateJavascript(script, null) }
++                        return@DownloadListener
++                    }
 +                    Log.i(TAG, "[FreeKiosk] PDF download intercepted, redirecting to PDF.js viewer: $cleanUrl")
 +                    val encodedUrl = java.net.URLEncoder.encode(cleanUrl, "UTF-8")
 +                    val viewerUrl = "file:///android_asset/pdfjs/viewer.html?file=$encodedUrl"
@@ -675,7 +686,7 @@ index f83033b..74f265d 100644
  
              // Sanitize filename by replacing invalid characters with "_"
              fileName = fileName.replace(invalidCharRegex, "_")
-@@ -109,7 +137,7 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
+@@ -109,7 +148,7 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
              //Attempt to add cookie, if it exists
              var urlObj: URL? = null
              try {
@@ -684,7 +695,7 @@ index f83033b..74f265d 100644
                  val baseUrl = urlObj.protocol + "://" + urlObj.host
                  val cookie = CookieManager.getInstance().getCookie(baseUrl)
                  request.addRequestHeader("Cookie", cookie)
-@@ -245,10 +273,10 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
+@@ -245,10 +284,10 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
          val view = viewWrapper.webView
          when {
              mUserAgent != null -> {
@@ -697,7 +708,7 @@ index f83033b..74f265d 100644
              }
              else -> {
                  view.settings.userAgentString = WebSettings.getDefaultUserAgent(view.context)
-@@ -256,6 +284,19 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
+@@ -256,6 +295,19 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
          }
      }
  
