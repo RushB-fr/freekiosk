@@ -1521,10 +1521,12 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
 
     /**
      * Schedule a native alarm to wake the screen at a specific time.
-     * Uses AlarmManager.setAlarmClock() (#307): exact, allowed in Doze, and it needs no
-     * SCHEDULE_EXACT_ALARM permission. An inexact alarm (setAndAllowWhileIdle) may be delivered
-     * anywhere in a window of 75% of the time left, up to an hour, so a wake set in the evening
-     * for 07:00 could fire as late as 08:00. The system lists it as the next alarm.
+     * Uses AlarmManager.setAlarmClock() (#307) when exact alarms are allowed: exact, and allowed
+     * in Doze. An inexact alarm (setAndAllowWhileIdle) may be delivered anywhere in a window of
+     * 75% of the time left, up to an hour, so a wake set in the evening for 07:00 could fire as
+     * late as 08:00. The system lists an exact one as the next alarm. When exact alarms are not
+     * allowed (a Play Store build, or the permission refused: setAlarmClock throws without it
+     * on Android 14+) it falls back to the inexact alarm, so a wake is never lost.
      * This is critical because JS timers are suspended when the screen is off via lockNow().
      *
      * @param wakeTimeMs Unix timestamp in milliseconds for the wake time
@@ -1545,6 +1547,44 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                 android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
             )
 
+            val exact = setExactWakeAlarm(context, alarmManager, wakeTimeMs.toLong(), pendingIntent)
+            if (!exact) {
+                // Same alarm as before #307: works without any permission, but may be late
+                alarmManager.setAndAllowWhileIdle(
+                    android.app.AlarmManager.RTC_WAKEUP,
+                    wakeTimeMs.toLong(),
+                    pendingIntent
+                )
+            }
+
+            val calendar = java.util.Calendar.getInstance().apply { timeInMillis = wakeTimeMs.toLong() }
+            val timeStr = String.format("%02d:%02d:%02d", 
+                calendar.get(java.util.Calendar.HOUR_OF_DAY),
+                calendar.get(java.util.Calendar.MINUTE),
+                calendar.get(java.util.Calendar.SECOND))
+            android.util.Log.d("KioskModule", "⏰ Screen WAKE alarm scheduled for $timeStr (${wakeTimeMs.toLong()}ms, exact=$exact)")
+            promise.resolve(true)
+        } catch (e: Exception) {
+            android.util.Log.e("KioskModule", "Failed to schedule wake alarm: ${e.message}")
+            promise.reject("ERROR", "Failed to schedule wake alarm: ${e.message}")
+        }
+    }
+
+    /**
+     * Sets the wake alarm as an exact alarm clock (#307). Returns false, and sets nothing, when
+     * exact alarms are not allowed for the app, so the caller can fall back to an inexact alarm.
+     */
+    private fun setExactWakeAlarm(
+        context: Context,
+        alarmManager: android.app.AlarmManager,
+        triggerAtMs: Long,
+        operation: android.app.PendingIntent
+    ): Boolean {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+            android.util.Log.w("KioskModule", "Exact alarms are not allowed for FreeKiosk: the wake alarm is inexact and can be late by up to an hour")
+            return false
+        }
+        return try {
             // The "show" intent is what the system opens when the alarm is tapped in its UI
             val showIntent = android.app.PendingIntent.getActivity(
                 context,
@@ -1552,21 +1592,12 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                 Intent(context, MainActivity::class.java),
                 android.app.PendingIntent.FLAG_IMMUTABLE
             )
-            alarmManager.setAlarmClock(
-                android.app.AlarmManager.AlarmClockInfo(wakeTimeMs.toLong(), showIntent),
-                pendingIntent
-            )
-
-            val calendar = java.util.Calendar.getInstance().apply { timeInMillis = wakeTimeMs.toLong() }
-            val timeStr = String.format("%02d:%02d:%02d", 
-                calendar.get(java.util.Calendar.HOUR_OF_DAY),
-                calendar.get(java.util.Calendar.MINUTE),
-                calendar.get(java.util.Calendar.SECOND))
-            android.util.Log.d("KioskModule", "⏰ Screen WAKE alarm scheduled for $timeStr (${wakeTimeMs.toLong()}ms)")
-            promise.resolve(true)
-        } catch (e: Exception) {
-            android.util.Log.e("KioskModule", "Failed to schedule wake alarm: ${e.message}")
-            promise.reject("ERROR", "Failed to schedule wake alarm: ${e.message}")
+            alarmManager.setAlarmClock(android.app.AlarmManager.AlarmClockInfo(triggerAtMs, showIntent), operation)
+            true
+        } catch (e: SecurityException) {
+            // canScheduleExactAlarms() said yes (or there was no way to ask) and the system refused anyway
+            android.util.Log.w("KioskModule", "Exact wake alarm refused (${e.message}), using an inexact one")
+            false
         }
     }
 

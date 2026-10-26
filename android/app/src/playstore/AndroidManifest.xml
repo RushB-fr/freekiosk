@@ -38,6 +38,15 @@
         android:name="android.permission.USE_FULL_SCREEN_INTENT"
         tools:node="remove" />
 
+    <!-- Strip the exact alarm permissions (#307): Play restricts them to alarm and calendar apps.
+         The screen schedule's wake then falls back to an inexact alarm, which can be late. -->
+    <uses-permission
+        android:name="android.permission.USE_EXACT_ALARM"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        tools:node="remove" />
+
     <!-- Strip READ_MEDIA_* (photo/video policy) -->
     <uses-permission
         android:name="android.permission.READ_MEDIA_VIDEO"
