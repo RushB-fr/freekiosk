@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+### Fixed
+- 🔗 **REST API: a request that follows one with a body no longer fails on a kept-alive connection** (#315). The server keeps connections open but never skipped the body of a request that its endpoint did not read (`POST /api/screen/on` with `{}`, a request refused for its API key...), so the next request on that connection was read from the middle of it: HTTP 400, a dropped connection or garbage. Home Assistant's `rest_command` reuses its connection, so a `screen/on` followed by a `brightness` failed on the second call. The body is now read once, after the key check, whatever the endpoint does with it, and a request refused for its API key gets `Connection: close`. Reproduced on an Android 15 emulator (`screen/on` with a body then `brightness`: `[200, 400]`; a UTF-8 body: `IncompleteRead`; with a wrong key: `[401, 400]`) and checked after the change: every sequence answers as it should, 60 mixed requests on one connection, 6 clients at once, accents and CJK characters kept in the body, a 60 KB body, and `OPTIONS`, `404` and `405` unchanged. Not tried on the Rockchip RK3588 tablet of the report.
+
 ***
 
 ## [2.1.0-beta.1] - 2026-10-24

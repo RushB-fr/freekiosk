@@ -61,9 +61,19 @@ class KioskHttpServer(
                 return jsonError(Response.Status.UNAUTHORIZED, "Invalid or missing API key").apply {
                     addHeader("WWW-Authenticate", "Basic realm=\"FreeKiosk\"")
                     corsHeaders.forEach { (key, value) -> addHeader(key, value) }
+                    // #315: the body of a refused request is not read, so the connection
+                    // cannot be reused for the next request
+                    closeConnection(true)
                 }
             }
         }
+
+        // #315: read the request body once, here, whatever the endpoint does with it.
+        // NanoHTTPD 2.3.1 keeps a connection alive but never skips a body the handler left
+        // unread, so the next request on that connection used to be parsed from the middle of
+        // it (HTTP 400, or a dropped connection). Home Assistant's rest_command reuses the
+        // connection, and e.g. POST /api/screen/on with a "{}" body ignores it.
+        val bodyReadCleanly = consumeBody(session)
 
         // Route requests
         val isGetOrPost = method == Method.GET || method == Method.POST
@@ -165,6 +175,8 @@ class KioskHttpServer(
 
         // Add CORS headers to response
         corsHeaders.forEach { (key, value) -> response.addHeader(key, value) }
+        // The stream may be out of step if the body could not be read: do not reuse it
+        if (!bodyReadCleanly) response.closeConnection(true)
         return response
     }
 
@@ -752,24 +764,68 @@ class KioskHttpServer(
         }
     }
 
-    private fun parseBody(session: IHTTPSession): JSONObject? {
+    /** What [consumeBody] read for the request being served on this connection's thread. */
+    private class ReadBody(val json: JSONObject?)
+
+    // NanoHTTPD serves each connection, and its keep-alive requests in turn, on one thread
+    private val currentBody = ThreadLocal<ReadBody?>()
+
+    /**
+     * Reads the body of a request that has one (#315), once. Returns false when it could not be
+     * read to the end, in which case the connection must be closed after the response.
+     */
+    private fun consumeBody(session: IHTTPSession): Boolean {
+        currentBody.set(null)
+        val method = session.method
+        if (method != Method.POST && method != Method.PUT && method != Method.DELETE && method != Method.PATCH) {
+            return true
+        }
+        val length = session.headers["content-length"]?.trim()?.toLongOrNull() ?: 0L
+        if (length <= 0L) return true
         return try {
-            // #115: NanoHTTPD 2.3.1 decodes the POST body with the charset from the
-            // Content-Type header, defaulting to US-ASCII when the client sends none.
-            // That silently corrupts every multibyte UTF-8 character in the body (Chinese,
-            // Korean, Japanese, Arabic, emoji), so e.g. /api/tts spoke English but stayed
-            // silent on Chinese text. JSON is UTF-8 by spec (RFC 8259), so when the request
-            // did not declare a charset we force UTF-8 before NanoHTTPD reads the body. We
-            // only add a charset and never change the media type, so form-urlencoded /
-            // multipart detection is untouched, and pure-ASCII bodies decode identically
-            // (English is unaffected).
-            val contentType = session.headers["content-type"]
-            if (contentType != null && !contentType.contains("charset", ignoreCase = true)) {
-                session.headers["content-type"] = "$contentType; charset=UTF-8"
-            }
-            val files = mutableMapOf<String, String>()
-            session.parseBody(files)
-            val postData = files["postData"] ?: return null
+            currentBody.set(ReadBody(readJsonBody(session)))
+            true
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not read the request body", e)
+            // Handlers get "no body", and none of them tries to read the connection again
+            currentBody.set(ReadBody(null))
+            false
+        }
+    }
+
+    private fun parseBody(session: IHTTPSession): JSONObject? {
+        // Already read by consumeBody() for this request
+        currentBody.get()?.let { return it.json }
+        return try {
+            readJsonBody(session)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to parse body", e)
+            null
+        }
+    }
+
+    /**
+     * Reads the body from the connection (the only time it can be) and returns it as JSON, or
+     * null when it is empty or not JSON. A body that cannot be read at all is an exception.
+     */
+    private fun readJsonBody(session: IHTTPSession): JSONObject? {
+        // #115: NanoHTTPD 2.3.1 decodes the POST body with the charset from the
+        // Content-Type header, defaulting to US-ASCII when the client sends none.
+        // That silently corrupts every multibyte UTF-8 character in the body (Chinese,
+        // Korean, Japanese, Arabic, emoji), so e.g. /api/tts spoke English but stayed
+        // silent on Chinese text. JSON is UTF-8 by spec (RFC 8259), so when the request
+        // did not declare a charset we force UTF-8 before NanoHTTPD reads the body. We
+        // only add a charset and never change the media type, so form-urlencoded /
+        // multipart detection is untouched, and pure-ASCII bodies decode identically
+        // (English is unaffected).
+        val contentType = session.headers["content-type"]
+        if (contentType != null && !contentType.contains("charset", ignoreCase = true)) {
+            session.headers["content-type"] = "$contentType; charset=UTF-8"
+        }
+        val files = mutableMapOf<String, String>()
+        session.parseBody(files)
+        val postData = files["postData"] ?: return null
+        return try {
             JSONObject(postData)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to parse body", e)
