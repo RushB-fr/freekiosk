@@ -19,6 +19,10 @@ const LOCKOUT_KEY = '@kiosk_pin_lockout';
 // (AndroidKeyStore) silently fails to persist — e.g. Rockchip signage firmwares
 // (issue #200). Holds the same irreversible PBKDF2 payload, never plaintext.
 const PIN_FALLBACK_KEY = '@kiosk_pin_secure_fallback';
+// Same fallback for the cloud enrollment credentials: on those firmwares the
+// keymaster HAL crashes on key generation, so the device enrolls on the server
+// but never stores its API key and never checks in.
+const CLOUD_CREDENTIALS_FALLBACK_KEY = '@kiosk_cloud_credentials_fallback';
 const DEFAULT_MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes in milliseconds
 const ATTEMPTS_RESET_DURATION = 60 * 60 * 1000; // 1 hour - Reset attempts after 1 hour of no activity
@@ -896,22 +900,52 @@ export interface CloudCredentials {
 }
 
 export async function saveCloudCredentials(creds: CloudCredentials): Promise<void> {
+  const payload = JSON.stringify(creds);
+
+  let keychainOk = false;
   try {
-    await Keychain.setGenericPassword(
-      'cloud',
-      JSON.stringify(creds),
-      { service: CLOUD_CREDENTIALS_SERVICE, accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED },
-    );
+    await Keychain.setGenericPassword('cloud', payload, {
+      service: CLOUD_CREDENTIALS_SERVICE,
+      accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED,
+    });
+    const check = await Keychain.getGenericPassword({ service: CLOUD_CREDENTIALS_SERVICE });
+    keychainOk = !!check && check.password === payload;
+  } catch (error) {
+    console.warn('[SecureStorage] Keychain write/read-back failed for cloud credentials:', error);
+  }
+
+  try {
+    if (keychainOk) {
+      await AsyncStorage.removeItem(CLOUD_CREDENTIALS_FALLBACK_KEY);
+    } else {
+      console.warn('[SecureStorage] Keychain did not persist cloud credentials; using AsyncStorage fallback');
+      await AsyncStorage.setItem(CLOUD_CREDENTIALS_FALLBACK_KEY, payload);
+    }
   } catch (error) {
     console.error('[SecureStorage] Error saving cloud credentials:', error);
   }
 }
 
+function parseCloudCredentials(raw: string): CloudCredentials | null {
+  const parsed = JSON.parse(raw);
+  if (parsed && typeof parsed.deviceId === 'string' && typeof parsed.apiKey === 'string') {
+    return parsed as CloudCredentials;
+  }
+  return null;
+}
+
 export async function getCloudCredentials(): Promise<CloudCredentials | null> {
   try {
     const creds = await Keychain.getGenericPassword({ service: CLOUD_CREDENTIALS_SERVICE });
-    if (!creds) return null;
-    return JSON.parse(creds.password) as CloudCredentials;
+    if (creds) return parseCloudCredentials(creds.password);
+  } catch (error) {
+    console.warn('[SecureStorage] Keychain read failed for cloud credentials:', error);
+  }
+
+  try {
+    const raw = await AsyncStorage.getItem(CLOUD_CREDENTIALS_FALLBACK_KEY);
+    if (!raw) return null;
+    return parseCloudCredentials(raw);
   } catch (error) {
     console.error('[SecureStorage] Error getting cloud credentials:', error);
     return null;
@@ -923,6 +957,11 @@ export async function clearCloudCredentials(): Promise<void> {
     await Keychain.resetGenericPassword({ service: CLOUD_CREDENTIALS_SERVICE });
   } catch (error) {
     console.error('[SecureStorage] Error clearing cloud credentials:', error);
+  }
+  try {
+    await AsyncStorage.removeItem(CLOUD_CREDENTIALS_FALLBACK_KEY);
+  } catch (error) {
+    console.error('[SecureStorage] Error clearing cloud credentials fallback:', error);
   }
 }
 
