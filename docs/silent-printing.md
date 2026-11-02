@@ -52,7 +52,9 @@ product id if Android does not offer FreeKiosk when it is plugged in.
 2. Android asks which app should open the device. Choose **FreeKiosk** and tick **Always open**.
 3. Go to **Settings > General > Printing**.
 4. Under **Silent Printing**, turn on **Enable Silent Printing**. It does not need
-   **Enable Window Printing**, which only controls `window.print()`.
+   **Enable Window Printing**, which only controls `window.print()`. If the page prints with
+   `window.print()` and you cannot change its code (a hosted service, for example), also turn on
+   **Send window.print() to this printer**.
 5. Check the status card names your printer, then tap **Print test page**.
 
 > [!WARNING]
@@ -73,11 +75,30 @@ the printer actually addresses, so no paper size or resolution is assumed anywhe
 Call `window.FreeKiosk.silentPrinter.print()`. The page's own print stylesheet is what lands on paper,
 including its fonts, its language and any QR codes.
 
-`window.print()` is separate and unchanged: with **Enable Window Printing** on it opens the Android
-print dialog, and otherwise it does nothing. A page can use both, A4 through the dialog and receipts
-through Silent Printing, but both render the same `@media print` stylesheet. Switch it to the receipt
-layout before calling `silentPrinter.print()`, for example with a class on `<html>`, or render the receipt
-yourself and call `printImage()`.
+`window.print()` opens the Android print dialog when **Enable Window Printing** is on, and does
+nothing otherwise. With **Send window.print() to this printer** on, it prints here instead, with no
+dialog, whatever Window Printing says: that option is for a page whose code you cannot change, and
+it sends every `window.print()` of the page to the receipt printer.
+
+Without it, a page can use both, A4 through the dialog and receipts through Silent Printing, but both
+render the same `@media print` stylesheet. Switch it to the receipt layout before calling
+`silentPrinter.print()`, for example with a class on `<html>`, or render the receipt yourself and call
+`printImage()`.
+
+### Printing a hidden frame (react-to-print, print-js)
+
+Libraries such as react-to-print and print-js copy what to print into a hidden `<iframe>` and call
+that frame's `print()`. Android ignores it there, so FreeKiosk copies the frame's styles and content
+into the page for the time of the print and prints the page, through the dialog or through this
+printer, whichever `window.print()` would use. A button inside a frame that calls its own `print()`
+is handled the same way.
+
+- Only a frame of the same origin as the page can be copied. A cross-origin frame does not print.
+- What is copied: the frame's `<style>` and stylesheet links, its body, the values typed in its
+  fields and the drawing of its canvases. Its scripts do not run again.
+- Images are waited for up to 3 seconds before the page is rendered.
+- The page's own print stylesheet still applies to the copy: a rule that hides everything but one
+  element of the page can hide the copy too.
 
 The page is laid out so that **one CSS pixel is one printer dot**, so design against the configured
 width — 384px below:
@@ -150,11 +171,14 @@ unexpected.
 
 **Restrict printing by origin** in Settings limits `window.FreeKiosk.silentPrinter`, `getStatus()` included,
 to the origins you list. Only the scheme, host and port of each entry are compared. Turned on with
-nothing listed, no page can print. Turned off, any page the kiosk displays may print. It does not
-cover `window.print()`, whose dialog needs someone to confirm it anyway.
+nothing listed, no page can print. Turned off, any page the kiosk displays may print. It covers
+`window.print()` sent to this printer too. It does not cover the print dialog, which needs someone to
+confirm it anyway.
 
-An iframe never prints, allow-list or not. `window.FreeKiosk` is injected into the main frame only,
-and a printer request that does not come from it is dropped.
+An iframe cannot use `window.FreeKiosk` itself: it is injected into the main frame only, and a printer
+request that does not come from it is dropped. A same-origin frame's `print()` is handled by the main
+frame, as described in [Printing a hidden frame](#printing-a-hidden-frame-react-to-print-print-js),
+and a cross-origin frame never prints.
 
 
 ## Troubleshooting

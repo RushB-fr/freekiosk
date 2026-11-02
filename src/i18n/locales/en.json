@@ -192,7 +192,9 @@
       "windowTitle": "Window Printing",
       "silentTitle": "Silent Printing",
       "silentEnable": "Enable Silent Printing",
-      "silentEnableHint": "Let web pages print to a USB ESC/POS printer with no dialog, via window.FreeKiosk.silentPrinter"
+      "silentEnableHint": "Let web pages print to a USB ESC/POS printer with no dialog, via window.FreeKiosk.silentPrinter",
+      "silentWindowPrint": "Send window.print() to this printer",
+      "silentWindowPrintHint": "Pages that call window.print(), or print a hidden frame as react-to-print does, print here with no dialog. Takes precedence over Window Printing."
     },
     "webNav": {
       "title": "Web Navigation Button",

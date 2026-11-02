@@ -192,7 +192,9 @@
       "windowTitle": "Fensterdruck",
       "silentTitle": "Stiller Druck",
       "silentEnable": "Stillen Druck aktivieren",
-      "silentEnableHint": "Webseiten erlauben, ohne Dialog auf einem USB-ESC/POS-Drucker zu drucken, über window.FreeKiosk.silentPrinter"
+      "silentEnableHint": "Webseiten erlauben, ohne Dialog auf einem USB-ESC/POS-Drucker zu drucken, über window.FreeKiosk.silentPrinter",
+      "silentWindowPrint": "window.print() an diesen Drucker senden",
+      "silentWindowPrintHint": "Seiten, die window.print() aufrufen oder wie react-to-print einen versteckten Frame drucken, drucken hier ohne Dialog. Hat Vorrang vor dem Fensterdruck."
     },
     "webNav": {
       "title": "Web-Navigationsschaltfläche",

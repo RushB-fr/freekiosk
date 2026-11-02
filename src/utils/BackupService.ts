@@ -182,6 +182,7 @@ const BACKUP_KEYS = [
   '@kiosk_print_enabled',
   '@kiosk_print_paper_size',
   '@kiosk_silent_print_enabled',
+  '@kiosk_silent_print_window_print',
   '@kiosk_esc_pos_width_dots',
   '@kiosk_esc_pos_cut',
   '@kiosk_esc_pos_feed_lines',

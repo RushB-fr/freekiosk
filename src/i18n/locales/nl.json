@@ -192,7 +192,9 @@
       "windowTitle": "Afdrukken van het venster",
       "silentTitle": "Stil afdrukken",
       "silentEnable": "Stil afdrukken inschakelen",
-      "silentEnableHint": "Laat webpagina's zonder dialoogvenster afdrukken op een USB ESC/POS-printer, via window.FreeKiosk.silentPrinter"
+      "silentEnableHint": "Laat webpagina's zonder dialoogvenster afdrukken op een USB ESC/POS-printer, via window.FreeKiosk.silentPrinter",
+      "silentWindowPrint": "window.print() naar deze printer sturen",
+      "silentWindowPrintHint": "Pagina's die window.print() aanroepen, of een verborgen frame afdrukken zoals react-to-print doet, drukken hier af zonder dialoogvenster. Gaat voor op afdrukken van het venster."
     },
     "webNav": {
       "title": "Webnavigatieknop",

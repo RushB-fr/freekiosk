@@ -192,7 +192,9 @@
       "windowTitle": "Stampa della finestra",
       "silentTitle": "Stampa silenziosa",
       "silentEnable": "Attiva la stampa silenziosa",
-      "silentEnableHint": "Consente alle pagine web di stampare su una stampante USB ESC/POS senza finestra di dialogo, tramite window.FreeKiosk.silentPrinter"
+      "silentEnableHint": "Consente alle pagine web di stampare su una stampante USB ESC/POS senza finestra di dialogo, tramite window.FreeKiosk.silentPrinter",
+      "silentWindowPrint": "Invia window.print() a questa stampante",
+      "silentWindowPrintHint": "Le pagine che chiamano window.print(), o stampano un frame nascosto come fa react-to-print, stampano qui senza finestra di dialogo. Ha la precedenza sulla stampa della finestra."
     },
     "webNav": {
       "title": "Pulsante di navigazione web",

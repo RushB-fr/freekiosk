@@ -98,6 +98,8 @@ interface GeneralTabProps {
   onPrintPaperSizeChange: (value: string) => void;
   silentPrintEnabled: boolean;
   onSilentPrintEnabledChange: (value: boolean) => void;
+  silentPrintWindowPrint: boolean;
+  onSilentPrintWindowPrintChange: (value: boolean) => void;
   escPosWidthDots: number;
   onEscPosWidthDotsChange: (value: number) => void;
   escPosCut: boolean;
@@ -234,6 +236,8 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
   onPrintPaperSizeChange,
   silentPrintEnabled,
   onSilentPrintEnabledChange,
+  silentPrintWindowPrint,
+  onSilentPrintWindowPrintChange,
   escPosWidthDots,
   onEscPosWidthDotsChange,
   escPosCut,
@@ -1089,6 +1093,15 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
               value={silentPrintEnabled}
               onValueChange={onSilentPrintEnabledChange}
             />
+
+            {silentPrintEnabled && (
+              <SettingsSwitch
+                label={t('general.printing.silentWindowPrint')}
+                hint={t('general.printing.silentWindowPrintHint')}
+                value={silentPrintWindowPrint}
+                onValueChange={onSilentPrintWindowPrintChange}
+              />
+            )}
 
             {silentPrintEnabled && (
               <EscPosPrinterSection

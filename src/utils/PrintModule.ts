@@ -3,6 +3,7 @@ import { NativeModules } from 'react-native';
 interface PrintModuleType {
   printWebView(title: string | null, paperSize: string | null): Promise<boolean>;
   isPrintAvailable(): Promise<boolean>;
+  isPrintActive(): Promise<boolean>;
   getPrintSpoolerPackages(): Promise<string[]>;
 }
 

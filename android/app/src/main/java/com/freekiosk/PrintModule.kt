@@ -141,6 +141,18 @@ class PrintModule(reactContext: ReactApplicationContext) :
     }
 
     /**
+     * Whether a print dialog or job opened by printWebView is still live.
+     *
+     * The dialog renders the page again each time its options change, so content that a frame
+     * print copied into the page has to stay there until the job is over. The page gets no
+     * signal of that, so JS polls this.
+     */
+    @ReactMethod
+    fun isPrintActive(promise: Promise) {
+        promise.resolve(Companion.isPrintActive)
+    }
+
+    /**
      * Get the list of print spooler/service packages installed on this device.
      * Used by JS to inform KioskModule which packages to whitelist in lock task mode.
      * Dynamically discovers all print services (covers com.android.printspooler,

@@ -192,7 +192,9 @@
       "windowTitle": "Impressão da janela",
       "silentTitle": "Impressão silenciosa",
       "silentEnable": "Ativar impressão silenciosa",
-      "silentEnableHint": "Permitir que as páginas web imprimam em uma impressora USB ESC/POS sem nenhuma caixa de diálogo, via window.FreeKiosk.silentPrinter"
+      "silentEnableHint": "Permitir que as páginas web imprimam em uma impressora USB ESC/POS sem nenhuma caixa de diálogo, via window.FreeKiosk.silentPrinter",
+      "silentWindowPrint": "Enviar window.print() para esta impressora",
+      "silentWindowPrintHint": "Páginas que chamam window.print(), ou imprimem um quadro oculto como faz o react-to-print, imprimem aqui sem caixa de diálogo. Tem prioridade sobre a impressão da janela."
     },
     "webNav": {
       "title": "Botão de navegação web",

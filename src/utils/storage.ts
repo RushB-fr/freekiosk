@@ -145,6 +145,8 @@ export const KEYS = {
   PRINT_PAPER_SIZE: '@kiosk_print_paper_size',
   // Silent Print: window.FreeKiosk.silentPrinter drives an ESC/POS printer, independent of window.print()
   SILENT_PRINT_ENABLED: '@kiosk_silent_print_enabled',
+  // window.print() (and a same-origin frame's print()) goes to the silent printer instead of the dialog
+  SILENT_PRINT_WINDOW_PRINT: '@kiosk_silent_print_window_print',
   // Origins allowed to use Silent Print (JSON): null = any page, [] = none
   PRINT_ORIGINS: '@kiosk_print_origins',
   ESC_POS_WIDTH_DOTS: '@kiosk_esc_pos_width_dots',
@@ -630,6 +632,7 @@ export const StorageService = {
         // Printing
         KEYS.WINDOW_PRINT_ENABLED,
         KEYS.SILENT_PRINT_ENABLED,
+        KEYS.SILENT_PRINT_WINDOW_PRINT,
         KEYS.ESC_POS_WIDTH_DOTS,
         KEYS.ESC_POS_CUT,
         KEYS.ESC_POS_FEED_LINES,
@@ -2617,6 +2620,24 @@ export const StorageService = {
       return value ? JSON.parse(value) : false;
     } catch (error) {
       console.error('Error getting silent print enabled:', error);
+      return false;
+    }
+  },
+
+  saveSilentPrintWindowPrint: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.SILENT_PRINT_WINDOW_PRINT, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving silent print window print:', error);
+    }
+  },
+
+  getSilentPrintWindowPrint: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.SILENT_PRINT_WINDOW_PRINT);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting silent print window print:', error);
       return false;
     }
   },

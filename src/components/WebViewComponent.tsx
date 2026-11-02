@@ -57,6 +57,7 @@ interface WebViewComponentProps {
   windowPrintEnabled?: boolean; // Enable window.print() interception for native printing
   printPaperSize?: string; // Default paper size: 'A4' | 'A5' | 'A3' | 'LETTER' | 'LEGAL'
   silentPrintEnabled?: boolean; // Inject window.FreeKiosk.silentPrinter, which drives an ESC/POS printer
+  silentPrintWindowPrint?: boolean; // window.print() (and a frame's print()) goes to the silent printer
   escPosWidthDots?: number; // Printable width in dots
   escPosCut?: boolean;
   escPosFeedLines?: number;
@@ -116,6 +117,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   windowPrintEnabled = false,
   printPaperSize = 'A4',
   silentPrintEnabled = false,
+  silentPrintWindowPrint = false,
   escPosWidthDots = 384,
   escPosCut = false,
   escPosFeedLines = 0,
@@ -381,6 +383,9 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
 
   // Injection JS pour détecter les clics dans la webview
   // Optimisé pour Fire OS : throttling des événements, protection double-init
+  // Only with the API injected: the redirect calls window.FreeKiosk.silentPrinter.
+  const printToSilent = silentPrintEnabled && silentPrintWindowPrint;
+
   const injectedJavaScript = `
     (function() {
     // Protection contre double exécution (important pour Fire OS)
@@ -445,15 +450,141 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
       console.error('[FreeKiosk] localStorage FAILED:', e);
     }
 
-    // Intercept window.print() to use native Android print (only when printing is enabled)
-    ${windowPrintEnabled ? `
-    window.print = function() {
-      window.ReactNativeWebView.postMessage(JSON.stringify({
-        type: 'PRINT_REQUEST',
-        title: document.title || '',
-        paperSize: '${printPaperSize}'
-      }));
-    };
+    // Intercept window.print(): the Android print dialog (Enable Window Printing), or the receipt
+    // printer when Silent Printing is set to take it. A print() called on a same-origin iframe
+    // (react-to-print, print-js) prints that frame: both paths render the page itself, so the
+    // frame's content is copied into the page for the time of the print.
+    ${windowPrintEnabled || printToSilent ? `
+    (function() {
+      var toSilent = ${printToSilent ? 'true' : 'false'};
+      var COPY_ID = '__fk_frame_print';
+
+      function clearCopy() {
+        var ids = [COPY_ID, COPY_ID + '_css'];
+        for (var i = 0; i < ids.length; i++) {
+          var node = document.getElementById(ids[i]);
+          if (node && node.parentNode) node.parentNode.removeChild(node);
+        }
+      }
+      // Called from the app once the print dialog is closed.
+      window.__fkClearFramePrint = clearCopy;
+
+      function printPage(fromFrame) {
+        if (toSilent) {
+          var printer = window.FreeKiosk && window.FreeKiosk.silentPrinter;
+          if (!printer) { clearCopy(); return; }
+          printer.print(document.title || '').then(clearCopy, function(e) {
+            clearCopy();
+            console.error('[FreeKiosk] Silent print failed: ' + (e && e.message));
+          });
+          return;
+        }
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'PRINT_REQUEST',
+          title: document.title || '',
+          paperSize: '${printPaperSize}',
+          framePrint: !!fromFrame
+        }));
+      }
+
+      window.print = function() { clearCopy(); printPage(false); };
+
+      // Cloning a node keeps attributes, not what was typed or drawn since.
+      function copyState(from, to) {
+        var a = from.querySelectorAll('input, textarea, select, canvas');
+        var b = to.querySelectorAll('input, textarea, select, canvas');
+        for (var i = 0; i < a.length && i < b.length; i++) {
+          try {
+            if (a[i].tagName === 'CANVAS') {
+              b[i].width = a[i].width;
+              b[i].height = a[i].height;
+              b[i].getContext('2d').drawImage(a[i], 0, 0);
+            } else if (a[i].type === 'checkbox' || a[i].type === 'radio') {
+              b[i].checked = a[i].checked;
+            } else {
+              b[i].value = a[i].value;
+            }
+          } catch (e) {}
+        }
+      }
+
+      function copyFrame(doc) {
+        clearCopy();
+        var host = document.createElement('div');
+        host.id = COPY_ID;
+        var sheets = doc.querySelectorAll('style, link[rel~="stylesheet"]');
+        for (var i = 0; i < sheets.length; i++) host.appendChild(document.importNode(sheets[i], true));
+        var body = document.createElement('div');
+        var nodes = doc.body.childNodes;
+        for (var j = 0; j < nodes.length; j++) body.appendChild(document.importNode(nodes[j], true));
+        copyState(doc.body, body);
+        // Hidden on screen, so a lazy image would never load before the print.
+        var images = body.getElementsByTagName('img');
+        for (var k = 0; k < images.length; k++) images[k].loading = 'eager';
+        host.appendChild(body);
+
+        var css = document.createElement('style');
+        css.id = COPY_ID + '_css';
+        css.textContent = '#' + COPY_ID + '{display:none}' +
+          '@media print{body>*:not(#' + COPY_ID + '){display:none!important}' +
+          '#' + COPY_ID + '{display:block!important}' +
+          'html,body{height:auto!important;overflow:visible!important}}';
+        (document.head || document.documentElement).appendChild(css);
+        document.body.appendChild(host);
+        return host;
+      }
+
+      // The page is rendered as it stands, so images still loading would print blank.
+      function whenImagesLoaded(root, done) {
+        var images = root.getElementsByTagName('img');
+        var left = 0;
+        var finished = false;
+        function finish() { if (!finished) { finished = true; done(); } }
+        function one() { if (--left <= 0) finish(); }
+        for (var i = 0; i < images.length; i++) {
+          if (!images[i].complete) {
+            left++;
+            images[i].addEventListener('load', one);
+            images[i].addEventListener('error', one);
+          }
+        }
+        if (left === 0) finish(); else setTimeout(finish, 3000);
+      }
+
+      function patchFrame(win) {
+        try {
+          if (!win || (win.print && win.print.__fk)) return;
+          var framePrint = function() {
+            var doc;
+            try { doc = win.document; } catch (e) { return; }
+            if (!doc || !doc.body) return;
+            whenImagesLoaded(copyFrame(doc), function() { printPage(true); });
+          };
+          framePrint.__fk = true;
+          win.print = framePrint;
+        } catch (e) {
+          // A cross-origin frame cannot be reached, and Android ignores its print() anyway.
+        }
+      }
+
+      // A library prints its hidden frame with frame.contentWindow.print(): patched on that read,
+      // which also covers a frame whose window was replaced by a navigation.
+      var desc = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow');
+      if (desc && desc.get && !desc.get.__fk) {
+        var getter = function() { var w = desc.get.call(this); patchFrame(w); return w; };
+        getter.__fk = true;
+        Object.defineProperty(HTMLIFrameElement.prototype, 'contentWindow', {
+          configurable: true, enumerable: desc.enumerable, get: getter
+        });
+      }
+      // A frame that calls its own print(), from a button inside it.
+      document.addEventListener('load', function(e) {
+        var target = e.target;
+        if (target && target.tagName === 'IFRAME') patchFrame(target.contentWindow);
+      }, true);
+      var frames = document.getElementsByTagName('iframe');
+      for (var f = 0; f < frames.length; f++) patchFrame(frames[f].contentWindow);
+    })();
     ` : '// Printing disabled - window.print() not intercepted'}
 
     // Silent Print: window.FreeKiosk.silentPrinter drives the ESC/POS printer with no dialog.
@@ -937,6 +1068,31 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
     setPrinterNonce(nonce);
   };
 
+  // A frame print copies the frame into the page, and the print dialog renders the page again
+  // each time its options change: the copy goes once the dialog is closed, which only the
+  // native side knows (bounded there to two minutes).
+  const framePrintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearFramePrint = () => {
+    if (framePrintTimer.current) clearTimeout(framePrintTimer.current);
+    framePrintTimer.current = null;
+    webViewRef.current?.injectJavaScript('window.__fkClearFramePrint && window.__fkClearFramePrint(); true;');
+  };
+  const clearFramePrintWhenDone = () => {
+    if (framePrintTimer.current) clearTimeout(framePrintTimer.current);
+    const check = () => {
+      PrintModule.isPrintActive()
+        .then((active) => {
+          if (active) framePrintTimer.current = setTimeout(check, 1000);
+          else clearFramePrint();
+        })
+        .catch(() => clearFramePrint());
+    };
+    framePrintTimer.current = setTimeout(check, 1000);
+  };
+  React.useEffect(() => () => {
+    if (framePrintTimer.current) clearTimeout(framePrintTimer.current);
+  }, []);
+
   const handlePrinterRequest = (data: any, pageUrl?: string) => {
     // The API is only injected when Silent Print is on, but any page can post this message itself.
     if (!silentPrintEnabled) return;
@@ -1073,8 +1229,14 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
         } else if (data.type === 'PRINT_REQUEST') {
           // Handle print request from window.print()
           PrintModule.printWebView(data.title || 'FreeKiosk Print', data.paperSize || 'A4')
-            .then(() => console.log('[WebView] Print job started'))
-            .catch((err: any) => console.error('[WebView] Print failed:', err));
+            .then(() => {
+              console.log('[WebView] Print job started');
+              if (data.framePrint) clearFramePrintWhenDone();
+            })
+            .catch((err: any) => {
+              console.error('[WebView] Print failed:', err);
+              if (data.framePrint) clearFramePrint();
+            });
         } else if (data.type === 'FK_PRINTER') {
           handlePrinterRequest(data, event.nativeEvent?.url);
         } else if (data.type === 'PDF_BLOB' && pdfViewerEnabled) {
@@ -1400,7 +1562,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
           // data: URLs - allow when window.print() is enabled (some label/receipt sites
           // generate print content as data:text/html popups)
           if (urlLower.startsWith('data:')) {
-            if (windowPrintEnabled) {
+            if (windowPrintEnabled || printToSilent) {
               console.log('[FreeKiosk] Allowing data: URL (printing enabled)');
               return true;
             }
