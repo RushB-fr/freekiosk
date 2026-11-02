@@ -3669,6 +3669,7 @@ export const StorageService = {
         printEnabled: bool(KEYS.WINDOW_PRINT_ENABLED), // window.print(); name kept for existing exports
         printPaperSize: str(KEYS.PRINT_PAPER_SIZE, 'A4'),
         silentPrintEnabled: bool(KEYS.SILENT_PRINT_ENABLED),
+        silentPrintWindowPrint: bool(KEYS.SILENT_PRINT_WINDOW_PRINT),
         escPosWidthDots: num(KEYS.ESC_POS_WIDTH_DOTS, 384),
         escPosCut: bool(KEYS.ESC_POS_CUT),
         escPosFeedLines: num(KEYS.ESC_POS_FEED_LINES, 0),
@@ -3907,6 +3908,7 @@ export const StorageService = {
       set(KEYS.WINDOW_PRINT_ENABLED, g.printEnabled);
       set(KEYS.PRINT_PAPER_SIZE, g.printPaperSize);
       set(KEYS.SILENT_PRINT_ENABLED, g.silentPrintEnabled);
+      set(KEYS.SILENT_PRINT_WINDOW_PRINT, g.silentPrintWindowPrint);
       set(KEYS.ESC_POS_WIDTH_DOTS, g.escPosWidthDots);
       set(KEYS.ESC_POS_CUT, g.escPosCut);
       set(KEYS.ESC_POS_FEED_LINES, g.escPosFeedLines);
