@@ -1068,6 +1068,11 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                 label: t('display.keyboard.smart'),
                 hint: t('display.keyboard.smartHint'),
               },
+              {
+                value: 'none',
+                label: t('display.keyboard.none'),
+                hint: t('display.keyboard.noneHint'),
+              },
             ]}
             value={keyboardMode}
             onValueChange={onKeyboardModeChange}

@@ -105,6 +105,10 @@
       "enableHint": "Automatisch door meerdere URL's bladeren",
       "interval": "Rotatie-interval (seconden)",
       "intervalHint": "Tijd tussen elke URL-wissel (minimaal 5 seconden)",
+      "pauseOnTouch": "Pauzeren terwijl iemand de pagina gebruikt",
+      "pauseOnTouchHint": "Houdt de rotatie aan zolang de pagina wordt aangeraakt of erin wordt getypt",
+      "resumeDelay": "Hervatten na (seconden)",
+      "resumeDelayHint": "Seconden zonder aanraking voordat de rotatie verdergaat (minimaal 5)",
       "needTwoUrls": "Voeg minstens 2 URL's toe om rotatie in te schakelen"
     },
     "urlPlanner": {
@@ -180,7 +184,9 @@
     "autoReload": {
       "title": "Automatisch herladen",
       "reloadOnError": "Herladen bij fout",
-      "reloadOnErrorHint": "De pagina automatisch herladen bij een netwerkfout"
+      "reloadOnErrorHint": "De pagina automatisch herladen bij een netwerkfout",
+      "hideUrl": "URL verbergen op het foutscherm",
+      "hideUrlHint": "Toont alleen de foutmelding als een pagina niet laadt, niet het adres"
     },
     "pdfViewer": {
       "title": "PDF-viewer",
@@ -422,7 +428,9 @@
       "forceNumeric": "Numeriek forceren",
       "forceNumericHint": "Alle velden tonen een numeriek toetsenbord",
       "smart": "Slimme detectie",
-      "smartHint": "Detecteert en converteert alleen numerieke velden"
+      "smartHint": "Detecteert en converteert alleen numerieke velden",
+      "none": "Geen schermtoetsenbord",
+      "noneHint": "Toon nooit het toetsenbord; een barcodescanner typt nog steeds in de velden"
     }
   },
   "security": {

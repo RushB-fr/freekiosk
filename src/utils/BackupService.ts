@@ -12,6 +12,7 @@ import { hasSecurePin, getSecureApiKey, saveSecureApiKey, getSecureMqttPassword,
 const BACKUP_KEYS = [
   '@kiosk_url',
   '@kiosk_auto_reload',
+  '@kiosk_hide_error_url',
   '@kiosk_enabled',
   '@kiosk_auto_launch',
   '@screensaver_enabled',
@@ -47,6 +48,8 @@ const BACKUP_KEYS = [
   '@kiosk_url_rotation_enabled',
   '@kiosk_url_rotation_list',
   '@kiosk_url_rotation_interval',
+  '@kiosk_url_rotation_pause_on_touch',
+  '@kiosk_url_rotation_resume_delay',
   // URL Planner
   '@kiosk_url_planner_enabled',
   '@kiosk_url_planner_events',

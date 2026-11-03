@@ -95,6 +95,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
   const [pinMaxAttempts, setPinMaxAttempts] = useState<number>(5);
   const [pinMaxAttemptsText, setPinMaxAttemptsText] = useState<string>('5');
   const [autoReload, setAutoReload] = useState<boolean>(false);
+  const [hideErrorUrl, setHideErrorUrl] = useState<boolean>(false);
   const [kioskEnabled, setKioskEnabled] = useState<boolean>(false);
   const [autoLaunchEnabled, setAutoLaunchEnabled] = useState<boolean>(false);
   const [screenLockCompatEnabled, setScreenLockCompatEnabled] = useState<boolean>(false);
@@ -162,6 +163,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
   const [urlRotationEnabled, setUrlRotationEnabled] = useState<boolean>(false);
   const [urlRotationList, setUrlRotationList] = useState<string[]>([]);
   const [urlRotationInterval, setUrlRotationInterval] = useState<string>('30');
+  const [urlRotationPauseOnTouch, setUrlRotationPauseOnTouch] = useState<boolean>(false);
+  const [urlRotationResumeDelay, setUrlRotationResumeDelay] = useState<string>('60');
   
   // URL Planner states
   const [urlPlannerEnabled, setUrlPlannerEnabled] = useState<boolean>(false);
@@ -538,6 +541,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
     if (hasPinConfigured) setPin('');
 
     setAutoReload(savedAutoReload);
+    setHideErrorUrl(await StorageService.getHideErrorUrl());
     setKioskEnabled(savedKioskEnabled);
     setAutoLaunchEnabled(savedAutoLaunch ?? false);
     setScreenLockCompatEnabled(savedScreenLockCompat ?? false);
@@ -687,6 +691,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
     setUrlRotationEnabled(savedUrlRotationEnabled);
     setUrlRotationList(savedUrlRotationList);
     setUrlRotationInterval(String(savedUrlRotationInterval));
+    setUrlRotationPauseOnTouch(await StorageService.getUrlRotationPauseOnTouch());
+    setUrlRotationResumeDelay(String(await StorageService.getUrlRotationResumeDelay()));
     setUrlPlannerEnabled(savedUrlPlannerEnabled);
     setUrlPlannerEvents(savedUrlPlannerEvents);
     setWebViewBackButtonEnabled(savedWebViewBackButtonEnabled);
@@ -1570,6 +1576,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
 
     if (displayMode === 'webview' || displayMode === 'media_player') {
       await StorageService.saveAutoReload(displayMode === 'webview' ? autoReload : false);
+      await StorageService.saveHideErrorUrl(hideErrorUrl);
       await StorageService.saveKioskEnabled(kioskEnabled);
       await StorageService.saveDefaultBrightness(defaultBrightness);
       // #242: also mirror it natively, so the wake paths and a reboot keep it.
@@ -1667,6 +1674,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
       await StorageService.saveUrlRotationList(urlRotationList);
       const rotationInterval = parseInt(urlRotationInterval, 10);
       await StorageService.saveUrlRotationInterval(isNaN(rotationInterval) ? 30 : Math.max(5, rotationInterval));
+      await StorageService.saveUrlRotationPauseOnTouch(urlRotationPauseOnTouch);
+      const resumeDelay = parseInt(urlRotationResumeDelay, 10);
+      await StorageService.saveUrlRotationResumeDelay(isNaN(resumeDelay) ? 60 : Math.max(5, resumeDelay));
       
       // Save URL Planner settings
       await StorageService.saveUrlPlannerEnabled(urlPlannerEnabled);
@@ -1855,6 +1865,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
               setPinMaxAttempts(5);
               setPinMaxAttemptsText('5');
               setAutoReload(false);
+              setHideErrorUrl(false);
               setKioskEnabled(false);
               setAutoLaunchEnabled(false);
               setScreensaverEnabled(false);
@@ -2068,6 +2079,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
             }}
             autoReload={autoReload}
             onAutoReloadChange={setAutoReload}
+            hideErrorUrl={hideErrorUrl}
+            onHideErrorUrlChange={setHideErrorUrl}
             pdfViewerEnabled={pdfViewerEnabled}
             onPdfViewerEnabledChange={setPdfViewerEnabled}
             windowPrintEnabled={windowPrintEnabled}
@@ -2092,6 +2105,10 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
             onUrlRotationListChange={setUrlRotationList}
             urlRotationInterval={urlRotationInterval}
             onUrlRotationIntervalChange={setUrlRotationInterval}
+            urlRotationPauseOnTouch={urlRotationPauseOnTouch}
+            onUrlRotationPauseOnTouchChange={setUrlRotationPauseOnTouch}
+            urlRotationResumeDelay={urlRotationResumeDelay}
+            onUrlRotationResumeDelayChange={setUrlRotationResumeDelay}
             urlPlannerEnabled={urlPlannerEnabled}
             onUrlPlannerEnabledChange={setUrlPlannerEnabled}
             urlPlannerEvents={urlPlannerEvents}

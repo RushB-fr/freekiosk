@@ -105,6 +105,10 @@
       "enableHint": "Faire défiler automatiquement plusieurs URL",
       "interval": "Intervalle de rotation (secondes)",
       "intervalHint": "Délai entre chaque changement d'URL (minimum 5 secondes)",
+      "pauseOnTouch": "Pause pendant l'utilisation de la page",
+      "pauseOnTouchHint": "Suspend la rotation tant que quelqu'un touche la page ou y tape du texte",
+      "resumeDelay": "Reprendre après (secondes)",
+      "resumeDelayHint": "Secondes sans toucher avant que la rotation reprenne (minimum 5)",
       "needTwoUrls": "Ajoutez au moins 2 URL pour activer la rotation"
     },
     "urlPlanner": {
@@ -180,7 +184,9 @@
     "autoReload": {
       "title": "Rechargement automatique",
       "reloadOnError": "Recharger en cas d'erreur",
-      "reloadOnErrorHint": "Recharger automatiquement la page en cas d'erreur réseau"
+      "reloadOnErrorHint": "Recharger automatiquement la page en cas d'erreur réseau",
+      "hideUrl": "Masquer l'URL sur l'écran d'erreur",
+      "hideUrlHint": "N'affiche que le message d'erreur quand une page ne se charge pas, sans son adresse"
     },
     "pdfViewer": {
       "title": "Lecteur PDF",
@@ -422,7 +428,9 @@
       "forceNumeric": "Forcer numérique",
       "forceNumericHint": "Tous les champs affichent un clavier numérique",
       "smart": "Détection intelligente",
-      "smartHint": "Détecte et convertit uniquement les champs numériques"
+      "smartHint": "Détecte et convertit uniquement les champs numériques",
+      "none": "Aucun clavier à l'écran",
+      "noneHint": "N'affiche jamais le clavier ; un lecteur de codes-barres saisit toujours dans les champs"
     }
   },
   "security": {

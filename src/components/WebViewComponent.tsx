@@ -43,7 +43,10 @@ const CLOUD_URL = 'https://cloud.freekiosk.app';
 interface WebViewComponentProps {
   url: string;
   autoReload: boolean;
-  keyboardMode?: string; // 'default', 'force_numeric', 'smart'
+  hideErrorUrl?: boolean; // Leave the failed URL out of the error screen (#217)
+  reportPageTouches?: boolean; // Post 'page-touch' on touches and keys only (#235, URL rotation pause)
+  onPageTouch?: () => void;
+  keyboardMode?: string; // 'default', 'force_numeric', 'smart', 'none'
   onUserInteraction?: (event?: { isTap?: boolean; x?: number; y?: number; fromFallbackButton?: boolean }) => void; // callback optionnel pour interaction utilisateur
   jsToExecute?: string; // JavaScript code to execute from API
   onJsExecuted?: () => void; // callback when JS is executed
@@ -103,6 +106,9 @@ export function defaultUserAgent(): string {
 const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(({ 
   url, 
   autoReload,
+  hideErrorUrl = false,
+  reportPageTouches = false,
+  onPageTouch,
   keyboardMode = 'default',
   onUserInteraction,
   jsToExecute,
@@ -686,6 +692,23 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
     // Scroll avec throttling (évite 50+ msg/sec)
     document.addEventListener('scroll', sendInteraction, true);
 
+    // #235: a person at the screen, not a page that scrolls itself: touches and keys only,
+    // at most once a second, so the URL rotation can wait for them.
+    ${reportPageTouches ? `
+    (function() {
+      var lastTouch = 0;
+      function pageTouch() {
+        var now = Date.now();
+        if (now - lastTouch > 1000) {
+          lastTouch = now;
+          window.ReactNativeWebView.postMessage('page-touch');
+        }
+      }
+      document.addEventListener('touchstart', pageTouch, true);
+      document.addEventListener('keydown', pageTouch, true);
+    })();
+    ` : ''}
+
     // Touch events avec throttling (for screensaver only, not for tap counting)
     document.addEventListener('touchstart', sendInteraction, true);
     document.addEventListener('touchmove', sendInteraction, true);
@@ -1003,6 +1026,34 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
       `;
     }
 
+    if (keyboardMode === 'none') {
+      // #148: no on-screen keyboard, for pages filled by a barcode scanner. inputmode="none"
+      // keeps the field focusable and typed into, it only tells Android not to show the IME.
+      return `
+        (function() {
+          var SKIP = { hidden: 1, submit: 1, button: 1, checkbox: 1, radio: 1, reset: 1, file: 1, image: 1 };
+          function noKeyboard() {
+            var fields = document.querySelectorAll('input, textarea, [contenteditable]');
+            for (var i = 0; i < fields.length; i++) {
+              var f = fields[i];
+              if (f.tagName === 'INPUT' && SKIP[(f.type || '').toLowerCase()]) continue;
+              if (f.getAttribute('inputmode') !== 'none') f.setAttribute('inputmode', 'none');
+            }
+          }
+          noKeyboard();
+          // A field focused before this ran (autofocus) keeps the keyboard it opened with:
+          // focus it again so the new inputmode is read.
+          var active = document.activeElement;
+          if (active && active !== document.body && active.getAttribute('inputmode') === 'none') {
+            active.blur();
+            active.focus();
+          }
+          var observer = new MutationObserver(noKeyboard);
+          observer.observe(document.body, { childList: true, subtree: true });
+        })();
+      `;
+    }
+
     if (keyboardMode === 'smart') {
       return `
         (function() {
@@ -1191,7 +1242,9 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   const onMessageHandler = (event: any) => {
     const message = event.nativeEvent.data;
     
-    if (message === 'user-interaction' && onUserInteraction) {
+    if (message === 'page-touch') {
+      onPageTouch?.();
+    } else if (message === 'user-interaction' && onUserInteraction) {
       onUserInteraction();
     } else if (message.startsWith('{')) {
       // Parse JSON message
@@ -1746,7 +1799,9 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
         <View style={styles.errorContainer}>
           <Icon name="alert" size={48} color="#f59e0b" style={styles.errorIcon} />
           <Text style={styles.errorText}>{t('components.webView.loadingError')}</Text>
-          <Text style={styles.errorSubtext}>{t('components.webView.urlLabel', { url })}</Text>
+          {!hideErrorUrl && (
+            <Text style={styles.errorSubtext}>{t('components.webView.urlLabel', { url })}</Text>
+          )}
           {autoReload && (
             <Text style={styles.helpText}>
               {t('components.webView.autoReloadText')}

@@ -16,6 +16,8 @@ export const KEYS = {
   URL: '@kiosk_url',
   PIN: '@kiosk_pin',
   AUTO_RELOAD: '@kiosk_auto_reload',
+  // The WebView error screen leaves the failed URL out (#217)
+  HIDE_ERROR_URL: '@kiosk_hide_error_url',
   KIOSK_ENABLED: '@kiosk_enabled',
   AUTO_LAUNCH: '@kiosk_auto_launch',
   SCREEN_LOCK_COMPAT: '@kiosk_screen_lock_compat',
@@ -65,6 +67,9 @@ export const KEYS = {
   URL_ROTATION_ENABLED: '@kiosk_url_rotation_enabled',
   URL_ROTATION_LIST: '@kiosk_url_rotation_list',
   URL_ROTATION_INTERVAL: '@kiosk_url_rotation_interval',
+  // #235: hold the rotation while someone touches the page, resume after a quiet delay
+  URL_ROTATION_PAUSE_ON_TOUCH: '@kiosk_url_rotation_pause_on_touch',
+  URL_ROTATION_RESUME_DELAY: '@kiosk_url_rotation_resume_delay',
   // URL Planner
   URL_PLANNER_ENABLED: '@kiosk_url_planner_enabled',
   URL_PLANNER_EVENTS: '@kiosk_url_planner_events',
@@ -311,6 +316,24 @@ export const StorageService = {
   },
 
   //AUTORELOAD
+  saveHideErrorUrl: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.HIDE_ERROR_URL, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving hide error URL:', error);
+    }
+  },
+
+  getHideErrorUrl: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.HIDE_ERROR_URL);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting hide error URL:', error);
+      return false;
+    }
+  },
+
   saveAutoReload: async (value: boolean): Promise<void> => {
     try {
       await AsyncStorage.setItem(KEYS.AUTO_RELOAD, JSON.stringify(value));
@@ -492,6 +515,7 @@ export const StorageService = {
         KEYS.URL,
         KEYS.PIN,
         KEYS.AUTO_RELOAD,
+        KEYS.HIDE_ERROR_URL,
         KEYS.KIOSK_ENABLED,
         KEYS.AUTO_LAUNCH,
         KEYS.SCREENSAVER_ENABLED,
@@ -532,6 +556,8 @@ export const StorageService = {
         KEYS.URL_ROTATION_ENABLED,
         KEYS.URL_ROTATION_LIST,
         KEYS.URL_ROTATION_INTERVAL,
+        KEYS.URL_ROTATION_PAUSE_ON_TOUCH,
+        KEYS.URL_ROTATION_RESUME_DELAY,
         // URL Planner
         KEYS.URL_PLANNER_ENABLED,
         KEYS.URL_PLANNER_EVENTS,
@@ -1586,6 +1612,43 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting URL rotation interval:', error);
       return 30;
+    }
+  },
+
+  saveUrlRotationPauseOnTouch: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.URL_ROTATION_PAUSE_ON_TOUCH, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving URL rotation pause on touch:', error);
+    }
+  },
+
+  getUrlRotationPauseOnTouch: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.URL_ROTATION_PAUSE_ON_TOUCH);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting URL rotation pause on touch:', error);
+      return false;
+    }
+  },
+
+  saveUrlRotationResumeDelay: async (seconds: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.URL_ROTATION_RESUME_DELAY, String(seconds));
+    } catch (error) {
+      console.error('Error saving URL rotation resume delay:', error);
+    }
+  },
+
+  getUrlRotationResumeDelay: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.URL_ROTATION_RESUME_DELAY);
+      const delay = value ? parseInt(value, 10) : 60;
+      return isNaN(delay) ? 60 : Math.max(5, delay);
+    } catch (error) {
+      console.error('Error getting URL rotation resume delay:', error);
+      return 60;
     }
   },
 
@@ -3665,6 +3728,7 @@ export const StorageService = {
         displayMode: str(KEYS.DISPLAY_MODE, 'webview'),
         url: str(KEYS.URL),
         autoReload: bool(KEYS.AUTO_RELOAD),
+        hideErrorUrl: bool(KEYS.HIDE_ERROR_URL),
         pdfViewerEnabled: bool(KEYS.PDF_VIEWER_ENABLED),
         printEnabled: bool(KEYS.WINDOW_PRINT_ENABLED), // window.print(); name kept for existing exports
         printPaperSize: str(KEYS.PRINT_PAPER_SIZE, 'A4'),
@@ -3678,6 +3742,8 @@ export const StorageService = {
           enabled: bool(KEYS.URL_ROTATION_ENABLED),
           list: json(KEYS.URL_ROTATION_LIST, []),
           interval: num(KEYS.URL_ROTATION_INTERVAL, 30),
+          pauseOnTouch: bool(KEYS.URL_ROTATION_PAUSE_ON_TOUCH),
+          resumeDelay: num(KEYS.URL_ROTATION_RESUME_DELAY, 60),
         },
         urlPlanner: {
           enabled: bool(KEYS.URL_PLANNER_ENABLED),
@@ -3904,6 +3970,7 @@ export const StorageService = {
       set(KEYS.DISPLAY_MODE, g.displayMode);
       set(KEYS.URL, g.url);
       set(KEYS.AUTO_RELOAD, g.autoReload);
+      set(KEYS.HIDE_ERROR_URL, g.hideErrorUrl);
       set(KEYS.PDF_VIEWER_ENABLED, g.pdfViewerEnabled);
       set(KEYS.WINDOW_PRINT_ENABLED, g.printEnabled);
       set(KEYS.PRINT_PAPER_SIZE, g.printPaperSize);
@@ -3921,6 +3988,8 @@ export const StorageService = {
         set(KEYS.URL_ROTATION_ENABLED, ur.enabled);
         set(KEYS.URL_ROTATION_LIST, ur.list);
         set(KEYS.URL_ROTATION_INTERVAL, ur.interval);
+        set(KEYS.URL_ROTATION_PAUSE_ON_TOUCH, ur.pauseOnTouch);
+        set(KEYS.URL_ROTATION_RESUME_DELAY, ur.resumeDelay);
       }
       const up = g.urlPlanner as Record<string, unknown> | undefined;
       if (up) {

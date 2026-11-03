@@ -105,6 +105,10 @@
       "enableHint": "Automatically cycle through multiple URLs",
       "interval": "Rotation Interval (seconds)",
       "intervalHint": "Time between each URL change (minimum 5 seconds)",
+      "pauseOnTouch": "Pause while someone uses the page",
+      "pauseOnTouchHint": "Hold the rotation while the page is being touched or typed into",
+      "resumeDelay": "Resume after (seconds)",
+      "resumeDelayHint": "Seconds without a touch before the rotation goes on (minimum 5)",
       "needTwoUrls": "Add at least 2 URLs to enable rotation"
     },
     "urlPlanner": {
@@ -180,7 +184,9 @@
     "autoReload": {
       "title": "Auto Reload",
       "reloadOnError": "Reload on Error",
-      "reloadOnErrorHint": "Automatically reload the page on network error"
+      "reloadOnErrorHint": "Automatically reload the page on network error",
+      "hideUrl": "Hide the URL on the error screen",
+      "hideUrlHint": "Show only the error message when a page fails to load, not its address"
     },
     "pdfViewer": {
       "title": "PDF Viewer",
@@ -422,7 +428,9 @@
       "forceNumeric": "Force Numeric",
       "forceNumericHint": "All fields show numeric keyboard",
       "smart": "Smart Detection",
-      "smartHint": "Detect and convert numeric fields only"
+      "smartHint": "Detect and convert numeric fields only",
+      "none": "No On-Screen Keyboard",
+      "noneHint": "Never show the keyboard; a barcode scanner still types into the fields"
     }
   },
   "security": {

@@ -105,6 +105,10 @@
       "enableHint": "Automatisch durch mehrere URLs wechseln",
       "interval": "Rotationsintervall (Sekunden)",
       "intervalHint": "Zeit zwischen den URL-Wechseln (mindestens 5 Sekunden)",
+      "pauseOnTouch": "Pausieren, während jemand die Seite nutzt",
+      "pauseOnTouchHint": "Hält die Rotation an, solange die Seite berührt oder darin getippt wird",
+      "resumeDelay": "Fortsetzen nach (Sekunden)",
+      "resumeDelayHint": "Sekunden ohne Berührung, bevor die Rotation weiterläuft (mindestens 5)",
       "needTwoUrls": "Füge mindestens 2 URLs hinzu, um die Rotation zu aktivieren"
     },
     "urlPlanner": {
@@ -180,7 +184,9 @@
     "autoReload": {
       "title": "Automatisches Neuladen",
       "reloadOnError": "Bei Fehler neu laden",
-      "reloadOnErrorHint": "Die Seite bei einem Netzwerkfehler automatisch neu laden"
+      "reloadOnErrorHint": "Die Seite bei einem Netzwerkfehler automatisch neu laden",
+      "hideUrl": "URL auf dem Fehlerbildschirm ausblenden",
+      "hideUrlHint": "Zeigt nur die Fehlermeldung an, wenn eine Seite nicht lädt, nicht ihre Adresse"
     },
     "pdfViewer": {
       "title": "PDF-Viewer",
@@ -422,7 +428,9 @@
       "forceNumeric": "Numerisch erzwingen",
       "forceNumericHint": "Alle Felder zeigen die numerische Tastatur",
       "smart": "Intelligente Erkennung",
-      "smartHint": "Erkennt und konvertiert nur numerische Felder"
+      "smartHint": "Erkennt und konvertiert nur numerische Felder",
+      "none": "Keine Bildschirmtastatur",
+      "noneHint": "Tastatur nie anzeigen; ein Barcodescanner tippt weiterhin in die Felder"
     }
   },
   "security": {

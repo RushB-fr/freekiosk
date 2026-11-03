@@ -229,7 +229,7 @@ Every key below is a straight passthrough: the value you pass is stored as-is.
 | `--ez overlay_button_visible true` | Show the floating return button in External App mode |
 | `--es overlay_button_position "bottom-right"` | Corner for that button |
 | `--ei pin_max_attempts 5` | Wrong-PIN attempts before lockout |
-| `--es keyboard_mode "default"` | On-screen keyboard: `default`, `force_numeric` or `smart` |
+| `--es keyboard_mode "default"` | On-screen keyboard: `default`, `force_numeric`, `smart` or `none` (no on-screen keyboard; a scanner still types into the fields) |
 
 **Lockdown**
 
@@ -247,7 +247,8 @@ Every key below is a straight passthrough: the value you pass is stored as-is.
 
 | Parameter | Description |
 |-----------|-------------|
-| `--ez auto_reload true` | Periodically reload the page |
+| `--ez auto_reload true` | Reload the page after a loading error |
+| `--ez hide_error_url true` | Leave the URL out of the loading error screen |
 | `--ez pdf_viewer_enabled true` | Open PDFs in the bundled viewer. **This is also what allows `file://` URLs**: without it the WebView refuses to load a local file, whatever the label says (see the [FAQ](faq.md)) |
 | `--ez disable_overscroll true` | Remove the elastic stretch at the top and bottom of the page. Off by default (Android's standard behaviour) |
 | `--ez session_reset_button_enabled true` | Show a small button, bottom-left, that clears cookies, cache and web storage after a confirmation, then returns to the start URL. Meant for shared tablets. Off by default |
@@ -264,6 +265,8 @@ Every key below is a straight passthrough: the value you pass is stored as-is.
 | `--ez url_rotation_enabled true` | Cycle through a list of URLs |
 | `--es url_rotation_list '["https://a","https://b"]'` | The list, as a JSON array |
 | `--es url_rotation_interval "30"` | Seconds between changes, minimum 5 |
+| `--ez url_rotation_pause_on_touch true` | Hold the rotation while someone touches the page or types |
+| `--es url_rotation_resume_delay "60"` | Seconds without a touch before the rotation resumes, minimum 5 |
 | `--ez url_planner_enabled true` | Schedule URLs by day and time |
 | `--es url_planner_events '[...]'` | Planner events, as a JSON array |
 

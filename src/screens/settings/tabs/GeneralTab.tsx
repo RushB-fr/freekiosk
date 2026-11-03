@@ -85,6 +85,8 @@ interface GeneralTabProps {
   // Auto reload (webview only)
   autoReload: boolean;
   onAutoReloadChange: (value: boolean) => void;
+  hideErrorUrl: boolean;
+  onHideErrorUrlChange: (value: boolean) => void;
   
   // PDF Viewer (webview only)
   pdfViewerEnabled: boolean;
@@ -115,6 +117,10 @@ interface GeneralTabProps {
   onUrlRotationListChange: (urls: string[]) => void;
   urlRotationInterval: string;
   onUrlRotationIntervalChange: (value: string) => void;
+  urlRotationPauseOnTouch: boolean;
+  onUrlRotationPauseOnTouchChange: (value: boolean) => void;
+  urlRotationResumeDelay: string;
+  onUrlRotationResumeDelayChange: (value: string) => void;
   
   // URL Planner (webview only)
   urlPlannerEnabled: boolean;
@@ -227,6 +233,8 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
   onDashboardModeEnabledChange,
   autoReload,
   onAutoReloadChange,
+  hideErrorUrl,
+  onHideErrorUrlChange,
   pdfViewerEnabled,
   onPdfViewerEnabledChange,
   windowPrintEnabled,
@@ -251,6 +259,10 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
   onUrlRotationListChange,
   urlRotationInterval,
   onUrlRotationIntervalChange,
+  urlRotationPauseOnTouch,
+  onUrlRotationPauseOnTouchChange,
+  urlRotationResumeDelay,
+  onUrlRotationResumeDelayChange,
   urlPlannerEnabled,
   onUrlPlannerEnabledChange,
   urlPlannerEvents,
@@ -748,6 +760,23 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
                     hint={t('general.urlRotation.intervalHint')}
                   />
 
+                  <SettingsSwitch
+                    label={t('general.urlRotation.pauseOnTouch')}
+                    hint={t('general.urlRotation.pauseOnTouchHint')}
+                    value={urlRotationPauseOnTouch}
+                    onValueChange={onUrlRotationPauseOnTouchChange}
+                  />
+                  {urlRotationPauseOnTouch && (
+                    <SettingsInput
+                      label={t('general.urlRotation.resumeDelay')}
+                      value={urlRotationResumeDelay}
+                      onChangeText={onUrlRotationResumeDelayChange}
+                      placeholder="60"
+                      keyboardType="numeric"
+                      hint={t('general.urlRotation.resumeDelayHint')}
+                    />
+                  )}
+
                   {urlRotationList.length < 2 && (
                     <SettingsInfoBox variant="warning">
                       <Text style={styles.infoText}>
@@ -1026,6 +1055,12 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
             hint={t('general.autoReload.reloadOnErrorHint')}
             value={autoReload}
             onValueChange={onAutoReloadChange}
+          />
+          <SettingsSwitch
+            label={t('general.autoReload.hideUrl')}
+            hint={t('general.autoReload.hideUrlHint')}
+            value={hideErrorUrl}
+            onValueChange={onHideErrorUrlChange}
           />
         </SettingsSection>
       )}

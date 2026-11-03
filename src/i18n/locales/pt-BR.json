@@ -105,6 +105,10 @@
       "enableHint": "Alternar automaticamente entre várias URLs",
       "interval": "Intervalo de rotação (segundos)",
       "intervalHint": "Tempo entre cada troca de URL (mínimo de 5 segundos)",
+      "pauseOnTouch": "Pausar enquanto alguém usa a página",
+      "pauseOnTouchHint": "Segura a rotação enquanto a página é tocada ou recebe digitação",
+      "resumeDelay": "Retomar após (segundos)",
+      "resumeDelayHint": "Segundos sem toque antes de a rotação continuar (mínimo 5)",
       "needTwoUrls": "Adicione pelo menos 2 URLs para ativar a rotação"
     },
     "urlPlanner": {
@@ -180,7 +184,9 @@
     "autoReload": {
       "title": "Recarregamento automático",
       "reloadOnError": "Recarregar em caso de erro",
-      "reloadOnErrorHint": "Recarregar a página automaticamente quando houver erro de rede"
+      "reloadOnErrorHint": "Recarregar a página automaticamente quando houver erro de rede",
+      "hideUrl": "Ocultar a URL na tela de erro",
+      "hideUrlHint": "Mostra apenas a mensagem de erro quando uma página não carrega, sem o endereço"
     },
     "pdfViewer": {
       "title": "Visualizador de PDF",
@@ -422,7 +428,9 @@
       "forceNumeric": "Forçar numérico",
       "forceNumericHint": "Todos os campos mostram o teclado numérico",
       "smart": "Detecção inteligente",
-      "smartHint": "Detectar e converter apenas os campos numéricos"
+      "smartHint": "Detectar e converter apenas os campos numéricos",
+      "none": "Sem teclado na tela",
+      "noneHint": "Nunca mostrar o teclado; um leitor de código de barras continua digitando nos campos"
     }
   },
   "security": {

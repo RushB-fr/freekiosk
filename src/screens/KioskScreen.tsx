@@ -57,6 +57,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const isFocused = useIsFocused();
   const [url, setUrl] = useState<string>('');
   const [autoReload, setAutoReload] = useState<boolean>(false);
+  const [hideErrorUrl, setHideErrorUrl] = useState<boolean>(false);
   // #177 — Pause WebView audio/video when the page is hidden (screensaver / screen off / background)
   const [pauseWebMediaWhenHidden, setPauseWebMediaWhenHidden] = useState<boolean>(true);
   const [screensaverEnabled, setScreensaverEnabled] = useState(false);
@@ -158,7 +159,12 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   
   const [urlRotationInterval, setUrlRotationInterval] = useState<number>(30000);
   const [currentUrlIndex, setCurrentUrlIndex] = useState<number>(0);
-  const urlRotationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const urlRotationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // #235: hold the rotation while someone touches the page. Its own signal, not the inactivity
+  // one: markUserInteraction() also fires on every navigation, rotation changes included.
+  const [urlRotationPauseOnTouch, setUrlRotationPauseOnTouch] = useState<boolean>(false);
+  const [urlRotationResumeDelay, setUrlRotationResumeDelay] = useState<number>(60000);
+  const lastPageTouchRef = useRef<number>(0);
   
   // URL Planner states
   const [urlPlannerEnabled, setUrlPlannerEnabled] = useState<boolean>(false);
@@ -1358,7 +1364,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   useEffect(() => {
     // Clear any existing rotation timer
     if (urlRotationTimerRef.current) {
-      clearInterval(urlRotationTimerRef.current);
+      clearTimeout(urlRotationTimerRef.current);
       urlRotationTimerRef.current = null;
     }
     
@@ -1377,23 +1383,36 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         setUrl(urlRotationList[0]);
       }
       
-      // Start rotation timer
-      urlRotationTimerRef.current = setInterval(() => {
+      // A chain of timeouts rather than an interval: a tick that lands while someone is using
+      // the page waits until the resume delay has passed, then a full interval (#235).
+      const schedule = (delay: number) => {
+        urlRotationTimerRef.current = setTimeout(tick, delay);
+      };
+      const tick = () => {
+        if (urlRotationPauseOnTouch) {
+          const sinceTouch = Date.now() - lastPageTouchRef.current;
+          if (sinceTouch < urlRotationResumeDelay) {
+            schedule(urlRotationResumeDelay - sinceTouch + urlRotationInterval);
+            return;
+          }
+        }
         setCurrentUrlIndex(prevIndex => {
           const nextIndex = (prevIndex + 1) % urlRotationList.length;
           setUrl(urlRotationList[nextIndex]);
           return nextIndex;
         });
-      }, urlRotationInterval);
+        schedule(urlRotationInterval);
+      };
+      schedule(urlRotationInterval);
     }
-    
+
     return () => {
       if (urlRotationTimerRef.current) {
-        clearInterval(urlRotationTimerRef.current);
+        clearTimeout(urlRotationTimerRef.current);
         urlRotationTimerRef.current = null;
       }
     };
-  }, [displayMode, urlRotationEnabled, dashboardModeEnabled, urlRotationList, urlRotationInterval, activeScheduledEvent]);
+  }, [displayMode, urlRotationEnabled, dashboardModeEnabled, urlRotationList, urlRotationInterval, activeScheduledEvent, urlRotationPauseOnTouch, urlRotationResumeDelay]);
 
   // URL Planner effect - checks every minute for scheduled events
   useEffect(() => {
@@ -1889,6 +1908,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
 
       if (savedUrl) setUrl(savedUrl);
       setAutoReload(savedAutoReload);
+      setHideErrorUrl(bool(K.HIDE_ERROR_URL, false));
       setPauseWebMediaWhenHidden(savedPauseWebMediaWhenHidden);
       // #205 — re-apply the opt-in 2-way audio (intercom) mode on each kiosk launch: the
       // native AudioRecordingCallback registration doesn't survive an app restart. No-op when off.
@@ -1990,6 +2010,8 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       setUrlRotationEnabled(savedUrlRotationEnabled);
       setUrlRotationList(savedUrlRotationList);
       setUrlRotationInterval(savedUrlRotationInterval * 1000); // Convert seconds to ms
+      setUrlRotationPauseOnTouch(bool(K.URL_ROTATION_PAUSE_ON_TOUCH, false));
+      setUrlRotationResumeDelay(Math.max(5, num(K.URL_ROTATION_RESUME_DELAY, 60)) * 1000);
       
       // Load URL Planner settings
       const savedUrlPlannerEnabled = bool(K.URL_PLANNER_ENABLED, false);
@@ -3091,6 +3113,9 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
               key={webViewKey}
               url={url}
               autoReload={autoReload}
+              hideErrorUrl={hideErrorUrl}
+              reportPageTouches={urlRotationEnabled && urlRotationPauseOnTouch}
+              onPageTouch={() => { lastPageTouchRef.current = Date.now(); }}
               keyboardMode={keyboardMode}
               onUserInteraction={onUserInteraction}
               jsToExecute={jsToExecute}
