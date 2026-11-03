@@ -13,7 +13,7 @@ import MotionDetector from '../components/MotionDetector';
 import ProximityDetectionModule, { onProximityNear as onProximityNearEvent } from '../utils/ProximityDetectionModule';
 import ExternalAppOverlay from '../components/ExternalAppOverlay';
 import { StorageService, toPrintOrigins } from '../utils/storage';
-import { saveSecurePin, saveSecureMqttPassword, getSecureBasicAuthPassword } from '../utils/secureStorage';
+import { saveSecurePin, saveSecureMqttPassword, saveSecureApiKey, getSecureBasicAuthPassword } from '../utils/secureStorage';
 import KioskModule from '../utils/KioskModule';
 import AppLauncherModule from '../utils/AppLauncherModule';
 import OverlayServiceModule from '../utils/OverlayServiceModule';
@@ -1760,6 +1760,16 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
               } else {
                 failedSecrets.push('PIN');
                 console.error('[KioskScreen] PIN could NOT be saved to secure storage (see #258)');
+              }
+            } else if (key === '@kiosk_rest_api_key') {
+              // REST API key goes to the Keychain too (#325). Written to AsyncStorage it was
+              // read only while the Keychain held no key, so an ADB rotation was ignored and
+              // the new key stayed in plain text. saveSecureApiKey also clears that legacy copy.
+              if (await saveSecureApiKey(value)) {
+                console.log('[KioskScreen] REST API key saved to secure Keychain via pending ADB config');
+              } else {
+                failedSecrets.push('REST API key');
+                console.error('[KioskScreen] REST API key could NOT be saved to secure storage (see #258)');
               }
             } else if (key === '@mqtt_password_pending') {
               // MQTT password must be saved to Keychain (not AsyncStorage)
