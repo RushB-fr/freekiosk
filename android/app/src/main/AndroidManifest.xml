@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+    <!-- CameraForegroundService: remote camera behind another app. Stripped from Play Store builds. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA"/>
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.CAMERA" />
@@ -278,6 +280,20 @@
         <property
           android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
           android:value="kiosk_watchdog"/>
+      </service>
+
+      <!-- Lets the REST API and MQTT use the camera while another app is in front (Android 11+
+           grants the camera in the background only to a camera-type foreground service).
+           specialUse is its fallback when the camera type is refused. Stripped from Play
+           Store builds. -->
+      <service
+        android:name=".CameraForegroundService"
+        android:enabled="true"
+        android:exported="false"
+        android:foregroundServiceType="camera|specialUse">
+        <property
+          android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+          android:value="remote_camera"/>
       </service>
 
       <!-- Runs one cloud heartbeat while backgrounded: React Native stops dispatching JS

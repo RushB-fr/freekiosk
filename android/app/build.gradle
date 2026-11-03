@@ -88,6 +88,8 @@ if (project.hasProperty('playstore') && project.hasProperty('cloudprovi')) {
 
 def enableSelfUpdate = !project.hasProperty('playstore')
 def enableAccessibilityService = !project.hasProperty('playstore') && !project.hasProperty('cloudprovi')
+// Camera-type foreground service for the remote camera behind another app: Play reviews that type.
+def enableCameraForegroundService = !project.hasProperty('playstore')
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
@@ -118,6 +120,7 @@ android {
 
         // Expose self-update flag to both Kotlin (BuildConfig) and JS (via UpdateModule constants)
         buildConfigField "boolean", "ENABLE_SELF_UPDATE", "${enableSelfUpdate}"
+        buildConfigField "boolean", "ENABLE_CAMERA_FGS", "${enableCameraForegroundService}"
 
         // Play Store compliance: when -Pplaystore is set, replace REQUEST_INSTALL_PACKAGES
         // with INTERNET (already declared → deduplicated by manifest merger → effectively removed)

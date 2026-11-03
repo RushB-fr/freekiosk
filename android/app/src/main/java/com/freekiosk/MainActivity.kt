@@ -796,6 +796,9 @@ class MainActivity : ReactActivity() {
     super.onPause()
     cookieFlushHandler.removeCallbacks(cookieFlushRunnable)
     flushCookies()
+    // Still visible here, so still allowed to start the camera service: this is the moment an
+    // external app comes in front, and settings changed inside the app have no onResume.
+    syncCameraForegroundService()
   }
 
   override fun onResume() {
@@ -805,6 +808,7 @@ class MainActivity : ReactActivity() {
     cookieFlushHandler.postDelayed(cookieFlushRunnable, COOKIE_FLUSH_INTERVAL_MS)
 
     readExternalAppConfig()
+    syncCameraForegroundService()
     
     // Re-register screen state receiver in case it was lost
     if (screenStateReceiver == null) {
@@ -1572,6 +1576,18 @@ class MainActivity : ReactActivity() {
     } catch (e: Exception) {
       DebugLog.d("MainActivity", "Error starting KioskWatchdogService: ${e.message}")
     }
+  }
+
+  /**
+   * Runs CameraForegroundService while a remote camera feature is on: the REST API (photo and
+   * stream) or MQTT camera snapshots. Without it Android refuses the camera to FreeKiosk as soon
+   * as another app is in front. No-op in Play Store builds.
+   */
+  private fun syncCameraForegroundService() {
+    val wanted = getAsyncStorageValue("@kiosk_rest_api_enabled", "false") == "true" ||
+      (getAsyncStorageValue("@kiosk_mqtt_enabled", "false") == "true" &&
+        getAsyncStorageValue("@kiosk_mqtt_camera_enabled", "false") == "true")
+    CameraForegroundService.sync(this, wanted)
   }
 
   /**

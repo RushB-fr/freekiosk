@@ -405,6 +405,7 @@ GET /api/camera/photo?camera=front&rotate=90
 - Photo resolution is automatically optimized (~1.2MP) for fast HTTP transfer
 - Higher quality values produce larger files
 - Capture fails while motion detection is using the camera
+- Works while another app is in front, or with the screen off, as long as the REST API is on and the camera permission is granted: FreeKiosk then runs a camera foreground service (silent notification "Remote camera available"). If the app in front is itself using the camera, that app keeps it and the capture fails. **Not in Play Store builds**, where the camera works only while FreeKiosk is in front. **(2.1.0+)**
 
 > 💡 Camera snapshots can also be published over MQTT as auto-discovered `image` / `camera` entities (one per camera) with a capture button in Home Assistant — see [MQTT: Images (Screenshot & Camera)](MQTT.md#-images-screenshot--camera).
 

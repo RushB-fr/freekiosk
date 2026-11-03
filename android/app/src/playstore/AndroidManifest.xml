@@ -55,7 +55,18 @@
         android:name="android.permission.READ_MEDIA_IMAGES"
         tools:node="remove" />
 
+    <!-- Strip FOREGROUND_SERVICE_CAMERA and its service: Play reviews the camera foreground
+         service type. Without it the remote camera (REST photo, stream, MQTT snapshots) works
+         only while FreeKiosk is in front, as before. BuildConfig.ENABLE_CAMERA_FGS is false too. -->
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_CAMERA"
+        tools:node="remove" />
+
     <application>
+        <service
+            android:name="com.freekiosk.CameraForegroundService"
+            tools:node="remove" />
+
         <!-- Strip AccessibilityService (BIND_ACCESSIBILITY_SERVICE) -->
         <service
             android:name="com.freekiosk.FreeKioskAccessibilityService"
