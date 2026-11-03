@@ -38,6 +38,8 @@
          Removed entirely in Play Store builds via src/playstore overlay (tools:node="remove"). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- navigator.vibrate() in web pages (#194): a normal permission, granted at install -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- Exact alarm for the screen schedule's wake (#307). USE_EXACT_ALARM (Android 13+) is granted
          at install and cannot be revoked; SCHEDULE_EXACT_ALARM covers Android 12, where it is granted
