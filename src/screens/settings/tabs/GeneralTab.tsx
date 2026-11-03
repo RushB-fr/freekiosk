@@ -321,16 +321,6 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
 
   return (
     <View>
-      {/* Language / Langue */}
-      <SettingsSection title={t('general.language.title')} icon="translate">
-        <SettingsRadioGroup
-          label={t('general.language.label')}
-          options={[...LANGUAGE_OPTIONS]}
-          value={language}
-          onValueChange={(v) => onLanguageChange(v as SupportedLanguage)}
-        />
-      </SettingsSection>
-
       {/* Display Mode Selection */}
       <SettingsSection title={t('general.displayMode.title')} icon="cellphone">
         <SettingsModeSelector
@@ -1225,6 +1215,16 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
           />
         </SettingsSection>
       )}
+
+      {/* Language, last (#305): set once, and seven options pushed Display Mode below the fold */}
+      <SettingsSection title={t('general.language.title')} icon="translate">
+        <SettingsRadioGroup
+          label={t('general.language.label')}
+          options={[...LANGUAGE_OPTIONS]}
+          value={language}
+          onValueChange={(v) => onLanguageChange(v as SupportedLanguage)}
+        />
+      </SettingsSection>
 
       {/* Back to Kiosk Button */}
       <SettingsButton
