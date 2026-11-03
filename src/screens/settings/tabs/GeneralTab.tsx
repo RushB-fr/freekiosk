@@ -26,7 +26,6 @@ import AppLauncherModule, { AppInfo } from '../../../utils/AppLauncherModule';
 import { ScheduledEvent } from '../../../types/planner';
 import type { MediaItem, MediaFitMode } from '../../../types/mediaPlayer';
 import { generateMediaItemId, detectMediaType, isLocalMedia, getMediaDisplayName } from '../../../types/mediaPlayer';
-import FilePickerModule from '../../../utils/FilePickerModule';
 import { useFilePickerAvailable } from '../../../utils/useFilePickerAvailable';
 import MediaCacheStatus from '../../../components/settings/MediaCacheStatus';
 import SignageManagedNotice from '../../../components/settings/SignageManagedNotice';
@@ -435,11 +434,8 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
                   <TouchableOpacity
                     style={styles.mediaItemDeleteBtn}
                     onPress={() => {
-                      const toDelete = mediaPlayerItems.find(i => i.id === item.id);
-                      // If it's a local file, also delete the copied file
-                      if (toDelete?.isLocal && toDelete.url.startsWith('file://')) {
-                        FilePickerModule.deleteMediaFile(toDelete.url).catch(() => {});
-                      }
+                      // The copied file is deleted on Save (SettingsScreenNew), not here: leaving
+                      // without saving used to keep a playlist pointing at a file already gone.
                       const updated = mediaPlayerItems.filter(i => i.id !== item.id);
                       onMediaPlayerItemsChange(updated);
                     }}
@@ -505,6 +501,29 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
                 onMediaPlayerItemsChange([...mediaPlayerItems, newItem]);
               }}
             />
+
+            {mediaPlayerItems.length > 1 && (
+              <SettingsButton
+                title={t('general.mediaPlaylist.removeAll')}
+                icon="delete-outline"
+                variant="danger"
+                onPress={() => {
+                  // #269: one confirmation instead of one tap per item.
+                  Alert.alert(
+                    t('general.mediaPlaylist.removeAllTitle'),
+                    t('general.mediaPlaylist.removeAllMessage'),
+                    [
+                      { text: t('general.mediaPlaylist.removeAllCancel'), style: 'cancel' },
+                      {
+                        text: t('general.mediaPlaylist.removeAllConfirm'),
+                        style: 'destructive',
+                        onPress: () => onMediaPlayerItemsChange([]),
+                      },
+                    ],
+                  );
+                }}
+              />
+            )}
 
             {mediaPlayerItems.length === 0 && (
               <SettingsInfoBox variant="warning">

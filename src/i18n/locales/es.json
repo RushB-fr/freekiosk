@@ -36,7 +36,12 @@
       "durationLabel": "Duración en pantalla (segundos)",
       "durationHint": "Déjalo vacío para usar la duración predeterminada",
       "addUrlEntry": "Agregar URL",
-      "emptyWarning": "Agrega al menos un elemento multimedia para usar el reproductor"
+      "emptyWarning": "Agrega al menos un elemento multimedia para usar el reproductor",
+      "removeAll": "Quitar todo",
+      "removeAllTitle": "¿Quitar todos los elementos?",
+      "removeAllMessage": "La lista de reproducción se vaciará. Los archivos copiados en el dispositivo se eliminan al guardar.",
+      "removeAllCancel": "Cancelar",
+      "removeAllConfirm": "Quitar todo"
     },
     "playback": {
       "cache": "Reproducir desde el dispositivo (caché sin conexión)",

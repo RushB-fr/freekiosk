@@ -36,7 +36,12 @@
       "durationLabel": "Durée d'affichage (secondes)",
       "durationHint": "Laisser vide pour utiliser la durée par défaut",
       "addUrlEntry": "Ajouter une URL",
-      "emptyWarning": "Ajoutez au moins un média pour utiliser le lecteur multimédia"
+      "emptyWarning": "Ajoutez au moins un média pour utiliser le lecteur multimédia",
+      "removeAll": "Tout supprimer",
+      "removeAllTitle": "Supprimer tous les éléments ?",
+      "removeAllMessage": "La playlist sera vidée. Les fichiers copiés sur l'appareil seront supprimés à l'enregistrement.",
+      "removeAllCancel": "Annuler",
+      "removeAllConfirm": "Tout supprimer"
     },
     "playback": {
       "cache": "Lire depuis l'appareil (cache hors ligne)",

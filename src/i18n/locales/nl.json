@@ -36,7 +36,12 @@
       "durationLabel": "Weergaveduur (seconden)",
       "durationHint": "Laat leeg om de standaardduur te gebruiken",
       "addUrlEntry": "URL toevoegen",
-      "emptyWarning": "Voeg minstens één media-item toe om de mediaspeler te gebruiken"
+      "emptyWarning": "Voeg minstens één media-item toe om de mediaspeler te gebruiken",
+      "removeAll": "Alles verwijderen",
+      "removeAllTitle": "Alle items verwijderen?",
+      "removeAllMessage": "De afspeellijst wordt leeggemaakt. Bestanden die naar het apparaat zijn gekopieerd, worden verwijderd bij het opslaan.",
+      "removeAllCancel": "Annuleren",
+      "removeAllConfirm": "Alles verwijderen"
     },
     "playback": {
       "cache": "Afspelen vanaf het apparaat (offline cache)",

@@ -36,7 +36,12 @@
       "durationLabel": "Display Duration (seconds)",
       "durationHint": "Leave empty to use default duration",
       "addUrlEntry": "Add URL Entry",
-      "emptyWarning": "Add at least one media item to use the Media Player"
+      "emptyWarning": "Add at least one media item to use the Media Player",
+      "removeAll": "Remove all",
+      "removeAllTitle": "Remove every item?",
+      "removeAllMessage": "This empties the playlist. Files copied to the device are deleted when you save.",
+      "removeAllCancel": "Cancel",
+      "removeAllConfirm": "Remove all"
     },
     "playback": {
       "cache": "Play from the device (offline cache)",

@@ -36,7 +36,12 @@
       "durationLabel": "Anzeigedauer (Sekunden)",
       "durationHint": "Leer lassen, um die Standarddauer zu verwenden",
       "addUrlEntry": "URL hinzufügen",
-      "emptyWarning": "Füge mindestens ein Medium hinzu, um den Mediaplayer zu verwenden"
+      "emptyWarning": "Füge mindestens ein Medium hinzu, um den Mediaplayer zu verwenden",
+      "removeAll": "Alle entfernen",
+      "removeAllTitle": "Alle Elemente entfernen?",
+      "removeAllMessage": "Die Playlist wird geleert. Auf das Gerät kopierte Dateien werden beim Speichern gelöscht.",
+      "removeAllCancel": "Abbrechen",
+      "removeAllConfirm": "Alle entfernen"
     },
     "playback": {
       "cache": "Vom Gerät abspielen (Offline-Cache)",

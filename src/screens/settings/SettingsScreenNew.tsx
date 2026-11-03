@@ -3,7 +3,7 @@
  * Material Design tabs with organized sections
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { defaultMediaCacheEnabled, defaultMediaUnattended } from '../../utils/MediaCache';
 import {
   View,
@@ -250,6 +250,14 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
   
   // Media Player states
   const [mediaPlayerItems, setMediaPlayerItems] = useState<MediaItem[]>([]);
+  // Every copied local file the playlist held during this visit. Those no longer in the
+  // playlist are deleted on Save only, so leaving without saving keeps the saved playlist whole.
+  const seenLocalMediaFiles = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const item of mediaPlayerItems) {
+      if (item.isLocal && item.url.startsWith('file://')) seenLocalMediaFiles.current.add(item.url);
+    }
+  }, [mediaPlayerItems]);
   const [mediaPlayerAutoPlay, setMediaPlayerAutoPlay] = useState<boolean>(true);
   const [mediaPlayerLoop, setMediaPlayerLoop] = useState<boolean>(true);
   const [mediaPlayerShuffle, setMediaPlayerShuffle] = useState<boolean>(false);
@@ -1712,6 +1720,11 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
     // Save Media Player settings
     if (displayMode === 'media_player') {
       await StorageService.saveMediaPlayerItems(mediaPlayerItems);
+      const kept = new Set(mediaPlayerItems.map(i => i.url));
+      for (const fileUrl of seenLocalMediaFiles.current) {
+        if (!kept.has(fileUrl)) FilePickerModule.deleteMediaFile(fileUrl).catch(() => {});
+      }
+      seenLocalMediaFiles.current = new Set([...kept].filter(u => u.startsWith('file://')));
       await StorageService.saveMediaPlayerAutoPlay(mediaPlayerAutoPlay);
       await StorageService.saveMediaPlayerLoop(mediaPlayerLoop);
       await StorageService.saveMediaPlayerShuffle(mediaPlayerShuffle);

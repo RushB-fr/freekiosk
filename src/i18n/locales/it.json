@@ -36,7 +36,12 @@
       "durationLabel": "Durata di visualizzazione (secondi)",
       "durationHint": "Lascia vuoto per usare la durata predefinita",
       "addUrlEntry": "Aggiungi URL",
-      "emptyWarning": "Aggiungi almeno un contenuto per usare il Media player"
+      "emptyWarning": "Aggiungi almeno un contenuto per usare il Media player",
+      "removeAll": "Rimuovi tutto",
+      "removeAllTitle": "Rimuovere tutti gli elementi?",
+      "removeAllMessage": "La playlist verrà svuotata. I file copiati sul dispositivo vengono eliminati al salvataggio.",
+      "removeAllCancel": "Annulla",
+      "removeAllConfirm": "Rimuovi tutto"
     },
     "playback": {
       "cache": "Riproduci dal dispositivo (cache offline)",
