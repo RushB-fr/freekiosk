@@ -420,6 +420,15 @@
       "intercom": "Modus voor tweeweg-audio (intercom)",
       "intercomHint": "Inschakelen voor WebRTC tweeweg-audio / terugspreken (bijv. een Home Assistant / go2rtc-deurbelintercomkaart). Zolang de webpagina actief de microfoon gebruikt, zet FreeKiosk het apparaat in de communicatie-audiomodus zodat het terugkanaal van de microfoon verzendt, en herstelt daarna de normale audio zodra je stopt met praten. Laat uitgeschakeld voor normaal browsen: het wordt alleen actief terwijl de microfoon in gebruik is."
     },
+    "orientation": {
+      "title": "Schermoriëntatie",
+      "hint": "Vergrendelt het scherm van FreeKiosk in één oriëntatie, of volgt het apparaat. Geldt niet voor een externe app.",
+      "auto": "Apparaat volgen",
+      "portrait": "Staand",
+      "landscape": "Liggend",
+      "reversePortrait": "Staand (ondersteboven)",
+      "reverseLandscape": "Liggend (omgekeerd)"
+    },
     "keyboard": {
       "title": "Toetsenbordmodus",
       "hint": "Bepaal welk toetsenbord verschijnt bij invoervelden",

@@ -119,6 +119,12 @@
       android:supportsRtl="true"
       android:networkSecurityConfig="@xml/network_security_config"
       android:usesCleartextTraffic="true">
+      <!-- #189: Android 16 ignores an app's requested orientation (and resizeableActivity) on
+           screens of 600 dp and more for apps targeting API 36; this documented, temporary
+           opt-out keeps the Screen Orientation setting working on those tablets. -->
+      <property
+        android:name="android.window.PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY"
+        android:value="true" />
       <!-- No android:enableOnBackInvokedCallback here (#221, #324). Set to true, Android 13 to 15
            send Back to a callback nobody registers below Android 16 (React Native only adds its own
            there), so the system finished the activity: Back left the kiosk and the page reloaded.

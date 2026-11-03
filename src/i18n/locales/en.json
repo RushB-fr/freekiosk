@@ -420,6 +420,15 @@
       "intercom": "2-way audio (intercom) mode",
       "intercomHint": "Enable for WebRTC 2-way audio / talk-back (e.g. a Home Assistant / go2rtc doorbell intercom card). While the web page is actively using the microphone, FreeKiosk switches the device to communication audio mode so the microphone back-channel transmits, then restores normal audio when you stop talking. Leave off for normal browsing — it only engages while the mic is in use."
     },
+    "orientation": {
+      "title": "Screen Orientation",
+      "hint": "Lock FreeKiosk's screen to one orientation, or follow the device. Not applied to an external app.",
+      "auto": "Follow the device",
+      "portrait": "Portrait",
+      "landscape": "Landscape",
+      "reversePortrait": "Portrait (upside down)",
+      "reverseLandscape": "Landscape (reversed)"
+    },
     "keyboard": {
       "title": "Keyboard Mode",
       "hint": "Control which keyboard appears for input fields",

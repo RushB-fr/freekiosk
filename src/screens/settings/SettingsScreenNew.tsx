@@ -146,6 +146,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
   const [statusBarTheme, setStatusBarTheme] = useState<'dark' | 'light'>('dark');
   const [language, setLanguage] = useState<SupportedLanguage>('en');
   const [keyboardMode, setKeyboardMode] = useState<string>('default');
+  const [screenOrientation, setScreenOrientation] = useState<string>('auto');
   const [allowPowerButton, setAllowPowerButton] = useState<boolean>(true);
   const [blockFactoryReset, setBlockFactoryReset] = useState<boolean>(false);
   const [allowRemoteScreenshot, setAllowRemoteScreenshot] = useState<boolean>(false);
@@ -676,6 +677,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
     setBackButtonMode(savedBackButtonMode);
     setBackButtonTimerDelay(String(savedBackButtonTimerDelay));
     setKeyboardMode(savedKeyboardMode);
+    setScreenOrientation(await StorageService.getScreenOrientation());
     setAllowPowerButton(savedAllowPowerButton);
     setBlockFactoryReset(savedBlockFactoryReset);
     setAllowRemoteScreenshot(savedAllowRemoteScreenshot);
@@ -1632,6 +1634,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
     const timerDelay = parseInt(backButtonTimerDelay, 10);
     await StorageService.saveBackButtonTimerDelay(isNaN(timerDelay) ? 10 : Math.max(1, Math.min(3600, timerDelay)));
     await StorageService.saveKeyboardMode(keyboardMode);
+    await StorageService.saveScreenOrientation(screenOrientation);
     await StorageService.saveWebViewZoomLevel(zoomLevel);
     await StorageService.saveWebViewZoomMode(zoomMode);
     await StorageService.saveDisableUserZoom(disableUserZoom);
@@ -2241,6 +2244,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
             }}
             keyboardMode={keyboardMode}
             onKeyboardModeChange={setKeyboardMode}
+            screenOrientation={screenOrientation}
+            onScreenOrientationChange={setScreenOrientation}
             zoomLevel={zoomLevel}
             onZoomLevelChange={setZoomLevel}
             zoomMode={zoomMode}

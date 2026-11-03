@@ -420,6 +420,15 @@
       "intercom": "Modo de áudio bidirecional (interfone)",
       "intercomHint": "Ative para áudio bidirecional / talk-back via WebRTC (ex.: um card de interfone de campainha do Home Assistant / go2rtc). Enquanto a página web estiver usando o microfone, o FreeKiosk coloca o dispositivo no modo de áudio de comunicação para que o canal de retorno do microfone transmita, e depois restaura o áudio normal quando você parar de falar. Deixe desativado para a navegação normal — ele só entra em ação enquanto o microfone está em uso."
     },
+    "orientation": {
+      "title": "Orientação da tela",
+      "hint": "Trava a tela do FreeKiosk em uma orientação ou segue o dispositivo. Não se aplica a um app externo.",
+      "auto": "Seguir o dispositivo",
+      "portrait": "Retrato",
+      "landscape": "Paisagem",
+      "reversePortrait": "Retrato (invertido)",
+      "reverseLandscape": "Paisagem (invertida)"
+    },
     "keyboard": {
       "title": "Modo do teclado",
       "hint": "Controlar qual teclado aparece nos campos de entrada",

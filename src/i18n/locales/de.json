@@ -420,6 +420,15 @@
       "intercom": "Modus für bidirektionales Audio (Gegensprechanlage)",
       "intercomHint": "Aktiviere dies für bidirektionales WebRTC-Audio / Rückkanal (z. B. eine Gegensprechanlagen-Karte einer Home-Assistant-/go2rtc-Türklingel). Solange die Webseite aktiv das Mikrofon nutzt, schaltet FreeKiosk das Gerät in den Kommunikations-Audiomodus, damit der Mikrofon-Rückkanal sendet, und stellt das normale Audio wieder her, wenn du aufhörst zu sprechen. Für normales Surfen deaktiviert lassen: Er greift nur, solange das Mikrofon genutzt wird."
     },
+    "orientation": {
+      "title": "Bildschirmausrichtung",
+      "hint": "Sperrt den Bildschirm von FreeKiosk in einer Ausrichtung oder folgt dem Gerät. Gilt nicht für eine externe App.",
+      "auto": "Dem Gerät folgen",
+      "portrait": "Hochformat",
+      "landscape": "Querformat",
+      "reversePortrait": "Hochformat (umgedreht)",
+      "reverseLandscape": "Querformat (umgedreht)"
+    },
     "keyboard": {
       "title": "Tastaturmodus",
       "hint": "Steuert, welche Tastatur für Eingabefelder erscheint",

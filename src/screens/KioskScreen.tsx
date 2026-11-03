@@ -1965,6 +1965,10 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       setBackButtonMode(savedBackButtonMode);
       setBackButtonTimerDelay(savedBackButtonTimerDelay);
       setKeyboardMode(savedKeyboardMode);
+      // #189: not on a TV or behind an external app, where the setting is not offered.
+      NativeModules.RotationControlModule?.setAppOrientation?.(
+        savedDisplayMode === 'external_app' ? 'auto' : (str(K.SCREEN_ORIENTATION) ?? 'auto')
+      )?.catch?.(() => {});
       setAllowPowerButton(savedAllowPowerButton);
       setAllowNotifications(savedAllowNotifications);
 

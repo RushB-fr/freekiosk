@@ -42,6 +42,7 @@ const BACKUP_KEYS = [
   '@kiosk_back_button_mode',
   '@kiosk_back_button_timer_delay',
   '@kiosk_keyboard_mode',
+  '@kiosk_screen_orientation',
   // PIN Mode
   '@kiosk_pin_mode',
   // URL Rotation

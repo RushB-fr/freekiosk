@@ -1,6 +1,7 @@
 package com.freekiosk
 
 import android.content.Context
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.provider.Settings
 import android.view.Surface
@@ -16,6 +17,16 @@ class RotationControlModule(private val reactContext: ReactApplicationContext) :
 
     companion object {
         private const val MODULE_NAME = "RotationControlModule"
+
+        /** The Screen Orientation setting (#189) as an ActivityInfo constant; unknown is 'auto'. */
+        @JvmStatic
+        fun orientationFor(mode: String?): Int = when (mode) {
+            "portrait" -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            "landscape" -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            "reverse_portrait" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
+            "reverse_landscape" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+            else -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
     }
 
     override fun getName(): String = MODULE_NAME
@@ -31,6 +42,28 @@ class RotationControlModule(private val reactContext: ReactApplicationContext) :
             promise.resolve(buildStateMap())
         } catch (e: Exception) {
             promise.reject("ROTATION_STATE_FAILED", e.message, e)
+        }
+    }
+
+    /**
+     * Locks FreeKiosk's own activity to an orientation, or frees it with 'auto' (#189). This is
+     * the activity's requested orientation, not the system rotation setting: it does not apply to
+     * an external app, and needs no permission.
+     */
+    @ReactMethod
+    fun setAppOrientation(mode: String?, promise: Promise) {
+        val activity = reactContext.currentActivity
+        if (activity == null) {
+            promise.resolve(false)
+            return
+        }
+        activity.runOnUiThread {
+            try {
+                activity.requestedOrientation = orientationFor(mode)
+                promise.resolve(true)
+            } catch (e: Exception) {
+                promise.reject("ORIENTATION_SET_FAILED", e.message, e)
+            }
         }
     }
 

@@ -105,6 +105,7 @@ class MainActivity : ReactActivity() {
       "auto_relaunch_app" to "@kiosk_auto_relaunch_app",
       "keep_screen_on" to "@kiosk_keep_screen_on",
       "keyboard_mode" to "@kiosk_keyboard_mode",
+      "screen_orientation" to "@kiosk_screen_orientation",
       "pin_max_attempts" to "@kiosk_pin_max_attempts",
       "back_button_timer_delay" to "@kiosk_back_button_timer_delay",
       "status_bar_enabled" to "@kiosk_status_bar_enabled",
@@ -812,6 +813,7 @@ class MainActivity : ReactActivity() {
 
     readExternalAppConfig()
     syncCameraForegroundService()
+    applyScreenOrientation()
     
     // Re-register screen state receiver in case it was lost
     if (screenStateReceiver == null) {
@@ -1578,6 +1580,21 @@ class MainActivity : ReactActivity() {
       }
     } catch (e: Exception) {
       DebugLog.d("MainActivity", "Error starting KioskWatchdogService: ${e.message}")
+    }
+  }
+
+  /**
+   * Applies the Screen Orientation setting (#189) to this activity. Read here, before React
+   * Native has loaded, so a locked kiosk does not show the other orientation first.
+   */
+  private fun applyScreenOrientation() {
+    try {
+      // Not behind an external app, where the setting is not offered (KioskScreen does the same).
+      val mode = if (getAsyncStorageValue("@kiosk_display_mode", "webview") == "external_app") "auto"
+        else getAsyncStorageValue("@kiosk_screen_orientation", "auto")
+      requestedOrientation = RotationControlModule.orientationFor(mode)
+    } catch (e: Exception) {
+      DebugLog.d("MainActivity", "Could not apply the screen orientation: ${e.message}")
     }
   }
 

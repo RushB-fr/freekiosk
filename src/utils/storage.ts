@@ -61,6 +61,8 @@ export const KEYS = {
   BACK_BUTTON_MODE: '@kiosk_back_button_mode',
   BACK_BUTTON_TIMER_DELAY: '@kiosk_back_button_timer_delay',
   KEYBOARD_MODE: '@kiosk_keyboard_mode',
+  // FreeKiosk's own screen orientation (#189): 'auto' | 'portrait' | 'landscape' | 'reverse_portrait' | 'reverse_landscape'
+  SCREEN_ORIENTATION: '@kiosk_screen_orientation',
   // PIN Mode
   PIN_MODE: '@kiosk_pin_mode', // 'numeric' or 'alphanumeric'
   // URL Rotation
@@ -552,6 +554,7 @@ export const StorageService = {
         KEYS.BACK_BUTTON_MODE,
         KEYS.BACK_BUTTON_TIMER_DELAY,
         KEYS.KEYBOARD_MODE,
+        KEYS.SCREEN_ORIENTATION,
         // URL Rotation
         KEYS.URL_ROTATION_ENABLED,
         KEYS.URL_ROTATION_LIST,
@@ -1501,6 +1504,23 @@ export const StorageService = {
   },
 
   // Keyboard Mode
+  saveScreenOrientation: async (mode: string): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.SCREEN_ORIENTATION, mode);
+    } catch (error) {
+      console.error('Error saving screen orientation:', error);
+    }
+  },
+
+  getScreenOrientation: async (): Promise<string> => {
+    try {
+      return (await AsyncStorage.getItem(KEYS.SCREEN_ORIENTATION)) || 'auto';
+    } catch (error) {
+      console.error('Error getting screen orientation:', error);
+      return 'auto';
+    }
+  },
+
   saveKeyboardMode: async (mode: string): Promise<void> => {
     try {
       await AsyncStorage.setItem(KEYS.KEYBOARD_MODE, mode);
@@ -3815,6 +3835,7 @@ export const StorageService = {
           theme: str(KEYS.STATUS_BAR_THEME, 'dark'),
         },
         keyboardMode: str(KEYS.KEYBOARD_MODE, 'default'),
+        screenOrientation: str(KEYS.SCREEN_ORIENTATION, 'auto'),
         zoom: {
           level: num(KEYS.WEBVIEW_ZOOM_LEVEL, 100),
           mode: str(KEYS.WEBVIEW_ZOOM_MODE, 'standard'),
@@ -4073,6 +4094,7 @@ export const StorageService = {
         set(KEYS.STATUS_BAR_THEME, sb.theme);
       }
       set(KEYS.KEYBOARD_MODE, d.keyboardMode);
+      set(KEYS.SCREEN_ORIENTATION, d.screenOrientation);
       const z = d.zoom as Record<string, unknown> | undefined;
       if (z) {
         set(KEYS.WEBVIEW_ZOOM_LEVEL, z.level);

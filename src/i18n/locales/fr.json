@@ -420,6 +420,15 @@
       "intercom": "Mode audio bidirectionnel (interphone)",
       "intercomHint": "À activer pour l'audio bidirectionnel WebRTC / talkie-walkie (ex. une carte interphone de sonnette Home Assistant / go2rtc). Pendant que la page web utilise activement le microphone, FreeKiosk bascule l'appareil en mode audio de communication pour que le canal retour du micro transmette, puis restaure l'audio normal quand vous arrêtez de parler. Laisser désactivé pour une navigation normale — ça ne s'active que quand le micro est utilisé."
     },
+    "orientation": {
+      "title": "Orientation de l'écran",
+      "hint": "Verrouille l'écran de FreeKiosk dans une orientation, ou suit l'appareil. Ne s'applique pas à une app externe.",
+      "auto": "Suivre l'appareil",
+      "portrait": "Portrait",
+      "landscape": "Paysage",
+      "reversePortrait": "Portrait (inversé)",
+      "reverseLandscape": "Paysage (inversé)"
+    },
     "keyboard": {
       "title": "Mode clavier",
       "hint": "Contrôle quel clavier apparaît pour les champs de saisie",
