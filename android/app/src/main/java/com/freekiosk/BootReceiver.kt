@@ -13,6 +13,10 @@ import android.provider.Settings
 class BootReceiver : BroadcastReceiver() {
 
     companion object {
+        /** Wait before the legacy path launches MainActivity, to ensure the system is ready
+         *  (important for Android 9, v1.2.1). BootSplashActivity covers this wait. */
+        private const val BOOT_LAUNCH_DELAY_MS = 3000L
+
         /**
          * DE (Device Encrypted) SharedPreferences that can be read even before the user
          * unlocks the device (i.e. at ACTION_LOCKED_BOOT_COMPLETED time).
@@ -176,7 +180,9 @@ class BootReceiver : BroadcastReceiver() {
                     launchMainActivityLegacy(context)
                 }
             } else {
-                // Non-Device-Owner path: use the original delayed launch
+                // Non-Device-Owner path: use the original delayed launch, with a native loading
+                // screen in front at once so the system launcher does not show while it waits.
+                showBootSplash(context)
                 launchMainActivityLegacy(context)
             }
 
@@ -308,6 +314,25 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     /**
+     * Shows BootSplashActivity until MainActivity starts (non-Device-Owner installs). Skipped when
+     * MainActivity already runs, as it does when FreeKiosk is the HOME app.
+     */
+    private fun showBootSplash(context: Context) {
+        if (MainActivity.hasStarted) {
+            DebugLog.d("BootReceiver", "Boot splash: MainActivity already running, not shown")
+            return
+        }
+        try {
+            val splashIntent = Intent(context, BootSplashActivity::class.java)
+            splashIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(splashIntent)
+            DebugLog.d("BootReceiver", "Boot splash shown")
+        } catch (e: Exception) {
+            DebugLog.errorProduction("BootReceiver", "Boot splash failed: ${e.message}")
+        }
+    }
+
+    /**
      * Legacy path: delayed launch of MainActivity (for non-Device-Owner installs).
      */
     private fun launchMainActivityLegacy(context: Context) {
@@ -343,7 +368,7 @@ class BootReceiver : BroadcastReceiver() {
                     }
                 }, 1000)
             }.start()
-        }, 3000) // 3 second delay to ensure system is ready
+        }, BOOT_LAUNCH_DELAY_MS)
     }
 
     /**

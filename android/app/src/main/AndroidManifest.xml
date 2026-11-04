@@ -158,6 +158,18 @@
         android:resizeableActivity="false"
         android:supportsPictureInPicture="false" />
 
+      <!-- BootSplashActivity - Loading screen at boot when the Device Owner boot lock does not apply -->
+      <activity
+        android:name=".BootSplashActivity"
+        android:label="@string/app_name"
+        android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+        android:launchMode="singleTask"
+        android:exported="false"
+        android:excludeFromRecents="true"
+        android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
+        android:resizeableActivity="false"
+        android:supportsPictureInPicture="false" />
+
       <!-- MainActivity - Interface React Native principale -->
       <activity
         android:name=".MainActivity"

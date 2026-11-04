@@ -267,6 +267,7 @@ class MainActivity : ReactActivity() {
       setShowWhenLocked(true)
       setTurnScreenOn(true)
     }
+    KeyguardHelper.dismissIfInsecure(this)
 
     // Extend content into display cutout areas to prevent OEM chrome from appearing (#94)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -807,6 +808,8 @@ class MainActivity : ReactActivity() {
 
   override fun onResume() {
     super.onResume()
+    // The lock screen comes back after the screen was off; a swipe-only one is dismissed again.
+    KeyguardHelper.dismissIfInsecure(this)
 
     cookieFlushHandler.removeCallbacks(cookieFlushRunnable)
     cookieFlushHandler.postDelayed(cookieFlushRunnable, COOKIE_FLUSH_INTERVAL_MS)
