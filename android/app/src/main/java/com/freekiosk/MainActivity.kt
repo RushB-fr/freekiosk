@@ -2363,7 +2363,7 @@ class MainActivity : ReactActivity() {
         return
       }
       
-      screenStateReceiver = ScreenStateReceiver()
+      screenStateReceiver = ScreenStateReceiver(this)
       
       val filter = IntentFilter()
       filter.addAction(Intent.ACTION_SCREEN_ON)

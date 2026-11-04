@@ -1,5 +1,6 @@
 package com.freekiosk
 
+import android.app.Activity
 import android.app.KeyguardManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -8,6 +9,7 @@ import android.os.Build
 import android.os.PowerManager
 import android.util.Log
 import android.view.WindowManager
+import java.lang.ref.WeakReference
 
 /**
  * BroadcastReceiver to detect screen ON/OFF events
@@ -19,11 +21,18 @@ import android.view.WindowManager
  * When "Auto Wake on Screen Off" is enabled in SharedPreferences, this receiver
  * will immediately re-wake the screen after detecting ACTION_SCREEN_OFF.
  */
-class ScreenStateReceiver : BroadcastReceiver() {
+class ScreenStateReceiver(activity: Activity? = null) : BroadcastReceiver() {
+
+    // #317: the activity that registered this receiver. Reaching it through
+    // ReactNativeHost throws under the New Architecture, so the keyboard dismissal and
+    // the activity half of auto-wake never ran.
+    private val activityRef = WeakReference(activity)
 
     companion object {
         private const val TAG = "ScreenStateReceiver"
         private const val WAKE_LOCK_TIMEOUT = 10_000L // 10 seconds
+        // How long the wake lock gets to turn the screen on before the activity fallback.
+        private const val WAKE_CHECK_DELAY_MS = 500L
         private const val PREFS = "FreeKioskSettings"
         private const val DELIBERATE_OFF_KEY = "deliberate_screen_off_at"
 
@@ -120,14 +129,7 @@ class ScreenStateReceiver : BroadcastReceiver() {
 
     private fun dismissKeyboard(context: Context) {
         try {
-            val reactApp = context.applicationContext
-            if (reactApp is com.facebook.react.ReactApplication) {
-                val reactContext = reactApp.reactNativeHost.reactInstanceManager?.currentReactContext
-                val activity = reactContext?.currentActivity
-                if (activity != null) {
-                    KeyboardUtils.dismiss(activity)
-                }
-            }
+            activityRef.get()?.let { KeyboardUtils.dismiss(it) }
         } catch (e: Exception) {
             Log.w(TAG, "Could not dismiss keyboard on screen off: ${e.message}")
         }
@@ -150,11 +152,8 @@ class ScreenStateReceiver : BroadcastReceiver() {
 
             // Try to set activity flags (dismiss keyguard, keep screen on)
             try {
-                val reactApp = context.applicationContext
-                if (reactApp is com.facebook.react.ReactApplication) {
-                    val reactHost = reactApp.reactNativeHost
-                    val reactContext = reactHost.reactInstanceManager?.currentReactContext
-                    val activity = reactContext?.currentActivity
+                run {
+                    val activity = activityRef.get()
                     if (activity != null) {
                         activity.runOnUiThread {
                             try {
@@ -196,8 +195,36 @@ class ScreenStateReceiver : BroadcastReceiver() {
             } catch (e: Exception) {
                 Log.w(TAG, "Auto-wake: could not access activity: ${e.message}")
             }
+            bringToFrontIfStillOff(context, powerManager)
         } catch (e: Exception) {
             Log.e(TAG, "Auto-wake failed: ${e.message}", e)
         }
+    }
+
+    /**
+     * #317: a wake lock with ACQUIRE_CAUSES_WAKEUP only turns the screen on when the system
+     * lets the app do so: without TURN_SCREEN_ON it logs "Not allowing device wake-up" once
+     * the REQUIRE_TURN_SCREEN_ON_PERMISSION change applies, and the screen stays off. If the
+     * screen is still off a moment later, bring MainActivity to the front: it is created with
+     * setTurnScreenOn(true), the path Android recommends instead of the wake lock. Only as a
+     * fallback, so a tablet whose wake lock works keeps the app in front (External App mode).
+     */
+    private fun bringToFrontIfStillOff(context: Context, powerManager: PowerManager) {
+        val appContext = context.applicationContext
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            try {
+                if (powerManager.isInteractive) return@postDelayed
+                Log.w(TAG, "Auto-wake: screen still off after the wake lock, bringing MainActivity to the front")
+                appContext.startActivity(
+                    Intent(appContext, MainActivity::class.java).addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                            Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                    )
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Auto-wake: could not bring MainActivity to the front: ${e.message}")
+            }
+        }, WAKE_CHECK_DELAY_MS)
     }
 }
