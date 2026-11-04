@@ -82,6 +82,9 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const screensaverFade = useRef(new Animated.Value(0)).current;
   // Bumped on every screensaver brightness ramp and on wake: a stale ramp stops
   const screensaverRampRef = useRef(0);
+  // Until then camera motion must not wake the screensaver: the fading screen lights the
+  // room, so the front camera sees the fade itself as motion (0 = no fade running)
+  const screensaverFadeEndsAtRef = useRef(0);
   const [inactivityEnabled, setInactivityEnabled] = useState(true);
   const [inactivityDelay, setInactivityDelay] = useState(600000);
   const [motionEnabled, setMotionEnabled] = useState(false);
@@ -1346,18 +1349,23 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   // Fade the black dim layer in. Its cleanup resets it to transparent, so the next
   // activation starts from 0 instead of flashing black for a frame.
   useEffect(() => {
-    if (!isScreensaverActive || screensaverFadeSeconds <= 0) return;
+    if (!isScreensaverActive || screensaverType !== 'dim' || screensaverFadeSeconds <= 0) return;
+    const fadeMs = screensaverFadeSeconds * 1000;
     const fade = Animated.timing(screensaverFade, {
       toValue: 1,
-      duration: screensaverFadeSeconds * 1000,
+      duration: fadeMs,
       useNativeDriver: true,
     });
     fade.start();
+    // ponytail: fixed settle time for the camera's auto-exposure after the fade (about
+    // two Camera2 frames); make it depend on the capture interval if 4 s proves too short
+    screensaverFadeEndsAtRef.current = Date.now() + fadeMs + 4000;
     return () => {
       fade.stop();
       screensaverFade.setValue(0);
+      screensaverFadeEndsAtRef.current = 0;
     };
-  }, [isScreensaverActive, screensaverFadeSeconds, screensaverFade]);
+  }, [isScreensaverActive, screensaverType, screensaverFadeSeconds, screensaverFade]);
 
   // External App mode: bring FreeKiosk to foreground when screensaver activates so the full
   // screensaver (dim/URL/video) renders normally in React Native. On dismiss, re-launch the app.
@@ -2891,6 +2899,12 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   }, [displayMode]);
 
   const onMotionDetected = useCallback(async () => {
+    // The screensaver's own fade changed the camera image: not motion, neither reported nor a wake
+    if (isScreensaverActiveRef.current && Date.now() < screensaverFadeEndsAtRef.current) {
+      console.log('[KioskScreen] Motion ignored — screensaver is still fading');
+      return;
+    }
+
     // Report motion to API/MQTT
     ApiService.updateStatus({ motionDetected: true });
     // Auto-clear after 10 seconds
