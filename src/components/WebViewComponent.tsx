@@ -13,6 +13,7 @@ import {
   findNodeHandle,
   DeviceEventEmitter,
   Platform,
+  useColorScheme,
 } from 'react-native';
 
 const { HttpServerModule } = NativeModules;
@@ -146,6 +147,9 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   const containerViewRef = useRef<View>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<boolean>(false);
+  // The loading overlay follows the device's dark theme, so a dark dashboard is not
+  // preceded by a white flash on every load.
+  const darkLoading = useColorScheme() === 'dark';
   const [pageLoaded, setPageLoaded] = useState<boolean>(false);
   const [blockedUrlMessage, setBlockedUrlMessage] = useState<string | null>(null);
   // App version for the error-overlay footer — read from the installed APK (build.gradle)
@@ -1777,12 +1781,14 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
       />
       
       {loading && !error && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2b7fff" />
-          <Text style={styles.loadingText}>{t('components.webView.loading')}</Text>
+        <View style={[styles.loadingContainer, darkLoading && styles.loadingContainerDark]}>
+          <ActivityIndicator size="large" color={darkLoading ? '#8ab4ff' : '#2b7fff'} />
+          <Text style={[styles.loadingText, darkLoading && styles.loadingTextDark]}>
+            {t('components.webView.loading')}
+          </Text>
           {/* Fallback settings button inside loading overlay */}
           <TouchableOpacity
-            style={styles.fallbackSettingsButton}
+            style={[styles.fallbackSettingsButton, darkLoading && styles.fallbackSettingsButtonDark]}
             activeOpacity={0.7}
             onPress={() => {
               if (onUserInteraction) {
@@ -1790,7 +1796,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
               }
             }}
           >
-            <Icon name="cog" size={24} color="#333" />
+            <Icon name="cog" size={24} color={darkLoading ? '#ccc' : '#333'} />
           </TouchableOpacity>
         </View>
       )}
@@ -2062,10 +2068,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#fff',
   },
-  loadingText: { 
-    marginTop: 10, 
-    fontSize: 16, 
-    color: '#666' 
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666'
+  },
+  loadingContainerDark: {
+    backgroundColor: '#000',
+  },
+  loadingTextDark: {
+    color: '#aaa',
+  },
+  fallbackSettingsButtonDark: {
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
   },
   errorContainer: {
     position: 'absolute',
