@@ -110,6 +110,8 @@ interface DisplayTabProps {
   onScreensaverVideoLoopChange: (value: boolean) => void;
   screensaverKeepExternalApp: boolean;
   onScreensaverKeepExternalAppChange: (value: boolean) => void;
+  screensaverFadeSeconds: number;
+  onScreensaverFadeSecondsChange: (value: number) => void;
   onPickScreensaverMedia: (type: 'video' | 'image' | 'any') => void;
   pickingScreensaverMedia: boolean;
 
@@ -213,6 +215,8 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
   onScreensaverVideoLoopChange,
   screensaverKeepExternalApp,
   onScreensaverKeepExternalAppChange,
+  screensaverFadeSeconds,
+  onScreensaverFadeSecondsChange,
   onPickScreensaverMedia,
   pickingScreensaverMedia,
   motionEnabled,
@@ -584,6 +588,23 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                       { label: t('display.screensaver.veryDim'), value: 0.05 },
                       { label: t('display.screensaver.dim'), value: 0.1 },
                     ]}
+                  />
+                </View>
+              )}
+
+              {/* Fade-out: Dim style rendered by FreeKiosk (not the native overlay over an external app) */}
+              {screensaverType === 'dim' && !dimsOverExternalApp && (
+                <View style={styles.subSection}>
+                  <Text style={styles.subSectionTitle}>{t('display.screensaver.fadeTitle')}</Text>
+                  <SettingsSlider
+                    label=""
+                    hint={t('display.screensaver.fadeHint')}
+                    value={screensaverFadeSeconds}
+                    onValueChange={onScreensaverFadeSecondsChange}
+                    minimumValue={0}
+                    maximumValue={30}
+                    step={1}
+                    formatValue={(v) => (v === 0 ? t('display.screensaver.fadeOff') : `${Math.round(v)} s`)}
                   />
                 </View>
               )}

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { View, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, NativeEventEmitter, NativeModules, AppState, DeviceEventEmitter, Dimensions, Pressable, BackHandler, Keyboard, Animated } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RNBrightness from '../utils/BrightnessModule';
+import { rampBrightness } from '../utils/brightnessRamp';
 import { useIsFocused, useFocusEffect } from '@react-navigation/native';
 import WebViewComponent, { WebViewComponentRef } from '../components/WebViewComponent';
 import { isNavGestureDirection, navAutoHideSeconds, nextTileIndex, NavGestureDirection } from '../utils/dashboardNavigation';
@@ -76,6 +77,11 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [screensaverVideoItems, setScreensaverVideoItems] = useState<MediaItem[]>([]);
   const [screensaverVideoLoop, setScreensaverVideoLoop] = useState<boolean>(true);
   const [screensaverKeepExternalApp, setScreensaverKeepExternalApp] = useState<boolean>(false);
+  const [screensaverFadeSeconds, setScreensaverFadeSeconds] = useState<number>(0);
+  // Opacity of the black dim layer while it fades in; reset to 0 on every wake
+  const screensaverFade = useRef(new Animated.Value(0)).current;
+  // Bumped on every screensaver brightness ramp and on wake: a stale ramp stops
+  const screensaverRampRef = useRef(0);
   const [inactivityEnabled, setInactivityEnabled] = useState(true);
   const [inactivityDelay, setInactivityDelay] = useState(600000);
   const [motionEnabled, setMotionEnabled] = useState(false);
@@ -574,7 +580,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         // Screensaver active: pause auto-brightness and apply screensaver brightness
         try {
           await AutoBrightnessModule.stopAutoBrightness();
-          await RNBrightness.setBrightnessLevel(screensaverBrightness);
+          await applyScreensaverBrightness();
           console.log('[KioskScreen] Auto-brightness paused for screensaver');
         } catch (error) {
           console.error('[KioskScreen] Error pausing auto-brightness:', error);
@@ -604,6 +610,8 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     };
     
     handleAutoBrightnessForScreensaver();
+    // applyScreensaverBrightness is recreated every render; screensaverBrightness covers what it reads
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isScreensaverActive, autoBrightnessEnabled, autoBrightnessMin, autoBrightnessMax, autoBrightnessOffset, autoBrightnessInterval, screensaverBrightness, isScheduledSleep, screensaverType, displayMode, defaultBrightness]);
 
   // #135 — Dismiss the soft keyboard whenever the screensaver activates.
@@ -1329,8 +1337,27 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   useEffect(() => {
     if (isScreensaverActive) {
       enableScreensaverEffects();
+    } else {
+      // Woken: stop a fade still in progress
+      screensaverRampRef.current++;
     }
   }, [isScreensaverActive, screensaverBrightness, screensaverType]);
+
+  // Fade the black dim layer in. Its cleanup resets it to transparent, so the next
+  // activation starts from 0 instead of flashing black for a frame.
+  useEffect(() => {
+    if (!isScreensaverActive || screensaverFadeSeconds <= 0) return;
+    const fade = Animated.timing(screensaverFade, {
+      toValue: 1,
+      duration: screensaverFadeSeconds * 1000,
+      useNativeDriver: true,
+    });
+    fade.start();
+    return () => {
+      fade.stop();
+      screensaverFade.setValue(0);
+    };
+  }, [isScreensaverActive, screensaverFadeSeconds, screensaverFade]);
 
   // External App mode: bring FreeKiosk to foreground when screensaver activates so the full
   // screensaver (dim/URL/video) renders normally in React Native. On dismiss, re-launch the app.
@@ -1909,6 +1936,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       const savedScreensaverVideoItems = jsonParse(K.SCREENSAVER_VIDEO_ITEMS, []) as MediaItem[];
       const savedScreensaverVideoLoop = bool(K.SCREENSAVER_VIDEO_LOOP, true);
       const savedScreensaverKeepExternalApp = bool(K.SCREENSAVER_KEEP_EXTERNAL_APP, false);
+      const savedScreensaverFadeSeconds = num(K.SCREENSAVER_FADE_SECONDS, 0);
       const savedStatusBarEnabled = bool(K.STATUS_BAR_ENABLED, false);
       const savedStatusBarOnOverlay = bool(K.STATUS_BAR_ON_OVERLAY, true);
       const savedStatusBarOnReturn = bool(K.STATUS_BAR_ON_RETURN, true);
@@ -1966,6 +1994,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       setScreensaverVideoItems(savedScreensaverVideoItems);
       setScreensaverVideoLoop(savedScreensaverVideoLoop);
       setScreensaverKeepExternalApp(savedScreensaverKeepExternalApp);
+      setScreensaverFadeSeconds(savedScreensaverFadeSeconds);
       setStatusBarEnabled(savedStatusBarEnabled);
       setStatusBarOnOverlay(savedStatusBarOnOverlay);
       setStatusBarOnReturn(savedStatusBarOnReturn);
@@ -2975,10 +3004,21 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     // so RNBrightness applies normally — no special guard needed.
     if (!brightnessManagementRef.current) return;
     try {
-      await RNBrightness.setBrightnessLevel(screensaverBrightness);
+      await applyScreensaverBrightness();
     } catch (error) {
       console.error('[KioskScreen] Error applying screensaver brightness:', error);
     }
+  };
+
+  // Dim to screensaverBrightness, over screensaverFadeSeconds when a fade is set. A newer
+  // call or a wake (see the isScreensaverActive effect) bumps screensaverRampRef and stops
+  // this ramp before its next step; the wake paths then restore their own level.
+  const applyScreensaverBrightness = async () => {
+    const run = ++screensaverRampRef.current;
+    const fadeMs = screensaverFadeSeconds * 1000;
+    const from = fadeMs > 0 ? await RNBrightness.getBrightnessLevel() : screensaverBrightness;
+    await rampBrightness(from, screensaverBrightness, fadeMs, RNBrightness.setBrightnessLevel,
+      () => run !== screensaverRampRef.current);
   };
 
   const launchExternalApp = async (packageName: string, tapCount?: number, tapTimeout?: number, mode?: string, buttonPos?: string): Promise<void> => {
@@ -3625,7 +3665,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           style={[
             styles.screensaverOverlay,
             screensaverType === 'dim'
-              ? ((screensaverBrightness === 0 || !brightnessManagementEnabled)
+              ? ((screensaverBrightness === 0 || !brightnessManagementEnabled) && screensaverFadeSeconds <= 0
                   ? styles.screensaverBlack
                   : styles.screensaverTransparent)
               : styles.screensaverTransparent,
@@ -3633,6 +3673,13 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           activeOpacity={1}
           onPress={onScreensaverTap}
         >
+          {/* Fade-out: the black layer fades in over screensaverFadeSeconds */}
+          {screensaverType === 'dim' && (screensaverBrightness === 0 || !brightnessManagementEnabled) && screensaverFadeSeconds > 0 && (
+            <Animated.View
+              pointerEvents="none"
+              style={[StyleSheet.absoluteFill, styles.screensaverBlack, { opacity: screensaverFade }]}
+            />
+          )}
           {screensaverType === 'url' && screensaverUrl.trim().length > 0 && (
             <View style={StyleSheet.absoluteFill} pointerEvents="none">
               <WebView
