@@ -90,7 +90,8 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   // armed none.
   const resetTimerRef = useRef<() => void>(() => {});
   // Mirrors MotionDetector's own enabled condition, so movement coming from the camera stream
-  // wakes the screen in exactly the same situations.
+  // wakes the screen in the same situations, except that it is also false while "Only wake for
+  // a face" is on: stream frames get no face check, so they must not wake the screen.
   const streamMotionAllowedRef = useRef(false);
   const [motionCameraPosition, setMotionCameraPosition] = useState<'front' | 'back'>('front');
   const [motionSensitivity, setMotionSensitivity] = useState<'low' | 'medium' | 'high'>('medium');

@@ -1,6 +1,7 @@
 /**
  * "Only wake for a face" is off by default, survives the config export/import round trip
- * (device backup and FreeKiosk Cloud sync), is left alone by a config that does not carry it,
+ * (FreeKiosk Cloud sync; the device backup is BackupService, see BackupMotionRequireFace.test.ts),
+ * is left alone by a config that does not carry it,
  * and is reset by clearAll.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';

@@ -36,7 +36,8 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
     /**
      * "Only wake for a face": motion opens a window of FACE_WINDOW_MS in which a frame with a
      * face triggers. Someone who walks up and then stands still in front of the screen still
-     * wakes it; a face on a poster never does, since nothing moves.
+     * wakes it. A face on a poster alone does not, since nothing moves, but any motion (a light
+     * change, a pet) opens the window, after which it can.
      */
     private var lastMotionAt = 0L
 
@@ -103,7 +104,7 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
                         false // First image, no comparison
                     }
 
-                    triggered = if (requireFace) faceGate(hasMotion, currentBitmap) else hasMotion
+                    triggered = if (requireFace) runCatching { faceGate(hasMotion, currentBitmap) }.getOrDefault(false) else hasMotion
 
                     // Store current for next comparison
                     previousBitmap?.let { 
@@ -253,8 +254,10 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
     }
 
     companion object {
-        // ponytail: fixed values, tune on real devices. At 640 px a face 2-3 m away is ~30 px
-        // wide, near FaceDetector's limit; raise FACE_MAX_SIDE if distant faces are missed.
+        // ponytail: fixed values, tune on real devices. The frame is already decoded at
+        // inSampleSize=4 (1/4 of the capture), so FACE_MAX_SIDE only caps it further; on the
+        // Camera2 fallback (~1280x960 capture) detection runs on ~320x240. More range would need
+        // decoding the file at a smaller inSampleSize for the face check.
         private const val FACE_MAX_SIDE = 640
         private const val FACE_WINDOW_MS = 10_000L
         private const val MAX_FACES = 3
