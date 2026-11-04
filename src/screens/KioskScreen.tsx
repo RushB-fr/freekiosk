@@ -82,6 +82,10 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   // onMotionDetected is defined further down; the API callbacks are registered on mount and
   // would otherwise capture a stale closure.
   const onMotionDetectedRef = useRef<(() => void) | null>(null);
+  // Same for resetTimer: the API callbacks and the screen-state listener are registered on
+  // mount, when the screensaver still reads as off, so their own copy cleared the timer and
+  // armed none.
+  const resetTimerRef = useRef<() => void>(() => {});
   // Mirrors MotionDetector's own enabled condition, so movement coming from the camera stream
   // wakes the screen in exactly the same situations.
   const streamMotionAllowedRef = useRef(false);
@@ -711,7 +715,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           await StorageService.saveScreensaverEnabled(false);
           // If screensaver is currently active, deactivate it too
           setIsScreensaverActive(false);
-          resetTimer();
+          resetTimerRef.current();
           console.log('[API] Screensaver setting DISABLED');
         },
         onScreenOn: () => {
@@ -720,7 +724,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           // screen was physically locked (onScreenStateChanged will also fire) and the case
           // where only the screensaver overlay was active (screen physically on, no lock event).
           setIsScreensaverActive(false);
-          resetTimer();
+          resetTimerRef.current();
           KioskModule.turnScreenOn()
             .catch((e: any) => console.warn('[API] turnScreenOn failed:', e));
         },
@@ -731,7 +735,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         },
         onWake: () => {
           setIsScreensaverActive(false);
-          resetTimer();
+          resetTimerRef.current();
           console.log('[API] Wake');
         },
         onReload: () => {
@@ -1062,7 +1066,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           // If screen turned on, deactivate screensaver
           if (isScreenOn && isScreensaverActiveRef.current) {
             setIsScreensaverActive(false);
-            resetTimer();
+            resetTimerRef.current();
           }
         }, 0);
       }
@@ -2455,6 +2459,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       }, inactivityDelay);
     }
   };
+  resetTimerRef.current = resetTimer;
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) {
