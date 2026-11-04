@@ -445,6 +445,8 @@ FreeKiosk can detect motion using the device camera and report it as a binary se
 
 **Always-on mode**: Enable "Always-on Motion Detection" in MQTT settings or via the HA switch entity to run motion detection continuously. The `motion_detected` binary sensor will update in real-time. Note: this uses the camera continuously and increases battery usage.
 
+**Only wake for a face**: with Settings > Display > Screensaver > Motion Detection > *Only wake for a face* on, `motion_detected` turns on only for motion followed by a face in the camera image (a face looking at the camera; a turned or distant one may be missed). Movement measured on a running camera stream has no face check and is not reported while the option is on.
+
 > [!NOTE]
 > Camera permission must be granted for motion detection to work. FreeKiosk requests this permission automatically on first launch.
 
