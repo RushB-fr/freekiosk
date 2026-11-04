@@ -40,8 +40,8 @@ const MotionDetector = require('../src/components/MotionDetector').default;
 
 let renderer: any;
 
-const element = (onMotionDetected: () => void) =>
-  React.createElement(MotionDetector, { enabled: true, onMotionDetected, sensitivity: 'medium' });
+const element = (onMotionDetected: () => void, referenceKey?: unknown) =>
+  React.createElement(MotionDetector, { enabled: true, onMotionDetected, sensitivity: 'medium', referenceKey });
 
 // CAMERA_READY_DELAY (1500 ms), then one capture per CAPTURE_INTERVAL (1000 ms)
 // In 100 ms steps so each capture's promises settle before the next tick (a tick that finds a
@@ -97,5 +97,41 @@ describe('MotionDetector with a new onMotionDetected', () => {
 
     expect(latest).toHaveBeenCalledTimes(1);
     expect(first).not.toHaveBeenCalled();
+  });
+});
+
+// The screensaver dims the screen, and the camera sees the room go darker: that must not count
+// as movement. A new referenceKey takes a new reference frame and skips the warm-up frames again.
+describe('MotionDetector with a new referenceKey', () => {
+  it('takes a new reference and ignores the warm-up frames', async () => {
+    const onMotion = jest.fn();
+    act(() => { renderer = TestRenderer.create(element(onMotion, false)); });
+    act(() => { mockCameraProps.onInitialized(); });
+    await advance(5500);
+    const resetsBefore = reset.mock.calls.length;
+
+    compareImages.mockImplementation(() => Promise.resolve(true)); // the dimmed frames differ
+    act(() => { renderer.update(element(onMotion, true)); });
+    await advance(3000); // the three warm-up frames
+
+    expect(reset.mock.calls.length).toBe(resetsBefore + 1);
+    expect(onMotion).not.toHaveBeenCalled();
+
+    await advance(1000); // the first real comparison
+    expect(onMotion).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('MotionDetector with an unchanged referenceKey', () => {
+  it('does not reset on a new callback', async () => {
+    act(() => { renderer = TestRenderer.create(element(jest.fn(), true)); });
+    act(() => { mockCameraProps.onInitialized(); });
+    await advance(5500);
+    const resetsBefore = reset.mock.calls.length;
+
+    act(() => { renderer.update(element(jest.fn(), true)); });
+    await advance(1000);
+
+    expect(reset.mock.calls.length).toBe(resetsBefore);
   });
 });

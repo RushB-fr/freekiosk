@@ -12,6 +12,12 @@ interface MotionDetectorProps {
   sensitivity: 'low' | 'medium' | 'high';
   cameraPosition?: 'front' | 'back';
   onStatusChange?: (status: MotionStatus) => void;
+  /**
+   * Change it when the app itself changes the scene, e.g. the screensaver dims the screen: in a
+   * dark room the camera sees that as movement. Detection takes a new reference frame and
+   * skips the warm-up frames again.
+   */
+  referenceKey?: unknown;
 }
 
 const THROTTLE_INTERVAL = 2000; // Minimum 2s entre détections
@@ -37,6 +43,7 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
   sensitivity,
   cameraPosition = 'front',
   onStatusChange,
+  referenceKey,
 }) => {
   const device = useCameraDevice(cameraPosition);
   const { hasPermission } = useCameraPermission();
@@ -57,6 +64,15 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
   // restart detection (native reset + warm-up, ~4.5 s blind each time the screensaver came on).
   const onMotionDetectedRef = useRef(onMotionDetected);
   onMotionDetectedRef.current = onMotionDetected;
+
+  // A new referenceKey: new reference frame, warm-up again, detection keeps running
+  const referenceKeyRef = useRef(referenceKey);
+  useEffect(() => {
+    if (Object.is(referenceKeyRef.current, referenceKey)) return;
+    referenceKeyRef.current = referenceKey;
+    warmupFrames.current = 0;
+    MotionDetectionModule?.reset().catch(() => {});
+  }, [referenceKey]);
 
   // #301 — recovery after another app took the camera. CameraX closes the session and never
   // reopens it by itself; only an isActive false -> true cycle does.

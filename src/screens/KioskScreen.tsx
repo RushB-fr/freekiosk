@@ -3227,6 +3227,8 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         onMotionDetected={onMotionDetected}
         sensitivity={motionSensitivity}
         cameraPosition={motionCameraPosition}
+        // The screensaver dims the screen: not movement
+        referenceKey={isScreensaverActive}
       />
 
       {/* Visual Button - WebView/Media mode only */}
