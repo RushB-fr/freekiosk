@@ -94,6 +94,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const streamMotionAllowedRef = useRef(false);
   const [motionCameraPosition, setMotionCameraPosition] = useState<'front' | 'back'>('front');
   const [motionSensitivity, setMotionSensitivity] = useState<'low' | 'medium' | 'high'>('medium');
+  const [motionRequireFace, setMotionRequireFace] = useState(false);
   const [proximityEnabled, setProximityEnabled] = useState(false);
   const [isPreCheckingMotion, setIsPreCheckingMotion] = useState(false); // Pre-check phase: motion is being monitored before activating the screensaver
   const preCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1899,6 +1900,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       const savedMotionAlwaysOn = bool(K.MQTT_MOTION_ALWAYS_ON, false);
       const savedMotionCameraPosition = (str(K.MOTION_CAMERA_POSITION) ?? 'front') as 'front' | 'back';
       const savedMotionSensitivity = (str(K.SCREENSAVER_MOTION_SENSITIVITY) ?? 'medium') as 'low' | 'medium' | 'high';
+      const savedMotionRequireFace = bool(K.SCREENSAVER_MOTION_REQUIRE_FACE, false);
       const savedProximityEnabled = bool(K.SCREENSAVER_PROXIMITY_ENABLED, false);
       // Coerce any unknown/legacy value (e.g. the removed 'off' type) back to
       // 'dim' so the screensaver still works instead of silently doing nothing.
@@ -1960,6 +1962,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       setMotionAlwaysOn(savedMotionAlwaysOn);
       setMotionCameraPosition(savedMotionCameraPosition);
       setMotionSensitivity(savedMotionSensitivity);
+      setMotionRequireFace(savedMotionRequireFace);
       setProximityEnabled(savedProximityEnabled);
       setScreensaverType(savedScreensaverType);
       setScreensaverUrl(savedScreensaverUrl);
@@ -2912,11 +2915,12 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   }, [onMotionDetected]);
 
   // Same condition as the MotionDetector `enabled` prop below, minus the stream check: while a
-  // stream runs, its frames are the motion source instead of the detector.
+  // stream runs, its frames are the motion source instead of the detector. Those frames get no
+  // face check, so with "Only wake for a face" they do not wake the screen.
   useEffect(() => {
-    streamMotionAllowedRef.current =
-      motionAlwaysOn || (motionEnabled && (isPreCheckingMotion || isScreensaverActive));
-  }, [motionAlwaysOn, motionEnabled, isPreCheckingMotion, isScreensaverActive]);
+    streamMotionAllowedRef.current = !motionRequireFace &&
+      (motionAlwaysOn || (motionEnabled && (isPreCheckingMotion || isScreensaverActive)));
+  }, [motionRequireFace, motionAlwaysOn, motionEnabled, isPreCheckingMotion, isScreensaverActive]);
 
   // Proximity wake: a hand/body moving close to the front sensor. Behaves like motion
   // (cancels the pre-check or wakes an active screensaver) but is a short-range, binary
@@ -3559,6 +3563,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         cameraPosition={motionCameraPosition}
         // The screensaver dims the screen: not movement
         referenceKey={isScreensaverActive}
+        requireFace={motionRequireFace}
       />
 
       {/* Visual Button - WebView/Media mode only */}
