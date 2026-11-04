@@ -1339,8 +1339,14 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
       return;
     }
 
-    // Show the error overlay (with the fallback settings button) for ANY main-page
-    // HTTP error code, regardless of autoReload — otherwise the user is stranded
+    // 4xx responses carry a page body the site wants shown, notably Cloudflare's
+    // JS challenge, served as 403. Let it render like a browser would.
+    if (statusCode >= 400 && statusCode < 500) {
+      return;
+    }
+
+    // Show the error overlay (with the fallback settings button) for any other
+    // main-page HTTP error code, regardless of autoReload — otherwise the user is stranded
     // with no way back to settings when the page can't load (#180).
     setError(true);
     setLoading(false);
