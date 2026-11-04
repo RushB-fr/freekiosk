@@ -37,6 +37,33 @@ class BootReceiver : BroadcastReceiver() {
          */
         const val DE_KEY_SCREEN_LOCK_COMPAT = "screen_lock_compat_enabled"
 
+        /**
+         * Whether the next boot shows BootSplashActivity already at LOCKED_BOOT_COMPLETED: auto-launch
+         * on and no Device Owner boot lock. BOOT_COMPLETED only comes once the system launcher has
+         * settled (5-6 s later on an Amazon Fire), and the launcher shows in the meantime.
+         */
+        const val DE_KEY_BOOT_SPLASH = "boot_splash_enabled"
+
+        fun updateBootSplashFlag(context: Context, enabled: Boolean) {
+            try {
+                context.createDeviceProtectedStorageContext()
+                    .getSharedPreferences(DE_PREFS_NAME, Context.MODE_PRIVATE)
+                    .edit().putBoolean(DE_KEY_BOOT_SPLASH, enabled).apply()
+            } catch (e: Exception) {
+                DebugLog.errorProduction("BootReceiver", "Failed to update DE boot splash flag: ${e.message}")
+            }
+        }
+
+        fun readBootSplashFlag(context: Context): Boolean {
+            return try {
+                context.createDeviceProtectedStorageContext()
+                    .getSharedPreferences(DE_PREFS_NAME, Context.MODE_PRIVATE)
+                    .getBoolean(DE_KEY_BOOT_SPLASH, false)
+            } catch (e: Exception) {
+                false
+            }
+        }
+
         fun updateDeBootFlag(context: Context, enabled: Boolean) {
             try {
                 val deCtx = context.createDeviceProtectedStorageContext()
@@ -132,6 +159,11 @@ class BootReceiver : BroadcastReceiver() {
                     DebugLog.d("BootReceiver", "LOCKED_BOOT: screen-lock compatibility active + device secure — deferring to the keyguard; FreeKiosk will start at BOOT_COMPLETED")
                 } else {
                     DebugLog.d("BootReceiver", "LOCKED_BOOT: DE flag=false — skipping BootLockActivity")
+                    // Not over a secure lock screen: the splash would hide it, and the user could not
+                    // enter the credential (see #222).
+                    if (readBootSplashFlag(context) && !isDeviceSecure(context)) {
+                        showBootSplash(context)
+                    }
                 }
                 // Do NOT start services yet — their SQLite reads also need CE storage.
                 return
@@ -147,6 +179,7 @@ class BootReceiver : BroadcastReceiver() {
                 DebugLog.d("BootReceiver", "Auto-launch is disabled, not starting app")
                 // Update DE flag so next LOCKED_BOOT_COMPLETED also respects the setting
                 updateDeBootFlag(context, false)
+                updateBootSplashFlag(context, false)
                 return
             }
 
@@ -162,6 +195,7 @@ class BootReceiver : BroadcastReceiver() {
             val screenLockCompatActive = compatSetting && isDeviceSecure(context)
             val fastLock = shouldUseFastBootLock(context) && !screenLockCompatActive
             updateDeBootFlag(context, fastLock)
+            updateBootSplashFlag(context, !fastLock)
 
             // ── #98 fix: launch BootLockActivity IMMEDIATELY if Device Owner + kiosk ──
             // This locks the device in < 1 second, before React Native loads.

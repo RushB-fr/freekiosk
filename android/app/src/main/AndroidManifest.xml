@@ -166,6 +166,7 @@
         android:launchMode="singleTask"
         android:exported="false"
         android:excludeFromRecents="true"
+        android:directBootAware="true"
         android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
         android:resizeableActivity="false"
         android:supportsPictureInPicture="false" />
