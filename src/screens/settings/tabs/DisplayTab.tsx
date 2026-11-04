@@ -120,6 +120,8 @@ interface DisplayTabProps {
   onMotionSensitivityChange: (value: 'low' | 'medium' | 'high') => void;
   motionCameraPosition: 'front' | 'back';
   onMotionCameraPositionChange: (value: 'front' | 'back') => void;
+  motionRequireFace: boolean;
+  onMotionRequireFaceChange: (value: boolean) => void;
 
   // Proximity detection (hardware sensor wake trigger)
   proximityEnabled: boolean;
@@ -221,6 +223,8 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
   onMotionSensitivityChange,
   motionCameraPosition,
   onMotionCameraPositionChange,
+  motionRequireFace,
+  onMotionRequireFaceChange,
   proximityEnabled,
   onProximityEnabledChange,
   availableCameras,
@@ -629,6 +633,13 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                       ]}
                       value={motionSensitivity}
                       onValueChange={handleMotionSensitivityChange}
+                    />
+
+                    <SettingsSwitch
+                      label={t('display.screensaver.motionRequireFace')}
+                      hint={t('display.screensaver.motionRequireFaceHint')}
+                      value={motionRequireFace}
+                      onValueChange={onMotionRequireFaceChange}
                     />
 
                     {availableCameras.length === 0 && (

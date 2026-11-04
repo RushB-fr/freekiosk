@@ -340,6 +340,8 @@
       "cameraPosition": "Position de la caméra",
       "cameraPositionHint": "Sélectionnez quelle caméra utiliser pour la détection de mouvement",
       "cameraUnavailable": "La caméra sélectionnée n'est pas disponible sur cet appareil",
+      "motionRequireFace": "Réveiller seulement pour un visage",
+      "motionRequireFaceHint": "Le mouvement ne réveille l'écran que si un visage est dans l'image de la caméra : les animaux et les changements de lumière sont ignorés. Fonctionne mieux avec un visage tourné vers la caméra ; un visage de profil ou éloigné peut ne pas être détecté.",
       "proximityTitle": "Détection de proximité",
       "proximityEnable": "Activer le réveil par proximité",
       "proximityEnableHint": "Réveiller l'écran quand une main ou un corps s'approche du capteur avant",

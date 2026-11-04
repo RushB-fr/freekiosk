@@ -108,6 +108,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
   const [motionSensitivity, setMotionSensitivity] = useState<'low' | 'medium' | 'high'>('medium');
   const [motionCameraPosition, setMotionCameraPosition] = useState<'front' | 'back'>('front');
   const [proximityEnabled, setProximityEnabled] = useState<boolean>(false);
+  const [motionRequireFace, setMotionRequireFace] = useState<boolean>(false);
   const [availableCameras, setAvailableCameras] = useState<Array<{position: 'front' | 'back', id: string}>>([]);
   const [screensaverBrightness, setScreensaverBrightness] = useState<number>(0);
   const [screensaverType, setScreensaverType] = useState<'dim' | 'url' | 'video'>('dim');
@@ -532,6 +533,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
     const savedMotionSensitivity = await StorageService.getScreensaverMotionSensitivity();
     const savedMotionCameraPosition = await StorageService.getMotionCameraPosition();
     const savedProximityEnabled = await StorageService.getScreensaverProximityEnabled();
+    const savedMotionRequireFace = await StorageService.getScreensaverMotionRequireFace();
     const savedScreensaverBrightness = await StorageService.getScreensaverBrightness();
     const savedScreensaverType = await StorageService.getScreensaverType();
     const savedScreensaverUrl = await StorageService.getScreensaverUrl();
@@ -566,6 +568,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
     setMotionSensitivity((savedMotionSensitivity as 'low' | 'medium' | 'high') ?? 'medium');
     setMotionCameraPosition(savedMotionCameraPosition ?? 'front');
     setProximityEnabled(savedProximityEnabled ?? false);
+    setMotionRequireFace(savedMotionRequireFace);
     setScreensaverBrightness(savedScreensaverBrightness ?? 0);
     setScreensaverType(savedScreensaverType);
     setScreensaverUrl(savedScreensaverUrl);
@@ -1578,6 +1581,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
     await StorageService.saveScreensaverMotionEnabled(motionEnabled);
     await StorageService.saveScreensaverMotionSensitivity(motionSensitivity);
     await StorageService.saveScreensaverProximityEnabled(proximityEnabled);
+    await StorageService.saveScreensaverMotionRequireFace(motionRequireFace);
     await StorageService.saveScreensaverBrightness(screensaverBrightness);
     await StorageService.saveScreensaverType(screensaverType);
     await StorageService.saveScreensaverUrl(screensaverUrl);
@@ -2301,6 +2305,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
             onMotionSensitivityChange={setMotionSensitivity}
             motionCameraPosition={motionCameraPosition}
             onMotionCameraPositionChange={handleMotionCameraPositionChange}
+            motionRequireFace={motionRequireFace}
+            onMotionRequireFaceChange={setMotionRequireFace}
             proximityEnabled={proximityEnabled}
             onProximityEnabledChange={setProximityEnabled}
             availableCameras={availableCameras}

@@ -340,6 +340,8 @@
       "cameraPosition": "Kameraposition",
       "cameraPositionHint": "Wähle aus, welche Kamera für die Bewegungserkennung verwendet wird",
       "cameraUnavailable": "Die ausgewählte Kamera ist auf diesem Gerät nicht verfügbar",
+      "motionRequireFace": "Nur bei Gesicht aufwecken",
+      "motionRequireFaceHint": "Bewegung weckt den Bildschirm nur, wenn ein Gesicht im Kamerabild ist. Haustiere und Lichtwechsel werden so ignoriert. Am zuverlässigsten mit einem Gesicht, das in die Kamera schaut; abgewandte oder weit entfernte Gesichter werden eventuell nicht erkannt.",
       "proximityTitle": "Näherungserkennung",
       "proximityEnable": "Aufwecken durch Annäherung aktivieren",
       "proximityEnableHint": "Bildschirm aufwecken, wenn sich eine Hand oder ein Körper dem vorderen Sensor nähert",

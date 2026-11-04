@@ -340,6 +340,8 @@
       "cameraPosition": "Camerapositie",
       "cameraPositionHint": "Kies welke camera voor bewegingsdetectie wordt gebruikt",
       "cameraUnavailable": "De geselecteerde camera is niet beschikbaar op dit apparaat",
+      "motionRequireFace": "Alleen ontwaken bij een gezicht",
+      "motionRequireFaceHint": "Beweging laat het scherm alleen ontwaken als er een gezicht in het camerabeeld is, zodat huisdieren en lichtwisselingen genegeerd worden. Werkt het best met een gezicht dat naar de camera kijkt; een afgewend of ver gezicht wordt mogelijk niet herkend.",
       "proximityTitle": "Nabijheidsdetectie",
       "proximityEnable": "Ontwaken bij nabijheid inschakelen",
       "proximityEnableHint": "Het scherm laten ontwaken wanneer een hand of lichaam dicht bij de voorsensor komt",
