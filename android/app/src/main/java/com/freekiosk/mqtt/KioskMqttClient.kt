@@ -12,6 +12,7 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
 import com.hivemq.client.mqtt.MqttClient
+import com.hivemq.client.mqtt.MqttClientState
 import com.hivemq.client.mqtt.datatypes.MqttQos
 import com.hivemq.client.mqtt.mqtt3.Mqtt3AsyncClient
 import org.json.JSONObject
@@ -423,6 +424,16 @@ class KioskMqttClient(
 
         if (disconnectRequested) return
 
+        // Three paths schedule a CONNECT: connect(), the backoff after a lost connection, and the
+        // WiFi callback (which also fires right after it is registered). When two overlap, the
+        // second CONNECT reaches a client that is already connecting or connected; HiveMQ fails it,
+        // and the failure handler below would mark the live connection as disconnected. Status
+        // publishing then stops for good while commands still arrive.
+        if (client.state != MqttClientState.DISCONNECTED) {
+            Log.d(TAG, "CONNECT skipped, client is ${client.state}")
+            return
+        }
+
         try {
             val connectBuilder = client.connectWith()
                 .cleanSession(true)
@@ -448,6 +459,11 @@ class KioskMqttClient(
 
             connectBuilder.send().whenComplete { _, throwable ->
                 if (throwable != null) {
+                    if (client.state.isConnected) {
+                        // A late failure of an earlier attempt must not mark a live connection down.
+                        Log.w(TAG, "Ignoring a failed CONNECT, the client is connected: ${throwable.message}")
+                        return@whenComplete
+                    }
                     Log.e(TAG, "Connection failed: ${throwable.message}", throwable)
                     _isConnected = false
                     val errorMsg = throwable.message ?: throwable.javaClass.simpleName
