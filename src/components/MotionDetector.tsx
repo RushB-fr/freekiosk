@@ -53,6 +53,10 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
   const captureCount = useRef<number>(0);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
+  // The parent passes a new callback on every render. Read through a ref so a new one does not
+  // restart detection (native reset + warm-up, ~4.5 s blind each time the screensaver came on).
+  const onMotionDetectedRef = useRef(onMotionDetected);
+  onMotionDetectedRef.current = onMotionDetected;
 
   // #301 — recovery after another app took the camera. CameraX closes the session and never
   // reopens it by itself; only an isActive false -> true cycle does.
@@ -249,7 +253,7 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
         const now = Date.now();
         if (now - lastMotionTime.current > THROTTLE_INTERVAL) {
           lastMotionTime.current = now;
-          onMotionDetected();
+          onMotionDetectedRef.current();
         }
       }
     } catch (error: any) {
@@ -259,7 +263,7 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
     } finally {
       isCapturing.current = false;
     }
-  }, [enabled, sensitivity, onMotionDetected, cameraPosition]);
+  }, [enabled, sensitivity, cameraPosition]);
 
   const captureAndCompare = useCallback(async () => {
     // Guard against multiple concurrent captures and unmounted state
@@ -328,7 +332,7 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
         const now = Date.now();
         if (now - lastMotionTime.current > THROTTLE_INTERVAL) {
           lastMotionTime.current = now;
-          onMotionDetected();
+          onMotionDetectedRef.current();
         } else {
           console.log('[MotionDetection] Motion throttled (too soon after last detection)');
         }
@@ -342,7 +346,7 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
     } finally {
       isCapturing.current = false;
     }
-  }, [enabled, sensitivity, onMotionDetected, isCameraReady]);
+  }, [enabled, sensitivity, isCameraReady]);
 
   // Start detection in Camera2 fallback mode
   const startCamera2Detection = useCallback(() => {
