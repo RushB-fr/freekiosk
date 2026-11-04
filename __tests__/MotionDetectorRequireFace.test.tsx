@@ -49,8 +49,11 @@ async function captureOnce(requireFace?: boolean) {
     );
   });
   act(() => { mockCameraProps.onInitialized(); });
-  // CAMERA_READY_DELAY (1500 ms), then the first CAPTURE_INTERVAL tick (1000 ms)
-  await act(async () => { jest.advanceTimersByTime(2500); });
+  // CAMERA_READY_DELAY (1500 ms), then one CAPTURE_INTERVAL tick (1000 ms) per frame:
+  // 3 warm-up frames and the first real comparison
+  for (let i = 0; i < 4; i++) {
+    await act(async () => { jest.advanceTimersByTime(i === 0 ? 2500 : 1000); });
+  }
 }
 
 beforeEach(() => {
@@ -68,13 +71,18 @@ afterEach(() => {
 });
 
 describe('MotionDetector requireFace', () => {
-  it('asks the native comparison for a face when the option is on', async () => {
+  it('asks for a face only on real comparisons, never on warm-up frames', async () => {
     await captureOnce(true);
-    expect(compareImages).toHaveBeenCalledWith('/cache/frame.jpg', 0.08, true);
+    expect(compareImages.mock.calls.slice(0, 4)).toEqual([
+      ['/cache/frame.jpg', 0.08, false],
+      ['/cache/frame.jpg', 0.08, false],
+      ['/cache/frame.jpg', 0.08, false],
+      ['/cache/frame.jpg', 0.08, true],
+    ]);
   });
 
   it('does not ask for a face by default', async () => {
     await captureOnce();
-    expect(compareImages).toHaveBeenCalledWith('/cache/frame.jpg', 0.08, false);
+    expect(compareImages.mock.calls[3]).toEqual(['/cache/frame.jpg', 0.08, false]);
   });
 });

@@ -252,7 +252,7 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
         await MotionDetectionModule.compareImages(
           photoPath,
           SENSITIVITY_THRESHOLDS[sensitivity],
-          requireFace
+          false // warm-up frames must not open the face window
         );
         return;
       }
@@ -328,7 +328,7 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
         await MotionDetectionModule.compareImages(
           photo.path,
           SENSITIVITY_THRESHOLDS[sensitivity],
-          requireFace
+          false // warm-up frames must not open the face window
         );
         return;
       }
