@@ -459,7 +459,7 @@ curl -m 10 "http://TABLET_IP:8080/api/camera/stream?fps=5" -o stream.mjpeg
 
 
 **Notes:**
-- **Motion detection keeps working.** A camera can only have one client, so while the stream runs, movement is measured on the stream's own frames and wakes the screen through the same path as the regular detector. Nothing to configure — the sensitivity you chose still applies.
+- **Motion detection keeps working.** A camera can only have one client, so while the stream runs, movement is measured on the stream's own frames and wakes the screen through the same path as the regular detector, with the sensitivity you chose. The exception is **Only wake for a face**: the stream's frames get no face check, so with that option on, stream motion does not wake the screen.
   - Measured on a Xiaomi tablet: frames are compared twice a second instead of once, a still scene sits at a 0.005-0.012 changed-pixel ratio against 0.026 for the regular detector, and movement reached 0.16-0.56. Detection to screen wake took 19 ms.
   - The one thing it does not see: a **colour change at constant brightness**, since only the luma plane is compared. Movement, people and lighting changes are unaffected.
 - The camera is opened when the first viewer connects and released when the last one leaves.
