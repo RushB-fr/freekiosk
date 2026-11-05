@@ -1351,6 +1351,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     }
   }, [isScreensaverActive, screensaverEnabled, displayMode, externalAppPackage, screensaverKeepExternalApp, screensaverType, screensaverBrightness, brightnessManagementEnabled]);
 
+  // isFocused: back from the PIN page (navigate, not reset) nothing else re-arms the timer
   useEffect(() => {
     if (screensaverEnabled && inactivityEnabled) {
       resetTimer();
@@ -1358,7 +1359,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       clearTimer();
       setIsScreensaverActive(false);
     }
-  }, [screensaverEnabled, inactivityEnabled, inactivityDelay]);
+  }, [isFocused, screensaverEnabled, inactivityEnabled, inactivityDelay]);
 
   // URL Rotation effect
   useEffect(() => {
@@ -2449,6 +2450,10 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     // External App mode: RN freezes JS timers while FreeKiosk is backgrounded, so the
     // native countdown in OverlayService drives screensaver activation instead. #190
     if (displayMode === 'external_app') return;
+    // PIN or Settings in front: the click that follows the last tap of the N-tap sequence
+    // arrives after the navigation, and would start a screensaver that dims the PIN page.
+    // navigation.isFocused() rather than isFocused: it is current before the next render.
+    if (!navigation.isFocused()) return;
     if (screensaverEnabled && inactivityEnabled) {
       timerRef.current = setTimeout(() => {
         triggerScreensaverTimeout();
@@ -2468,6 +2473,10 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     setIsPreCheckingMotion(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // only refs and stable setState — safe to omit
+
+  // Leaving through Settings unmounts this screen (navigation.reset): a timer left running
+  // would fire on the dead instance
+  useEffect(() => clearTimer, [clearTimer]);
 
   // #190 — External App mode: drive the inactivity countdown natively, since the JS
   // setTimeout is frozen while FreeKiosk is backgrounded behind the external app. The
