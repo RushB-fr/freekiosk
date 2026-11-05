@@ -895,15 +895,28 @@ export interface CloudCredentials {
   organizationName: string;
 }
 
-export async function saveCloudCredentials(creds: CloudCredentials): Promise<void> {
+/**
+ * True only when the Keystore took the credentials and gives the same value back (#321).
+ * On some boards the Keystore refuses the write, or accepts it and returns nothing: the
+ * error used to be swallowed, so enrollment reported success with nothing stored. They
+ * are never written anywhere else: a device API key in app storage is a bearer token
+ * anyone with a backup or root can replay (the same rule as the MQTT password, #258).
+ */
+export async function saveCloudCredentials(creds: CloudCredentials): Promise<boolean> {
+  const value = JSON.stringify(creds);
   try {
     await Keychain.setGenericPassword(
       'cloud',
-      JSON.stringify(creds),
+      value,
       { service: CLOUD_CREDENTIALS_SERVICE, accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED },
     );
+    const stored = await Keychain.getGenericPassword({ service: CLOUD_CREDENTIALS_SERVICE });
+    if (stored && stored.password === value) return true;
+    console.error('[SecureStorage] Cloud credentials did not read back from the Keystore');
+    return false;
   } catch (error) {
     console.error('[SecureStorage] Error saving cloud credentials:', error);
+    return false;
   }
 }
 
