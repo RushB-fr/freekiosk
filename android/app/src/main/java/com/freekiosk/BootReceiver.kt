@@ -13,6 +13,10 @@ import android.provider.Settings
 class BootReceiver : BroadcastReceiver() {
 
     companion object {
+        /** Wait before the legacy path launches MainActivity, to ensure the system is ready
+         *  (important for Android 9, v1.2.1). BootSplashActivity covers this wait. */
+        private const val BOOT_LAUNCH_DELAY_MS = 3000L
+
         /**
          * DE (Device Encrypted) SharedPreferences that can be read even before the user
          * unlocks the device (i.e. at ACTION_LOCKED_BOOT_COMPLETED time).
@@ -32,6 +36,33 @@ class BootReceiver : BroadcastReceiver() {
          * change for anyone who hasn't enabled it.
          */
         const val DE_KEY_SCREEN_LOCK_COMPAT = "screen_lock_compat_enabled"
+
+        /**
+         * Whether the next boot shows BootSplashActivity already at LOCKED_BOOT_COMPLETED: auto-launch
+         * on and no Device Owner boot lock. BOOT_COMPLETED only comes once the system launcher has
+         * settled (5-6 s later on an Amazon Fire), and the launcher shows in the meantime.
+         */
+        const val DE_KEY_BOOT_SPLASH = "boot_splash_enabled"
+
+        fun updateBootSplashFlag(context: Context, enabled: Boolean) {
+            try {
+                context.createDeviceProtectedStorageContext()
+                    .getSharedPreferences(DE_PREFS_NAME, Context.MODE_PRIVATE)
+                    .edit().putBoolean(DE_KEY_BOOT_SPLASH, enabled).apply()
+            } catch (e: Exception) {
+                DebugLog.errorProduction("BootReceiver", "Failed to update DE boot splash flag: ${e.message}")
+            }
+        }
+
+        fun readBootSplashFlag(context: Context): Boolean {
+            return try {
+                context.createDeviceProtectedStorageContext()
+                    .getSharedPreferences(DE_PREFS_NAME, Context.MODE_PRIVATE)
+                    .getBoolean(DE_KEY_BOOT_SPLASH, false)
+            } catch (e: Exception) {
+                false
+            }
+        }
 
         fun updateDeBootFlag(context: Context, enabled: Boolean) {
             try {
@@ -128,6 +159,11 @@ class BootReceiver : BroadcastReceiver() {
                     DebugLog.d("BootReceiver", "LOCKED_BOOT: screen-lock compatibility active + device secure — deferring to the keyguard; FreeKiosk will start at BOOT_COMPLETED")
                 } else {
                     DebugLog.d("BootReceiver", "LOCKED_BOOT: DE flag=false — skipping BootLockActivity")
+                    // Not over a secure lock screen: the splash would hide it, and the user could not
+                    // enter the credential (see #222).
+                    if (readBootSplashFlag(context) && !isDeviceSecure(context)) {
+                        showBootSplash(context)
+                    }
                 }
                 // Do NOT start services yet — their SQLite reads also need CE storage.
                 return
@@ -143,6 +179,7 @@ class BootReceiver : BroadcastReceiver() {
                 DebugLog.d("BootReceiver", "Auto-launch is disabled, not starting app")
                 // Update DE flag so next LOCKED_BOOT_COMPLETED also respects the setting
                 updateDeBootFlag(context, false)
+                updateBootSplashFlag(context, false)
                 return
             }
 
@@ -158,6 +195,7 @@ class BootReceiver : BroadcastReceiver() {
             val screenLockCompatActive = compatSetting && isDeviceSecure(context)
             val fastLock = shouldUseFastBootLock(context) && !screenLockCompatActive
             updateDeBootFlag(context, fastLock)
+            updateBootSplashFlag(context, !fastLock)
 
             // ── #98 fix: launch BootLockActivity IMMEDIATELY if Device Owner + kiosk ──
             // This locks the device in < 1 second, before React Native loads.
@@ -176,7 +214,9 @@ class BootReceiver : BroadcastReceiver() {
                     launchMainActivityLegacy(context)
                 }
             } else {
-                // Non-Device-Owner path: use the original delayed launch
+                // Non-Device-Owner path: use the original delayed launch, with a native loading
+                // screen in front at once so the system launcher does not show while it waits.
+                showBootSplash(context)
                 launchMainActivityLegacy(context)
             }
 
@@ -308,6 +348,25 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     /**
+     * Shows BootSplashActivity until MainActivity starts (non-Device-Owner installs). Skipped when
+     * MainActivity already runs, as it does when FreeKiosk is the HOME app.
+     */
+    private fun showBootSplash(context: Context) {
+        if (MainActivity.hasStarted) {
+            DebugLog.d("BootReceiver", "Boot splash: MainActivity already running, not shown")
+            return
+        }
+        try {
+            val splashIntent = Intent(context, BootSplashActivity::class.java)
+            splashIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(splashIntent)
+            DebugLog.d("BootReceiver", "Boot splash shown")
+        } catch (e: Exception) {
+            DebugLog.errorProduction("BootReceiver", "Boot splash failed: ${e.message}")
+        }
+    }
+
+    /**
      * Legacy path: delayed launch of MainActivity (for non-Device-Owner installs).
      */
     private fun launchMainActivityLegacy(context: Context) {
@@ -343,7 +402,7 @@ class BootReceiver : BroadcastReceiver() {
                     }
                 }, 1000)
             }.start()
-        }, 3000) // 3 second delay to ensure system is ready
+        }, BOOT_LAUNCH_DELAY_MS)
     }
 
     /**
