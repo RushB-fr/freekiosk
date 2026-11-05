@@ -5,6 +5,8 @@ import {
   SettingsInput,
   SettingsInfoBox,
   SettingsButton,
+  SettingsSwitch,
+  SettingsSlider,
 } from '../../../components/settings';
 import { Colors, Spacing, Typography } from '../../../theme';
 import {
@@ -42,11 +44,39 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ dashboardModeEnabled }) => 
   const [editIconValue, setEditIconValue] = useState('');
   const [editIconColor, setEditIconColor] = useState<string | undefined>(undefined);
   const [iconSize, setIconSize] = useState<DashboardIconSize>(DEFAULT_DASHBOARD_ICON_SIZE);
+  const [navAutoHide, setNavAutoHide] = useState(false);
+  const [navAutoHideSeconds, setNavAutoHideSeconds] = useState(4);
+  const [swipeBetweenTiles, setSwipeBetweenTiles] = useState(false);
+  const [keepTilesLoaded, setKeepTilesLoaded] = useState(false);
 
   useEffect(() => {
     loadTiles();
     StorageService.getDashboardIconSize().then(setIconSize);
+    StorageService.getDashboardNavAutoHide().then(setNavAutoHide);
+    StorageService.getDashboardNavAutoHideSeconds().then(setNavAutoHideSeconds);
+    StorageService.getDashboardSwipeBetweenTiles().then(setSwipeBetweenTiles);
+    StorageService.getDashboardKeepTilesLoaded().then(setKeepTilesLoaded);
   }, []);
+
+  const handleNavAutoHideChange = async (enabled: boolean) => {
+    setNavAutoHide(enabled);
+    await StorageService.saveDashboardNavAutoHide(enabled);
+  };
+
+  const handleSwipeBetweenTilesChange = async (enabled: boolean) => {
+    setSwipeBetweenTiles(enabled);
+    await StorageService.saveDashboardSwipeBetweenTiles(enabled);
+  };
+
+  const handleKeepTilesLoadedChange = async (enabled: boolean) => {
+    setKeepTilesLoaded(enabled);
+    await StorageService.saveDashboardKeepTilesLoaded(enabled);
+  };
+
+  const handleNavAutoHideSecondsChange = async (seconds: number) => {
+    setNavAutoHideSeconds(seconds);
+    await StorageService.saveDashboardNavAutoHideSeconds(seconds);
+  };
 
   const handleIconSizeChange = async (size: DashboardIconSize) => {
     setIconSize(size);
@@ -216,6 +246,41 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ dashboardModeEnabled }) => 
             </TouchableOpacity>
           ))}
         </View>
+      </SettingsSection>
+
+      <SettingsSection title={t('dashboard.tilePages.title')} icon="gesture-tap">
+        <SettingsSwitch
+          label={t('dashboard.tilePages.autoHide')}
+          hint={t('dashboard.tilePages.autoHideHint')}
+          value={navAutoHide}
+          onValueChange={handleNavAutoHideChange}
+        />
+        {navAutoHide && (
+          <SettingsSlider
+            label={t('dashboard.tilePages.hideAfter')}
+            hint={t('dashboard.tilePages.hideAfterHint')}
+            icon="timer-outline"
+            value={navAutoHideSeconds}
+            onValueChange={handleNavAutoHideSecondsChange}
+            minimumValue={1}
+            maximumValue={30}
+            step={1}
+            unit="s"
+            formatValue={(v) => `${Math.round(v)}s`}
+          />
+        )}
+        <SettingsSwitch
+          label={t('dashboard.tilePages.swipeBetweenTiles')}
+          hint={t('dashboard.tilePages.swipeBetweenTilesHint')}
+          value={swipeBetweenTiles}
+          onValueChange={handleSwipeBetweenTilesChange}
+        />
+        <SettingsSwitch
+          label={t('dashboard.tilePages.keepTilesLoaded')}
+          hint={t('dashboard.tilePages.keepTilesLoadedHint')}
+          value={keepTilesLoaded}
+          onValueChange={handleKeepTilesLoadedChange}
+        />
       </SettingsSection>
 
       <SettingsSection title={t('dashboard.tilesTitle')} icon="view-dashboard">
