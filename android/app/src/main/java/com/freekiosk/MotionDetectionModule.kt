@@ -104,7 +104,14 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
                         false // First image, no comparison
                     }
 
-                    triggered = if (requireFace) runCatching { faceGate(hasMotion, currentBitmap) }.getOrDefault(false) else hasMotion
+                    triggered = if (requireFace) {
+                        // Fail closed: a broken face check must not wake the screen, but say why
+                        runCatching { updateWindowAndCheckFace(hasMotion, currentBitmap) }
+                            .onFailure { android.util.Log.w("MotionDetection", "Face check failed", it) }
+                            .getOrDefault(false)
+                    } else {
+                        hasMotion
+                    }
 
                     // Store current for next comparison
                     previousBitmap?.let { 
@@ -214,7 +221,8 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
         return result
     }
 
-    private fun faceGate(motion: Boolean, frame: Bitmap): Boolean {
+    /** Motion (re)opens the face window; inside it, a frame with a face triggers. */
+    private fun updateWindowAndCheckFace(motion: Boolean, frame: Bitmap): Boolean {
         val now = SystemClock.elapsedRealtime()
         if (motion) lastMotionAt = now
         if (lastMotionAt == 0L || now - lastMotionAt > FACE_WINDOW_MS) return false
@@ -234,14 +242,17 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
             for (rotation in listOf(faceRotation) + (listOf(0, 90, 270, 180) - faceRotation)) {
                 var turned = if (rotation == 0) small
                     else Bitmap.createBitmap(small, 0, 0, w, h, Matrix().apply { postRotate(rotation.toFloat()) }, false)
-                if (turned.config != Bitmap.Config.RGB_565) {
-                    // FaceDetector only takes RGB_565
-                    turned = turned.copy(Bitmap.Config.RGB_565, false).also { if (turned !== small) turned.recycle() }
+                val confident = try {
+                    if (turned.config != Bitmap.Config.RGB_565) {
+                        // FaceDetector only takes RGB_565
+                        turned = turned.copy(Bitmap.Config.RGB_565, false).also { if (turned !== small) turned.recycle() }
+                    }
+                    val faces = arrayOfNulls<FaceDetector.Face>(MAX_FACES)
+                    val found = FaceDetector(turned.width, turned.height, MAX_FACES).findFaces(turned, faces)
+                    faces.take(found).count { it != null && it.confidence() >= FaceDetector.Face.CONFIDENCE_THRESHOLD }
+                } finally {
+                    if (turned !== small) turned.recycle()
                 }
-                val faces = arrayOfNulls<FaceDetector.Face>(MAX_FACES)
-                val found = FaceDetector(turned.width, turned.height, MAX_FACES).findFaces(turned, faces)
-                val confident = faces.take(found).count { it != null && it.confidence() >= FaceDetector.Face.CONFIDENCE_THRESHOLD }
-                if (turned !== small) turned.recycle()
                 if (confident > 0) {
                     faceRotation = rotation
                     return confident
@@ -254,7 +265,7 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
     }
 
     companion object {
-        // ponytail: fixed values, tune on real devices. The frame is already decoded at
+        // NOTE: fixed values, tune on real devices. The frame is already decoded at
         // inSampleSize=4 (1/4 of the capture), so FACE_MAX_SIDE only caps it further; on the
         // Camera2 fallback (~1280x960 capture) detection runs on ~320x240. More range would need
         // decoding the file at a smaller inSampleSize for the face check.
