@@ -340,6 +340,8 @@
       "cameraPosition": "Położenie kamery",
       "cameraPositionHint": "Wybierz kamerę używaną do wykrywania ruchu",
       "cameraUnavailable": "Wybrana kamera jest niedostępna na tym urządzeniu",
+      "motionRequireFace": "Wybudzaj tylko przy twarzy",
+      "motionRequireFaceHint": "Ruch wybudza ekran tylko wtedy, gdy w obrazie z kamery jest twarz, więc zwierzęta i zmiany światła są ignorowane. Działa najlepiej z twarzą zwróconą w stronę kamery; odwrócona lub odległa twarz może zostać pominięta.",
       "proximityTitle": "Wykrywanie zbliżenia",
       "proximityEnable": "Włącz wybudzanie zbliżeniem",
       "proximityEnableHint": "Wybudzaj ekran, gdy dłoń lub ciało zbliży się do przedniego czujnika",
