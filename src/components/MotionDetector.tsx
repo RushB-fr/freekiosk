@@ -12,6 +12,12 @@ interface MotionDetectorProps {
   sensitivity: 'low' | 'medium' | 'high';
   cameraPosition?: 'front' | 'back';
   onStatusChange?: (status: MotionStatus) => void;
+  /**
+   * Change it when the app itself changes the scene, e.g. the screensaver dims the screen: in a
+   * dark room the camera sees that as movement. Detection takes a new reference frame and
+   * skips the warm-up frames again.
+   */
+  referenceKey?: unknown;
 }
 
 const THROTTLE_INTERVAL = 2000; // Minimum 2s entre détections
@@ -37,6 +43,7 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
   sensitivity,
   cameraPosition = 'front',
   onStatusChange,
+  referenceKey,
 }) => {
   const device = useCameraDevice(cameraPosition);
   const { hasPermission } = useCameraPermission();
@@ -53,6 +60,19 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
   const captureCount = useRef<number>(0);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
+  // The parent passes a new callback on every render. Read through a ref so a new one does not
+  // restart detection (native reset + warm-up, ~4.5 s blind each time the screensaver came on).
+  const onMotionDetectedRef = useRef(onMotionDetected);
+  onMotionDetectedRef.current = onMotionDetected;
+
+  // A new referenceKey: new reference frame, warm-up again, detection keeps running
+  const referenceKeyRef = useRef(referenceKey);
+  useEffect(() => {
+    if (Object.is(referenceKeyRef.current, referenceKey)) return;
+    referenceKeyRef.current = referenceKey;
+    warmupFrames.current = 0;
+    MotionDetectionModule?.reset().catch(() => {});
+  }, [referenceKey]);
 
   // #301 — recovery after another app took the camera. CameraX closes the session and never
   // reopens it by itself; only an isActive false -> true cycle does.
@@ -249,7 +269,7 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
         const now = Date.now();
         if (now - lastMotionTime.current > THROTTLE_INTERVAL) {
           lastMotionTime.current = now;
-          onMotionDetected();
+          onMotionDetectedRef.current();
         }
       }
     } catch (error: any) {
@@ -259,7 +279,7 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
     } finally {
       isCapturing.current = false;
     }
-  }, [enabled, sensitivity, onMotionDetected, cameraPosition]);
+  }, [enabled, sensitivity, cameraPosition]);
 
   const captureAndCompare = useCallback(async () => {
     // Guard against multiple concurrent captures and unmounted state
@@ -328,7 +348,7 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
         const now = Date.now();
         if (now - lastMotionTime.current > THROTTLE_INTERVAL) {
           lastMotionTime.current = now;
-          onMotionDetected();
+          onMotionDetectedRef.current();
         } else {
           console.log('[MotionDetection] Motion throttled (too soon after last detection)');
         }
@@ -342,7 +362,7 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
     } finally {
       isCapturing.current = false;
     }
-  }, [enabled, sensitivity, onMotionDetected, isCameraReady]);
+  }, [enabled, sensitivity, isCameraReady]);
 
   // Start detection in Camera2 fallback mode
   const startCamera2Detection = useCallback(() => {
