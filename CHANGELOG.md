@@ -1387,3 +1387,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.0.3]: https://github.com/rushb-fr/freekiosk/releases/tag/v1.0.3
 [1.0.2]: https://github.com/rushb-fr/freekiosk/releases/tag/v1.0.2
 [1.0.1]: https://github.com/rushb-fr/freekiosk/releases/tag/v1.0.1
+- 🔆 **REST and MQTT report the auto-brightness minimum and maximum again** (#341). They always read 0 and 1: the app keeps both levels as 0-1 and passed them on that way, and the REST server and the MQTT client read them as integers, so 0.15 became 0 and 1.0 became 1. They are now passed as 0-100, as `brightness` already was and as `POST /api/autoBrightness/enable` takes them, so the status shows 15 and 80 for levels of 15 % and 80 %. **Not checked on a device yet.**
