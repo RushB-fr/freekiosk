@@ -187,7 +187,7 @@ it is stable and feature-complete, and **no date is set**.
 | **Cloud Management** | Shipped (open beta) | FreeKiosk Cloud, see [cloud.md](cloud.md) |
 | **Enterprise Features** | Planned | Corporate deployment tools |
 | **Advanced Integrations** | Planned | Third-party platform support |
-| **Localization** | Shipped | 7 languages in the app (2.1.0-beta.1) |
+| **Localization** | Shipped | 7 languages in the app (2.1.0-beta.1); Polish and Simplified Chinese next (9) |
 | **Analytics Platform** | Planned | Comprehensive insights |
 | **Enterprise Security** | Planned | Advanced authentication |
 | **AI Features** | Planned | Smart automation |

@@ -9,6 +9,8 @@ import fr from './locales/fr.json';
 import itIT from './locales/it.json';
 import nl from './locales/nl.json';
 import ptBR from './locales/pt-BR.json';
+import pl from './locales/pl.json';
+import zhHans from './locales/zh-Hans.json';
 
 // Each language is named in itself: someone who cannot read the current one must still find theirs.
 export const LANGUAGE_OPTIONS = [
@@ -19,6 +21,8 @@ export const LANGUAGE_OPTIONS = [
   { value: 'it', label: 'Italiano' },
   { value: 'nl', label: 'Nederlands' },
   { value: 'pt-BR', label: 'Português (Brasil)' },
+  { value: 'pl', label: 'Polski' },
+  { value: 'zh-Hans', label: '简体中文' },
 ] as const;
 export type SupportedLanguage = (typeof LANGUAGE_OPTIONS)[number]['value'];
 export const SUPPORTED_LANGUAGES: readonly SupportedLanguage[] = LANGUAGE_OPTIONS.map((o) => o.value);
@@ -38,7 +42,8 @@ export function resolveSupportedLanguage(code: string | null | undefined): Suppo
     return code as SupportedLanguage;
   }
   // Device locales come as "pt_BR", "pt-PT" or "fr_CA": match on the language part,
-  // so every Portuguese variant gets pt-BR, the only Portuguese translation.
+  // so every Portuguese variant gets pt-BR, the only Portuguese translation, and every Chinese
+  // one (zh_CN, zh_TW, zh-Hant-HK) gets zh-Hans, the only Chinese one.
   const base = code?.split(/[-_]/)[0].toLowerCase();
   return SUPPORTED_LANGUAGES.find((lang) => lang.split('-')[0] === base) ?? 'en';
 }
@@ -53,6 +58,8 @@ i18next.use(initReactI18next).init({
     it: { translation: itIT },
     nl: { translation: nl },
     'pt-BR': { translation: ptBR },
+    pl: { translation: pl },
+    'zh-Hans': { translation: zhHans },
   },
   lng: resolveSupportedLanguage(getDeviceLocale()),
   fallbackLng: 'en',
