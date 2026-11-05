@@ -1149,8 +1149,9 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       rotationInterval: Math.round(urlRotationInterval / 1000),
       rotationCurrentIndex: currentUrlIndex,
       autoBrightnessEnabled: autoBrightnessEnabled,
-      autoBrightnessMin: autoBrightnessMin,
-      autoBrightnessMax: autoBrightnessMax,
+      // Stored as 0-1, reported as 0-100 like brightness (the native modules read integers)
+      autoBrightnessMin: Math.round(autoBrightnessMin * 100),
+      autoBrightnessMax: Math.round(autoBrightnessMax * 100),
       motionAlwaysOn: motionAlwaysOn,
       // Used by the stream-based motion detection, which takes over while a stream runs
       motionSensitivity: motionSensitivity,
