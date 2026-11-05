@@ -13,6 +13,7 @@ const BACKUP_KEYS = [
   '@kiosk_url',
   '@kiosk_auto_reload',
   '@kiosk_hide_error_url',
+  '@kiosk_always_load_from_network',
   '@kiosk_enabled',
   '@kiosk_auto_launch',
   '@screensaver_enabled',

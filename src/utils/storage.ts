@@ -18,6 +18,8 @@ export const KEYS = {
   AUTO_RELOAD: '@kiosk_auto_reload',
   // The WebView error screen leaves the failed URL out (#217)
   HIDE_ERROR_URL: '@kiosk_hide_error_url',
+  // #263: WebView cache mode LOAD_NO_CACHE, so an updated site never shows old files
+  ALWAYS_LOAD_FROM_NETWORK: '@kiosk_always_load_from_network',
   KIOSK_ENABLED: '@kiosk_enabled',
   AUTO_LAUNCH: '@kiosk_auto_launch',
   SCREEN_LOCK_COMPAT: '@kiosk_screen_lock_compat',
@@ -336,6 +338,24 @@ export const StorageService = {
     }
   },
 
+  saveAlwaysLoadFromNetwork: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.ALWAYS_LOAD_FROM_NETWORK, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving always load from network:', error);
+    }
+  },
+
+  getAlwaysLoadFromNetwork: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.ALWAYS_LOAD_FROM_NETWORK);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting always load from network:', error);
+      return false;
+    }
+  },
+
   saveAutoReload: async (value: boolean): Promise<void> => {
     try {
       await AsyncStorage.setItem(KEYS.AUTO_RELOAD, JSON.stringify(value));
@@ -518,6 +538,7 @@ export const StorageService = {
         KEYS.PIN,
         KEYS.AUTO_RELOAD,
         KEYS.HIDE_ERROR_URL,
+        KEYS.ALWAYS_LOAD_FROM_NETWORK,
         KEYS.KIOSK_ENABLED,
         KEYS.AUTO_LAUNCH,
         KEYS.SCREENSAVER_ENABLED,
@@ -3749,6 +3770,7 @@ export const StorageService = {
         url: str(KEYS.URL),
         autoReload: bool(KEYS.AUTO_RELOAD),
         hideErrorUrl: bool(KEYS.HIDE_ERROR_URL),
+        alwaysLoadFromNetwork: bool(KEYS.ALWAYS_LOAD_FROM_NETWORK),
         pdfViewerEnabled: bool(KEYS.PDF_VIEWER_ENABLED),
         printEnabled: bool(KEYS.WINDOW_PRINT_ENABLED), // window.print(); name kept for existing exports
         printPaperSize: str(KEYS.PRINT_PAPER_SIZE, 'A4'),
@@ -3992,6 +4014,7 @@ export const StorageService = {
       set(KEYS.URL, g.url);
       set(KEYS.AUTO_RELOAD, g.autoReload);
       set(KEYS.HIDE_ERROR_URL, g.hideErrorUrl);
+      set(KEYS.ALWAYS_LOAD_FROM_NETWORK, g.alwaysLoadFromNetwork);
       set(KEYS.PDF_VIEWER_ENABLED, g.pdfViewerEnabled);
       set(KEYS.WINDOW_PRINT_ENABLED, g.printEnabled);
       set(KEYS.PRINT_PAPER_SIZE, g.printPaperSize);

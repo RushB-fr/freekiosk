@@ -250,6 +250,7 @@ Every key below is a straight passthrough: the value you pass is stored as-is.
 |-----------|-------------|
 | `--ez auto_reload true` | Reload the page after a loading error |
 | `--ez hide_error_url true` | Leave the URL out of the loading error screen |
+| `--ez always_load_from_network true` | Fetch every image, script and style sheet from the network on each load, so an updated site never shows old files. Uses more data, and a page cannot show from cache while the network is down |
 | `--ez pdf_viewer_enabled true` | Open PDFs in the bundled viewer. **This is also what allows `file://` URLs**: without it the WebView refuses to load a local file, whatever the label says (see the [FAQ](faq.md)) |
 | `--ez disable_overscroll true` | Remove the elastic stretch at the top and bottom of the page. Off by default (Android's standard behaviour) |
 | `--ez session_reset_button_enabled true` | Show a small button, bottom-left, that clears cookies, cache and web storage after a confirmation, then returns to the start URL. Meant for shared tablets. Off by default |

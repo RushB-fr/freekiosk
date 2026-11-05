@@ -186,7 +186,9 @@
       "reloadOnError": "Bei Fehler neu laden",
       "reloadOnErrorHint": "Die Seite bei einem Netzwerkfehler automatisch neu laden",
       "hideUrl": "URL auf dem Fehlerbildschirm ausblenden",
-      "hideUrlHint": "Zeigt nur die Fehlermeldung an, wenn eine Seite nicht lädt, nicht ihre Adresse"
+      "hideUrlHint": "Zeigt nur die Fehlermeldung an, wenn eine Seite nicht lädt, nicht ihre Adresse",
+      "alwaysNetwork": "Immer aus dem Netzwerk laden",
+      "alwaysNetworkHint": "Lädt bei jedem Laden alle Bilder, Skripte und Stylesheets neu, damit eine aktualisierte Seite nie alte Dateien zeigt. Verbraucht mehr Daten, und die Seite kann bei einem Netzausfall nicht aus dem Cache angezeigt werden."
     },
     "pdfViewer": {
       "title": "PDF-Viewer",

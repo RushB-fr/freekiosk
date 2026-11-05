@@ -186,7 +186,9 @@
       "reloadOnError": "Recharger en cas d'erreur",
       "reloadOnErrorHint": "Recharger automatiquement la page en cas d'erreur réseau",
       "hideUrl": "Masquer l'URL sur l'écran d'erreur",
-      "hideUrlHint": "N'affiche que le message d'erreur quand une page ne se charge pas, sans son adresse"
+      "hideUrlHint": "N'affiche que le message d'erreur quand une page ne se charge pas, sans son adresse",
+      "alwaysNetwork": "Toujours charger depuis le réseau",
+      "alwaysNetworkHint": "Télécharge à nouveau chaque image, script et feuille de style à chaque chargement, pour qu'un site mis à jour n'affiche jamais d'anciens fichiers. Consomme plus de données, et la page ne peut plus s'afficher depuis le cache quand le réseau est coupé."
     },
     "pdfViewer": {
       "title": "Lecteur PDF",

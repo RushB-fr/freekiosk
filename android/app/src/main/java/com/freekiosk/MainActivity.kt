@@ -110,6 +110,7 @@ class MainActivity : ReactActivity() {
       "media_player_cache_limit_mb" to "@kiosk_media_player_cache_limit_mb",
       "auto_reload" to "@kiosk_auto_reload",
       "hide_error_url" to "@kiosk_hide_error_url",
+      "always_load_from_network" to "@kiosk_always_load_from_network",
       "auto_relaunch" to "@kiosk_auto_relaunch_app",
       "auto_relaunch_app" to "@kiosk_auto_relaunch_app",
       "keep_screen_on" to "@kiosk_keep_screen_on",

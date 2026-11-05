@@ -186,7 +186,9 @@
       "reloadOnError": "Herladen bij fout",
       "reloadOnErrorHint": "De pagina automatisch herladen bij een netwerkfout",
       "hideUrl": "URL verbergen op het foutscherm",
-      "hideUrlHint": "Toont alleen de foutmelding als een pagina niet laadt, niet het adres"
+      "hideUrlHint": "Toont alleen de foutmelding als een pagina niet laadt, niet het adres",
+      "alwaysNetwork": "Altijd van het netwerk laden",
+      "alwaysNetworkHint": "Haalt bij elke keer laden alle afbeeldingen, scripts en stylesheets opnieuw op, zodat een bijgewerkte site nooit oude bestanden toont. Gebruikt meer data, en de pagina kan niet uit de cache worden getoond als het netwerk wegvalt."
     },
     "pdfViewer": {
       "title": "PDF-viewer",

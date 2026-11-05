@@ -186,7 +186,9 @@
       "reloadOnError": "Reload on Error",
       "reloadOnErrorHint": "Automatically reload the page on network error",
       "hideUrl": "Hide the URL on the error screen",
-      "hideUrlHint": "Show only the error message when a page fails to load, not its address"
+      "hideUrlHint": "Show only the error message when a page fails to load, not its address",
+      "alwaysNetwork": "Always Load from the Network",
+      "alwaysNetworkHint": "Fetch every image, script and style sheet again on each load, so an updated site never shows old files. Uses more data, and the page cannot show from cache while the network is down."
     },
     "pdfViewer": {
       "title": "PDF Viewer",

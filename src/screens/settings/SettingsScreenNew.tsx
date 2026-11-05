@@ -96,6 +96,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
   const [pinMaxAttemptsText, setPinMaxAttemptsText] = useState<string>('5');
   const [autoReload, setAutoReload] = useState<boolean>(false);
   const [hideErrorUrl, setHideErrorUrl] = useState<boolean>(false);
+  const [alwaysLoadFromNetwork, setAlwaysLoadFromNetwork] = useState<boolean>(false);
   const [kioskEnabled, setKioskEnabled] = useState<boolean>(false);
   const [autoLaunchEnabled, setAutoLaunchEnabled] = useState<boolean>(false);
   const [screenLockCompatEnabled, setScreenLockCompatEnabled] = useState<boolean>(false);
@@ -543,6 +544,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
 
     setAutoReload(savedAutoReload);
     setHideErrorUrl(await StorageService.getHideErrorUrl());
+    setAlwaysLoadFromNetwork(await StorageService.getAlwaysLoadFromNetwork());
     setKioskEnabled(savedKioskEnabled);
     setAutoLaunchEnabled(savedAutoLaunch ?? false);
     setScreenLockCompatEnabled(savedScreenLockCompat ?? false);
@@ -1579,6 +1581,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
     if (displayMode === 'webview' || displayMode === 'media_player') {
       await StorageService.saveAutoReload(displayMode === 'webview' ? autoReload : false);
       await StorageService.saveHideErrorUrl(hideErrorUrl);
+      await StorageService.saveAlwaysLoadFromNetwork(alwaysLoadFromNetwork);
       await StorageService.saveKioskEnabled(kioskEnabled);
       await StorageService.saveDefaultBrightness(defaultBrightness);
       // #242: also mirror it natively, so the wake paths and a reboot keep it.
@@ -1869,6 +1872,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
               setPinMaxAttemptsText('5');
               setAutoReload(false);
               setHideErrorUrl(false);
+              setAlwaysLoadFromNetwork(false);
               setKioskEnabled(false);
               setAutoLaunchEnabled(false);
               setScreensaverEnabled(false);
@@ -2084,6 +2088,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
             onAutoReloadChange={setAutoReload}
             hideErrorUrl={hideErrorUrl}
             onHideErrorUrlChange={setHideErrorUrl}
+            alwaysLoadFromNetwork={alwaysLoadFromNetwork}
+            onAlwaysLoadFromNetworkChange={setAlwaysLoadFromNetwork}
             pdfViewerEnabled={pdfViewerEnabled}
             onPdfViewerEnabledChange={setPdfViewerEnabled}
             windowPrintEnabled={windowPrintEnabled}

@@ -186,7 +186,9 @@
       "reloadOnError": "Recargar si hay un error",
       "reloadOnErrorHint": "Recargar automáticamente la página si hay un error de red",
       "hideUrl": "Ocultar la URL en la pantalla de error",
-      "hideUrlHint": "Muestra solo el mensaje de error cuando una página no carga, sin su dirección"
+      "hideUrlHint": "Muestra solo el mensaje de error cuando una página no carga, sin su dirección",
+      "alwaysNetwork": "Cargar siempre desde la red",
+      "alwaysNetworkHint": "Vuelve a descargar cada imagen, script y hoja de estilo en cada carga, para que un sitio actualizado no muestre nunca archivos antiguos. Consume más datos, y la página no puede mostrarse desde la caché si la red se cae."
     },
     "pdfViewer": {
       "title": "Visor de PDF",

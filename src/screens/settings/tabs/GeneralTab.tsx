@@ -87,6 +87,8 @@ interface GeneralTabProps {
   onAutoReloadChange: (value: boolean) => void;
   hideErrorUrl: boolean;
   onHideErrorUrlChange: (value: boolean) => void;
+  alwaysLoadFromNetwork: boolean;
+  onAlwaysLoadFromNetworkChange: (value: boolean) => void;
   
   // PDF Viewer (webview only)
   pdfViewerEnabled: boolean;
@@ -235,6 +237,8 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
   onAutoReloadChange,
   hideErrorUrl,
   onHideErrorUrlChange,
+  alwaysLoadFromNetwork,
+  onAlwaysLoadFromNetworkChange,
   pdfViewerEnabled,
   onPdfViewerEnabledChange,
   windowPrintEnabled,
@@ -1061,6 +1065,12 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
             hint={t('general.autoReload.hideUrlHint')}
             value={hideErrorUrl}
             onValueChange={onHideErrorUrlChange}
+          />
+          <SettingsSwitch
+            label={t('general.autoReload.alwaysNetwork')}
+            hint={t('general.autoReload.alwaysNetworkHint')}
+            value={alwaysLoadFromNetwork}
+            onValueChange={onAlwaysLoadFromNetworkChange}
           />
         </SettingsSection>
       )}

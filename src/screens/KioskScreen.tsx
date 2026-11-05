@@ -58,6 +58,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [url, setUrl] = useState<string>('');
   const [autoReload, setAutoReload] = useState<boolean>(false);
   const [hideErrorUrl, setHideErrorUrl] = useState<boolean>(false);
+  const [alwaysLoadFromNetwork, setAlwaysLoadFromNetwork] = useState<boolean>(false);
   // #177 — Pause WebView audio/video when the page is hidden (screensaver / screen off / background)
   const [pauseWebMediaWhenHidden, setPauseWebMediaWhenHidden] = useState<boolean>(true);
   const [screensaverEnabled, setScreensaverEnabled] = useState(false);
@@ -1914,6 +1915,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       if (savedUrl) setUrl(savedUrl);
       setAutoReload(savedAutoReload);
       setHideErrorUrl(bool(K.HIDE_ERROR_URL, false));
+      setAlwaysLoadFromNetwork(bool(K.ALWAYS_LOAD_FROM_NETWORK, false));
       setPauseWebMediaWhenHidden(savedPauseWebMediaWhenHidden);
       // #205 — re-apply the opt-in 2-way audio (intercom) mode on each kiosk launch: the
       // native AudioRecordingCallback registration doesn't survive an app restart. No-op when off.
@@ -3132,6 +3134,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
               url={url}
               autoReload={autoReload}
               hideErrorUrl={hideErrorUrl}
+              alwaysLoadFromNetwork={alwaysLoadFromNetwork}
               reportPageTouches={urlRotationEnabled && urlRotationPauseOnTouch}
               onPageTouch={() => { lastPageTouchRef.current = Date.now(); }}
               keyboardMode={keyboardMode}

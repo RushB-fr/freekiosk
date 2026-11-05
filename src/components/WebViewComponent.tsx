@@ -45,6 +45,7 @@ interface WebViewComponentProps {
   url: string;
   autoReload: boolean;
   hideErrorUrl?: boolean; // Leave the failed URL out of the error screen (#217)
+  alwaysLoadFromNetwork?: boolean; // #263: never reuse cached subresources
   reportPageTouches?: boolean; // Post 'page-touch' on touches and keys only (#235, URL rotation pause)
   onPageTouch?: () => void;
   keyboardMode?: string; // 'default', 'force_numeric', 'smart', 'none'
@@ -108,6 +109,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   url, 
   autoReload,
   hideErrorUrl = false,
+  alwaysLoadFromNetwork = false,
   reportPageTouches = false,
   onPageTouch,
   keyboardMode = 'default',
@@ -1550,6 +1552,13 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
           // Retires the old nonce at once: a page cannot post a request and then navigate to an
           // allow-listed origin to get it past the URL check.
           if (silentPrintEnabled) rotatePrinterNonce();
+
+          // #263: a reload reuses a cached image, script or style sheet still within its
+          // max-age, so a site updated behind a long-lived kiosk shows its new page with old
+          // files. cacheMode LOAD_NO_CACHE does not change that (checked on an Android 15
+          // emulator: the cached file was never fetched again); clearing the cache does.
+          // Done on every page load, whoever starts it: the page itself, FreeKiosk or a command.
+          if (alwaysLoadFromNetwork) webViewRef.current?.clearCache(true);
 
           // Don't reset error state when loading about:blank (error recovery)
           if (!error) {
