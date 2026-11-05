@@ -287,6 +287,15 @@ const deepMerge = (base: unknown, overlay: unknown): unknown => {
 export const toPrintOrigins = (value: unknown): string[] | null =>
   Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : null;
 
+/** Longest screensaver fade-out in seconds; the settings slider stops here too. */
+export const MAX_SCREENSAVER_FADE_SECONDS = 30;
+
+/** A cloud config or backup can carry any number: keep the fade within 0..30 s. */
+export const clampScreensaverFadeSeconds = (value: unknown): number =>
+  typeof value === 'number' && Number.isFinite(value)
+    ? Math.min(Math.max(value, 0), MAX_SCREENSAVER_FADE_SECONDS)
+    : 0;
+
 export const StorageService = {
   //URL
   saveUrl: async (url: string): Promise<void> => {
@@ -1125,7 +1134,7 @@ export const StorageService = {
   getScreensaverFadeSeconds: async (): Promise<number> => {
     try {
       const value = await AsyncStorage.getItem(KEYS.SCREENSAVER_FADE_SECONDS);
-      return value === null ? 0 : JSON.parse(value);
+      return value === null ? 0 : clampScreensaverFadeSeconds(JSON.parse(value));
     } catch (error) {
       console.error('Error getting screensaver fade seconds:', error);
       return 0;

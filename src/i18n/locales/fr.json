@@ -321,6 +321,7 @@
       "fadeTitle": "Fondu",
       "fadeHint": "Secondes pendant lesquelles l'écran s'assombrit progressivement jusqu'au niveau de l'économiseur. Le réveil reste immédiat.",
       "fadeOff": "Non",
+      "fadeSeconds": "{{value}} s",
       "blackScreen": "Écran noir",
       "veryDim": "Très sombre (5 %)",
       "dim": "Sombre (10 %)",

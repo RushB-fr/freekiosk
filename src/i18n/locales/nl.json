@@ -321,6 +321,7 @@
       "fadeTitle": "Uitfaden",
       "fadeHint": "Seconden waarin het scherm langzaam dimt tot het niveau van de schermbeveiliging. Wekken blijft direct.",
       "fadeOff": "Uit",
+      "fadeSeconds": "{{value}} s",
       "blackScreen": "Zwart scherm",
       "veryDim": "Zeer gedimd (5%)",
       "dim": "Gedimd (10%)",

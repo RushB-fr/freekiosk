@@ -321,6 +321,7 @@
       "fadeTitle": "Esmaecer",
       "fadeHint": "Segundos em que a tela escurece aos poucos até o nível do protetor de tela. Despertar continua imediato.",
       "fadeOff": "Não",
+      "fadeSeconds": "{{value}} s",
       "blackScreen": "Tela preta",
       "veryDim": "Muito escuro (5%)",
       "dim": "Escuro (10%)",

@@ -20,6 +20,7 @@ import { Colors, Spacing, Typography } from '../../../theme';
 import { ScreenScheduleRule } from '../../../types/screenScheduler';
 import type { MediaItem } from '../../../types/mediaPlayer';
 import { getMediaDisplayName } from '../../../types/mediaPlayer';
+import { MAX_SCREENSAVER_FADE_SECONDS } from '../../../utils/storage';
 import { useTranslation } from 'react-i18next';
 
 interface DisplayTabProps {
@@ -602,9 +603,9 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
                     value={screensaverFadeSeconds}
                     onValueChange={onScreensaverFadeSecondsChange}
                     minimumValue={0}
-                    maximumValue={30}
+                    maximumValue={MAX_SCREENSAVER_FADE_SECONDS}
                     step={1}
-                    formatValue={(v) => (v === 0 ? t('display.screensaver.fadeOff') : `${Math.round(v)} s`)}
+                    formatValue={(v) => (v === 0 ? t('display.screensaver.fadeOff') : t('display.screensaver.fadeSeconds', { value: Math.round(v) }))}
                   />
                 </View>
               )}

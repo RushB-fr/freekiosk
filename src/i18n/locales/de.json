@@ -321,6 +321,7 @@
       "fadeTitle": "Ausblenden",
       "fadeHint": "Sekunden, über die der Bildschirm langsam auf die Bildschirmschoner-Helligkeit abdunkelt. Aufwecken bleibt sofort.",
       "fadeOff": "Aus",
+      "fadeSeconds": "{{value}} s",
       "blackScreen": "Schwarzer Bildschirm",
       "veryDim": "Sehr dunkel (5 %)",
       "dim": "Dunkel (10 %)",

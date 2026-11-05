@@ -321,6 +321,7 @@
       "fadeTitle": "Dissolvenza",
       "fadeHint": "Secondi in cui lo schermo si scurisce lentamente fino al livello del salvaschermo. Il risveglio resta immediato.",
       "fadeOff": "No",
+      "fadeSeconds": "{{value}} s",
       "blackScreen": "Schermo nero",
       "veryDim": "Molto attenuato (5%)",
       "dim": "Attenuato (10%)",

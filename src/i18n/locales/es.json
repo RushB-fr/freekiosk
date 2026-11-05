@@ -321,6 +321,7 @@
       "fadeTitle": "Atenuación",
       "fadeHint": "Segundos durante los que la pantalla se oscurece poco a poco hasta el nivel del protector. Al despertar sigue siendo inmediato.",
       "fadeOff": "No",
+      "fadeSeconds": "{{value}} s",
       "blackScreen": "Pantalla negra",
       "veryDim": "Muy tenue (5%)",
       "dim": "Tenue (10%)",
