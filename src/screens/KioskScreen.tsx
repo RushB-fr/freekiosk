@@ -12,6 +12,7 @@ import StatusBar from '../components/StatusBar';
 import MotionDetector from '../components/MotionDetector';
 import ProximityDetectionModule, { onProximityNear as onProximityNearEvent } from '../utils/ProximityDetectionModule';
 import ExternalAppOverlay from '../components/ExternalAppOverlay';
+import { DEFAULT_MULTI_APP_APPEARANCE, MultiAppAppearance, parseMultiAppAppearance } from '../types/multiAppAppearance';
 import { StorageService, toPrintOrigins } from '../utils/storage';
 import { saveSecurePin, saveSecureMqttPassword, saveSecureApiKey, getSecureBasicAuthPassword } from '../utils/secureStorage';
 import KioskModule from '../utils/KioskModule';
@@ -131,6 +132,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   // Managed Apps (multi-app mode, background apps, accessibility whitelist)
   const [managedApps, setManagedApps] = useState<import('../types/managedApps').ManagedApp[]>([]);
   const [externalAppMode, setExternalAppMode] = useState<'single' | 'multi'>('single');
+  const [multiAppAppearance, setMultiAppAppearance] = useState<MultiAppAppearance>({ ...DEFAULT_MULTI_APP_APPEARANCE });
   const externalAppModeRef = useRef<'single' | 'multi'>('single');
   
   // Spatial proximity detection for N-tap (WebView mode)
@@ -1995,6 +1997,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       // Load external app sub-mode (single vs multi)
       const savedExternalAppMode = (str(K.EXTERNAL_APP_MODE) ?? 'single') as 'single' | 'multi';
       setExternalAppMode(savedExternalAppMode);
+      setMultiAppAppearance(parseMultiAppAppearance(settings.get(K.MULTI_APP_APPEARANCE)));
       externalAppModeRef.current = savedExternalAppMode;
       console.log('[KioskScreen] External app mode:', savedExternalAppMode);
       
@@ -3218,6 +3221,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           externalAppPackage={externalAppPackage}
           managedApps={managedApps}
           externalAppMode={externalAppMode}
+          multiAppAppearance={multiAppAppearance}
           isAppLaunched={isAppLaunched}
           backButtonMode={backButtonMode}
           returnTapCount={returnTapCount}

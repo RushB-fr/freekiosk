@@ -20,6 +20,8 @@ import {
   EscPosPrinterSection,
 } from '../../../components/settings';
 import { ManagedApp } from '../../../types/managedApps';
+import { MultiAppAppearance } from '../../../types/multiAppAppearance';
+import MultiAppAppearanceSection from '../../../components/settings/MultiAppAppearanceSection';
 import Icon from '../../../components/Icon';
 import { Colors, Spacing, Typography } from '../../../theme';
 import AppLauncherModule, { AppInfo } from '../../../utils/AppLauncherModule';
@@ -53,6 +55,8 @@ interface GeneralTabProps {
   loadingApps: boolean;
   
   // External app sub-mode (single vs multi)
+  multiAppAppearance: MultiAppAppearance;
+  onMultiAppAppearanceChange: (value: MultiAppAppearance) => void;
   externalAppMode: 'single' | 'multi';
   onExternalAppModeChange: (mode: 'single' | 'multi') => void;
   
@@ -213,6 +217,8 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
   onExternalAppPackageChange,
   onPickApp,
   loadingApps,
+  multiAppAppearance,
+  onMultiAppAppearanceChange,
   externalAppMode,
   onExternalAppModeChange,
   managedApps,
@@ -880,6 +886,10 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
                 isDeviceOwner={isDeviceOwner}
               />
             </SettingsSection>
+          )}
+
+          {externalAppMode === 'multi' && (
+            <MultiAppAppearanceSection appearance={multiAppAppearance} onChange={onMultiAppAppearanceChange} />
           )}
 
           {/* Managed Apps for Single App mode (optional, for background/accessibility features) */}
