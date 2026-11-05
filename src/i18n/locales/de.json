@@ -2,6 +2,24 @@
   "common": {},
   "general": {
     "externalAppTvWarning": "Auf einem Fernseher erreicht FreeKiosk keine Taste, solange eine andere App im Vordergrund ist. Die Fernbedienung kann dich also nicht zu diesen Einstellungen zurückbringen. Nutze FreeKiosk Cloud, MQTT, die REST API oder adb, um sie zu ändern.",
+    "appearance": {
+      "title": "Erscheinungsbild Multi-App",
+      "background": "Hintergrundfarbe",
+      "customColor": "Eigene Farbe",
+      "invalidColor": "Gib eine Farbe im Format #RRGGBB ein, zum Beispiel #2b7fff.",
+      "colorHint": "Überschrift und App-Namen verwenden automatisch einen kontrastierenden Text.",
+      "showTitle": "Überschrift anzeigen",
+      "heading": "Text der Überschrift",
+      "showLogo": "Logo anzeigen",
+      "chooseLogo": "Logo vom Gerät wählen",
+      "defaultLogo": "Standardlogo verwenden",
+      "logoHint": "Das gewählte Bild wird auf diesem Gerät gespeichert. Sicherungen behalten die Einstellung, enthalten aber die Bilddatei nicht.",
+      "preview": "Vorschau",
+      "sampleApp": "App-Name",
+      "reset": "Erscheinungsbild zurücksetzen",
+      "logoErrorTitle": "Logo konnte nicht gewählt werden",
+      "logoError": "Bitte wähle ein anderes Bild."
+    },
     "language": {
       "title": "Sprache",
       "label": "App-Sprache"

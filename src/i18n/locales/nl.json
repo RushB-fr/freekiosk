@@ -2,6 +2,24 @@
   "common": {},
   "general": {
     "externalAppTvWarning": "Op een tv komt er niets bij FreeKiosk aan zolang een andere app op de voorgrond staat, dus met de afstandsbediening kun je niet terug naar deze instellingen. Gebruik FreeKiosk Cloud, MQTT, de REST API of adb om ze te wijzigen.",
+    "appearance": {
+      "title": "Weergave multi-app",
+      "background": "Achtergrondkleur",
+      "customColor": "Eigen kleur",
+      "invalidColor": "Voer een kleur in het formaat #RRGGBB in, bijvoorbeeld #2b7fff.",
+      "colorHint": "De titel en de namen van de apps krijgen automatisch een contrasterende tekst.",
+      "showTitle": "Titel tonen",
+      "heading": "Tekst van de titel",
+      "showLogo": "Logo tonen",
+      "chooseLogo": "Logo van het apparaat kiezen",
+      "defaultLogo": "Standaardlogo gebruiken",
+      "logoHint": "De gekozen afbeelding wordt op dit apparaat opgeslagen. Back-ups bewaren de instelling, maar niet het afbeeldingsbestand.",
+      "preview": "Voorbeeld",
+      "sampleApp": "Naam van de app",
+      "reset": "Weergave terugzetten naar standaard",
+      "logoErrorTitle": "Logo kon niet worden gekozen",
+      "logoError": "Kies een andere afbeelding."
+    },
     "language": {
       "title": "Taal",
       "label": "App-taal"

@@ -2,6 +2,24 @@
   "common": {},
   "general": {
     "externalAppTvWarning": "Su una TV, nessun comando arriva a FreeKiosk finché un'altra app è in primo piano, quindi il telecomando non può riportarti a queste impostazioni. Usa FreeKiosk Cloud, MQTT, la REST API o adb per modificarle.",
+    "appearance": {
+      "title": "Aspetto multi-app",
+      "background": "Colore di sfondo",
+      "customColor": "Colore personalizzato",
+      "invalidColor": "Inserisci un colore nel formato #RRGGBB, ad esempio #2b7fff.",
+      "colorHint": "Il titolo e i nomi delle app usano automaticamente un testo a contrasto.",
+      "showTitle": "Mostra il titolo",
+      "heading": "Testo del titolo",
+      "showLogo": "Mostra il logo",
+      "chooseLogo": "Scegli un logo dal dispositivo",
+      "defaultLogo": "Usa il logo predefinito",
+      "logoHint": "L'immagine scelta viene salvata su questo dispositivo. I backup conservano l'impostazione ma non contengono il file dell'immagine.",
+      "preview": "Anteprima",
+      "sampleApp": "Nome dell'app",
+      "reset": "Ripristina l'aspetto predefinito",
+      "logoErrorTitle": "Impossibile scegliere il logo",
+      "logoError": "Prova a scegliere un'altra immagine."
+    },
     "language": {
       "title": "Lingua",
       "label": "Lingua dell'app"

@@ -2,6 +2,24 @@
   "common": {},
   "general": {
     "externalAppTvWarning": "En un televisor, ninguna tecla llega a FreeKiosk mientras otra app está en primer plano, así que el control remoto no puede devolverte a esta configuración. Usa FreeKiosk Cloud, MQTT, la API REST o adb para cambiarla.",
+    "appearance": {
+      "title": "Apariencia multiapp",
+      "background": "Color de fondo",
+      "customColor": "Color personalizado",
+      "invalidColor": "Introduce un color con el formato #RRGGBB, por ejemplo #2b7fff.",
+      "colorHint": "El título y los nombres de las apps usan automáticamente un texto con contraste.",
+      "showTitle": "Mostrar el título",
+      "heading": "Texto del título",
+      "showLogo": "Mostrar el logo",
+      "chooseLogo": "Elegir un logo del dispositivo",
+      "defaultLogo": "Usar el logo predeterminado",
+      "logoHint": "La imagen elegida se guarda en este dispositivo. Las copias de seguridad conservan el ajuste, pero no incluyen el archivo de imagen.",
+      "preview": "Vista previa",
+      "sampleApp": "Nombre de la app",
+      "reset": "Restablecer la apariencia",
+      "logoErrorTitle": "No se pudo elegir el logo",
+      "logoError": "Prueba a elegir otra imagen."
+    },
     "language": {
       "title": "Idioma",
       "label": "Idioma de la app"
