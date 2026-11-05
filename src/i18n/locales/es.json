@@ -747,6 +747,17 @@
       "large": "Grande",
       "xlarge": "Muy grande"
     },
+    "tilePages": {
+      "title": "Páginas de mosaicos",
+      "autoHide": "Ocultar automáticamente la barra de navegación",
+      "autoHideHint": "En una página de mosaico, oculta la barra de navegación para que la página ocupe toda la pantalla. Desliza hacia abajo con dos dedos para mostrarla y hacia arriba para volver a ocultarla.",
+      "hideAfter": "Ocultar después de (segundos)",
+      "hideAfterHint": "Cuánto tiempo sigue visible la barra después de mostrarse o de tocarla por última vez.",
+      "swipeBetweenTiles": "Deslizar entre mosaicos",
+      "swipeBetweenTilesHint": "En una página de mosaico, desliza hacia la izquierda con dos dedos para el siguiente mosaico y hacia la derecha para el anterior.",
+      "keepTilesLoaded": "Mantener los mosaicos cargados",
+      "keepTilesLoadedHint": "Carga tus mosaicos (hasta 5) en segundo plano en cuanto arranca el panel y los mantiene activos: abrir o cambiar de mosaico es instantáneo y cada página conserva su estado. Usa más memoria."
+    },
     "iconColor": "Color del icono",
     "colorAuto": "Auto",
     "preview": "Vista previa",

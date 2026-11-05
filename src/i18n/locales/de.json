@@ -747,6 +747,17 @@
       "large": "Groß",
       "xlarge": "Extragroß"
     },
+    "tilePages": {
+      "title": "Kachelseiten",
+      "autoHide": "Navigationsleiste automatisch ausblenden",
+      "autoHideHint": "Auf einer Kachelseite die Navigationsleiste ausblenden, damit die Seite den Bildschirm füllt. Mit zwei Fingern nach unten wischen, um sie zu zeigen, und nach oben, um sie wieder auszublenden.",
+      "hideAfter": "Ausblenden nach (Sekunden)",
+      "hideAfterHint": "Wie lange die Leiste sichtbar bleibt, nachdem sie gezeigt oder zuletzt berührt wurde.",
+      "swipeBetweenTiles": "Zwischen Kacheln wischen",
+      "swipeBetweenTilesHint": "Auf einer Kachelseite mit zwei Fingern nach links wischen für die nächste Kachel und nach rechts für die vorherige.",
+      "keepTilesLoaded": "Kacheln geladen lassen",
+      "keepTilesLoadedHint": "Lädt deine Kacheln (bis zu 5) im Hintergrund, sobald das Dashboard startet, und hält sie aktiv: Öffnen und Wechseln geht sofort, und jede Seite behält ihren Zustand. Verbraucht mehr Speicher."
+    },
     "iconColor": "Symbolfarbe",
     "colorAuto": "Auto",
     "preview": "Vorschau",

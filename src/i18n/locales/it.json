@@ -747,6 +747,17 @@
       "large": "Grande",
       "xlarge": "Molto grande"
     },
+    "tilePages": {
+      "title": "Pagine dei riquadri",
+      "autoHide": "Nascondi automaticamente la barra di navigazione",
+      "autoHideHint": "In una pagina di riquadro, nasconde la barra di navigazione perché la pagina occupi tutto lo schermo. Scorri verso il basso con due dita per mostrarla e verso l'alto per nasconderla di nuovo.",
+      "hideAfter": "Nascondi dopo (secondi)",
+      "hideAfterHint": "Per quanto tempo la barra resta visibile dopo essere stata mostrata o toccata l'ultima volta.",
+      "swipeBetweenTiles": "Scorri tra i riquadri",
+      "swipeBetweenTilesHint": "In una pagina di riquadro, scorri verso sinistra con due dita per il riquadro successivo e verso destra per il precedente.",
+      "keepTilesLoaded": "Mantieni i riquadri caricati",
+      "keepTilesLoadedHint": "Carica i tuoi riquadri (fino a 5) in background appena si avvia la dashboard e li mantiene attivi: aprire o cambiare riquadro è immediato e ogni pagina conserva il suo stato. Usa più memoria."
+    },
     "iconColor": "Colore icona",
     "colorAuto": "Auto",
     "preview": "Anteprima",

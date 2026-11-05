@@ -747,6 +747,17 @@
       "large": "Grande",
       "xlarge": "Extragrande"
     },
+    "tilePages": {
+      "title": "Páginas dos blocos",
+      "autoHide": "Ocultar automaticamente a barra de navegação",
+      "autoHideHint": "Em uma página de bloco, oculta a barra de navegação para que a página ocupe a tela inteira. Deslize para baixo com dois dedos para mostrá-la e para cima para ocultá-la de novo.",
+      "hideAfter": "Ocultar após (segundos)",
+      "hideAfterHint": "Por quanto tempo a barra fica visível depois de aparecer ou de ser tocada pela última vez.",
+      "swipeBetweenTiles": "Deslizar entre blocos",
+      "swipeBetweenTilesHint": "Em uma página de bloco, deslize para a esquerda com dois dedos para o próximo bloco e para a direita para o anterior.",
+      "keepTilesLoaded": "Manter os blocos carregados",
+      "keepTilesLoadedHint": "Carrega seus blocos (até 5) em segundo plano assim que o painel inicia e os mantém ativos: abrir ou trocar de bloco é instantâneo e cada página mantém seu estado. Usa mais memória."
+    },
     "iconColor": "Cor do ícone",
     "colorAuto": "Automática",
     "preview": "Pré-visualização",

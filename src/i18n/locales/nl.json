@@ -747,6 +747,17 @@
       "large": "Groot",
       "xlarge": "Extra groot"
     },
+    "tilePages": {
+      "title": "Tegelpagina's",
+      "autoHide": "Navigatiebalk automatisch verbergen",
+      "autoHideHint": "Verbergt op een tegelpagina de navigatiebalk, zodat de pagina het hele scherm vult. Veeg met twee vingers omlaag om hem te tonen en omhoog om hem weer te verbergen.",
+      "hideAfter": "Verbergen na (seconden)",
+      "hideAfterHint": "Hoe lang de balk zichtbaar blijft nadat hij getoond of voor het laatst aangeraakt is.",
+      "swipeBetweenTiles": "Tussen tegels vegen",
+      "swipeBetweenTilesHint": "Veeg op een tegelpagina met twee vingers naar links voor de volgende tegel en naar rechts voor de vorige.",
+      "keepTilesLoaded": "Tegels geladen houden",
+      "keepTilesLoadedHint": "Laadt je tegels (maximaal 5) op de achtergrond zodra het dashboard start en houdt ze actief: openen of wisselen gaat meteen en elke pagina behoudt haar toestand. Gebruikt meer geheugen."
+    },
     "iconColor": "Pictogramkleur",
     "colorAuto": "Automatisch",
     "preview": "Voorbeeld",
