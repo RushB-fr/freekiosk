@@ -265,7 +265,7 @@ All entities are grouped under one HA device:
 
 
 
-#### Switches (3)
+#### Switches (4)
 
 
 
@@ -274,6 +274,7 @@ All entities are grouped under one HA device:
 | **Screen Power** | `.../set/screen` | ON / OFF |
 | **Screensaver** | `.../set/screensaver` | ON / OFF |
 | **Always-on Motion Detection** | `.../set/motion_always_on` | ON / OFF |
+| **Auto Brightness** | `.../set/auto_brightness` | ON / OFF |
 
 
 
@@ -387,6 +388,7 @@ Commands are sent by publishing to `{baseTopic}/{topicId}/set/{entity}`.
 | **screen** | screenOn / screenOff | `ON` / `OFF` | Turn screen on or off |
 | **screensaver** | screensaverOn / screensaverOff | `ON` / `OFF` | Enable/disable screensaver |
 | **motion_always_on** | setMotionAlwaysOn | `ON` / `OFF` | Toggle always-on motion detection |
+| **auto_brightness** | autoBrightnessEnable / autoBrightnessDisable | `ON` / `OFF` | Follow the light sensor with the configured min/max, or go back to the manual brightness |
 | **reload** | reload | any | Reload WebView |
 | **wake** | wake | any | Wake from screensaver |
 | **reboot** | reboot | any | Reboot device (Device Owner required) |

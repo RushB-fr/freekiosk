@@ -741,6 +741,12 @@ class KioskMqttClient(
                 cmd to null
             }
 
+            // No levels: the JS side keeps the configured min/max (REST always sends them)
+            "auto_brightness" -> {
+                val cmd = if (payload.uppercase() == "ON") "autoBrightnessEnable" else "autoBrightnessDisable"
+                cmd to null
+            }
+
             "reload" -> "reload" to null
             "wake" -> "wake" to null
             "reboot" -> "reboot" to null
