@@ -42,6 +42,7 @@ export const KEYS = {
   SCREENSAVER_VIDEO_ITEMS: '@screensaver_video_items',
   SCREENSAVER_VIDEO_LOOP: '@screensaver_video_loop',
   SCREENSAVER_KEEP_EXTERNAL_APP: '@screensaver_keep_external_app',
+  SCREENSAVER_FADE_SECONDS: '@screensaver_fade_seconds',
   DEFAULT_BRIGHTNESS: '@default_brightness',
   DISPLAY_MODE: '@kiosk_display_mode',
   EXTERNAL_APP_PACKAGE: '@kiosk_external_app_package',
@@ -285,6 +286,15 @@ const deepMerge = (base: unknown, overlay: unknown): unknown => {
  */
 export const toPrintOrigins = (value: unknown): string[] | null =>
   Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : null;
+
+/** Longest screensaver fade-out in seconds; the settings slider stops here too. */
+export const MAX_SCREENSAVER_FADE_SECONDS = 30;
+
+/** A cloud config or backup can carry any number: keep the fade within 0..30 s. */
+export const clampScreensaverFadeSeconds = (value: unknown): number =>
+  typeof value === 'number' && Number.isFinite(value)
+    ? Math.min(Math.max(value, 0), MAX_SCREENSAVER_FADE_SECONDS)
+    : 0;
 
 export const StorageService = {
   //URL
@@ -559,6 +569,7 @@ export const StorageService = {
         KEYS.SCREENSAVER_VIDEO_ITEMS,
         KEYS.SCREENSAVER_VIDEO_LOOP,
         KEYS.SCREENSAVER_KEEP_EXTERNAL_APP,
+        KEYS.SCREENSAVER_FADE_SECONDS,
         KEYS.DEFAULT_BRIGHTNESS,
         KEYS.DISPLAY_MODE,
         KEYS.EXTERNAL_APP_PACKAGE,
@@ -1107,6 +1118,26 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting screensaver keep-external-app:', error);
       return false;
+    }
+  },
+
+  // Dim style only: seconds over which the screensaver fades to its target level.
+  // 0 = no fade, which keeps today's instant dim.
+  saveScreensaverFadeSeconds: async (value: number): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.SCREENSAVER_FADE_SECONDS, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving screensaver fade seconds:', error);
+    }
+  },
+
+  getScreensaverFadeSeconds: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.SCREENSAVER_FADE_SECONDS);
+      return value === null ? 0 : clampScreensaverFadeSeconds(JSON.parse(value));
+    } catch (error) {
+      console.error('Error getting screensaver fade seconds:', error);
+      return 0;
     }
   },
 
@@ -3975,6 +4006,7 @@ export const StorageService = {
           videoItems: json(KEYS.SCREENSAVER_VIDEO_ITEMS, []),
           videoLoop: bool(KEYS.SCREENSAVER_VIDEO_LOOP, true),
           keepExternalApp: bool(KEYS.SCREENSAVER_KEEP_EXTERNAL_APP),
+          fadeSeconds: num(KEYS.SCREENSAVER_FADE_SECONDS, 0),
         },
         motionDetection: {
           enabled: bool(KEYS.SCREENSAVER_MOTION_ENABLED),
@@ -4247,6 +4279,7 @@ export const StorageService = {
         set(KEYS.SCREENSAVER_VIDEO_ITEMS, ss.videoItems);
         set(KEYS.SCREENSAVER_VIDEO_LOOP, ss.videoLoop);
         set(KEYS.SCREENSAVER_KEEP_EXTERNAL_APP, ss.keepExternalApp);
+        set(KEYS.SCREENSAVER_FADE_SECONDS, ss.fadeSeconds);
       }
       const md = d.motionDetection as Record<string, unknown> | undefined;
       if (md) {
