@@ -325,6 +325,11 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start server", e)
+            // e.g. port in use: without this the dead server stayed set, every later start
+            // answered ALREADY_RUNNING, and the wake and WiFi locks were held for good
+            try { server?.stop() } catch (_: Exception) {}
+            server = null
+            releaseServerLocks()
             promise.reject("START_ERROR", e.message)
         }
     }
