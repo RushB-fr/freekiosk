@@ -451,14 +451,15 @@ class ApiServiceClass {
         cb.onRemoteKey(p.key);
         return ok();
 
-      case 'autoBrightnessEnable':
+      case 'autoBrightnessEnable': {
         if (!cb.onAutoBrightnessEnable) return fail('Handler unavailable');
-        cb.onAutoBrightnessEnable(
-          p.min !== undefined ? p.min : 10,
-          p.max !== undefined ? p.max : 100,
-          p.offset !== undefined ? p.offset : undefined,
-        );
+        // MQTT's switch sends no levels: keep the configured ones (stored as 0-1, the API takes 0-100).
+        // REST always sends both, with 10 and 100 as its defaults.
+        const min = p.min !== undefined ? p.min : Math.round((await StorageService.getAutoBrightnessMin()) * 100);
+        const max = p.max !== undefined ? p.max : Math.round((await StorageService.getAutoBrightnessMax()) * 100);
+        cb.onAutoBrightnessEnable(min, max, p.offset !== undefined ? p.offset : undefined);
         return ok();
+      }
 
       case 'autoBrightnessDisable':
         if (!cb.onAutoBrightnessDisable) return fail('Handler unavailable');

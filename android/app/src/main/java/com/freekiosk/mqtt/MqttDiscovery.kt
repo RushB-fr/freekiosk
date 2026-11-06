@@ -276,6 +276,12 @@ class MqttDiscovery(
                 "$baseTopic/$topicId/set/motion_always_on",
                 "{% if value_json.device.motionAlwaysOn %}ON{% else %}OFF{% endif %}",
                 "mdi:motion-sensor"
+            ),
+            SwitchDef(
+                "auto_brightness", "Auto Brightness",
+                "$baseTopic/$topicId/set/auto_brightness",
+                "{% if value_json.autoBrightness.enabled %}ON{% else %}OFF{% endif %}",
+                "mdi:brightness-auto"
             )
         )
 
