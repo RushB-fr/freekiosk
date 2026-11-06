@@ -2760,6 +2760,11 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       && event?.isTap
       && (returnMode === 'tap_anywhere' || event?.fromFallbackButton);
 
+    // A scroll or click reported by the page while the screensaver covers it came from the
+    // page itself, e.g. the inactivity return scrolling it to the top (#344): not a wake.
+    // People wake the screensaver through its overlay (onScreensaverTap).
+    if (isScreensaverActiveRef.current && !event) return;
+
     // If in scheduled sleep and wake on touch is disabled, ignore user interaction
     // (except still allow N-tap for settings access)
     if (isScheduledSleepRef.current && !screenSchedulerWakeOnTouchRef.current) {
