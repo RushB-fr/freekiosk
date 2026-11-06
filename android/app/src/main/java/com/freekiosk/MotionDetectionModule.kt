@@ -2,6 +2,9 @@ package com.freekiosk
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.media.FaceDetector
+import android.os.SystemClock
 import com.facebook.react.bridge.*
 import java.io.File
 import java.util.concurrent.Executors
@@ -30,6 +33,17 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
      */
     private var comparisonsSinceReset = 0
 
+    /**
+     * "Only wake for a face": motion opens a window of FACE_WINDOW_MS in which a frame with a
+     * face triggers. Someone who walks up and then stands still in front of the screen still
+     * wakes it. A face on a poster alone does not, since nothing moves, but any motion (a light
+     * change, a pet) opens the window, after which it can.
+     */
+    private var lastMotionAt = 0L
+
+    /** Rotation that last found a face. The camera does not turn, so it is tried first. */
+    private var faceRotation = 0
+
     override fun getName(): String {
         return "MotionDetectionModule"
     }
@@ -38,6 +52,7 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
     fun compareImages(
         imagePath: String,
         threshold: Double,
+        requireFace: Boolean,
         promise: Promise
     ) {
         // Run image processing on background thread to avoid ANR
@@ -68,9 +83,9 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
                     return@execute
                 }
 
-                val hasMotion: Boolean
+                val triggered: Boolean
                 synchronized(bitmapLock) {
-                    hasMotion = if (previousBitmap != null && !previousBitmap!!.isRecycled) {
+                    val hasMotion = if (previousBitmap != null && !previousBitmap!!.isRecycled) {
                         val detected = detectMotion(previousBitmap!!, currentBitmap, threshold)
                         comparisonsSinceReset++
                         if (comparisonsSinceReset == 1) {
@@ -89,6 +104,15 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
                         false // First image, no comparison
                     }
 
+                    triggered = if (requireFace) {
+                        // Fail closed: a broken face check must not wake the screen, but say why
+                        runCatching { updateWindowAndCheckFace(hasMotion, currentBitmap) }
+                            .onFailure { android.util.Log.w("MotionDetection", "Face check failed", it) }
+                            .getOrDefault(false)
+                    } else {
+                        hasMotion
+                    }
+
                     // Store current for next comparison
                     previousBitmap?.let { 
                         if (!it.isRecycled) {
@@ -98,7 +122,7 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
                     previousBitmap = currentBitmap
                 }
 
-                promise.resolve(hasMotion)
+                promise.resolve(triggered)
 
             } catch (e: Exception) {
                 android.util.Log.e("MotionDetection", "Motion detection error: ${e.message}")
@@ -119,6 +143,7 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
                     }
                     previousBitmap = null
                     comparisonsSinceReset = 0
+                    lastMotionAt = 0L
                 }
                 promise.resolve(true)
             } catch (e: Exception) {
@@ -194,6 +219,59 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
         android.util.Log.d("MotionDetection", "Compare: ${width}x${height}, samples=$samples, changed=$differences, ratio=${"%,.4f".format(changeRatio)}, avgDiff=${"%,.1f".format(avgDiff)}, threshold=$threshold, motion=$result")
         
         return result
+    }
+
+    /** Motion (re)opens the face window; inside it, a frame with a face triggers. */
+    private fun updateWindowAndCheckFace(motion: Boolean, frame: Bitmap): Boolean {
+        val now = SystemClock.elapsedRealtime()
+        if (motion) lastMotionAt = now
+        if (lastMotionAt == 0L || now - lastMotionAt > FACE_WINDOW_MS) return false
+        val faces = countFaces(frame)
+        android.util.Log.d("MotionDetection", "Face gate: motion=$motion, faces=$faces, rotation=$faceRotation")
+        return faces > 0
+    }
+
+    /** Faces in the frame, trying each rotation since the sensor may not be upright. */
+    private fun countFaces(frame: Bitmap): Int {
+        val scale = minOf(1f, FACE_MAX_SIDE.toFloat() / maxOf(frame.width, frame.height))
+        // FaceDetector wants an even width; both sides even keeps it even after a 90° turn
+        val w = (frame.width * scale).toInt() and 1.inv()
+        val h = (frame.height * scale).toInt() and 1.inv()
+        val small = Bitmap.createScaledBitmap(frame, w, h, true)
+        try {
+            for (rotation in listOf(faceRotation) + (listOf(0, 90, 270, 180) - faceRotation)) {
+                var turned = if (rotation == 0) small
+                    else Bitmap.createBitmap(small, 0, 0, w, h, Matrix().apply { postRotate(rotation.toFloat()) }, false)
+                val confident = try {
+                    if (turned.config != Bitmap.Config.RGB_565) {
+                        // FaceDetector only takes RGB_565
+                        turned = turned.copy(Bitmap.Config.RGB_565, false).also { if (turned !== small) turned.recycle() }
+                    }
+                    val faces = arrayOfNulls<FaceDetector.Face>(MAX_FACES)
+                    val found = FaceDetector(turned.width, turned.height, MAX_FACES).findFaces(turned, faces)
+                    faces.take(found).count { it != null && it.confidence() >= FaceDetector.Face.CONFIDENCE_THRESHOLD }
+                } finally {
+                    if (turned !== small) turned.recycle()
+                }
+                if (confident > 0) {
+                    faceRotation = rotation
+                    return confident
+                }
+            }
+            return 0
+        } finally {
+            if (small !== frame) small.recycle()
+        }
+    }
+
+    companion object {
+        // NOTE: fixed values, tune on real devices. The frame is already decoded at
+        // inSampleSize=4 (1/4 of the capture), so FACE_MAX_SIDE only caps it further; on the
+        // Camera2 fallback (~1280x960 capture) detection runs on ~320x240. More range would need
+        // decoding the file at a smaller inSampleSize for the face check.
+        private const val FACE_MAX_SIDE = 640
+        private const val FACE_WINDOW_MS = 10_000L
+        private const val MAX_FACES = 3
     }
 
     override fun onCatalystInstanceDestroy() {

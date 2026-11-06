@@ -344,6 +344,8 @@
       "cameraPosition": "Posizione della fotocamera",
       "cameraPositionHint": "Seleziona quale fotocamera usare per il rilevamento del movimento",
       "cameraUnavailable": "La fotocamera selezionata non è disponibile su questo dispositivo",
+      "motionRequireFace": "Riattiva solo con un volto",
+      "motionRequireFaceHint": "Il movimento riattiva lo schermo solo quando c'è un volto nell'immagine della fotocamera: animali e cambi di luce vengono ignorati. Funziona meglio con un volto rivolto verso la fotocamera; un volto girato o lontano potrebbe non essere rilevato.",
       "proximityTitle": "Rilevamento di prossimità",
       "proximityEnable": "Attiva riattivazione per prossimità",
       "proximityEnableHint": "Riattiva lo schermo quando una mano o il corpo si avvicina al sensore frontale",

@@ -344,6 +344,8 @@
       "cameraPosition": "Posição da câmera",
       "cameraPositionHint": "Selecione qual câmera usar para a detecção de movimento",
       "cameraUnavailable": "A câmera selecionada não está disponível neste dispositivo",
+      "motionRequireFace": "Despertar só com um rosto",
+      "motionRequireFaceHint": "O movimento desperta a tela somente quando há um rosto na imagem da câmera, assim animais e mudanças de luz são ignorados. Funciona melhor com um rosto olhando para a câmera; um rosto virado ou distante pode não ser detectado.",
       "proximityTitle": "Detecção de proximidade",
       "proximityEnable": "Ativar despertar por proximidade",
       "proximityEnableHint": "Despertar a tela quando uma mão ou um corpo se aproximar do sensor frontal",

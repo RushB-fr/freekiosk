@@ -36,6 +36,7 @@ export const KEYS = {
   SCREENSAVER_MOTION_SENSITIVITY: '@screensaver_motion_sensitivity',
   SCREENSAVER_MOTION_DELAY: '@screensaver_motion_delay',
   SCREENSAVER_PROXIMITY_ENABLED: '@screensaver_proximity_enabled',
+  SCREENSAVER_MOTION_REQUIRE_FACE: '@screensaver_motion_require_face',
   SCREENSAVER_BRIGHTNESS: '@screensaver_brightness',
   SCREENSAVER_TYPE: '@screensaver_type',
   SCREENSAVER_URL: '@screensaver_url',
@@ -618,6 +619,7 @@ export const StorageService = {
         KEYS.INTERCOM_MODE,
         KEYS.ALLOW_REMOTE_SCREENSHOT,
         KEYS.SCREENSAVER_PROXIMITY_ENABLED,
+        KEYS.SCREENSAVER_MOTION_REQUIRE_FACE,
         KEYS.CAMERA_STREAM_ENABLED,
         KEYS.CAMERA_STREAM_CAMERA,
         KEYS.CAMERA_STREAM_FPS,
@@ -1007,6 +1009,24 @@ export const StorageService = {
       return value === null ? false : JSON.parse(value);
     } catch (error) {
       console.error('Error getting screensaver proximity enabled:', error);
+      return false;
+    }
+  },
+
+  saveScreensaverMotionRequireFace: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.SCREENSAVER_MOTION_REQUIRE_FACE, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving screensaver motion require face:', error);
+    }
+  },
+
+  getScreensaverMotionRequireFace: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.SCREENSAVER_MOTION_REQUIRE_FACE);
+      return value === null ? false : JSON.parse(value);
+    } catch (error) {
+      console.error('Error getting screensaver motion require face:', error);
       return false;
     }
   },
@@ -4014,6 +4034,7 @@ export const StorageService = {
           cameraPosition: str(KEYS.MOTION_CAMERA_POSITION, 'front'),
           delay: num(KEYS.SCREENSAVER_MOTION_DELAY, 30000),
           proximityEnabled: bool(KEYS.SCREENSAVER_PROXIMITY_ENABLED),
+          requireFace: bool(KEYS.SCREENSAVER_MOTION_REQUIRE_FACE),
         },
         screenScheduler: {
           enabled: bool(KEYS.SCREEN_SCHEDULER_ENABLED),
@@ -4291,6 +4312,7 @@ export const StorageService = {
         set(KEYS.SCREENSAVER_MOTION_DELAY, md.delay);
         set(KEYS.MOTION_DELAY, md.delay);
         set(KEYS.SCREENSAVER_PROXIMITY_ENABLED, md.proximityEnabled);
+        set(KEYS.SCREENSAVER_MOTION_REQUIRE_FACE, md.requireFace);
       }
       const sch = d.screenScheduler as Record<string, unknown> | undefined;
       if (sch) {

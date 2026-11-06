@@ -1,7 +1,8 @@
 import { NativeModules } from 'react-native';
 
 interface IMotionDetectionModule {
-  compareImages(imagePath: string, threshold: number): Promise<boolean>;
+  /** Resolves true when the frame should trigger: motion, and with requireFace a face too. */
+  compareImages(imagePath: string, threshold: number, requireFace: boolean): Promise<boolean>;
   reset(): Promise<boolean>;
 }
 

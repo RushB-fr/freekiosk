@@ -344,6 +344,8 @@
       "cameraPosition": "Posición de la cámara",
       "cameraPositionHint": "Selecciona qué cámara usar para la detección de movimiento",
       "cameraUnavailable": "La cámara seleccionada no está disponible en este dispositivo",
+      "motionRequireFace": "Reactivar solo con un rostro",
+      "motionRequireFaceHint": "El movimiento reactiva la pantalla solo cuando hay un rostro en la imagen de la cámara, así se ignoran mascotas y cambios de luz. Funciona mejor con un rostro que mira a la cámara; un rostro girado o lejano puede no detectarse.",
       "proximityTitle": "Detección de proximidad",
       "proximityEnable": "Activar reactivación por proximidad",
       "proximityEnableHint": "Reactivar la pantalla cuando una mano o un cuerpo se acerque al sensor frontal",

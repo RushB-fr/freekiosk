@@ -344,6 +344,8 @@
       "cameraPosition": "Camera Position",
       "cameraPositionHint": "Select which camera to use for motion detection",
       "cameraUnavailable": "Selected camera not available on this device",
+      "motionRequireFace": "Only wake for a face",
+      "motionRequireFaceHint": "Motion wakes the screen only when a face is in the camera image, so pets and light changes are ignored. Works best with a face looking at the camera; a turned or distant face may be missed.",
       "proximityTitle": "Proximity Detection",
       "proximityEnable": "Enable Proximity Wake",
       "proximityEnableHint": "Wake the screen when a hand or body comes close to the front sensor",

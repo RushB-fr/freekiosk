@@ -344,6 +344,8 @@
       "cameraPosition": "摄像头位置",
       "cameraPositionHint": "选择用于动作检测的摄像头",
       "cameraUnavailable": "此设备上没有所选摄像头",
+      "motionRequireFace": "仅在检测到人脸时唤醒",
+      "motionRequireFaceHint": "仅当摄像头画面中有人脸时，动作才会唤醒屏幕，因此会忽略宠物和光线变化。人脸正对摄像头时效果最好；侧脸或距离较远的人脸可能无法识别。",
       "proximityTitle": "接近检测",
       "proximityEnable": "启用接近唤醒",
       "proximityEnableHint": "手或身体靠近前置传感器时唤醒屏幕",
