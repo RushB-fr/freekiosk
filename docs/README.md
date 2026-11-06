@@ -21,7 +21,7 @@ _Complete guides for deployment, automation, and integration_
 FreeKiosk is a **free, open-source kiosk platform** for Android tablets. It's designed for teams and individuals who need **full device control without licensing costs**.
 
 **Perfect for:**
-- Home Assistant dashboards
+- Home Assistant and ioBroker dashboards
 - Corporate information displays
 - Cloud gaming kiosks (Steam Link, Xbox Cloud Gaming)
 - Digital signage
@@ -33,7 +33,7 @@ FreeKiosk is a **free, open-source kiosk platform** for Android tablets. It's de
 - **100% Free** - No per-device costs, no subscriptions, MIT licensed
 - **Complete Lockdown** - Device Owner mode for enterprise-grade security
 - **Multiple Modes** - WebView, External App, Dashboard, Media Player
-- **Rich Automation** - 40+ REST API endpoints + MQTT with Home Assistant auto-discovery
+- **Rich Automation** - 40+ REST API endpoints + MQTT with Home Assistant auto-discovery, ioBroker adapter
 - **Mass Deployment** - ADB-based headless provisioning
 - **Privacy First** - No tracking; the cloud is optional and off until you enroll a device
 
@@ -79,7 +79,7 @@ adb shell dpm set-device-owner com.freekiosk/.DeviceAdminReceiver
 
 | Guide | Description | Link |
 |-------|-------------|------|
-| **Integrations Overview** | Choose between REST API and MQTT | [Read →](INTEGRATIONS.md) |
+| **Integrations Overview** | Choose between REST API and MQTT, ioBroker adapter | [Read →](INTEGRATIONS.md) |
 | **REST API** | 40+ HTTP endpoints for device control | [Read →](rest-api.md) |
 | **MQTT** | Real-time telemetry and Home Assistant discovery | [Read →](MQTT.md) |
 | **ADB Configuration** | Headless provisioning and scripting | [Read →](adb-configuration.md) |
