@@ -142,6 +142,11 @@ class KioskHttpServer(
                 isGetOrPost && uri == "/api/audio/stop" -> handleAudioStop()
                 isGetOrPost && uri == "/api/audio/beep" -> handleAudioBeep()
 
+                // Auto-brightness (documented in docs/rest-api.md, #346)
+                isGetOrPost && uri == "/api/autoBrightness" -> handleGetAutoBrightness()
+                isGetOrPost && uri == "/api/autoBrightness/enable" -> handleAutoBrightnessEnable(session)
+                isGetOrPost && uri == "/api/autoBrightness/disable" -> handleAutoBrightnessDisable()
+
                 // Rotation control (accept both GET and POST)
                 isGetOrPost && uri == "/api/rotation/start" -> handleRotationStart()
                 isGetOrPost && uri == "/api/rotation/stop" -> handleRotationStop()
@@ -444,6 +449,34 @@ class KioskHttpServer(
             put("currentIndex", 0)
         }
         return jsonSuccess(rotation)
+    }
+
+    private fun handleGetAutoBrightness(): Response {
+        val autoBrightness = statusProvider().optJSONObject("autoBrightness") ?: JSONObject()
+        return jsonSuccess(autoBrightness)
+    }
+
+    /** Only the levels that were sent are passed on: the command applies its own defaults. */
+    private fun handleAutoBrightnessEnable(session: IHTTPSession): Response {
+        checkControlAllowed()?.let { return it }
+
+        val body = parseBody(session)
+        val params = JSONObject()
+        for (key in listOf("min", "max", "offset")) {
+            if (body != null && body.has(key)) {
+                val value = body.optInt(key, -1)
+                if (value < 0 || value > 100) {
+                    return jsonError(Response.Status.BAD_REQUEST, "Invalid $key (0-100)")
+                }
+                params.put(key, value)
+            }
+        }
+        return jsonSuccess(commandHandler("autoBrightnessEnable", params))
+    }
+
+    private fun handleAutoBrightnessDisable(): Response {
+        checkControlAllowed()?.let { return it }
+        return jsonSuccess(commandHandler("autoBrightnessDisable", null))
     }
 
     private fun handleRotationStart(): Response {
