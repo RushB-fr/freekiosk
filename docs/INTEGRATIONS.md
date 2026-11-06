@@ -13,6 +13,7 @@
 - [Integration Channels](#integration-channels)
 - [REST API](#rest-api)
 - [MQTT](#mqtt)
+- [ioBroker](#iobroker)
 - [Headless Setup](#headless-setup)
 - [Choosing Your Integration](#choosing-your-integration)
 
@@ -25,6 +26,8 @@ FreeKiosk offers two main integration methods:
 |---------|----------|---------------|
 | **REST API** | On-demand control via HTTP | [REST API Docs](rest-api.md) |
 | **MQTT** | Real-time telemetry + Home Assistant | [MQTT Docs](MQTT.md) |
+
+For ioBroker there is a dedicated adapter that uses either channel, see [ioBroker](#iobroker).
 
 ### Feature Comparison
 
@@ -150,6 +153,35 @@ freekiosk/lobby/set/url              # Navigate to URL
 > See the complete [MQTT Reference](MQTT.md) for topics and commands.
 
 
+## ioBroker
+
+**Tablet states and commands as ioBroker objects, via the [ioBroker.freekiosk](https://github.com/typhosj/ioBroker.freekiosk) adapter.**
+
+The adapter turns each tablet into a device in ioBroker: battery, screen, brightness, volume, current URL, Wi-Fi and sensors as states, and the commands (reload, wake, URL, screensaver, text-to-speech, screenshots, camera photos, remote keys, display mode and more) as writable states for scripts, Blockly and vis. It needs FreeKiosk 2.0.0 or newer.
+
+### Choosing the Transport
+
+Each tablet is added to the adapter's device table with one of two transports:
+
+| Transport | How it works | FreeKiosk side |
+|-----------|--------------|----------------|
+| **REST** | The adapter polls the tablet (default every 30 s) | Enable the [REST API](rest-api.md), optionally with an API key |
+| **MQTT** | The tablet pushes to a broker built into the adapter, no Mosquitto needed | Point the [MQTT](MQTT.md) settings at the ioBroker host |
+
+Motion detection and periodic screenshots or camera photos are only available over MQTT. Screenshots and camera photos on demand work over both.
+
+### FreeKiosk Settings
+
+- **Allow Remote Control** must be on, otherwise the tablet refuses every command. REST API and MQTT each have their own switch; turn on the one of the transport you use.
+- **MQTT:** broker = the ioBroker host, port = the adapter's broker port (default `1886`), the same username, password and base topic as in the adapter. The adapter's broker requires a username and a password. The **Device Name** is the topic ID you enter in the adapter's device table.
+- **MQTT images:** screenshots and camera photos arrive only for the streams turned on in FreeKiosk's MQTT settings (**Publish Screenshot**, **Publish Camera Snapshots**).
+
+The adapter's broker ignores the Home Assistant discovery messages, so nothing has to be turned off. FreeKiosk connects to one broker only, though: if Home Assistant already uses the tablet over MQTT, add the tablet to ioBroker over REST.
+
+> [!TIP]
+> Setup steps, the device table and the full list of states are in the [adapter README](https://github.com/typhosj/ioBroker.freekiosk#readme).
+
+
 ## Headless Setup
 
 **Configure integrations via ADB for mass deployment.**
@@ -214,6 +246,7 @@ adb shell am start -n com.freekiosk/.MainActivity \
 | Use Case | Recommended | Why |
 |----------|-------------|-----|
 | **Home Assistant** | MQTT | Auto-discovery + real-time |
+| **ioBroker** | [ioBroker.freekiosk](#iobroker) adapter | Ready-made states and commands, over REST or MQTT |
 | **Mobile App** | REST API | Simple HTTP requests |
 | **Monitoring** | REST API | Polling for status |
 | **Event Automation** | MQTT | Push-based notifications |
@@ -235,6 +268,7 @@ Use both for maximum flexibility:
 
 - **REST API:** [Complete endpoint reference](rest-api.md)
 - **MQTT:** [Topics, discovery, and commands](MQTT.md)
+- **ioBroker:** [ioBroker.freekiosk adapter](https://github.com/typhosj/ioBroker.freekiosk#readme)
 - **ADB Configuration:** [Headless provisioning](adb-configuration.md)
 - **Installation:** [Device setup guide](installation.md)
 - **FAQ:** [Common questions](faq.md)
