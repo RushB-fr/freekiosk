@@ -315,6 +315,10 @@ class MainActivity : ReactActivity() {
     // Request camera permission for motion detection
     requestCameraPermission()
 
+    // Request the notification permission (Android 13+): on Samsung, a wake lock of an app
+    // with notifications off is cancelled, so Auto Wake could not turn the screen back on (#317)
+    requestNotificationPermission()
+
     // Adjust content padding when the soft keyboard appears.
     // In immersive/kiosk mode adjustResize is ignored, so we listen for IME insets
     // and manually add bottom padding so WebView form fields stay visible.
@@ -445,6 +449,26 @@ class MainActivity : ReactActivity() {
       } catch (_: Exception) {}
     } else {
       ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 1002)
+    }
+  }
+
+  private fun requestNotificationPermission() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+    if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+        == PackageManager.PERMISSION_GRANTED) return
+
+    // Device Owner grants silently, like camera and location above; otherwise the prompt.
+    if (devicePolicyManager.isDeviceOwnerApp(packageName)) {
+      try {
+        devicePolicyManager.setPermissionGrantState(
+          adminComponent,
+          packageName,
+          Manifest.permission.POST_NOTIFICATIONS,
+          DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
+        )
+      } catch (_: Exception) {}
+    } else {
+      ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1005)
     }
   }
 
