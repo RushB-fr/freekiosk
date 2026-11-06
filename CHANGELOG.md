@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+***
+
+## [2.1.0-beta.2] - 2026-11-06
 
 ### Added
 - 🌏 **Two more languages: Polish and Simplified Chinese.** Settings > General > Language now lists **Polski** and **简体中文**, nine languages in all. With no language chosen, a device set to Polish gets Polish, and a device set to any Chinese (`zh_CN`, `zh_TW`, `zh-Hant-HK`) gets Simplified Chinese, there being no Traditional Chinese translation. Polish uses its four plural forms. The texts follow a glossary shared with FreeKiosk Cloud and the website, which get the same two languages, so a setting has the same name in all three; no native speaker has reviewed them yet. Checked on an Android 15 tablet emulator: in each language the PIN screen and the five settings tabs, scrolled to the end, showed no English text apart from *Bluetooth* and *Device Owner*, the language list showed the nine names, and removing the stored language brought English back. **Not checked on screen**: the one plural text (ESC/POS feed lines), covered by the locale tests only.
