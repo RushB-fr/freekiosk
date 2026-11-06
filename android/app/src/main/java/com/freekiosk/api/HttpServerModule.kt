@@ -811,12 +811,15 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             "autoBrightnessEnable" -> {
                 val min = params?.optInt("min", 10) ?: 10
                 val max = params?.optInt("max", 100) ?: 100
+                // The offset is optional: without it the app keeps the current one
+                val offset = if (params?.has("offset") == true) params.optInt("offset") else null
                 // Send to JS for handling
                 sendEvent("onApiCommand", Arguments.createMap().apply {
                     putString("command", "autoBrightnessEnable")
                     putString("params", JSONObject().apply {
                         put("min", min)
                         put("max", max)
+                        offset?.let { put("offset", it) }
                     }.toString())
                 })
                 return JSONObject().apply {
@@ -824,6 +827,7 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                     put("command", command)
                     put("min", min)
                     put("max", max)
+                    offset?.let { put("offset", it) }
                 }
             }
             "autoBrightnessDisable" -> {

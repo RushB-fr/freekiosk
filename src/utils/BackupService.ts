@@ -198,6 +198,7 @@ const BACKUP_KEYS = [
   '@screensaver_video_items',
   '@screensaver_video_loop',
   '@screensaver_keep_external_app',
+  '@screensaver_fade_seconds',
   '@kiosk_language',
   '@kiosk_screen_lock_compat',
   '@kiosk_allow_remote_screenshot',

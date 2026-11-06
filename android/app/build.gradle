@@ -111,6 +111,10 @@ android {
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace "com.freekiosk"
+    testOptions {
+        // android.util.Log in the code under test returns defaults instead of throwing
+        unitTests.returnDefaultValues = true
+    }
     defaultConfig {
         applicationId "com.freekiosk"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -240,4 +244,6 @@ dependencies {
 
     // Plain JVM unit tests (android/app/src/test)
     testImplementation("junit:junit:4.13.2")
+    // android.jar's org.json only has stubs that throw in a JVM test
+    testImplementation("org.json:json:20231013")
 }
