@@ -1340,6 +1340,16 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     }, [])
   );
 
+  // Android TV has no touch screen: tell native when the screensaver is showing, so a remote key
+  // wakes it (MainActivity.dispatchKeyEvent, which also keeps that key from reaching the page).
+  // Native ignores this unless the device is a TV and this screen is in front.
+  useEffect(() => {
+    KioskModule.setScreensaverShowing?.(isScreensaverActive).catch(() => {});
+    return () => {
+      KioskModule.setScreensaverShowing?.(false).catch(() => {});
+    };
+  }, [isScreensaverActive]);
+
   useEffect(() => {
     // Don't apply manual brightness when auto-brightness is active
     if (autoBrightnessEnabled) return;
@@ -2922,6 +2932,13 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   // onScreensaverTap is rebuilt on every render (resetTimer is not memoised).
   const onScreensaverTapRef = useRef(onScreensaverTap);
   onScreensaverTapRef.current = onScreensaverTap;
+  // Android TV: a remote key press wakes the screensaver like a tap does.
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('onTvKeyWake', () => {
+      if (isScreensaverActiveRef.current) onScreensaverTapRef.current();
+    });
+    return () => sub.remove();
+  }, []);
   useEffect(() => {
     if (displayMode !== 'external_app') return;
     const emitter = new NativeEventEmitter(NativeModules.DeviceEventManagerModule);

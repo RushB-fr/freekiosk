@@ -83,6 +83,11 @@ class MainActivity : ReactActivity() {
     // (slow cold boot), so it must not depend on reactApplicationContext.currentActivity.
     @Volatile var kioskScreenActive = false
 
+    // Android TV has no touch screen, so a remote key has to wake the screensaver. True while the
+    // Kiosk screen shows it (set from JS, like kioskScreenActive): the key is then consumed here
+    // and does not also act on the page behind the screensaver.
+    @Volatile var screensaverShowing = false
+
     // Set before bringToFront() when the screensaver activates in External App mode.
     // Tells onResume() to skip auto-relaunch and stay in the foreground for the screensaver.
     @Volatile
@@ -1284,7 +1289,35 @@ class MainActivity : ReactActivity() {
         return true
       }
     }
+
+    // Wake the screensaver with any remote key, and swallow the key (and its release) so an OK or
+    // a D-pad press does not also click or move the focus in the page that is hidden behind it.
+    // Only while the Kiosk screen is in front: the PIN page and Settings keep their keys.
+    if (isTelevision && isWakeKey(event.keyCode)) {
+      if (screensaverShowing && kioskScreenActive) {
+        if (event.action == KeyEvent.ACTION_DOWN) {
+          if (event.repeatCount == 0) KioskModule.sendEventFromNative("onTvKeyWake")
+          wakeKeyDown = event.keyCode
+        }
+        return true
+      }
+      if (event.action == KeyEvent.ACTION_UP && event.keyCode == wakeKeyDown) {
+        wakeKeyDown = -1
+        return true
+      }
+    }
     return super.dispatchKeyEvent(event)
+  }
+
+  /** The key whose press woke the screensaver: its release is swallowed too. */
+  private var wakeKeyDown = -1
+
+  /** Volume, power and Home keep their own meaning; every other key counts as "someone is there". */
+  private fun isWakeKey(keyCode: Int): Boolean = when (keyCode) {
+    KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN, KeyEvent.KEYCODE_VOLUME_MUTE,
+    KeyEvent.KEYCODE_POWER, KeyEvent.KEYCODE_SLEEP, KeyEvent.KEYCODE_WAKEUP,
+    KeyEvent.KEYCODE_HOME -> false
+    else -> true
   }
 
   // Volume Up 5-tap tracking
