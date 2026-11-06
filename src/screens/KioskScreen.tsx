@@ -2643,7 +2643,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   useEffect(() => {
     clearInactivityReturnTimer();
 
-    console.log(`[InactivityReturn] useEffect fired — enabled=${inactivityReturnEnabled}, displayMode=${displayMode}, baseUrl="${baseUrl}", url="${url}", screensaver=${isScreensaverActive}, rotation=${urlRotationEnabled}, delay=${inactivityReturnDelay}`);
+    console.log(`[InactivityReturn] useEffect fired — enabled=${inactivityReturnEnabled}, displayMode=${displayMode}, baseUrl="${baseUrl}", url="${url}", focused=${isFocused}, rotation=${urlRotationEnabled}, delay=${inactivityReturnDelay}`);
 
     // Guard: only active in webview mode with a valid base URL (or dashboard mode)
     if (!inactivityReturnEnabled || displayMode !== 'webview' || (!baseUrl && !dashboardModeEnabled)) {
@@ -2655,9 +2655,12 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       console.log('[InactivityReturn] BLOCKED: already on dashboard grid');
       return;
     }
-    // Don't start during screensaver
-    if (isScreensaverActive) {
-      console.log('[InactivityReturn] BLOCKED: screensaver active');
+    // #344: the screensaver does not pause this timer. It keeps counting from the last real
+    // interaction and resets the page behind the screensaver, so the next user wakes to the
+    // start page. That is why isScreensaverActive is not a dependency: re-running here would
+    // reset the timestamp below. Blur clears the timer; isFocused re-arms it on the way back.
+    if (!isFocused) {
+      console.log('[InactivityReturn] BLOCKED: screen not focused');
       return;
     }
     // Don't start during URL rotation or planner
@@ -2721,7 +2724,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     inactivityReturnTimerRef.current = setTimeout(tick, delayMs);
 
     return () => clearInactivityReturnTimer();
-  }, [inactivityReturnEnabled, inactivityReturnDelay, inactivityReturnClearCache, inactivityReturnScrollTop, displayMode, baseUrl, url, isScreensaverActive, urlRotationEnabled, urlRotationList.length, activeScheduledEvent, dashboardModeEnabled, dashboardShowGrid]);
+  }, [inactivityReturnEnabled, inactivityReturnDelay, inactivityReturnClearCache, inactivityReturnScrollTop, displayMode, baseUrl, url, isFocused, urlRotationEnabled, urlRotationList.length, activeScheduledEvent, dashboardModeEnabled, dashboardShowGrid]);
 
   // Ref for 5-tap debounce (prevent multiple events per tap)
   const lastTapTimeRef = useRef<number>(0);
@@ -2786,8 +2789,9 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     }
     
     resetTimer();
-    markUserInteraction();
     if (isScreensaverActiveRef.current) {
+      // #344: the touch that wakes the screensaver is not an interaction with the page,
+      // so markUserInteraction() is left out here
       setIsScreensaverActive(false);
       // Restore brightness immediately (auto-brightness is handled by its own useEffect)
       if (brightnessManagementRef.current && !autoBrightnessEnabled) {
@@ -2797,6 +2801,8 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           console.error('[KioskScreen] Error restoring brightness on interaction:', error);
         }
       }
+    } else {
+      markUserInteraction();
     }
 
     // N-tap detection for WebView/MediaPlayer mode - Only count dedicated 'tap' events from clicks
