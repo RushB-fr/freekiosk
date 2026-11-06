@@ -303,21 +303,18 @@ class MainActivity : ReactActivity() {
       return  // Exit - app restarting with new config
     }
 
-    // Request location permission for WiFi SSID access (Android 8+ requires it)
-    requestLocationPermission()
-
-    // Request Bluetooth runtime permissions (Android 12+ / API 31+)
-    requestBluetoothPermissions()
-
-    // Request Android 13+ WiFi scan permission for visible SSID results
-    requestWifiPermissions()
-
-    // Request camera permission for motion detection
-    requestCameraPermission()
-
-    // Request the notification permission (Android 13+): on Samsung, a wake lock of an app
-    // with notifications off is cancelled, so Auto Wake could not turn the screen back on (#317)
-    requestNotificationPermission()
+    // Runtime permissions: location for WiFi SSID access (Android 8+ requires it), Bluetooth
+    // (Android 12+), the Android 13+ WiFi scan permission for visible SSID results, the camera
+    // for motion detection, and notifications (Android 13+: on Samsung, a wake lock of an app
+    // with notifications off is cancelled, so Auto Wake could not turn the screen back on, #317).
+    // Device Owner grants them silently; the others come back here and are asked in ONE request:
+    // Android keeps a single pending request per activity, so separate calls swallowed each other
+    // and the last prompt only showed after several launches.
+    val toAsk = requestLocationPermission() + requestBluetoothPermissions() +
+      requestWifiPermissions() + requestCameraPermission() + requestNotificationPermission()
+    if (toAsk.isNotEmpty()) {
+      ActivityCompat.requestPermissions(this, toAsk.toTypedArray(), 1001)
+    }
 
     // Adjust content padding when the soft keyboard appears.
     // In immersive/kiosk mode adjustResize is ignored, so we listen for IME insets
@@ -404,7 +401,7 @@ class MainActivity : ReactActivity() {
     }
   }
 
-  private fun requestLocationPermission() {
+  private fun requestLocationPermission(): List<String> {
     val needed = mutableListOf<String>()
     if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
         != PackageManager.PERMISSION_GRANTED) {
@@ -414,7 +411,7 @@ class MainActivity : ReactActivity() {
         != PackageManager.PERMISSION_GRANTED) {
       needed.add(Manifest.permission.ACCESS_COARSE_LOCATION)
     }
-    if (needed.isEmpty()) return
+    if (needed.isEmpty()) return emptyList()
 
     if (devicePolicyManager.isDeviceOwnerApp(packageName)) {
       needed.forEach { perm ->
@@ -428,13 +425,14 @@ class MainActivity : ReactActivity() {
         } catch (_: Exception) {}
       }
     } else {
-      ActivityCompat.requestPermissions(this, needed.toTypedArray(), 1001)
+      return needed
     }
+    return emptyList()
   }
 
-  private fun requestCameraPermission() {
+  private fun requestCameraPermission(): List<String> {
     if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-        == PackageManager.PERMISSION_GRANTED) return
+        == PackageManager.PERMISSION_GRANTED) return emptyList()
 
     // Device Owner can grant silently (consistent with location/bluetooth/wifi
     // above); otherwise fall back to the runtime prompt.
@@ -448,14 +446,15 @@ class MainActivity : ReactActivity() {
         )
       } catch (_: Exception) {}
     } else {
-      ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 1002)
+      return listOf(Manifest.permission.CAMERA)
     }
+    return emptyList()
   }
 
-  private fun requestNotificationPermission() {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+  private fun requestNotificationPermission(): List<String> {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return emptyList()
     if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-        == PackageManager.PERMISSION_GRANTED) return
+        == PackageManager.PERMISSION_GRANTED) return emptyList()
 
     // Device Owner grants silently, like camera and location above; otherwise the prompt.
     if (devicePolicyManager.isDeviceOwnerApp(packageName)) {
@@ -468,19 +467,20 @@ class MainActivity : ReactActivity() {
         )
       } catch (_: Exception) {}
     } else {
-      ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1005)
+      return listOf(Manifest.permission.POST_NOTIFICATIONS)
     }
+    return emptyList()
   }
 
-  private fun requestBluetoothPermissions() {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+  private fun requestBluetoothPermissions(): List<String> {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return emptyList()
 
     val needed = mutableListOf<String>()
     if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
         != PackageManager.PERMISSION_GRANTED) needed.add(Manifest.permission.BLUETOOTH_CONNECT)
     if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN)
         != PackageManager.PERMISSION_GRANTED) needed.add(Manifest.permission.BLUETOOTH_SCAN)
-    if (needed.isEmpty()) return
+    if (needed.isEmpty()) return emptyList()
 
     if (devicePolicyManager.isDeviceOwnerApp(packageName)) {
       needed.forEach { perm ->
@@ -494,14 +494,15 @@ class MainActivity : ReactActivity() {
         } catch (_: Exception) {}
       }
     } else {
-      ActivityCompat.requestPermissions(this, needed.toTypedArray(), 1003)
+      return needed
     }
+    return emptyList()
   }
 
-  private fun requestWifiPermissions() {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+  private fun requestWifiPermissions(): List<String> {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return emptyList()
     if (ContextCompat.checkSelfPermission(this, Manifest.permission.NEARBY_WIFI_DEVICES)
-        == PackageManager.PERMISSION_GRANTED) return
+        == PackageManager.PERMISSION_GRANTED) return emptyList()
 
     if (devicePolicyManager.isDeviceOwnerApp(packageName)) {
       try {
@@ -513,8 +514,9 @@ class MainActivity : ReactActivity() {
         )
       } catch (_: Exception) {}
     } else {
-      ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.NEARBY_WIFI_DEVICES), 1004)
+      return listOf(Manifest.permission.NEARBY_WIFI_DEVICES)
     }
+    return emptyList()
   }
 
   /**
@@ -2046,7 +2048,9 @@ class MainActivity : ReactActivity() {
     val allEntries = verifyPrefs.all
     android.util.Log.i("FreeKiosk-ADB", "Pending config verification - ${allEntries.size} entries:")
     for ((key, value) in allEntries) {
-      android.util.Log.i("FreeKiosk-ADB", "  Pending: $key = $value")
+      // The pending keys are storage keys ("@kiosk_pin"), the sensitive list holds ADB names ("pin")
+      val shown = if (ADB_SENSITIVE_KEYS.any { key.endsWith(it) }) "***" else value
+      android.util.Log.i("FreeKiosk-ADB", "  Pending: $key = $shown")
     }
     
     } catch (e: Exception) {

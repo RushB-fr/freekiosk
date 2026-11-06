@@ -1380,7 +1380,7 @@
       "noOrigins": "Brak dozwolonych źródeł",
       "noOriginsHint": "Żadna strona nie może drukować, dopóki nie dodasz źródła",
       "printTestPage": "Drukuj stronę testową",
-      "info": "Strony WWW drukują po cichu, wywołując window.FreeKiosk.silentPrinter.print() lub printImage(). print() układa stronę tak, że jeden piksel CSS to jeden punkt.\n\nNie dotyczy to window.print(): otwiera ono okno drukowania Androida, gdy włączone jest drukowanie okna, a w przeciwnym razie nic nie robi.\n\nAby dostęp był zachowany po ponownym uruchomieniu: podłącz drukarkę, a następnie wybierz FreeKiosk i zaznacz „Zawsze otwieraj”. Przycisk powyżej przyznaje dostęp tylko do odłączenia drukarki, a tryb lock task całkowicie blokuje to okno dialogowe.\n\nDrukarki udostępniające interfejs USB specyficzny dla producenta zamiast standardowej klasy drukarki nadal drukują, ale nie mogą zgłaszać poziomu papieru."
+      "info": "Strony WWW drukują po cichu, wywołując window.FreeKiosk.silentPrinter.print() lub printImage(). print() układa stronę tak, że jeden piksel CSS to jeden punkt.\n\nDomyślnie window.print() otwiera okno drukowania Androida, gdy włączone jest drukowanie okna, a w przeciwnym razie nic nie robi. Gdy włączona jest opcja „Wysyłaj window.print() do tej drukarki”, drukuje zamiast tego bez okna na drukarce ESC/POS.\n\nAby dostęp był zachowany po ponownym uruchomieniu: podłącz drukarkę, a następnie wybierz FreeKiosk i zaznacz „Zawsze otwieraj”. Przycisk powyżej przyznaje dostęp tylko do odłączenia drukarki, a tryb lock task całkowicie blokuje to okno dialogowe.\n\nDrukarki udostępniające interfejs USB specyficzny dla producenta zamiast standardowej klasy drukarki nadal drukują, ale nie mogą zgłaszać poziomu papieru."
     }
   },
   "screens": {
