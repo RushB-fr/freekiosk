@@ -289,7 +289,7 @@ adb shell "am start -n com.freekiosk/.MainActivity --es pin YOUR_PIN --ez url_pl
 | `startDate`, `endDate` | `oneTime` only, `YYYY-MM-DD`, local time. The end date is included |
 | `allDay` | `oneTime` only. `true`, or give `startTime` and `endTime` instead |
 | `days` | `recurring` only, `0` (Sunday) to `6` (Saturday) |
-| `startTime`, `endTime` | `HH:MM`, 24 h, local time. An end before the start runs overnight |
+| `startTime`, `endTime` | `HH:MM`, 24 h, local time. An end before the start runs overnight. For `oneTime`, a daily window on each day of the range |
 
 > **Windows PowerShell:** it strips the double quotes inside the JSON, and FreeKiosk then receives `[{id:advert-1,...}]`, which is not valid. Put the command in a `.sh` file, `adb push` it to `/data/local/tmp` and run it with `adb shell sh /data/local/tmp/file.sh`, or use `cmd.exe`/Git Bash.
 

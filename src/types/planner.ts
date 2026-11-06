@@ -73,15 +73,17 @@ export const isDatePast = (date: string): boolean => {
   return checkDate < today;
 };
 
+// Local calendar date: toISOString() is UTC, which shifts the day around midnight.
+const localDate = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 // Check if event is currently active
-export const isEventActive = (event: ScheduledEvent): boolean => {
+export const isEventActive = (event: ScheduledEvent, now: Date = new Date()): boolean => {
   if (!event.enabled) return false;
-  
-  const now = new Date();
+
   const currentDay = now.getDay();
   const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-  // Local calendar date: toISOString() is UTC, which shifts the day around midnight.
-  const currentDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const currentDate = localDate(now);
   
   if (event.type === 'recurring') {
     if (event.startTime && event.endTime) {
@@ -102,18 +104,23 @@ export const isEventActive = (event: ScheduledEvent): boolean => {
   }
   
   if (event.type === 'oneTime') {
-    // Check if current date is within the date range
     if (!event.startDate || !event.endDate) return false;
-    if (currentDate < event.startDate || currentDate > event.endDate) return false;
-    
-    // If all day, it's active
-    if (event.allDay) return true;
-    
-    // Check time range
-    if (event.startTime && event.endTime) {
-      return currentTime >= event.startTime && currentTime < event.endTime;
+    const { startDate, endDate } = event;
+    const inRange = (date: string) => date >= startDate && date <= endDate;
+
+    // All day, or no times: active on every day of the range
+    if (event.allDay || !event.startTime || !event.endTime) return inRange(currentDate);
+
+    // The times are a daily window on each day of the range
+    if (event.startTime > event.endTime) {
+      // Overnight, as for recurring events: the evening on a day of the range, and the
+      // morning after it, which may be the day after endDate
+      if (inRange(currentDate) && currentTime >= event.startTime) return true;
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      return inRange(localDate(yesterday)) && currentTime < event.endTime;
     }
-    return true;
+    return inRange(currentDate) && currentTime >= event.startTime && currentTime < event.endTime;
   }
   
   return false;
@@ -121,7 +128,7 @@ export const isEventActive = (event: ScheduledEvent): boolean => {
 
 // Get the currently active event with highest priority
 export const getActiveEvent = (events: ScheduledEvent[]): ScheduledEvent | null => {
-  const activeEvents = events.filter(isEventActive);
+  const activeEvents = events.filter(event => isEventActive(event));
   
   if (activeEvents.length === 0) return null;
   
