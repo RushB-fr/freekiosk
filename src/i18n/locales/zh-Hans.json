@@ -1378,7 +1378,7 @@
       "noOrigins": "未允许任何来源",
       "noOriginsHint": "添加来源之前，任何页面都无法打印",
       "printTestPage": "打印测试页",
-      "info": "网页通过调用 window.FreeKiosk.silentPrinter.print() 或 printImage() 进行静默打印。print() 会将页面排版为一个 CSS 像素对应一个点。\n\nwindow.print() 不受影响：启用窗口打印时，它会打开 Android 打印对话框，否则不执行任何操作。\n\n要获得重启后仍然有效的访问权限：插入打印机，然后选择 FreeKiosk 并勾选“始终打开”。上方按钮授予的访问权限仅在打印机拔出前有效，而 lock task 模式会完全屏蔽该对话框。\n\n使用厂商专用 USB 接口而非标准打印机类的打印机仍可打印，但无法报告纸量。"
+      "info": "网页通过调用 window.FreeKiosk.silentPrinter.print() 或 printImage() 进行静默打印。print() 会将页面排版为一个 CSS 像素对应一个点。\n\n默认情况下，启用窗口打印时，window.print() 会打开 Android 打印对话框，否则不执行任何操作。开启“将 window.print() 发送到此打印机”后，它会改为无对话框地在 ESC/POS 打印机上打印。\n\n要获得重启后仍然有效的访问权限：插入打印机，然后选择 FreeKiosk 并勾选“始终打开”。上方按钮授予的访问权限仅在打印机拔出前有效，而 lock task 模式会完全屏蔽该对话框。\n\n使用厂商专用 USB 接口而非标准打印机类的打印机仍可打印，但无法报告纸量。"
     }
   },
   "screens": {
