@@ -179,7 +179,11 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [autoBrightnessMax, setAutoBrightnessMax] = useState<number>(1.0);
   const [autoBrightnessOffset, setAutoBrightnessOffset] = useState<number>(0.0);
   const [autoBrightnessInterval, setAutoBrightnessInterval] = useState<number>(1000);
-  
+  // The REST/MQTT handlers are registered once on mount: they read these through the ref,
+  // or they would see the first render's values
+  const brightnessStateRef = useRef({ defaultBrightness, autoBrightnessEnabled, autoBrightnessOffset, autoBrightnessInterval });
+  brightnessStateRef.current = { defaultBrightness, autoBrightnessEnabled, autoBrightnessOffset, autoBrightnessInterval };
+
   // Brightness management (allow system to manage)
   const [brightnessManagementEnabled, setBrightnessManagementEnabled] = useState<boolean>(true);
   const brightnessManagementRef = useRef<boolean>(true);
@@ -729,7 +733,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
               return;
             }
             // If auto-brightness is enabled, disable it first
-            if (autoBrightnessEnabled) {
+            if (brightnessStateRef.current.autoBrightnessEnabled) {
               await AutoBrightnessModule.stopAutoBrightness();
               setAutoBrightnessEnabled(false);
               await StorageService.saveAutoBrightnessEnabled(false);
@@ -897,7 +901,8 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
             const minNormalized = min / 100;
             const maxNormalized = max / 100;
             // Use API offset if provided, otherwise keep current setting
-            const offsetNormalized = offset !== undefined ? offset / 100 : autoBrightnessOffset;
+            const current = brightnessStateRef.current;
+            const offsetNormalized = offset !== undefined ? offset / 100 : current.autoBrightnessOffset;
             
             setAutoBrightnessMin(minNormalized);
             setAutoBrightnessMax(maxNormalized);
@@ -907,13 +912,13 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
             setAutoBrightnessEnabled(true);
             
             // Save current manual brightness before enabling
-            await StorageService.saveAutoBrightnessSavedManual(defaultBrightness);
+            await StorageService.saveAutoBrightnessSavedManual(current.defaultBrightness);
             
             // Start auto-brightness
             await AutoBrightnessModule.startAutoBrightness(
               minNormalized,
               maxNormalized,
-              autoBrightnessInterval,
+              current.autoBrightnessInterval,
               offsetNormalized
             );
             
