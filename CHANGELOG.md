@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- 💬 **MQTT: a toast shows once, not twice.** A message on `.../set/toast` was shown by the MQTT client itself, so it also appears while the app's JavaScript is paused, and then passed to the app, which showed it a second time. It is no longer passed on. REST's `/api/toast` is unchanged.
+
 ***
 
 ## [2.1.0-beta.2] - 2026-11-06
