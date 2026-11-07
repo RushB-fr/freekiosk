@@ -469,7 +469,11 @@
       disableStream: true,
       disableAutoFetch: true,
       // CORS: credentials handled by native proxy
-      withCredentials: false
+      withCredentials: false,
+      // CVE-2024-4367: with eval on, pdf.js < 4.2.67 compiles font glyph paths with
+      // new Function(), and a crafted font runs its own code. This page is a file:// URL
+      // with universal access, so that code could read the app's files.
+      isEvalSupported: false
     });
 
     loadingTask.promise.then(function(pdf) {

@@ -1378,7 +1378,7 @@
       "noOrigins": "No origins allowed",
       "noOriginsHint": "No page can print until you add one",
       "printTestPage": "Print test page",
-      "info": "Web pages print silently by calling window.FreeKiosk.silentPrinter.print() or printImage(). print() lays the page out so one CSS pixel is one dot.\n\nwindow.print() is not affected: it opens the Android print dialog when Window Printing is enabled, and does nothing otherwise.\n\nFor access that survives reboots: plug the printer in, then choose FreeKiosk and tick \"Always open\". The button above only grants access until the printer is unplugged, and lock task mode suppresses that dialog entirely.\n\nPrinters exposing a vendor-specific USB interface instead of the standard printer class still print, but cannot report paper level."
+      "info": "Web pages print silently by calling window.FreeKiosk.silentPrinter.print() or printImage(). print() lays the page out so one CSS pixel is one dot.\n\nBy default, window.print() opens the Android print dialog when Window Printing is enabled, and does nothing otherwise. With \"Send window.print() to this printer\" on, it prints with no dialog on the ESC/POS printer instead.\n\nFor access that survives reboots: plug the printer in, then choose FreeKiosk and tick \"Always open\". The button above only grants access until the printer is unplugged, and lock task mode suppresses that dialog entirely.\n\nPrinters exposing a vendor-specific USB interface instead of the standard printer class still print, but cannot report paper level."
     }
   },
   "screens": {

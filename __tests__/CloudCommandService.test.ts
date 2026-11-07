@@ -104,6 +104,24 @@ describe('native dispatch', () => {
     spy.mockReset();
   });
 
+  it('reports a native command that ran but failed as an error', async () => {
+    const spy = nativeHttp.executeNativeCommand;
+    spy.mockResolvedValue(JSON.stringify({
+      executed: false,
+      command: 'reboot',
+      error: 'Reboot requires Device Owner mode',
+    }));
+
+    const cmd = { id: 'cmd-native-3', type: 'reboot', params: {}, created_at: '', expires_at: future() };
+    const calls = installFetch({ commands: [cmd] });
+    await CloudCommandService.poll();
+
+    const report = calls.find(c => c.url.includes('/commands/cmd-native-3/result/'));
+    expect(report!.body.status).toBe('error');
+    expect(report!.body.error_message).toBe('Reboot requires Device Owner mode');
+    spy.mockReset();
+  });
+
   it('falls back to the JS path when the native handler declines', async () => {
     const spy = nativeHttp.executeNativeCommand;
     spy.mockResolvedValue(JSON.stringify({ nativelyHandled: false, command: 'reload' }));
