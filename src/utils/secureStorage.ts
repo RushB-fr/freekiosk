@@ -19,6 +19,9 @@ const LOCKOUT_KEY = '@kiosk_pin_lockout';
 // (AndroidKeyStore) silently fails to persist — e.g. Rockchip signage firmwares
 // (issue #200). Holds the same irreversible PBKDF2 payload, never plaintext.
 const PIN_FALLBACK_KEY = '@kiosk_pin_secure_fallback';
+// Not a secret: set once a PIN has been saved. With it set, a PIN that cannot be read is a
+// broken Keystore, not "no PIN", and the default 1234 must not open the settings.
+const PIN_SET_KEY = '@kiosk_pin_set';
 const DEFAULT_MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes in milliseconds
 const ATTEMPTS_RESET_DURATION = 60 * 60 * 1000; // 1 hour - Reset attempts after 1 hour of no activity
@@ -218,6 +221,24 @@ async function getPinFallback(): Promise<{ hash: string; salt: string } | null> 
   }
 }
 
+async function markPinSet(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(PIN_SET_KEY, 'true');
+  } catch (e) {
+    console.error('[SecureStorage] Error marking PIN as set:', e);
+  }
+}
+
+/** Fails closed: when the flag cannot be read, a PIN is assumed to exist. */
+async function isPinMarkedSet(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(PIN_SET_KEY)) === 'true';
+  } catch (e) {
+    console.error('[SecureStorage] Error reading the PIN flag:', e);
+    return true;
+  }
+}
+
 async function clearPinFallback(): Promise<void> {
   try {
     await AsyncStorage.removeItem(PIN_FALLBACK_KEY);
@@ -261,6 +282,7 @@ export async function saveSecurePin(pin: string): Promise<boolean> {
       console.warn('[SecureStorage] Keychain did not persist PIN; using AsyncStorage fallback (issue #200)');
       await savePinFallback(payload);
     }
+    await markPinSet();
 
     // Also save hash for ADB verification (keeps native and RN in sync)
     if (Platform.OS === 'android' && KioskModule?.saveAdbPinHash) {
@@ -323,6 +345,7 @@ export async function verifySecurePin(inputPin: string): Promise<{
         const inputHash = await hashPin(inputPin, hexToBytes(fallback.salt));
         if (inputHash === fallback.hash) {
           await resetPinAttempts();
+          await markPinSet(); // PINs saved before the flag existed
           return { success: true };
         }
         await recordFailedAttempt();
@@ -378,6 +401,17 @@ export async function verifySecurePin(inputPin: string): Promise<{
         }
       }
 
+      // A PIN was set but cannot be read (Keystore failing, #258): refuse rather than
+      // fall back to the default. Not a failed attempt, there is nothing to guess against.
+      if (await isPinMarkedSet()) {
+        console.error('[SecureStorage] A PIN was set but cannot be read; refusing the default PIN');
+        return {
+          success: false,
+          // Any ADB config sent with the PIN saves it again (docs/adb-configuration.md)
+          message: 'The saved PIN cannot be read. Send any ADB config with the PIN to save it again.',
+        };
+      }
+
       // No PIN at all - use default '1234' (backward compatibility)
       if (inputPin === '1234') {
         await resetPinAttempts();
@@ -403,6 +437,7 @@ export async function verifySecurePin(inputPin: string): Promise<{
     if (inputHash === storedHash) {
       // Success - reset attempts
       await resetPinAttempts();
+      await markPinSet(); // PINs saved before the flag existed
       return { success: true };
     } else {
       // Failed - record attempt
@@ -616,6 +651,7 @@ export async function clearSecurePin(): Promise<void> {
     await resetPinAttempts();
     await clearLegacyPlaintextPin(); // Also clear any plaintext PIN
     await clearPinFallback(); // And the AsyncStorage fallback (issue #200)
+    await AsyncStorage.removeItem(PIN_SET_KEY); // The default PIN applies again
     
     // Also clear ADB PIN hash
     if (Platform.OS === 'android' && KioskModule?.clearAdbPinHash) {

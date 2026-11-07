@@ -165,6 +165,9 @@ const PinInput: React.FC<PinInputProps> = ({ onSuccess }) => {
             result.message || t('components.pinInput.accountLockedDefault'),
             [{ text: t('components.pinInput.ok') }]
           );
+        } else if (result.attemptsRemaining === undefined) {
+          // Not a wrong PIN: the check itself failed (e.g. the saved PIN cannot be read)
+          Alert.alert(t('components.pinInput.error'), result.message || t('components.pinInput.genericError'));
         } else {
           setAttemptsRemaining(result.attemptsRemaining || 0);
           Alert.alert(
