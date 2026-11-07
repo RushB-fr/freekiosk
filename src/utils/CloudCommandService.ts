@@ -293,6 +293,10 @@ class CloudCommandServiceClass {
       );
       const parsed = raw ? JSON.parse(raw) : null;
       if (!parsed || parsed.nativelyHandled === false) return null;
+      // Handled natively but not done (reboot without Device Owner, unknown key...)
+      if (parsed.executed === false) {
+        return { ok: false, error: parsed.error ?? `${command} failed`, result: parsed };
+      }
       return { ok: true, result: parsed };
     } catch {
       // Never let a native failure swallow the command: let the JS path have its turn.

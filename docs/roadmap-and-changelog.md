@@ -29,6 +29,7 @@
 
 | Version | Date | Channel | Highlights |
 |---|---|---|---|
+| **v2.1.0-beta.2** | 2026-11-06 | Beta | Polish and Simplified Chinese; full-screen dashboard tiles with two-finger gestures; screen orientation lock; screensaver fade-out and wake only for a face; the remote of a TV wakes the screensaver; the camera works while another app is in front; many REST, MQTT and screensaver fixes |
 | **v2.1.0-beta.1** | 2026-10-24 | Beta | Android TV, Google TV and Fire TV; digital signage playlists from FreeKiosk Cloud (with web pages and YouTube); German, Italian, Dutch and Spanish |
 | **v2.0.0** | 2026-10-22 | Stable | FreeKiosk Cloud (open beta), shared tablets, Brazilian Portuguese |
 
@@ -187,7 +188,7 @@ it is stable and feature-complete, and **no date is set**.
 | **Cloud Management** | Shipped (open beta) | FreeKiosk Cloud, see [cloud.md](cloud.md) |
 | **Enterprise Features** | Planned | Corporate deployment tools |
 | **Advanced Integrations** | Planned | Third-party platform support |
-| **Localization** | Shipped | 7 languages in the app (2.1.0-beta.1); Polish and Simplified Chinese next (9) |
+| **Localization** | Shipped | 9 languages in the app (2.1.0-beta.2 adds Polish and Simplified Chinese) |
 | **Analytics Platform** | Planned | Comprehensive insights |
 | **Enterprise Security** | Planned | Advanced authentication |
 | **AI Features** | Planned | Smart automation |

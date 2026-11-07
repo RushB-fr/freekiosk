@@ -185,6 +185,17 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
         }
     }
 
+    // Android TV: tells MainActivity the screensaver is showing, so a remote key wakes it.
+    @ReactMethod
+    fun setScreensaverShowing(active: Boolean, promise: Promise) {
+        try {
+            MainActivity.screensaverShowing = active
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.resolve(false)
+        }
+    }
+
     // #180 — Tells MainActivity whether the Kiosk screen is the active route, so the
     // native tap-to-settings fallback (dispatchTouchEvent) only fires on the kiosk
     // screen and not while the user is inside Pin/Settings. Revert: delete this method.
