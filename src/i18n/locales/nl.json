@@ -1378,7 +1378,7 @@
       "noOrigins": "Geen oorsprongen toegestaan",
       "noOriginsHint": "Geen enkele pagina kan afdrukken totdat je er een toevoegt",
       "printTestPage": "Testpagina afdrukken",
-      "info": "Webpagina's drukken stil af via window.FreeKiosk.silentPrinter.print() of printImage(). print() legt de pagina zo op dat één CSS-pixel één stip is.\n\nwindow.print() wordt niet beïnvloed: het opent het Android-afdrukvenster als Window Printing is ingeschakeld, en doet anders niets.\n\nVoor toegang die een herstart overleeft: sluit de printer aan, kies FreeKiosk en vink \"Altijd openen\" aan. De knop hierboven verleent alleen toegang totdat de printer wordt losgekoppeld, en de lock task-modus onderdrukt dat venster volledig.\n\nPrinters met een leverancierspecifieke USB-interface in plaats van de standaard printerklasse drukken nog steeds af, maar kunnen het papierniveau niet melden."
+      "info": "Webpagina's drukken stil af via window.FreeKiosk.silentPrinter.print() of printImage(). print() legt de pagina zo op dat één CSS-pixel één stip is.\n\nStandaard opent window.print() het Android-afdrukvenster als Window Printing is ingeschakeld, en doet anders niets. Met \"window.print() naar deze printer sturen\" aan, print het in plaats daarvan zonder venster op de ESC/POS-printer.\n\nVoor toegang die een herstart overleeft: sluit de printer aan, kies FreeKiosk en vink \"Altijd openen\" aan. De knop hierboven verleent alleen toegang totdat de printer wordt losgekoppeld, en de lock task-modus onderdrukt dat venster volledig.\n\nPrinters met een leverancierspecifieke USB-interface in plaats van de standaard printerklasse drukken nog steeds af, maar kunnen het papierniveau niet melden."
     }
   },
   "screens": {

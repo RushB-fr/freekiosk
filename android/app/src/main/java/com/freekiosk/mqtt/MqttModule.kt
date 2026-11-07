@@ -403,7 +403,8 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
                         }
                     }
                 }
-                emitCommand(command, params)
+                // The toast is already shown above, and the JS handler would show it again
+                if (command != "toast") emitCommand(command, params)
             }
 
             client.onConnectionChanged = { connected ->

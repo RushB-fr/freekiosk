@@ -25,6 +25,7 @@ import { CONFIG_UPDATED_EVENT } from '../../utils/CloudSyncService';
 import CookieManager from '@react-native-cookies/cookies';
 import { Camera } from 'react-native-vision-camera';
 import { StorageService } from '../../utils/storage';
+import { formatInactivityMinutes, resolveInactivityDelayMs, StoredInactivityDelay } from '../../utils/inactivityDelay';
 import i18n, { setAppLanguage, resolveSupportedLanguage, SupportedLanguage } from '../../i18n';
 import { useTranslation } from 'react-i18next';
 import { saveSecurePin, hasSecurePin, clearSecurePin, saveSecureBasicAuthPassword, getSecureBasicAuthPassword } from '../../utils/secureStorage';
@@ -104,6 +105,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
   const [defaultLauncherEnabled, setDefaultLauncherEnabled] = useState<boolean>(false);
   const [screensaverEnabled, setScreensaverEnabled] = useState<boolean>(false);
   const [inactivityDelay, setInactivityDelay] = useState<string>('10');
+  // What was stored and how the field showed it: an untouched field is saved back as it was (utils/inactivityDelay)
+  const storedInactivityDelayRef = useRef<StoredInactivityDelay | null>(null);
   const [motionEnabled, setMotionEnabled] = useState<boolean>(false);
   const [motionSensitivity, setMotionSensitivity] = useState<'low' | 'medium' | 'high'>('medium');
   const [motionCameraPosition, setMotionCameraPosition] = useState<'front' | 'back'>('front');
@@ -584,8 +587,11 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
     detectCameras();
 
     if (savedInactivityDelay && !isNaN(savedInactivityDelay)) {
-      setInactivityDelay(String(Math.floor(savedInactivityDelay / 60000)));
+      const text = formatInactivityMinutes(savedInactivityDelay);
+      storedInactivityDelayRef.current = { ms: savedInactivityDelay, text };
+      setInactivityDelay(text);
     } else {
+      storedInactivityDelayRef.current = null;
       setInactivityDelay('10');
     }
 
@@ -1537,9 +1543,10 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
       return;
     }
 
-    // Inactivity delay validation
-    const inactivityDelayNumber = parseInt(inactivityDelay, 10);
-    if (isNaN(inactivityDelayNumber) || inactivityDelayNumber <= 0) {
+    // Inactivity delay validation: a delay set by ADB or the cloud that the minutes field cannot
+    // show (10 s) is kept as it is when the field was not touched, not refused or rounded
+    const inactivityDelayMs = resolveInactivityDelayMs(inactivityDelay, storedInactivityDelayRef.current);
+    if (inactivityDelayMs === null) {
       Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.enterValidInactivityDelay'));
       return;
     }
@@ -1580,7 +1587,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
     // Screensaver settings apply to all display modes (external_app now supports screensaver)
     await StorageService.saveScreensaverEnabled(screensaverEnabled);
     await StorageService.saveScreensaverInactivityEnabled(true);
-    await StorageService.saveScreensaverInactivityDelay(inactivityDelayNumber * 60000);
+    await StorageService.saveScreensaverInactivityDelay(inactivityDelayMs);
+    storedInactivityDelayRef.current = { ms: inactivityDelayMs, text: inactivityDelay };
     await StorageService.saveScreensaverMotionEnabled(motionEnabled);
     await StorageService.saveScreensaverMotionSensitivity(motionSensitivity);
     await StorageService.saveScreensaverProximityEnabled(proximityEnabled);
@@ -1893,6 +1901,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
               setAutoLaunchEnabled(false);
               setScreensaverEnabled(false);
               setInactivityDelay('10');
+              storedInactivityDelayRef.current = null;
               setMotionEnabled(false);
               setScreensaverBrightness(0);
               setDefaultBrightness(0.5);
