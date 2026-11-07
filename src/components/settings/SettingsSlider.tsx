@@ -4,7 +4,9 @@
  * 
  * Uses local state during drag to avoid StackOverflowError on Android 8.x
  * caused by infinite onProgressChanged loop in @react-native-community/slider.
- * The parent state is only updated via onSlidingComplete.
+ * The parent state is only updated via onSlidingComplete, or once the value has stopped changing
+ * for COMMIT_DELAY_MS: a D-pad (Android TV) moves the thumb without ever ending a "slide", so
+ * onSlidingComplete never comes and the value would be lost on Save.
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
@@ -12,6 +14,9 @@ import { View, Text, TouchableOpacity, StyleSheet, ViewStyle } from 'react-nativ
 import Slider from '@react-native-community/slider';
 import { Colors, Spacing, Typography } from '../../theme';
 import Icon, { IconName } from '../Icon';
+
+/** How long the thumb must stay still before its value is handed to the parent without a touch. */
+const COMMIT_DELAY_MS = 400;
 
 interface PresetOption {
   label: string;
@@ -54,6 +59,28 @@ const SettingsSlider: React.FC<SettingsSliderProps> = ({
   // where setProgress() triggers onProgressChanged which calls setProgress() again.
   const [localValue, setLocalValue] = useState(value);
   const isSlidingRef = useRef(false);
+  const commitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingValueRef = useRef<number | null>(null);
+  // The callback of the latest render, so a timer or an unmount never calls a stale one
+  const onValueChangeRef = useRef(onValueChange);
+  onValueChangeRef.current = onValueChange;
+
+  const clearCommitTimer = useCallback(() => {
+    if (commitTimerRef.current) {
+      clearTimeout(commitTimerRef.current);
+      commitTimerRef.current = null;
+    }
+  }, []);
+
+  // Leaving with a change still waiting (the slider is hidden, the screen closes): hand it over
+  useEffect(() => () => {
+    clearCommitTimer();
+    if (pendingValueRef.current !== null) {
+      const pending = pendingValueRef.current;
+      pendingValueRef.current = null;
+      onValueChangeRef.current(pending);
+    }
+  }, [clearCommitTimer]);
 
   // Sync local state when parent value changes (but not during active drag)
   useEffect(() => {
@@ -65,13 +92,24 @@ const SettingsSlider: React.FC<SettingsSliderProps> = ({
   const handleValueChange = useCallback((val: number) => {
     isSlidingRef.current = true;
     setLocalValue(val);
-  }, []);
+    // No onSlidingComplete follows a D-pad press: commit when the value stops changing
+    pendingValueRef.current = val;
+    clearCommitTimer();
+    commitTimerRef.current = setTimeout(() => {
+      commitTimerRef.current = null;
+      pendingValueRef.current = null;
+      isSlidingRef.current = false;
+      onValueChangeRef.current(val);
+    }, COMMIT_DELAY_MS);
+  }, [clearCommitTimer]);
 
   const handleSlidingComplete = useCallback((val: number) => {
+    clearCommitTimer();
+    pendingValueRef.current = null;
     isSlidingRef.current = false;
     setLocalValue(val);
     onValueChange(val);
-  }, [onValueChange]);
+  }, [onValueChange, clearCommitTimer]);
 
   const displayValue = formatValue 
     ? formatValue(localValue) 
