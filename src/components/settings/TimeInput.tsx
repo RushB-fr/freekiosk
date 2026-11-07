@@ -57,11 +57,14 @@ const TimeInput: React.FC<TimeInputProps> = ({
     const formatted = formatTimeInput(text);
     setDisplayValue(formatted);
     
-    // Only call onChange with valid time
+    // Only call onChange with valid time, always as HH:MM: times are compared as strings,
+    // and "22:00" < "7:00". Waiting for blur is not enough, Save can be tapped before it.
     if (isValidTime(formatted)) {
-      onChange(formatted);
+      onChange(padHours(formatted));
     }
   };
+
+  const padHours = (time: string): string => time.padStart(5, '0');
 
   const isValidTime = (time: string): boolean => {
     const regex = /^([01]?[0-9]|2[0-3]):([0-5][0-9])$/;
@@ -71,8 +74,7 @@ const TimeInput: React.FC<TimeInputProps> = ({
   const handleBlur = () => {
     // Normalize time on blur (e.g., "9:00" -> "09:00")
     if (displayValue && isValidTime(displayValue)) {
-      const [hours, minutes] = displayValue.split(':');
-      const normalized = `${hours.padStart(2, '0')}:${minutes}`;
+      const normalized = padHours(displayValue);
       setDisplayValue(normalized);
       onChange(normalized);
     }
