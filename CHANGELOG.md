@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- 📅 **URL Planner: a one-time event over several days can run overnight.** The times of a one-time event are a daily window on each day of its date range, and the editor accepts an end before the start when the event spans several days, but such an event (say 18:00 to 10:00 from the 10th to the 12th) never became active: every day was checked for 18:00 ≤ now < 10:00. It now runs like an overnight recurring event, from 18:00 on each day of the range until 10:00 the next morning, the morning after the end date included, as `docs/adb-configuration.md` already described. Windows within a day and all-day events are unchanged. Covered by a unit test.
 - 💬 **MQTT: a toast shows once, not twice.** A message on `.../set/toast` was shown by the MQTT client itself, so it also appears while the app's JavaScript is paused, and then passed to the app, which showed it a second time. It is no longer passed on. REST's `/api/toast` is unchanged.
 
 ***
