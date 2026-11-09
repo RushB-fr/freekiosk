@@ -138,7 +138,15 @@ android {
             accessibilityServiceEnabled: "${enableAccessibilityService}"
         ]
     }
-    
+
+    // androidx and Material ship their strings in ~80 languages, FreeKiosk is translated into
+    // 9 (src/i18n/locales). The filter matches exactly, a region-less code does not keep its
+    // regions: androidx has no plain values-zh, only zh-rCN/-rHK/-rTW. A new app language
+    // goes here too.
+    androidResources {
+        localeFilters += ["en", "de", "es", "fr", "it", "nl", "pt", "pt-rBR", "pl", "zh-rCN", "zh-rHK", "zh-rTW"]
+    }
+
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
