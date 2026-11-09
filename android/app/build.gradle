@@ -229,7 +229,10 @@ tasks.whenTaskAdded { task ->
     }
 }
 
-// React Native Vector Icons configuration
+// React Native Vector Icons: only MaterialCommunityIcons is used (react-native-paper and
+// src/components/Icon.tsx). The other 18 fonts cost 1.4 MB, and an icon from another family
+// would render as an empty box - src/types/react-native-vector-icons.d.ts only declares this one.
+project.ext.vectoricons = [iconFontNames: ['MaterialCommunityIcons.ttf']]
 apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")
 
 dependencies {

@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - 📦 **The APK is half the size** (64 MB down to 30 MB). The native libraries were stored uncompressed, so all four processor architectures went into the download at full size. They are compressed now, and the installer unpacks only the one the device uses, so the app also takes less space once installed. QR provisioning downloads half as much. Play Store builds are unchanged: Play already delivers one architecture per device.
+- 📦 **1.4 MB less: only the icon font FreeKiosk uses is packaged.** All 19 fonts of react-native-vector-icons were included, the app only draws Material Design Icons.
 
 ### Fixed
 - 🔆 **Turning auto-brightness off over REST or MQTT restores the configured brightness, not 50 %.** The REST/MQTT handlers are set up once when the app starts and kept reading the brightness settings of that moment, before they were loaded. Turning auto-brightness on saved 50 % as the level to go back to, so Home Assistant's *Auto Brightness* switch (or `POST /api/autoBrightness/enable` then `/disable`) left the screen at 50 % whatever Settings > Display said, until the next restart. For the same reason, setting a brightness over REST or MQTT did not turn off an auto-brightness that was already on when the app started, and the light sensor overrode the new level at once. Both now use the current settings. Covered by a test of the Kiosk screen (the saved level is the configured one; a set brightness turns off auto-brightness that was on at startup).
