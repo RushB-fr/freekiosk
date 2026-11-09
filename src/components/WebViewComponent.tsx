@@ -892,6 +892,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
               try { fn(new Event('voiceschanged')); } catch(e) {}
             } else {
               _fkVoicesChangedCbs.push(fn);
+              _fkLoadVoices();
             }
           }
         },
@@ -907,6 +908,8 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
           _fkVoicesChangedCbs = fn ? [fn] : [];
           if (fn && _fkVoicesLoaded) {
             try { fn(new Event('voiceschanged')); } catch(e) {}
+          } else if (fn) {
+            _fkLoadVoices();
           }
         }
       });
@@ -914,8 +917,8 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
         get: function() { return synth; },
         configurable: true
       });
-      // Start loading voices immediately
-      _fkLoadVoices();
+      // Voices load on first use (getVoices, a voiceschanged listener, speak). Loading them
+      // here bound the native TTS engine for every page, including the ones that never speak.
     })();
 
     // PDF link interception: prevent <a download href="...pdf"> from triggering
