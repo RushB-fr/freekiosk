@@ -6,10 +6,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.location.Location
 import android.location.LocationManager
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
@@ -46,6 +42,8 @@ import com.freekiosk.camera.CameraStreamManager
 import com.freekiosk.FreeKioskAccessibilityService
 import com.freekiosk.ScreenCapture
 import com.freekiosk.ScreenController
+import com.freekiosk.LazyTts
+import com.freekiosk.StatusSensors
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.net.Inet4Address
@@ -56,7 +54,7 @@ import java.util.Locale
  * React Native Module for HTTP Server management
  */
 class HttpServerModule(private val reactContext: ReactApplicationContext) : 
-    ReactContextBaseJavaModule(reactContext), SensorEventListener {
+    ReactContextBaseJavaModule(reactContext) {
 
     companion object {
         private const val TAG = "HttpServerModule"
@@ -113,17 +111,9 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     private var jsAutoBrightnessMin: Int = 10
     private var jsAutoBrightnessMax: Int = 100
     
-    // Sensor data
-    private var sensorManager: SensorManager? = null
-    private var lightSensor: Sensor? = null
-    private var proximitySensor: Sensor? = null
-    private var accelerometerSensor: Sensor? = null
-    private var lightValue: Float = -1f
-    private var proximityValue: Float = -1f
-    private var accelerometerX: Float = 0f
-    private var accelerometerY: Float = 0f
-    private var accelerometerZ: Float = 0f
-    
+    // Sensor readings for the status, listening only while the server runs
+    private val sensors = StatusSensors(reactContext.applicationContext)
+
     // Audio playback
     private var mediaPlayer: MediaPlayer? = null
     
@@ -137,53 +127,17 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     private var cameraPhotoModule: CameraPhotoModule? = null
     private var cameraStreamManager: CameraStreamManager? = null
     
-    // Text-to-Speech
-    private var tts: TextToSpeech? = null
-    private var ttsReady: Boolean = false
+    // Text-to-Speech, bound on first use
+    private val tts = LazyTts(reactContext.applicationContext, TAG)
     private var ttsVoicesCache: List<Map<String, String>> = emptyList()
-
-    init {
-        initSensors()
-        initTts()
-    }
-
-    private fun initTts() {
-        try {
-            // Use the system's preferred TTS engine so that installed language packs
-            // (e.g. Chinese, Japanese) are available — the no-arg constructor may pick
-            // a different, more limited engine than what the user configured in Settings.
-            val preferredEngine = android.provider.Settings.Secure.getString(
-                reactContext.contentResolver,
-                "tts_default_engine"
-            )
-            val listener = TextToSpeech.OnInitListener { status ->
-                if (status == TextToSpeech.SUCCESS) {
-                    ttsReady = true
-                    Log.d(TAG, "TextToSpeech initialized (engine=$preferredEngine)")
-                    // Cache available voices so WebView polyfill can enumerate them
-                    cacheTtsVoices()
-                } else {
-                    Log.e(TAG, "TextToSpeech initialization failed: $status")
-                }
-            }
-            tts = if (!preferredEngine.isNullOrEmpty()) {
-                TextToSpeech(reactContext.applicationContext, listener, preferredEngine)
-            } else {
-                TextToSpeech(reactContext.applicationContext, listener)
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize TTS: ${e.message}")
-        }
-    }
 
     /**
      * Cache available TTS voices for the WebView speechSynthesis polyfill.
      * Exposes Google TTS voices (and any other engine voices) so web apps
      * can enumerate and select them via speechSynthesis.getVoices().
      */
-    private fun cacheTtsVoices() {
+    private fun cacheTtsVoices(ttsEngine: TextToSpeech) {
         try {
-            val ttsEngine = tts ?: return
             val voices = mutableListOf<Map<String, String>>()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 for (voice in ttsEngine.voices) {
@@ -215,39 +169,6 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
         } catch (e: Exception) {
             Log.e(TAG, "Failed to cache TTS voices: ${e.message}")
         }
-    }
-
-    private fun initSensors() {
-        try {
-            sensorManager = reactContext.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-            lightSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_LIGHT)
-            proximitySensor = sensorManager?.getDefaultSensor(Sensor.TYPE_PROXIMITY)
-            accelerometerSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-            
-            lightSensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL) }
-            proximitySensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL) }
-            accelerometerSensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL) }
-            
-            Log.d(TAG, "Sensors initialized: light=${lightSensor != null}, proximity=${proximitySensor != null}, accelerometer=${accelerometerSensor != null}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize sensors", e)
-        }
-    }
-
-    override fun onSensorChanged(event: SensorEvent) {
-        when (event.sensor.type) {
-            Sensor.TYPE_LIGHT -> lightValue = event.values[0]
-            Sensor.TYPE_PROXIMITY -> proximityValue = event.values[0]
-            Sensor.TYPE_ACCELEROMETER -> {
-                accelerometerX = event.values[0]
-                accelerometerY = event.values[1]
-                accelerometerZ = event.values[2]
-            }
-        }
-    }
-
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-        // Not needed
     }
 
     override fun getName(): String = NAME
@@ -312,8 +233,9 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 }
             )
 
+            sensors.start()
             server?.start()
-            
+
             Log.i(TAG, "HTTP Server started on port $port with locks acquired")
             
             val result = Arguments.createMap().apply {
@@ -330,6 +252,7 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             try { server?.stop() } catch (_: Exception) {}
             server = null
             releaseServerLocks()
+            sensors.stop()
             promise.reject("START_ERROR", e.message)
         }
     }
@@ -342,6 +265,7 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             server?.stop()
             server = null
             releaseServerLocks()
+            sensors.stop()
             Log.i(TAG, "HTTP Server stopped and locks released")
             promise.resolve(true)
         } catch (e: Exception) {
@@ -568,12 +492,12 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
         
         // Sensors
         val sensorsStatus = JSONObject().apply {
-            put("light", lightValue)
-            put("proximity", proximityValue)
+            put("light", sensors.light)
+            put("proximity", sensors.proximity)
             put("accelerometer", JSONObject().apply {
-                put("x", accelerometerX)
-                put("y", accelerometerY)
-                put("z", accelerometerZ)
+                put("x", sensors.accelX)
+                put("y", sensors.accelY)
+                put("z", sensors.accelZ)
             })
         }
         status.put("sensors", sensorsStatus)
@@ -583,7 +507,7 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             put("enabled", jsAutoBrightnessEnabled)
             put("min", jsAutoBrightnessMin)
             put("max", jsAutoBrightnessMax)
-            put("currentLightLevel", lightValue)
+            put("currentLightLevel", sensors.light)
         }
         status.put("autoBrightness", autoBrightnessStatus)
         
@@ -853,7 +777,7 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                         put("enabled", jsAutoBrightnessEnabled)
                         put("min", jsAutoBrightnessMin)
                         put("max", jsAutoBrightnessMax)
-                        put("currentLightLevel", lightValue)
+                        put("currentLightLevel", sensors.light)
                     })
                 }
             }
@@ -1386,25 +1310,25 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
      */
     @ReactMethod
     fun getTtsVoices(promise: Promise) {
-        try {
-            if (!ttsReady || ttsVoicesCache.isEmpty()) {
-                // Try to re-cache if not ready
-                cacheTtsVoices()
+        // Binds the engine on the first call and answers once it is up
+        tts.use { engine ->
+            try {
+                if (engine != null && ttsVoicesCache.isEmpty()) cacheTtsVoices(engine)
+                val voices = Arguments.createArray()
+                for (voice in ttsVoicesCache) {
+                    val v = Arguments.createMap()
+                    v.putString("name", voice["name"] ?: "")
+                    v.putString("lang", voice["lang"] ?: "")
+                    v.putString("voiceUri", voice["voiceUri"] ?: "")
+                    v.putBoolean("localService", voice["localService"] == "true")
+                    v.putBoolean("default", voice["default"] == "true")
+                    voices.pushMap(v)
+                }
+                promise.resolve(voices)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to get TTS voices: ${e.message}")
+                promise.reject("TTS_ERROR", e.message)
             }
-            val voices = Arguments.createArray()
-            for (voice in ttsVoicesCache) {
-                val v = Arguments.createMap()
-                v.putString("name", voice["name"] ?: "")
-                v.putString("lang", voice["lang"] ?: "")
-                v.putString("voiceUri", voice["voiceUri"] ?: "")
-                v.putBoolean("localService", voice["localService"] == "true")
-                v.putBoolean("default", voice["default"] == "true")
-                voices.pushMap(v)
-            }
-            promise.resolve(voices)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to get TTS voices: ${e.message}")
-            promise.reject("TTS_ERROR", e.message)
         }
     }
 
@@ -1434,7 +1358,7 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     @ReactMethod
     fun stopSpeaking(promise: Promise) {
         try {
-            tts?.stop()
+            tts.stop()
             promise.resolve(true)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to stop speaking", e)
@@ -1697,52 +1621,49 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
     }
 
     private fun speakText(text: String, language: String? = null, voiceName: String? = null) {
-        try {
-            if (tts != null && ttsReady) {
+        // Binds the engine on first use; the text waits until it is up instead of being lost
+        tts.use { engine ->
+            if (engine == null) {
+                Log.w(TAG, "TTS unavailable, dropping: $text")
+                return@use
+            }
+            try {
                 // If a specific voice name is requested, try to find and set it
-                if (!voiceName.isNullOrEmpty() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    val matchingVoice = tts?.voices?.find { it.name == voiceName }
+                var voiceSet = false
+                if (!voiceName.isNullOrEmpty()) {
+                    val matchingVoice = engine.voices?.find { it.name == voiceName }
                     if (matchingVoice != null) {
-                        val setResult = tts?.setVoice(matchingVoice)
+                        val setResult = engine.setVoice(matchingVoice)
+                        voiceSet = true
                         Log.d(TAG, "TTS set voice: $voiceName (result=$setResult)")
                     } else {
                         Log.w(TAG, "TTS voice not found: $voiceName, using locale-based selection")
-                        // Fall through to locale-based selection
                     }
                 }
 
-                // If no voice was set (or pre-Lollipop), use locale-based selection
-                if (voiceName.isNullOrEmpty() || tts?.voice == null) {
+                // No voice set: pick one by locale. This used to check `voice == null`, which
+                // is practically never true, so a voice that was not found skipped it.
+                if (!voiceSet) {
                     val targetLocale = if (!language.isNullOrEmpty()) {
                         parseLocale(language)
                     } else {
                         detectLocaleForText(text)
                     }
 
-                    val result = tts?.setLanguage(targetLocale)
+                    val result = engine.setLanguage(targetLocale)
                     if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                         Log.w(TAG, "TTS language not supported: $targetLocale, falling back to default")
-                        tts?.setLanguage(Locale.getDefault())
+                        engine.setLanguage(Locale.getDefault())
                     } else {
                         Log.d(TAG, "TTS language set to: $targetLocale")
                     }
                 }
 
-                tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "freekiosk_tts_${System.currentTimeMillis()}")
+                engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "freekiosk_tts_${System.currentTimeMillis()}")
                 Log.d(TAG, "TTS speaking: $text (voice=$voiceName)")
-            } else {
-                // TTS not ready, try to reinitialize
-                Log.w(TAG, "TTS not ready, reinitializing...")
-                initTts()
-                // Retry after a short delay
-                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                    if (ttsReady) {
-                        speakText(text, language, voiceName)
-                    }
-                }, 1000)
+            } catch (e: Exception) {
+                Log.e(TAG, "TTS speak failed: ${e.message}")
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "TTS speak failed: ${e.message}")
         }
     }
 
@@ -2197,11 +2118,8 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             mediaPlayer = null
             toneGenerator?.release()
             toneGenerator = null
-            tts?.stop()
-            tts?.shutdown()
-            tts = null
-            ttsReady = false
-            sensorManager?.unregisterListener(this)
+            tts.shutdown()
+            sensors.stop()
             cameraStreamManager?.stopAll()
             cameraStreamManager = null
             cameraPhotoModule = null
