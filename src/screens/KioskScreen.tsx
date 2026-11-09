@@ -2262,7 +2262,9 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       setCustomUserAgent(savedCustomUserAgent);
 
       const savedBasicAuthUsername = str(K.HTTP_BASIC_AUTH_USERNAME) ?? '';
-      const savedBasicAuthPassword = await getSecureBasicAuthPassword();
+      // Without a username the password is never sent (see basicAuthCredential), and a
+      // Keystore read is slow on cheap devices and throws on broken ones (#258).
+      const savedBasicAuthPassword = savedBasicAuthUsername ? await getSecureBasicAuthPassword() : '';
       setBasicAuthUsername(savedBasicAuthUsername);
       setBasicAuthPassword(savedBasicAuthPassword);
       
