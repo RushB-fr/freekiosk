@@ -138,7 +138,15 @@ android {
             accessibilityServiceEnabled: "${enableAccessibilityService}"
         ]
     }
-    
+
+    // androidx and Material ship their strings in ~80 languages, FreeKiosk is translated into
+    // 9 (src/i18n/locales). The filter matches exactly, a region-less code does not keep its
+    // regions: androidx has no plain values-zh, only zh-rCN/-rHK/-rTW. A new app language
+    // goes here too.
+    androidResources {
+        localeFilters += ["en", "de", "es", "fr", "it", "nl", "pt", "pt-rBR", "pl", "zh-rCN", "zh-rHK", "zh-rTW"]
+    }
+
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
@@ -167,6 +175,13 @@ android {
     packaging {
         resources {
             excludes += ['META-INF/INDEX.LIST', 'META-INF/io.netty.versions.properties']
+        }
+        // Native libraries compressed in the APK. Stored, the four ABIs' libraries made up
+        // most of the download; the installer extracts only the device's own ABI, so the
+        // installed size drops too. Play Store bundles keep the default: Play splits by ABI
+        // and compresses the download itself, and uncompressed libs install smaller there.
+        jniLibs {
+            useLegacyPackaging = !project.hasProperty('playstore')
         }
     }
 
@@ -222,7 +237,10 @@ tasks.whenTaskAdded { task ->
     }
 }
 
-// React Native Vector Icons configuration
+// React Native Vector Icons: only MaterialCommunityIcons is used (react-native-paper and
+// src/components/Icon.tsx). The other 18 fonts cost 1.4 MB, and an icon from another family
+// would render as an empty box - src/types/react-native-vector-icons.d.ts only declares this one.
+project.ext.vectoricons = [iconFontNames: ['MaterialCommunityIcons.ttf']]
 apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")
 
 dependencies {
