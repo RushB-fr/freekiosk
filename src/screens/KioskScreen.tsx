@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { View, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, NativeEventEmitter, NativeModules, AppState, DeviceEventEmitter, Dimensions, Pressable, BackHandler, Keyboard, Animated } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, NativeEventEmitter, NativeModules, AppState, DeviceEventEmitter, Dimensions, Pressable, BackHandler, Keyboard, Animated, findNodeHandle } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RNBrightness from '../utils/BrightnessModule';
 import { rampBrightness, cancelBrightnessRamp } from '../utils/brightnessRamp';
@@ -302,6 +302,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [keptTileIds, setKeptTileIds] = useState<string[]>([]); // least recently opened first
   const [activeTileId, setActiveTileId] = useState<string | null>(null);
   const tileWebViewRefs = useRef<Record<string, WebViewComponentRef | null>>({});
+  const tileWrapperRefs = useRef<Record<string, View | null>>({}); // what TileSlider moves
   const tileNavStatesRef = useRef<Record<string, { canGoBack: boolean; canGoForward: boolean; title: string }>>({});
   const keptTileHandlersRef = useRef<Record<string, KeptTileHandlers>>({});
   const [navState, setNavState] = useState<{ canGoBack: boolean; canGoForward: boolean; title: string }>({ canGoBack: false, canGoForward: false, title: '' });
@@ -3319,7 +3320,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   // Forget the refs and handlers of tiles that are no longer kept.
   useEffect(() => {
     const kept = new Set(keptTileIds);
-    for (const store of [tileWebViewRefs.current, tileNavStatesRef.current, keptTileHandlersRef.current]) {
+    for (const store of [tileWebViewRefs.current, tileWrapperRefs.current, tileNavStatesRef.current, keptTileHandlersRef.current]) {
       Object.keys(store).forEach(id => {
         if (!kept.has(id)) delete store[id];
       });
@@ -3364,6 +3365,24 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     KioskModule.setNavGestureEnabled?.(navGestureActive).catch(() => {});
   }, [navGestureActive]);
   useEffect(() => () => { KioskModule.setNavGestureEnabled?.(false).catch(() => {}); }, []);
+
+  // A sideways drag slides the tiles natively (TileSlider, in MainActivity), in step with the
+  // fingers; tell it which views are the tile on screen and the ones a drag brings in. Without
+  // kept tiles there is nothing to slide and the switch is instant, on release.
+  useEffect(() => {
+    if (!navGestureActive || !dashboardSwipeBetweenTiles) return;
+    const tag = (id: string | undefined) => {
+      const view = id ? tileWrapperRefs.current[id] : null;
+      return (view && findNodeHandle(view)) || -2; // -2: there is a tile, not mounted
+    };
+    const current = dashboardTileIndexRef.current;
+    const neighbour = (direction: 'left' | 'right') => {
+      const index = nextTileIndex(current, orderedDashboardTiles.length, direction);
+      return index === current ? -1 : tag(orderedDashboardTiles[index]?.id);
+    };
+    const tiles = shownTileId ? [tag(shownTileId), neighbour('right'), neighbour('left')] : [-1, -1, -1];
+    KioskModule.setNavSlideTiles?.(tiles[0], tiles[1], tiles[2]).catch(() => {});
+  }, [navGestureActive, dashboardSwipeBetweenTiles, shownTileId, orderedDashboardTiles, keptTileIds, webViewKey]);
 
   const onDashboardNavGestureRef = useRef(onDashboardNavGesture);
   onDashboardNavGestureRef.current = onDashboardNavGesture;
@@ -3466,6 +3485,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     const cached = keptTileHandlersRef.current[id];
     if (cached) return cached;
     const handlers: KeptTileHandlers = {
+      wrapperRef: (view) => { tileWrapperRefs.current[id] = view; },
       ref: (instance) => {
         tileWebViewRefs.current[id] = instance;
         if (!instance) return;
@@ -3532,27 +3552,25 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
                 const tile = dashboardTiles.find(t => t.id === id);
                 if (!tile) return null;
                 const active = id === shownTileId;
+                const handlers = getKeptTileHandlers(id);
                 return (
                   <View
                     key={`${id}-${webViewKey}`}
+                    ref={handlers.wrapperRef}
+                    collapsable={false}
                     style={[StyleSheet.absoluteFill, !active && styles.hiddenTile]}
                     pointerEvents={active ? 'auto' : 'none'}
                   >
-                    {(() => {
-                      const handlers = getKeptTileHandlers(id);
-                      return (
-                        <WebViewComponent
-                          ref={handlers.ref}
-                          url={tile.url}
-                          {...sharedWebViewProps}
-                          inactive={!active}
-                          jsToExecute={active ? jsToExecute : ''}
-                          onUserInteraction={active ? handlers.onUserInteraction : undefined}
-                          onNavigationStateChange={handlers.onNavigationStateChange}
-                          onPageNavigated={handlers.onPageNavigated}
-                        />
-                      );
-                    })()}
+                    <WebViewComponent
+                      ref={handlers.ref}
+                      url={tile.url}
+                      {...sharedWebViewProps}
+                      inactive={!active}
+                      jsToExecute={active ? jsToExecute : ''}
+                      onUserInteraction={active ? handlers.onUserInteraction : undefined}
+                      onNavigationStateChange={handlers.onNavigationStateChange}
+                      onPageNavigated={handlers.onPageNavigated}
+                    />
                   </View>
                 );
               })}
@@ -3799,6 +3817,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
 const MAX_KEPT_TILES = 5;
 
 type KeptTileHandlers = {
+  wrapperRef: (view: View | null) => void;
   ref: (instance: WebViewComponentRef | null) => void;
   onNavigationStateChange: (state: { canGoBack: boolean; canGoForward: boolean; title: string }) => void;
   onPageNavigated: (url: string) => void;
@@ -3811,6 +3830,7 @@ const styles = StyleSheet.create({
   },
   keptTiles: {
     flex: 1,
+    overflow: 'hidden', // TileSlider slides tiles in from off screen
   },
   // Invisible but still full size, so a tile loaded in the background is already laid out
   // when shown (display: 'none' would leave it at zero size until then). Touches are
