@@ -764,6 +764,11 @@
       "keepTilesLoaded": "Kacheln geladen lassen",
       "keepTilesLoadedHint": "Lädt deine Kacheln (bis zu 5) im Hintergrund, sobald das Dashboard startet, und hält sie aktiv: Öffnen und Wechseln geht sofort, und jede Seite behält ihren Zustand. Verbraucht mehr Speicher."
     },
+    "startOn": {
+      "title": "Starten mit",
+      "hint": "Was der Kiosk beim Start oder nach dem Verlassen der Einstellungen zeigt: das Kachelraster oder eine Ihrer Kacheln.",
+      "grid": "Kachelraster"
+    },
     "iconColor": "Symbolfarbe",
     "colorAuto": "Auto",
     "preview": "Vorschau",

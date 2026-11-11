@@ -764,6 +764,11 @@
       "keepTilesLoaded": "Mantieni i riquadri caricati",
       "keepTilesLoadedHint": "Carica i tuoi riquadri (fino a 5) in background appena si avvia la dashboard e li mantiene attivi: aprire o cambiare riquadro è immediato e ogni pagina conserva il suo stato. Usa più memoria."
     },
+    "startOn": {
+      "title": "Avvia su",
+      "hint": "Cosa mostra il kiosk all'avvio o al ritorno dalle Impostazioni: la griglia dei riquadri o uno dei tuoi riquadri.",
+      "grid": "Griglia dei riquadri"
+    },
     "iconColor": "Colore icona",
     "colorAuto": "Auto",
     "preview": "Anteprima",

@@ -56,6 +56,18 @@ describe('dashboard tile pages settings', () => {
     expect(await StorageService.getDashboardKeepTilesLoaded()).toBe(true);
   });
 
+  it('round-trips the start tile, the grid by default', async () => {
+    expect(await StorageService.getDashboardStartTile()).toBe('');
+    await StorageService.saveDashboardStartTile('tile-2');
+
+    const exported = await StorageService.exportConfig();
+    expect((exported.general as Record<string, unknown>).dashboardStartTile).toBe('tile-2');
+
+    await AsyncStorage.clear();
+    await StorageService.importConfig(exported);
+    expect(await StorageService.getDashboardStartTile()).toBe('tile-2');
+  });
+
   it('leaves the settings untouched when an older config omits them', async () => {
     await StorageService.saveDashboardNavAutoHide(true);
     const exported = await StorageService.exportConfig();

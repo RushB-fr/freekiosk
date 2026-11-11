@@ -764,6 +764,11 @@
       "keepTilesLoaded": "Utrzymuj kafelki wczytane",
       "keepTilesLoadedHint": "Wczytuj kafelki (do 5) w tle od razu po uruchomieniu pulpitu i utrzymuj je w działaniu, aby otwieranie i przełączanie kafelków było natychmiastowe, a każda strona zachowywała swój stan. Zużywa więcej pamięci."
     },
+    "startOn": {
+      "title": "Uruchom na",
+      "hint": "Co kiosk pokazuje po uruchomieniu lub po powrocie z Ustawień: siatkę kafelków lub jeden z Twoich kafelków.",
+      "grid": "Siatka kafelków"
+    },
     "iconColor": "Kolor ikony",
     "colorAuto": "Auto",
     "preview": "Podgląd",

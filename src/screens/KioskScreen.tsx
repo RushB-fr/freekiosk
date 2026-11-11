@@ -2138,9 +2138,26 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       setDashboardNavAutoHide(bool(K.DASHBOARD_NAV_AUTO_HIDE, false));
       setDashboardNavAutoHideSeconds(navAutoHideSeconds(num(K.DASHBOARD_NAV_AUTO_HIDE_SECONDS, 4)));
       setDashboardSwipeBetweenTiles(bool(K.DASHBOARD_SWIPE_BETWEEN_TILES, false));
-      setDashboardKeepTilesLoaded(bool(K.DASHBOARD_KEEP_TILES_LOADED, false));
+      const savedKeepTilesLoaded = bool(K.DASHBOARD_KEEP_TILES_LOADED, false);
+      setDashboardKeepTilesLoaded(savedKeepTilesLoaded);
       if (savedDashboardMode) {
-        setDashboardShowGrid(true);
+        // Open on the start tile when one is set (and still exists), else on the grid. Same as
+        // openDashboardTile, which can't be used here: it reads state this load is still setting.
+        const ordered = [...savedDashboardTiles].sort((a, b) => a.order - b.order);
+        const startId = str(K.DASHBOARD_START_TILE);
+        const startIndex = startId ? ordered.findIndex(tile => tile.id === startId) : -1;
+        if (startIndex >= 0) {
+          const startTile = ordered[startIndex];
+          dashboardTileIndexRef.current = startIndex;
+          setActiveTileId(startTile.id);
+          if (savedKeepTilesLoaded) {
+            setKeptTileIds(prev => [...prev.filter(id => id !== startTile.id), startTile.id].slice(-MAX_KEPT_TILES));
+          }
+          setUrl(startTile.url);
+          setDashboardShowGrid(false);
+        } else {
+          setDashboardShowGrid(true);
+        }
       }
 
       // Store base URL for when planner/rotation is not active

@@ -764,6 +764,11 @@
       "keepTilesLoaded": "Tegels geladen houden",
       "keepTilesLoadedHint": "Laadt je tegels (maximaal 5) op de achtergrond zodra het dashboard start en houdt ze actief: openen of wisselen gaat meteen en elke pagina behoudt haar toestand. Gebruikt meer geheugen."
     },
+    "startOn": {
+      "title": "Starten op",
+      "hint": "Wat de kiosk toont bij het starten of na terugkeer uit Instellingen: het tegelraster of een van je tegels.",
+      "grid": "Tegelraster"
+    },
     "iconColor": "Pictogramkleur",
     "colorAuto": "Automatisch",
     "preview": "Voorbeeld",

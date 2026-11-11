@@ -764,6 +764,11 @@
       "keepTilesLoaded": "Mantener los mosaicos cargados",
       "keepTilesLoadedHint": "Carga tus mosaicos (hasta 5) en segundo plano en cuanto arranca el panel y los mantiene activos: abrir o cambiar de mosaico es instantáneo y cada página conserva su estado. Usa más memoria."
     },
+    "startOn": {
+      "title": "Iniciar en",
+      "hint": "Lo que muestra el kiosco al iniciarse o al volver de Ajustes: la cuadrícula de mosaicos o uno de sus mosaicos.",
+      "grid": "Cuadrícula de mosaicos"
+    },
     "iconColor": "Color del icono",
     "colorAuto": "Auto",
     "preview": "Vista previa",
