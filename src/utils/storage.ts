@@ -229,6 +229,8 @@ export const KEYS = {
   DASHBOARD_NAV_AUTO_HIDE_SECONDS: '@kiosk_dashboard_nav_auto_hide_seconds',
   DASHBOARD_SWIPE_BETWEEN_TILES: '@kiosk_dashboard_swipe_between_tiles',
   DASHBOARD_KEEP_TILES_LOADED: '@kiosk_dashboard_keep_tiles_loaded',
+  // Tile the kiosk opens on instead of the grid ('' = the grid)
+  DASHBOARD_START_TILE: '@kiosk_dashboard_start_tile',
   // Lock Screen Controls
   LOCKSCREEN_CONTROLS_ENABLED: '@kiosk_lockscreen_controls_enabled',
   LOCKSCREEN_WIFI_ENABLED: '@kiosk_lockscreen_wifi_enabled',
@@ -742,6 +744,7 @@ export const StorageService = {
         KEYS.DASHBOARD_NAV_AUTO_HIDE_SECONDS,
         KEYS.DASHBOARD_SWIPE_BETWEEN_TILES,
         KEYS.DASHBOARD_KEEP_TILES_LOADED,
+        KEYS.DASHBOARD_START_TILE,
         // Lock Screen Controls
         KEYS.LOCKSCREEN_CONTROLS_ENABLED,
         KEYS.LOCKSCREEN_WIFI_ENABLED,
@@ -3753,6 +3756,23 @@ export const StorageService = {
     }
   },
 
+  saveDashboardStartTile: async (tileId: string): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.DASHBOARD_START_TILE, tileId);
+    } catch (error) {
+      console.error('Error saving dashboard start tile:', error);
+    }
+  },
+
+  getDashboardStartTile: async (): Promise<string> => {
+    try {
+      return (await AsyncStorage.getItem(KEYS.DASHBOARD_START_TILE)) || ''; // '' = the grid
+    } catch (error) {
+      console.error('Error getting dashboard start tile:', error);
+      return '';
+    }
+  },
+
   saveHttpBasicAuthUsername: async (username: string): Promise<void> => {
     try {
       await AsyncStorage.setItem(KEYS.HTTP_BASIC_AUTH_USERNAME, username);
@@ -3977,6 +3997,7 @@ export const StorageService = {
         },
         dashboardSwipeBetweenTiles: bool(KEYS.DASHBOARD_SWIPE_BETWEEN_TILES),
         dashboardKeepTilesLoaded: bool(KEYS.DASHBOARD_KEEP_TILES_LOADED),
+        dashboardStartTile: str(KEYS.DASHBOARD_START_TILE, ''),
         pauseWebMediaWhenHidden: bool(KEYS.PAUSE_WEB_MEDIA_WHEN_HIDDEN, true),
         restartButton: {
           enabled: bool(KEYS.RESTART_BUTTON_ENABLED),
@@ -4245,6 +4266,7 @@ export const StorageService = {
       }
       set(KEYS.DASHBOARD_SWIPE_BETWEEN_TILES, g.dashboardSwipeBetweenTiles);
       set(KEYS.DASHBOARD_KEEP_TILES_LOADED, g.dashboardKeepTilesLoaded);
+      set(KEYS.DASHBOARD_START_TILE, g.dashboardStartTile);
       set(KEYS.PAUSE_WEB_MEDIA_WHEN_HIDDEN, g.pauseWebMediaWhenHidden);
       const rb = g.restartButton as Record<string, unknown> | undefined;
       if (rb) {
