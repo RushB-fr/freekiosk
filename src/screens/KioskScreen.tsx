@@ -3286,8 +3286,10 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   shownTileIdRef.current = shownTileId;
   const previousShownTileIdRef = useRef<string | null>(null);
 
-  // Point webViewRef at the tile on screen; pause the one just hidden, resume the one shown.
-  // Tiles loading in the background pause themselves once mounted (see getKeptTileHandlers).
+  // Point webViewRef at the tile on screen and make sure it is running (the screensaver or the
+  // app going to the background may have paused it). Hidden tiles are not paused: a paused page
+  // stops its live updates (WebSocket, timers), so a scoreboard or control page shown again was
+  // stale and replayed everything it missed.
   useEffect(() => {
     if (!keepTilesActive) {
       previousShownTileIdRef.current = null;
@@ -3302,7 +3304,6 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     }
     const previous = previousShownTileIdRef.current;
     if (previous !== shownTileId) {
-      if (previous) tileWebViewRefs.current[previous]?.pauseMedia();
       if (shownTileId) tileWebViewRefs.current[shownTileId]?.resumeMedia();
       previousShownTileIdRef.current = shownTileId;
     }
@@ -3471,8 +3472,6 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         if (!instance) return;
         if (shownTileIdRef.current === id) {
           (webViewRef as React.MutableRefObject<WebViewComponentRef | null>).current = instance;
-        } else {
-          instance.pauseMedia(); // loading in the background
         }
       },
       onNavigationStateChange: (state) => {
