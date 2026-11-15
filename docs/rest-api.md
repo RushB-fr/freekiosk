@@ -705,7 +705,7 @@ Perfect for controlling Android TV devices or navigating apps.
 > - D-pad navigation highlights UI elements (buttons, links, inputs)
 > - Back, Home, and Recents trigger the corresponding system actions
 >
-> Without the AccessibilityService, keys only work within FreeKiosk's own Activity.
+> Without the AccessibilityService, keys only work within FreeKiosk's own Activity. `/api/remote/home` answers `400` with an explanation in that case, since Home cannot do anything inside FreeKiosk. The service is not in the cloud (QR setup) APK nor in the Play Store build; the GitHub APK includes it, and it has to be enabled.
 
 | Endpoint | Key |
 |----------|-----|

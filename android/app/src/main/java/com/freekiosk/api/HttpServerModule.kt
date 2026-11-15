@@ -1035,6 +1035,16 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                         put("error", "Unknown remote key: $key. Use up, down, left, right, select, back, home, menu, playpause, play, pause, stop, next, previous, volumeup, volumedown, mute")
                     }
                 }
+                // Home is a system action: without the AccessibilityService the key only reaches
+                // FreeKiosk's own Activity, where it does nothing. Say so instead of reporting success (#379).
+                if (keyCode == KeyEvent.KEYCODE_HOME && !FreeKioskAccessibilityService.isRunning()) {
+                    return JSONObject().apply {
+                        put("executed", false)
+                        put("command", command)
+                        put("key", key)
+                        put("error", "Home needs the FreeKiosk accessibility service, which is not running. It is not part of the cloud (QR setup) and Play Store builds; on the GitHub APK, enable it in Settings > Accessibility.")
+                    }
+                }
                 dispatchKeyDown(keyCode)
                 return JSONObject().apply {
                     put("executed", true)
