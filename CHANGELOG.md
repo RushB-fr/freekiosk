@@ -1,4 +1,5 @@
-﻿# Changelog
+﻿# Change- 🔎 **Page zoom below 100 % fills the screen instead of leaving white space** (#382). The zoom was a CSS `zoom`, which does not change the viewport units: a page laid out with `height: 100vh` (Home Assistant dashboards, most single-page apps) stayed at 50 % of the screen height with white below it. Below 100 % the page now gets a mobile viewport 1/zoom times larger, so it lays itself out on the whole screen. 100 % and above are unchanged. Checked on a tablet emulator at 50 %, 75 % and 150 %, with and without Disable user zoom, on one test page; not checked on real sites.
+log
 
 
 All notable changes to FreeKiosk will be documented in this file.
