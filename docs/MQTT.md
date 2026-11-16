@@ -41,6 +41,9 @@ FreeKiosk includes a native MQTT client for real-time integration with **Home As
 > [!TIP]
 > **MQTT vs REST API**: MQTT is push-based — the tablet publishes status updates automatically every N seconds. The REST API requires polling. MQTT is the preferred integration for Home Assistant. Both can run simultaneously.
 
+> [!NOTE]
+> **ioBroker**: the [ioBroker.freekiosk](https://github.com/typhosj/ioBroker.freekiosk) adapter brings its own MQTT broker and maps the tablet's status, images and commands to ioBroker states. See [Integrations > ioBroker](INTEGRATIONS.md#iobroker).
+
 ## Enabling MQTT
 
 ### Via UI

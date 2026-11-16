@@ -59,6 +59,8 @@ interface KioskModuleInterface {
   setScreensaverShowing(active: boolean): Promise<boolean>;
   // Dashboard: report two-finger swipes as 'onNavGesture' events while a tile is shown
   setNavGestureEnabled(enabled: boolean): Promise<boolean>;
+  // Dashboard: React tags of the tile views a sideways drag slides (-1 none, -2 not mounted)
+  setNavSlideTiles(current: number, prev: number, next: number): Promise<boolean>;
   // #135 — Dismiss the soft keyboard at the window level (works for WebView inputs too)
   hideKeyboard(): Promise<boolean>;
   // #177 — Pause/resume the content WebView's renderer (stops background audio/video).
