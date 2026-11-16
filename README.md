@@ -53,7 +53,7 @@ Instead of burying everything in one long page, this README gives you the essent
 |---|---|---|
 | Kiosk modes | Website (WebView), External App, Dashboard of pages, Media Player (videos and images) | [Features and Modes](docs/features-and-modes.md) |
 | Device control | Lock task, boot behavior, status bar policies, PIN access | [Installation](docs/installation.md) |
-| Automation | 40+ REST endpoints, MQTT discovery for Home Assistant | [Integrations](docs/INTEGRATIONS.md) |
+| Automation | 40+ REST endpoints, MQTT discovery for Home Assistant, ioBroker adapter | [Integrations](docs/INTEGRATIONS.md) |
 | Provisioning | ADB command-based configuration and scripting | [ADB Configuration](docs/adb-configuration.md) |
 | Fleet management | Optional FreeKiosk Cloud (open beta): remote config, commands, groups, alerts, QR enrollment | See [FreeKiosk Cloud](#-freekiosk-cloud-open-beta) below |
 | Digital signage (beta) | Playlists of videos, images, web pages and YouTube videos built in the cloud, with schedules and offline playback; Android TV, Google TV and Fire TV | [Digital signage](docs/digital-signage.md), [Android TV](docs/android-tv.md) |
@@ -80,6 +80,7 @@ adb shell dpm set-device-owner com.freekiosk/.DeviceAdminReceiver
 | Deploy tablets correctly | [Installation Guide](docs/installation.md) |
 | Understand display/kiosk modes | [Features and Modes](docs/features-and-modes.md) |
 | Integrate with Home Assistant | [Integrations Overview](docs/INTEGRATIONS.md) |
+| Integrate with ioBroker | [ioBroker](docs/INTEGRATIONS.md#iobroker) |
 | Manage a fleet from a dashboard | [FreeKiosk Cloud](docs/cloud.md) |
 | Use API endpoints | [REST API Docs](docs/rest-api.md) |
 | Configure MQTT topics/discovery | [MQTT Docs](docs/MQTT.md) |

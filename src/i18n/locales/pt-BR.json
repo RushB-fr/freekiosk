@@ -764,6 +764,11 @@
       "keepTilesLoaded": "Manter os blocos carregados",
       "keepTilesLoadedHint": "Carrega seus blocos (até 5) em segundo plano assim que o painel inicia e os mantém ativos: abrir ou trocar de bloco é instantâneo e cada página mantém seu estado. Usa mais memória."
     },
+    "startOn": {
+      "title": "Iniciar em",
+      "hint": "O que o quiosque mostra ao iniciar ou ao voltar das Configurações: a grade de blocos ou um dos seus blocos.",
+      "grid": "Grade de blocos"
+    },
     "iconColor": "Cor do ícone",
     "colorAuto": "Automática",
     "preview": "Pré-visualização",

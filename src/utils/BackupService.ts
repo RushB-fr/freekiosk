@@ -214,6 +214,7 @@ const BACKUP_KEYS = [
   '@kiosk_dashboard_nav_auto_hide_seconds',
   '@kiosk_dashboard_swipe_between_tiles',
   '@kiosk_dashboard_keep_tiles_loaded',
+  '@kiosk_dashboard_start_tile',
   '@kiosk_status_bar_theme',
 ];
 
