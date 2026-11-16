@@ -443,7 +443,29 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
         vp.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
       }
 
-      if (ZOOM !== 1) {
+      if (ZOOM < 1) {
+        // Zoom out (#382): CSS zoom shrinks the boxes but not the viewport units, so a page laid
+        // out with height:100vh stayed at ZOOM x the screen height with white below it. A mobile
+        // viewport that is 1/ZOOM times larger makes the page lay itself out on the whole screen.
+        var applyViewport = function() {
+          var vp = document.querySelector('meta[name="viewport"]');
+          if (!vp) {
+            vp = document.createElement('meta');
+            vp.setAttribute('name', 'viewport');
+            (document.head || document.documentElement).appendChild(vp);
+          }
+          var content = 'width=' + Math.round(screen.width / ZOOM) +
+            ', initial-scale=' + ZOOM + ', minimum-scale=' + ZOOM +
+            (DISABLE_USER_ZOOM ? ', maximum-scale=' + ZOOM + ', user-scalable=no' : '');
+          if (vp.getAttribute('content') !== content) { vp.setAttribute('content', content); }
+        };
+        applyViewport();
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', applyViewport);
+        }
+        // screen.width changes with the orientation.
+        window.addEventListener('orientationchange', function() { setTimeout(applyViewport, 300); });
+      } else if (ZOOM !== 1) {
         var applyZoom = function() {
           if (FIT) {
             if (document.body) { document.body.style.zoom = String(ZOOM); }
