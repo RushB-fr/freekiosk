@@ -5,10 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import com.freekiosk.MainActivity
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
@@ -29,7 +25,6 @@ import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.os.StatFs
-import android.provider.Settings
 import android.speech.tts.TextToSpeech
 import android.util.Log
 import android.widget.Toast
@@ -37,6 +32,8 @@ import com.facebook.react.bridge.*
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import com.freekiosk.CameraPhotoModule
 import com.freekiosk.ScreenController
+import com.freekiosk.LazyTts
+import com.freekiosk.StatusSensors
 import org.json.JSONObject
 import java.net.Inet4Address
 import java.net.NetworkInterface
@@ -59,7 +56,7 @@ private fun ReadableMap.optInt(key: String, default: Int): Int =
  * - Emits `onMqttConnectionChanged` events for connection state changes
  */
 class MqttModule(private val reactContext: ReactApplicationContext) :
-    ReactContextBaseJavaModule(reactContext), SensorEventListener {
+    ReactContextBaseJavaModule(reactContext) {
 
     companion object {
         private const val TAG = "MqttModule"
@@ -139,51 +136,28 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
 
     // ==================== TTS ====================
 
-    private var tts: TextToSpeech? = null
-    private var ttsReady: Boolean = false
-
-    init {
-        try {
-            // Use the system's preferred TTS engine so installed language packs (e.g. Chinese)
-            // are available — the no-arg constructor may pick a different limited engine.
-            val preferredEngine = Settings.Secure.getString(
-                reactContext.contentResolver,
-                "tts_default_engine"
-            )
-            val listener = TextToSpeech.OnInitListener { status ->
-                if (status == TextToSpeech.SUCCESS) {
-                    ttsReady = true
-                    Log.d(TAG, "TextToSpeech initialized (engine=$preferredEngine)")
-                } else {
-                    Log.e(TAG, "TextToSpeech initialization failed: $status")
-                }
-            }
-            tts = if (!preferredEngine.isNullOrEmpty()) {
-                TextToSpeech(reactContext.applicationContext, listener, preferredEngine)
-            } else {
-                TextToSpeech(reactContext.applicationContext, listener)
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize TTS: ${e.message}")
-        }
-    }
+    // Bound on first use
+    private val tts = LazyTts(reactContext.applicationContext, TAG)
 
     private fun speakText(text: String) {
-        try {
-            if (tts != null && ttsReady) {
+        // Binds the engine on first use; the text waits until it is up instead of being dropped
+        tts.use { engine ->
+            if (engine == null) {
+                Log.w(TAG, "TTS unavailable, dropping: $text")
+                return@use
+            }
+            try {
                 val locale = detectLocaleForText(text)
-                val result = tts?.setLanguage(locale)
+                val result = engine.setLanguage(locale)
                 if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                     Log.w(TAG, "TTS language not supported: $locale, falling back to default")
-                    tts?.setLanguage(java.util.Locale.getDefault())
+                    engine.setLanguage(java.util.Locale.getDefault())
                 }
-                tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "mqtt_tts_${System.currentTimeMillis()}")
+                engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "mqtt_tts_${System.currentTimeMillis()}")
                 Log.d(TAG, "TTS speaking: $text (locale: $locale)")
-            } else {
-                Log.w(TAG, "TTS not ready")
+            } catch (e: Exception) {
+                Log.e(TAG, "TTS speak failed: ${e.message}")
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "TTS speak failed: ${e.message}")
         }
     }
 
@@ -234,56 +208,8 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
 
     // ==================== Sensor data ====================
 
-    private var sensorManager: SensorManager? = null
-    private var lightSensor: Sensor? = null
-    private var proximitySensor: Sensor? = null
-    private var accelerometerSensor: Sensor? = null
-    private var lightValue: Float = -1f
-    private var proximityValue: Float = -1f
-    private var accelerometerX: Float = 0f
-    private var accelerometerY: Float = 0f
-    private var accelerometerZ: Float = 0f
-
-    // ==================== Initialisation ====================
-
-    init {
-        initSensors()
-    }
-
-    private fun initSensors() {
-        try {
-            sensorManager = reactContext.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-            lightSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_LIGHT)
-            proximitySensor = sensorManager?.getDefaultSensor(Sensor.TYPE_PROXIMITY)
-            accelerometerSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-
-            lightSensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL) }
-            proximitySensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL) }
-            accelerometerSensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL) }
-
-            Log.d(TAG, "Sensors initialized: light=${lightSensor != null}, proximity=${proximitySensor != null}, accelerometer=${accelerometerSensor != null}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize sensors", e)
-        }
-    }
-
-    // ==================== SensorEventListener ====================
-
-    override fun onSensorChanged(event: SensorEvent) {
-        when (event.sensor.type) {
-            Sensor.TYPE_LIGHT -> lightValue = event.values[0]
-            Sensor.TYPE_PROXIMITY -> proximityValue = event.values[0]
-            Sensor.TYPE_ACCELEROMETER -> {
-                accelerometerX = event.values[0]
-                accelerometerY = event.values[1]
-                accelerometerZ = event.values[2]
-            }
-        }
-    }
-
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-        // Not needed
-    }
+    // Readings for the status, listening only while the MQTT client runs
+    private val sensors = StatusSensors(reactContext.applicationContext)
 
     // ==================== Module name ====================
 
@@ -444,6 +370,7 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
             discovery.imageStreams = buildImageStreams(config.baseTopic, topicId, imagePublisher)
 
             mqttClient = client
+            sensors.start()
             client.connect()
 
             Log.i(TAG, "MQTT client started for broker ${config.brokerUrl}:${config.port}")
@@ -469,6 +396,7 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
                 Log.e(TAG, "Caused by: ${cause.javaClass.name}: ${cause.message}")
                 cause = cause.cause
             }
+            sensors.stop()
             promise.reject("START_ERROR", "${e.javaClass.simpleName}: ${e.message}")
         }
     }
@@ -481,6 +409,7 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
         try {
             mqttClient?.disconnect()
             mqttClient = null
+            sensors.stop()
             Log.i(TAG, "MQTT client stopped")
             promise.resolve(true)
         } catch (e: Exception) {
@@ -750,12 +679,12 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
 
         // Sensors
         val sensorsStatus = JSONObject().apply {
-            put("light", lightValue)
-            put("proximity", proximityValue)
+            put("light", sensors.light)
+            put("proximity", sensors.proximity)
             put("accelerometer", JSONObject().apply {
-                put("x", accelerometerX)
-                put("y", accelerometerY)
-                put("z", accelerometerZ)
+                put("x", sensors.accelX)
+                put("y", sensors.accelY)
+                put("z", sensors.accelZ)
             })
         }
         status.put("sensors", sensorsStatus)
@@ -765,7 +694,7 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
             put("enabled", jsAutoBrightnessEnabled)
             put("min", jsAutoBrightnessMin)
             put("max", jsAutoBrightnessMax)
-            put("currentLightLevel", lightValue)
+            put("currentLightLevel", sensors.light)
         }
         status.put("autoBrightness", autoBrightnessStatus)
 
@@ -1153,12 +1082,9 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
             mqttClient?.disconnect()
             mqttClient = null
             instance = null
-            sensorManager?.unregisterListener(this)
+            sensors.stop()
             stopAudio()
-            tts?.stop()
-            tts?.shutdown()
-            tts = null
-            ttsReady = false
+            tts.shutdown()
             Log.d(TAG, "MqttModule cleaned up")
         } catch (e: Exception) {
             Log.e(TAG, "Error during cleanup: ${e.message}")

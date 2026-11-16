@@ -764,6 +764,11 @@
       "keepTilesLoaded": "Keep tiles loaded",
       "keepTilesLoadedHint": "Load your tiles (up to 5) in the background as soon as the dashboard starts, and keep them running, so opening or switching tiles is instant and each page keeps its state. Uses more memory."
     },
+    "startOn": {
+      "title": "Start On",
+      "hint": "What the kiosk shows when it starts or you return from Settings: the tile grid, or one of your tiles.",
+      "grid": "Tile grid"
+    },
     "iconColor": "Icon Color",
     "colorAuto": "Auto",
     "preview": "Preview",

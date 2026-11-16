@@ -764,6 +764,11 @@
       "keepTilesLoaded": "Garder les tuiles chargées",
       "keepTilesLoadedHint": "Charge vos tuiles (jusqu'à 5) en arrière-plan dès le démarrage du tableau de bord et les garde actives : ouvrir ou changer de tuile est instantané et chaque page garde son état. Utilise plus de mémoire."
     },
+    "startOn": {
+      "title": "Démarrer sur",
+      "hint": "Ce que le kiosque affiche au démarrage ou au retour des Paramètres : la grille des tuiles, ou l'une de vos tuiles.",
+      "grid": "Grille des tuiles"
+    },
     "iconColor": "Couleur de l'icône",
     "colorAuto": "Auto",
     "preview": "Aperçu",

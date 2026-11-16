@@ -55,6 +55,9 @@
 **Q: Does it work with Home Assistant?**
 - **A:** Perfectly! Many users deploy FreeKiosk for Home Assistant dashboards.
 
+**Q: Does it work with ioBroker?**
+- **A:** Yes, through the [ioBroker.freekiosk](https://github.com/typhosj/ioBroker.freekiosk) adapter, over REST or MQTT. See [Integrations > ioBroker](INTEGRATIONS.md#iobroker).
+
 **Q: Can I display local HTML files?**
 - **A:** Yes. Enter a `file://` URL in Website mode, for example
   `file:///storage/emulated/0/Android/data/com.freekiosk/files/dashboard/index.html`.

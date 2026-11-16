@@ -54,6 +54,18 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     private val safetyHubPackage = "com.google.android.apps.safetyhub"
 
     companion object {
+        /** The WebView in [view]'s subtree (a WebViewComponent's host view, or a tile wrapper). */
+        internal fun findWebView(view: View?): WebView? {
+            if (view == null) return null
+            if (view is WebView) return view
+            if (view is ViewGroup) {
+                for (i in 0 until view.childCount) {
+                    findWebView(view.getChildAt(i))?.let { return it }
+                }
+            }
+            return null
+        }
+
         // #234: how long the battery dialog may stay whitelisted if we never see the user
         // come back (dialog dismissed by the system, activity never resumed).
         private const val BATTERY_DIALOG_WHITELIST_TIMEOUT_MS = 60_000L
@@ -193,6 +205,23 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
             promise.resolve(true)
         } catch (e: Exception) {
             promise.resolve(false)
+        }
+    }
+
+    // Dashboard: the tile views a sideways drag slides (TileSlider). Each is a React tag:
+    // -1 = no tile that way, -2 = a tile that is not mounted. current -1 = tiles not kept.
+    @ReactMethod
+    fun setNavSlideTiles(current: Int, prev: Int, next: Int, promise: Promise) {
+        UiThreadUtil.runOnUiThread {
+            try {
+                val activity = reactApplicationContext.currentActivity as? MainActivity
+                val uiManager = UIManagerHelper.getUIManager(reactApplicationContext, UIManagerType.FABRIC)
+                val view = { tag: Int -> if (tag > 0) runCatching { uiManager?.resolveView(tag) }.getOrNull() else null }
+                activity?.tileSlider?.setTiles(view(current), view(prev), view(next), prev != -1, next != -1)
+                promise.resolve(activity != null)
+            } catch (e: Exception) {
+                promise.resolve(false)
+            }
         }
     }
 
@@ -447,17 +476,6 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                 promise.resolve(false)
             }
         }
-    }
-
-    private fun findWebView(view: View?): WebView? {
-        if (view == null) return null
-        if (view is WebView) return view
-        if (view is ViewGroup) {
-            for (i in 0 until view.childCount) {
-                findWebView(view.getChildAt(i))?.let { return it }
-            }
-        }
-        return null
     }
 
     @ReactMethod
