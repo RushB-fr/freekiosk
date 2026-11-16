@@ -6,6 +6,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform, PermissionsAndroid, Alert } from 'react-native';
 import RNFS from 'react-native-fs';
+import UpdateModule from './UpdateModule';
 import { hasSecurePin, getSecureApiKey, saveSecureApiKey, getSecureMqttPassword, saveSecureMqttPassword } from './secureStorage';
 
 // All storage keys to backup
@@ -227,7 +228,6 @@ export interface BackupData {
 }
 
 const BACKUP_VERSION = '1.0';
-const APP_VERSION = '1.3.0';
 
 /**
  * Request storage permissions on Android
@@ -331,10 +331,18 @@ export async function buildBackupJson(): Promise<{ success: boolean; json?: stri
 
     const hasPinConfigured = await hasSecurePin();
 
+    // The version of the app that writes the file (#363); 'unknown' if the native side cannot say
+    let appVersion = 'unknown';
+    try {
+      appVersion = (await UpdateModule.getCurrentVersion()).versionName || appVersion;
+    } catch (e) {
+      console.warn('Failed to read the app version for the backup:', e);
+    }
+
     const backupData: BackupData = {
       version: BACKUP_VERSION,
       exportDate: new Date().toISOString(),
-      appVersion: APP_VERSION,
+      appVersion,
       settings,
       hasPinConfigured,
     };
