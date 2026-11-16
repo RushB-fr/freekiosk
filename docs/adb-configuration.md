@@ -312,7 +312,7 @@ adb shell "am start -n com.freekiosk/.MainActivity --es pin YOUR_PIN --ez url_pl
 | `--ez screen_scheduler_enabled false` | Turn the screen on and off on a schedule |
 | `--es screen_scheduler_rules '[]'` | Schedule rules, as a JSON array |
 | `--ez screen_scheduler_wake_on_touch true` | Touch wakes the screen outside scheduled hours |
-| `--es screensaver_delay "300"` | Inactivity before the screensaver, in seconds |
+| `--es screensaver_delay "300000"` | Inactivity before the screensaver, in **milliseconds** (`300000` = 5 minutes; `300` would be 0.3 s) |
 | `--es screensaver_brightness "0"` | Brightness while the screensaver is showing |
 
 **Screen scheduler rule format**
