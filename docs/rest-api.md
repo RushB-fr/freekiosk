@@ -375,6 +375,8 @@ curl http://TABLET_IP:8080/api/screenshot -o screenshot.png
 
 Take a photo using the device camera. **(v1.2.5+)**
 
+When no photo can be taken the answer is `503` and the `error` field says why: permission not granted, camera in use (by another app, the live camera stream or motion detection), camera disabled by a device policy, no camera, or a timeout.
+
 **Query Parameters:**
 
 
