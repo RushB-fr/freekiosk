@@ -45,6 +45,7 @@ class KioskWatchdogService : Service() {
         private const val NOTIFICATION_ID = 2002
         private const val CHECK_INTERVAL_MS = 10_000L  // check every 10 s
         private const val RELAUNCH_COOLDOWN_MS = 15_000L // min 15 s between relaunches
+        private const val RESTORE_DELAY_MS = 3_000L // #376: after a sticky restart
         private const val FOREGROUND_LOOKBACK_MS = 24 * 60 * 60 * 1000L // #282
         private const val SYSTEM_UI_PACKAGE = "com.android.systemui" // #268
 
@@ -93,6 +94,42 @@ class KioskWatchdogService : Service() {
         /** True when something in the app needs the process alive while backgrounded. */
         private fun needsKeepAlive(context: Context): Boolean =
             readFlag(context, "@kiosk_mqtt_enabled") || readFlag(context, "@cloud_enrolled")
+
+        /** #376: at most one restore this often, so a crash at start-up cannot become a loop. */
+        internal const val RESTORE_MIN_INTERVAL_MS = 5 * 60_000L
+        private const val KEY_LAST_RESTORE_MS = "watchdog_last_restore_ms"
+
+        /**
+         * #376: should the watchdog bring MainActivity back after the process died and the
+         * system restarted only this service (START_STICKY)? Observed after the Android
+         * System WebView updated overnight: the process came back with the watchdog and
+         * nothing else, so MQTT and the REST API (both started from the activity's React
+         * context) stayed offline until somebody opened the app by hand.
+         *
+         * Every condition narrows it, on purpose:
+         *  - [activityStarted]: MainActivity ran in this process (a user who left the app,
+         *    or a launch already under way) -> nothing to restore.
+         *  - [runsUnattended]: Lock Mode, MQTT or a cloud enrolment; an ordinary install is
+         *    left alone.
+         *  - [deviceInteractive]: with the screen on someone may be using another app, and
+         *    #234 forbids dragging FreeKiosk over it. Lock Mode already relaunches on a lit
+         *    screen through [checkAndRelaunch].
+         *  - the interval: no restore loop if the activity crashes at start.
+         *
+         * The one visible effect is that the screen lights up once, since MainActivity turns
+         * it on; the device is reachable again afterwards.
+         */
+        internal fun shouldRestoreAfterProcessDeath(
+            activityStarted: Boolean,
+            runsUnattended: Boolean,
+            deviceInteractive: Boolean,
+            lastRestoreMs: Long,
+            nowMs: Long,
+        ): Boolean =
+            !activityStarted &&
+                runsUnattended &&
+                !deviceInteractive &&
+                (lastRestoreMs <= 0L || nowMs - lastRestoreMs >= RESTORE_MIN_INTERVAL_MS)
 
         private fun start(context: Context, keepAliveOnly: Boolean) {
             try {
@@ -187,8 +224,48 @@ class KioskWatchdogService : Service() {
 
         DebugLog.d(TAG, "Watchdog started (START_STICKY)")
 
+        // A null intent is the system restarting us after the process died; every start from
+        // the app, the boot receiver or the update receiver carries one.
+        if (intent == null) {
+            handler.postDelayed({ restoreActivityAfterProcessDeath() }, RESTORE_DELAY_MS)
+        }
+
         // START_STICKY: Android will restart this service if the process is killed
         return START_STICKY
+    }
+
+    /**
+     * #376: see [shouldRestoreAfterProcessDeath]. Runs a little after the sticky restart, so
+     * a launch already under way (update receiver, boot) has set MainActivity.hasStarted and
+     * is not doubled.
+     */
+    private fun restoreActivityAfterProcessDeath() {
+        if (!isRunning) return
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val now = System.currentTimeMillis()
+        val powerManager = getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+        val restore = shouldRestoreAfterProcessDeath(
+            activityStarted = MainActivity.hasStarted,
+            runsUnattended = isKioskEnabled() || needsKeepAlive(this),
+            deviceInteractive = powerManager?.isInteractive != false,
+            lastRestoreMs = prefs.getLong(KEY_LAST_RESTORE_MS, 0L),
+            nowMs = now,
+        )
+        if (!restore) {
+            DebugLog.d(TAG, "Process restarted without MainActivity - nothing to restore")
+            return
+        }
+
+        prefs.edit().putLong(KEY_LAST_RESTORE_MS, now).apply()
+        DebugLog.d(TAG, "Process restarted without MainActivity while the screen is off - restoring it")
+        try {
+            val intent = Intent(this, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            DebugLog.errorProduction(TAG, "Failed to restore MainActivity: ${e.message}")
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
