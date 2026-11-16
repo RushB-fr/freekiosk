@@ -585,6 +585,9 @@ class KioskHttpServer(
     private fun handleRemoteKey(key: String): Response {
         checkControlAllowed()?.let { return it }
         val result = commandHandler("remoteKey", JSONObject().put("key", key))
+        if (!result.optBoolean("executed", true)) {
+            return jsonError(Response.Status.BAD_REQUEST, result.optString("error", "Key not sent"))
+        }
         return jsonSuccess(result)
     }
 
