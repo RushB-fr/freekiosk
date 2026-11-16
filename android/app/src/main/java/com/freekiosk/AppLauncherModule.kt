@@ -28,7 +28,10 @@ class AppLauncherModule(reactContext: ReactApplicationContext) : ReactContextBas
 
             if (launchIntent != null) {
                 launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                launchIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                // No CLEAR_TOP: the launch intent targets the app's root activity, so CLEAR_TOP finished
+                // every activity above it and the app came back on its first screen (a login, for
+                // example) although its process was alive (#377). NEW_TASK alone brings the existing
+                // task to the front as it was left, like a stock launcher, and starts it if absent.
 
                 val currentActivity = reactApplicationContext.currentActivity
                 
