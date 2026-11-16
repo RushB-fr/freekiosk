@@ -21,6 +21,7 @@ class KioskHttpServer(
     private val screenshotProvider: (() -> java.io.InputStream?)? = null,
     private val screenshotErrorProvider: (() -> String?)? = null,
     private val cameraPhotoProvider: ((camera: String, quality: Int, rotation: Int) -> java.io.InputStream?)? = null,
+    private val cameraPhotoErrorProvider: (() -> String?)? = null,
     private val cameraStreamProvider: ((params: CameraStreamManager.StreamParams) -> CameraStreamManager.StreamResult)? = null,
     private val cameraStreamDefaults: (() -> CameraStreamManager.StreamParams)? = null
 ) : NanoHTTPD(port) {
@@ -706,7 +707,10 @@ class KioskHttpServer(
                 java.io.ByteArrayInputStream(bytes), bytes.size.toLong()
             )
         } else {
-            jsonError(Response.Status.SERVICE_UNAVAILABLE, "Camera not available. Check camera permission and hardware.")
+            jsonError(
+                Response.Status.SERVICE_UNAVAILABLE,
+                cameraPhotoErrorProvider?.invoke() ?: "Camera not available. Check camera permission and hardware.",
+            )
         }
     }
 

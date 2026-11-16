@@ -300,6 +300,7 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 screenshotProvider = { captureScreenshot() },
                 screenshotErrorProvider = { ScreenCapture.lastError },
                 cameraPhotoProvider = { camera, quality, rotation -> cameraPhotoModule?.capturePhoto(camera, quality, rotation) },
+                cameraPhotoErrorProvider = { cameraPhotoModule?.lastError },
                 cameraStreamProvider = { params -> streamManager.openClient(params) },
                 cameraStreamDefaults = {
                     CameraStreamManager.StreamParams(

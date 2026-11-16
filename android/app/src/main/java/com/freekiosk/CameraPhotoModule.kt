@@ -40,6 +40,21 @@ class CameraPhotoModule(private val context: Context) {
     }
 
     /**
+     * Why the last [capturePhoto] returned null, in words the REST client can act on (#375).
+     * Null after a success. One value for the module, like ScreenCapture.lastError.
+     */
+    @Volatile var lastError: String? = null
+        private set
+
+    private fun cameraErrorText(code: Int): String = when (code) {
+        CameraDevice.StateCallback.ERROR_CAMERA_IN_USE ->
+            "The camera is in use by another app, or by FreeKiosk's live camera stream or motion detection"
+        CameraDevice.StateCallback.ERROR_MAX_CAMERAS_IN_USE -> "Too many cameras are open on this device"
+        CameraDevice.StateCallback.ERROR_CAMERA_DISABLED -> "The camera is disabled by a device policy"
+        else -> "The camera reported an error (code $code)"
+    }
+
+    /**
      * Capture a photo from the specified camera
      * @param cameraFacing "front" or "back" (default: "back")
      * @param quality JPEG compression quality 0-100 (default: 80)
@@ -49,10 +64,12 @@ class CameraPhotoModule(private val context: Context) {
      * @return ByteArrayInputStream of JPEG data, or null on failure
      */
     fun capturePhoto(cameraFacing: String = "back", quality: Int = 80, rotation: Int = 0): ByteArrayInputStream? {
+        lastError = null
         // Check camera permission
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) 
             != PackageManager.PERMISSION_GRANTED) {
             Log.e(TAG, "Camera permission not granted")
+            lastError = "The camera permission is not granted: allow Camera for FreeKiosk in the Android app settings"
             return null
         }
 
@@ -62,6 +79,7 @@ class CameraPhotoModule(private val context: Context) {
         val cameraId = findCameraId(cameraManager, cameraFacing)
         if (cameraId == null) {
             Log.e(TAG, "No $cameraFacing camera found")
+            lastError = "This device has no camera"
             return null
         }
 
@@ -123,12 +141,14 @@ class CameraPhotoModule(private val context: Context) {
                 }
 
                 override fun onDisconnected(camera: CameraDevice) {
+                    lastError = "The camera was disconnected, probably taken by another app"
                     camera.close()
                     cameraLatch.countDown()
                 }
 
                 override fun onError(camera: CameraDevice, error: Int) {
                     Log.e(TAG, "Camera error: $error")
+                    lastError = cameraErrorText(error)
                     camera.close()
                     cameraLatch.countDown()
                     latch.countDown()
@@ -138,6 +158,7 @@ class CameraPhotoModule(private val context: Context) {
             // Wait for camera to open
             if (!cameraLatch.await(5, TimeUnit.SECONDS)) {
                 Log.e(TAG, "Timeout waiting for camera to open")
+                lastError = "The camera did not open within 5 seconds"
                 handlerThread.quitSafely()
                 return null
             }
@@ -145,6 +166,7 @@ class CameraPhotoModule(private val context: Context) {
             val camera = cameraDevice
             if (camera == null) {
                 Log.e(TAG, "Camera failed to open")
+                if (lastError == null) lastError = "The camera failed to open"
                 handlerThread.quitSafely()
                 return null
             }
@@ -168,6 +190,7 @@ class CameraPhotoModule(private val context: Context) {
 
                 override fun onConfigureFailed(session: CameraCaptureSession) {
                     Log.e(TAG, "Capture session configuration failed")
+                    lastError = "The camera session could not be configured"
                     sessionLatch.countDown()
                     latch.countDown()
                 }
@@ -176,6 +199,7 @@ class CameraPhotoModule(private val context: Context) {
             // Wait for session
             if (!sessionLatch.await(5, TimeUnit.SECONDS)) {
                 Log.e(TAG, "Timeout waiting for capture session")
+                lastError = "The camera session did not start within 5 seconds"
                 camera.close()
                 dummySurface.release()
                 dummyTexture.release()
@@ -186,6 +210,7 @@ class CameraPhotoModule(private val context: Context) {
             val session = captureSession
             if (session == null) {
                 Log.e(TAG, "Capture session failed")
+                if (lastError == null) lastError = "The camera session failed to start"
                 camera.close()
                 dummySurface.release()
                 dummyTexture.release()
@@ -232,6 +257,7 @@ class CameraPhotoModule(private val context: Context) {
                     failure: CaptureFailure
                 ) {
                     Log.e(TAG, "Capture failed: ${failure.reason}")
+                    lastError = "The camera failed to take the picture (reason ${failure.reason})"
                     latch.countDown()
                 }
             }, handler)
@@ -239,6 +265,7 @@ class CameraPhotoModule(private val context: Context) {
             // Wait for image
             if (!latch.await(CAPTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                 Log.e(TAG, "Timeout waiting for photo capture")
+                lastError = "No picture arrived within $CAPTURE_TIMEOUT_SECONDS seconds"
             }
 
             // Cleanup
@@ -250,14 +277,23 @@ class CameraPhotoModule(private val context: Context) {
 
         } catch (e: SecurityException) {
             Log.e(TAG, "Camera permission denied: ${e.message}")
+            lastError = "The camera permission was denied: allow Camera for FreeKiosk in the Android app settings"
         } catch (e: CameraAccessException) {
             Log.e(TAG, "Camera access error: ${e.message}")
+            lastError = when (e.reason) {
+                CameraAccessException.CAMERA_IN_USE ->
+                    "The camera is in use by another app, or by FreeKiosk's live camera stream or motion detection"
+                CameraAccessException.CAMERA_DISABLED -> "The camera is disabled by a device policy"
+                else -> "Camera access error: ${e.message}"
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Unexpected error during capture: ${e.message}", e)
+            lastError = "Unexpected camera error: ${e.message}"
         } finally {
             handlerThread.quitSafely()
         }
 
+        if (resultStream == null && lastError == null) lastError = "The camera returned no picture"
         return resultStream
     }
 
