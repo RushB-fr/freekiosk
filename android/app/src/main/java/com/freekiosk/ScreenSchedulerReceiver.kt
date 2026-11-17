@@ -60,14 +60,10 @@ class ScreenSchedulerReceiver : BroadcastReceiver() {
             // 2. Dismiss keyguard / show over lock screen on the activity
             //    This is needed if the user has a PIN/pattern lock.
             try {
-                val app = context.applicationContext as? android.app.Application
-                val activityClass = Class.forName("com.freekiosk.MainActivity")
-                // Try to get the current activity via React Native's context
-                val reactApp = context.applicationContext
-                if (reactApp is com.facebook.react.ReactApplication) {
-                    val reactHost = reactApp.reactNativeHost
-                    val reactContext = reactHost.reactInstanceManager?.currentReactContext
-                    val activity = reactContext?.currentActivity
+                // #364: the activity itself. ReactNativeHost throws under the New Architecture,
+                // which skipped every flag below.
+                run {
+                    val activity = MainActivity.current()
                     if (activity != null) {
                         activity.runOnUiThread {
                             try {
