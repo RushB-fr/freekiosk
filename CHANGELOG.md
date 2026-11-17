@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Managed apps accept an optional `iconDataUri` (a `data:image/png;base64,...` PNG). When set, the home grid shows it instead of the package or micro-app icon, so every tile can use one custom icon style. Set it through `@kiosk_managed_apps` with `POST /api/settings`; other URI types are ignored.
+- ADB configuration accepts `--es new_pin`, which changes the FreeKiosk PIN once the current `pin` authenticates.
+
+### Fixed
+- Custom grid icons (`iconDataUri`) survive loading: managed-app normalization dropped the field, so the grid kept the package icons.
+- ADB `managed_apps` configuration keeps each entry's `iconDataUri`; its validation rebuilt entries without it.
+
 ### Fixed
 - An authenticated ADB configuration intent with `rest_api_key` now replaces the REST API key on a device that already had one. The key was written only to the legacy AsyncStorage entry, which is migrated solely when the Keychain is empty, so the server kept the old key. The pending config now stores it in the Keychain and restarts a running server with the new key.
 - REST control commands such as `POST /api/volume` no longer stop reaching the app when FreeKiosk is the HOME launcher. Two kiosk screens could mount at once, and the older one unmounting removed the shared command listener, so commands returned success but did nothing. The listener is now reference-counted per mounted screen.

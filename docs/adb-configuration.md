@@ -116,6 +116,7 @@ adb shell am start -n com.freekiosk/.MainActivity [OPTIONS]
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `--es pin "XXXX"` | String | **Always required**. PIN for authentication (new or existing) |
+| `--es new_pin "XXXX"` | String | Changes the PIN after `pin` authenticates: 4-6 digits, or 4-32 characters with `pin_mode "alphanumeric"` |
 
 ### App Lock Parameters
 

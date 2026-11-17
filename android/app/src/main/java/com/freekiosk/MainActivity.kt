@@ -57,6 +57,7 @@ class MainActivity : ReactActivity() {
     // Flag to prevent processing the same ADB config intent twice
     @Volatile
     var lastProcessedAdbIntent: Long = 0
+    private val PNG_DATA_URI = Regex("^data:image/png;base64,[A-Za-z0-9+/]+={0,2}$")
   }
 
   private lateinit var devicePolicyManager: DevicePolicyManager
@@ -1499,7 +1500,7 @@ class MainActivity : ReactActivity() {
     // intent that set only e.g. REST API or MQTT options (plus the required pin) bailed out
     // here and was silently ignored (#193). Keep this list in sync with the extras read below.
     val adbConfigKeys = arrayOf(
-      "lock_package", "url", "pin", "config",
+      "lock_package", "url", "pin", "new_pin", "config",
       "kiosk_enabled", "hidden_mode_enabled", "app_blocking_enabled",
       "network_blocking_enabled", "network_block_rules",
       "auto_launch", "auto_start", "screensaver_enabled", "auto_relaunch",
@@ -1575,6 +1576,19 @@ class MainActivity : ReactActivity() {
     // Always include PIN in pending config so it's visible in Settings UI
     if (pin != null) {
       editor.putString("@kiosk_pin", pin)
+    }
+
+    // PIN change: the current PIN authenticated above, new_pin replaces it for ADB and the UI.
+    intent.getStringExtra("new_pin")?.let { newPin ->
+      if (Regex("^[0-9]{4,6}$").matches(newPin) ||
+          (intent.getStringExtra("pin_mode") == "alphanumeric" && newPin.length in 4..32)) {
+        saveAdbPinHash(newPin)
+        editor.putString("@kiosk_pin", newPin)
+        android.util.Log.i("FreeKiosk-ADB", "PIN changed via ADB config")
+      } else {
+        android.util.Log.w("FreeKiosk-ADB", "Rejected new_pin: invalid format")
+        showAdbToast("❌ new_pin rejected: invalid format")
+      }
     }
 
     if (lockPackage != null) {
@@ -1769,6 +1783,7 @@ class MainActivity : ReactActivity() {
             val microAppId = appObj.optString("microAppId", "")
             val isMicroApp = microAppId.isNotEmpty() && MicroAppCatalog.isValidId(microAppId)
             if (isMicroApp) validApp.put("microAppId", microAppId)
+            appObj.optString("iconDataUri").takeIf { PNG_DATA_URI.matches(it) }?.let { validApp.put("iconDataUri", it) }
             // A micro-app opens through its own intent; boot/keep-alive would open the host editor.
             validApp.put("launchOnBoot", !isMicroApp && appObj.optBoolean("launchOnBoot", false))
             validApp.put("keepAlive", !isMicroApp && appObj.optBoolean("keepAlive", false))
@@ -2123,6 +2138,7 @@ class MainActivity : ReactActivity() {
             val microAppId = appObj.optString("microAppId", "")
             val isMicroApp = microAppId.isNotEmpty() && MicroAppCatalog.isValidId(microAppId)
             if (isMicroApp) validApp.put("microAppId", microAppId)
+            appObj.optString("iconDataUri").takeIf { PNG_DATA_URI.matches(it) }?.let { validApp.put("iconDataUri", it) }
             // A micro-app opens through its own intent; boot/keep-alive would open the host editor.
             validApp.put("launchOnBoot", !isMicroApp && appObj.optBoolean("launchOnBoot", false))
             validApp.put("keepAlive", !isMicroApp && appObj.optBoolean("keepAlive", false))

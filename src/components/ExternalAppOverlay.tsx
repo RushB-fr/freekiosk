@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, useWindowDimensions, Dimensions } from 'react-native';
 import StatusBar from './StatusBar';
 import AppLauncherModule from '../utils/AppLauncherModule';
-import { ManagedApp, getManagedAppKey } from '../types/managedApps';
+import { ManagedApp, getManagedAppKey, getCustomIcon } from '../types/managedApps';
 import { AppGroup } from '../types/appGroups';
 import { getAppsInGroup, getChildGroups, getGroupPath, normalizeAppGroups } from '../utils/appGroupLayout';
 import { DEFAULT_WALLPAPER_POSITION, WallpaperPosition } from '../types/wallpaper';
@@ -272,7 +272,7 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
     const resolveLabelsAndIcons = async () => {
       const labels: Record<string, string> = {};
       const icons: Record<string, string> = {};
-      const appsToResolve: Array<Pick<ManagedApp, 'packageName' | 'displayName' | 'microAppId'>> =
+      const appsToResolve: Array<Pick<ManagedApp, 'packageName' | 'displayName' | 'microAppId' | 'iconDataUri'>> =
         isMultiAppMode ? homeScreenApps :
         (externalAppPackage ? [{ packageName: externalAppPackage, displayName: '' }] : []);
       // Live micro-app names so a rename in MicroAppStation shows without re-adding.
@@ -289,10 +289,12 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
 
       await Promise.all(appsToResolve.map(async (app) => {
         const key = getManagedAppKey(app);
+        const customIcon = getCustomIcon(app);
+        if (customIcon) icons[key] = customIcon;
         if (app.microAppId) {
           labels[key] = microAppNames.get(key) || app.displayName || 'Micro-app';
           try {
-            icons[key] = await AppLauncherModule.getMicroAppIcon(app.packageName, app.microAppId, 128);
+            icons[key] ??= await AppLauncherModule.getMicroAppIcon(app.packageName, app.microAppId, 128);
           } catch {
             // No icon available — fallback to initials
           }
@@ -305,8 +307,7 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
           labels[key] = app.displayName || app.packageName;
         }
         try {
-          const icon = await AppLauncherModule.getAppIcon(app.packageName, 128);
-          icons[key] = icon;
+          if (!customIcon) icons[key] = await AppLauncherModule.getAppIcon(app.packageName, 128);
         } catch {
           // No icon available — fallback to initials
         }

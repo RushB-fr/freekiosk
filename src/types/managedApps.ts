@@ -21,6 +21,12 @@ export interface ManagedApp {
    */
   microAppId?: string;
 
+  /**
+   * Custom home-grid icon as a `data:image/png;base64,...` URI. When set, it replaces the
+   * package or micro-app icon so every tile can share one icon style.
+   */
+  iconDataUri?: string;
+
   // --- #67: Multi-App Mode ---
   /** Show this app on the kiosk home screen grid */
   showOnHomeScreen: boolean;
@@ -98,4 +104,12 @@ export function createMicroApp(
  */
 export function isValidPackageName(pkg: string): boolean {
   return /^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$/.test(pkg);
+}
+
+const PNG_DATA_URI = /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/;
+
+/** The entry's custom grid icon when it is a valid PNG data URI, otherwise undefined. */
+export function getCustomIcon(app: Pick<ManagedApp, 'iconDataUri'>): string | undefined {
+  const uri = app.iconDataUri;
+  return uri && PNG_DATA_URI.test(uri) ? uri : undefined;
 }

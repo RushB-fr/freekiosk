@@ -3,7 +3,7 @@ import { BlockingRegion } from '../types/blockingOverlay';
 import { ScreenScheduleRule } from '../types/screenScheduler';
 import { DashboardTile } from '../types/dashboard';
 import { normalizeAdminAccessPosition } from '../types/adminAccessPosition';
-import { ManagedApp } from '../types/managedApps';
+import { ManagedApp, getCustomIcon } from '../types/managedApps';
 import { BlockedApp, normalizeBlockedApps } from '../types/blockedApps';
 import { AppGroup } from '../types/appGroups';
 import { normalizeAppGroups } from './appGroupLayout';
@@ -1121,6 +1121,7 @@ export const StorageService = {
           packageName: app.packageName || '',
           displayName: app.displayName || app.packageName || '',
           ...(microAppId ? { microAppId } : {}),
+          ...(getCustomIcon(app) ? { iconDataUri: app.iconDataUri } : {}),
           showOnHomeScreen: app.showOnHomeScreen ?? true,
           groupId: typeof app.groupId === 'string' && app.groupId ? app.groupId : null,
           displayOrder: Number.isFinite(app.displayOrder) ? Number(app.displayOrder) : index,

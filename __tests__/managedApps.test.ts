@@ -1,4 +1,4 @@
-import { createManagedApp, createMicroApp, getManagedAppKey, isMicroApp } from '../src/types/managedApps';
+import { createManagedApp, createMicroApp, getManagedAppKey, isMicroApp, getCustomIcon } from '../src/types/managedApps';
 
 describe('managed micro-apps', () => {
   it('keys micro-apps that share a host package independently', () => {
@@ -22,5 +22,14 @@ describe('managed micro-apps', () => {
 
     expect(app).toMatchObject({ launchOnBoot: false, keepAlive: false, allowAccessibility: false });
     expect(app.showOnHomeScreen).toBe(true);
+  });
+});
+
+describe('custom grid icons', () => {
+  it('accepts only PNG data URIs', () => {
+    expect(getCustomIcon({ iconDataUri: 'data:image/png;base64,iVBORw0KGgo=' })).toBe('data:image/png;base64,iVBORw0KGgo=');
+    expect(getCustomIcon({ iconDataUri: 'https://example.com/a.png' })).toBeUndefined();
+    expect(getCustomIcon({ iconDataUri: 'data:image/svg+xml;base64,PHN2Zz4=' })).toBeUndefined();
+    expect(getCustomIcon({})).toBeUndefined();
   });
 });
