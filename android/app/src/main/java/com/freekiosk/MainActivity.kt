@@ -145,6 +145,7 @@ class MainActivity : ReactActivity() {
       "return_tap_count" to "@kiosk_return_tap_count",
       "return_tap_timeout" to "@kiosk_return_tap_timeout",
       "volume_up_5tap_enabled" to "@kiosk_volume_up_5tap_enabled",
+      "pause_page_screen_off" to "@kiosk_pause_page_screen_off",
       "webview_back_button_enabled" to "@kiosk_webview_back_button_enabled",
       "allow_power_button" to "@kiosk_allow_power_button",
       "allow_notifications" to "@kiosk_allow_notifications",
@@ -865,6 +866,8 @@ class MainActivity : ReactActivity() {
 
   override fun onResume() {
     super.onResume()
+    // #215: never leave the page frozen if the screen-on broadcast was missed.
+    if (pageTimersPaused) setPageTimersPaused(false)
     // The lock screen comes back after the screen was off; a swipe-only one is dismissed again.
     KeyguardHelper.dismissIfInsecure(this)
 
@@ -1629,6 +1632,29 @@ class MainActivity : ReactActivity() {
    * Read a value from AsyncStorage (React Native SQLite database)
    * Uses database "RKStorage" with table "catalystLocalStorage"
    */
+  // ===== #215: pause the page while the screen is off =====
+  // WebView.onPause() does not stop a page's timers: a slideshow kept fetching its images with the
+  // screen off (checked with a page that sends a request every second, 10 in 10 s on and off).
+  // pauseTimers() does. It is global to the process's WebViews, so it is lifted as soon as the screen
+  // is on, when the activity resumes, and never applied unless the option is on.
+  private var pageTimersPaused = false
+
+  /** Called by ScreenStateReceiver on every screen on/off. */
+  fun onScreenStateChanged(screenOn: Boolean) {
+    val enabled = getAsyncStorageValue("@kiosk_pause_page_screen_off", "false") == "true"
+    setPageTimersPaused(!screenOn && enabled)
+  }
+
+  private fun setPageTimersPaused(paused: Boolean) {
+    runOnUiThread {
+      val webView = KioskModule.findWebView(window.decorView)
+      if (webView != null) {
+        if (paused) webView.pauseTimers() else webView.resumeTimers()
+      }
+      pageTimersPaused = paused && webView != null
+    }
+  }
+
   private fun getAsyncStorageValue(key: String, defaultValue: String): String {
     return try {
       val dbPath = getDatabasePath("RKStorage").absolutePath

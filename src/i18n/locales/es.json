@@ -445,6 +445,8 @@
       "title": "Multimedia web",
       "pauseHidden": "Pausar audio/video al ocultarse",
       "pauseHiddenHint": "Pausar el audio y el video de la página web cuando se muestra el protector de pantalla, se apaga la pantalla o la app pasa a segundo plano. De lo contrario, una radio o un video web podría seguir reproduciéndose en segundo plano sin forma de detenerlo. Desactívalo para que el audio web se reproduzca de forma continua.",
+      "pausePage": "Pausar la página con la pantalla apagada",
+      "pausePageHint": "Detiene la actividad propia de la página (temporizadores, carga de imágenes) mientras la pantalla está realmente apagada (comando de apagado, bloqueo, botón de encendido, programación), para que una presentación no siga descargando. Se reanuda al encender la pantalla. Desactivado por defecto: un panel que debe seguir actualizándose debe dejarlo desactivado.",
       "intercom": "Modo de audio bidireccional (intercomunicador)",
       "intercomHint": "Actívalo para audio bidireccional WebRTC / respuesta por voz (p. ej., una tarjeta de intercomunicador de timbre de Home Assistant / go2rtc). Mientras la página web usa activamente el micrófono, FreeKiosk cambia el dispositivo al modo de audio de comunicación para que el canal de retorno del micrófono transmita, y luego restablece el audio normal cuando dejas de hablar. Déjalo desactivado para la navegación normal: solo se activa mientras el micrófono está en uso."
     },

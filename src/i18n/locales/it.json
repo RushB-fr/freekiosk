@@ -445,6 +445,8 @@
       "title": "Contenuti multimediali web",
       "pauseHidden": "Metti in pausa audio/video quando nascosti",
       "pauseHiddenHint": "Mette in pausa audio e video della pagina web quando compare il salvaschermo, lo schermo si spegne o l'app va in background, altrimenti una web radio o un video potrebbero continuare a suonare in background senza poterli raggiungere. Disattiva per mantenere l'audio web sempre in riproduzione.",
+      "pausePage": "Metti in pausa la pagina a schermo spento",
+      "pausePageHint": "Ferma l'attività propria della pagina (timer, caricamento di immagini) mentre lo schermo è davvero spento (comando di spegnimento, blocco, tasto di accensione, pianificazione), così una presentazione non continua a scaricare. Riprende all'accensione. Disattivato per impostazione predefinita: una dashboard che deve restare aggiornata deve lasciarlo disattivato.",
       "intercom": "Modalità audio bidirezionale (citofono)",
       "intercomHint": "Attiva per l'audio bidirezionale WebRTC / talk-back (ad es. una card citofono Home Assistant / go2rtc). Mentre la pagina web usa attivamente il microfono, FreeKiosk porta il dispositivo in modalità audio di comunicazione affinché il canale di ritorno del microfono trasmetta, poi ripristina l'audio normale quando smetti di parlare. Lascia disattivato per la normale navigazione: si attiva solo mentre il microfono è in uso."
     },

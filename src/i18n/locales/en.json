@@ -445,6 +445,8 @@
       "title": "Web Media",
       "pauseHidden": "Pause audio/video when hidden",
       "pauseHiddenHint": "Pause web page audio and video when the screensaver is shown, the screen turns off, or the app goes to the background — otherwise a web radio or video could keep playing unreachable in the background. Turn off to keep web audio playing continuously.",
+      "pausePage": "Pause the page while the screen is off",
+      "pausePageHint": "Stops the page's own activity (timers, image fetching) while the screen is really off (screen-off command, lock, power button, schedule), so a slideshow does not keep downloading. It runs again when the screen turns on. Off by default: a dashboard that must keep updating should leave it off.",
       "intercom": "2-way audio (intercom) mode",
       "intercomHint": "Enable for WebRTC 2-way audio / talk-back (e.g. a Home Assistant / go2rtc doorbell intercom card). While the web page is actively using the microphone, FreeKiosk switches the device to communication audio mode so the microphone back-channel transmits, then restores normal audio when you stop talking. Leave off for normal browsing — it only engages while the mic is in use."
     },
