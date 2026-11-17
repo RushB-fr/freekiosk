@@ -272,15 +272,10 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
      * Clockwise turn that makes the photo upright. The detector only finds upright faces, and
      * trying all four turns let a hand in an upside-down frame pass for one. CameraX records the
      * turn in EXIF rather than turning the pixels; the Camera2 fallback turns the pixels itself
-     * and records nothing, so 0 is right there. Mirroring does not matter to the detector.
+     * and records nothing, so 0 is right there.
      */
     private fun exifRotation(path: String): Int = runCatching {
-        when (ExifInterface(path).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
-            ExifInterface.ORIENTATION_ROTATE_90, ExifInterface.ORIENTATION_TRANSVERSE -> 90
-            ExifInterface.ORIENTATION_ROTATE_180, ExifInterface.ORIENTATION_FLIP_VERTICAL -> 180
-            ExifInterface.ORIENTATION_ROTATE_270, ExifInterface.ORIENTATION_TRANSPOSE -> 270
-            else -> 0
-        }
+        uprightTurn(ExifInterface(path).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL))
     }.getOrDefault(0)
 
     /** A new upright copy of the frame, capped at FACE_MAX_SIDE, as FaceDetector takes it. */
@@ -313,6 +308,20 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
     }
 
     companion object {
+        /**
+         * Clockwise turn that makes a photo with this EXIF orientation upright, leaving out the
+         * mirroring (the detector does not care about left and right). A mirrored front camera
+         * photo is tagged TRANSPOSE or TRANSVERSE, and those need the opposite turn to the one
+         * ExifInterface.getRotationDegrees() gives: that one assumes the flip is applied too, and
+         * on its own it leaves the picture upside down (seen on a Galaxy A52s held upright).
+         */
+        internal fun uprightTurn(exifOrientation: Int): Int = when (exifOrientation) {
+            ExifInterface.ORIENTATION_ROTATE_90, ExifInterface.ORIENTATION_TRANSPOSE -> 90
+            ExifInterface.ORIENTATION_ROTATE_180, ExifInterface.ORIENTATION_FLIP_VERTICAL -> 180
+            ExifInterface.ORIENTATION_ROTATE_270, ExifInterface.ORIENTATION_TRANSVERSE -> 270
+            else -> 0
+        }
+
         // NOTE: fixed values, tune on real devices. The frame is already decoded at
         // inSampleSize=4 (1/4 of the capture), so FACE_MAX_SIDE only caps it further; on the
         // Camera2 fallback (~1280x960 capture) detection runs on ~320x240. More range would need
