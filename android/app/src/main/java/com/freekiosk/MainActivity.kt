@@ -869,6 +869,8 @@ class MainActivity : ReactActivity() {
     super.onResume()
     // #215: never leave the page frozen if the screen-on broadcast was missed.
     if (pageTimersPaused) setPageTimersPaused(false)
+    // A wake interrupted by a restart never cancelled its notification.
+    ScreenController.cancelWakeNotification(this)
     // The lock screen comes back after the screen was off; a swipe-only one is dismissed again.
     KeyguardHelper.dismissIfInsecure(this)
 
