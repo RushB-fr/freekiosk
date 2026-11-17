@@ -187,6 +187,7 @@ const BACKUP_KEYS = [
   '@kiosk_media_player_transition',
   '@kiosk_media_player_transition_duration',
   '@kiosk_pause_web_media_when_hidden',
+  '@kiosk_pause_page_screen_off',
   '@kiosk_print_enabled',
   '@kiosk_print_paper_size',
   '@kiosk_silent_print_enabled',

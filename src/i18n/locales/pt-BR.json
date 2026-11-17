@@ -104,6 +104,8 @@
       "dashboardActive": "O modo Painel está ativo. Configure os blocos na aba Painel.",
       "placeholder": "https://exemplo.com",
       "hint": "Exemplo: https://www.freekiosk.app",
+      "pickLocalFile": "Escolher um arquivo HTML local",
+      "pickLocalFileHint": "O arquivo é lido onde está, então uma página que outro app reescreve é exibida atualizada. Imagens e scripts ao lado dele não carregam: use um arquivo autônomo ou digite um endereço file:// para uma pasta.",
       "httpWarning": "SEGURANÇA: esta URL usa HTTP (sem criptografia).\nSeus dados podem ser interceptados. Use HTTPS."
     },
     "auth": {
@@ -445,6 +447,8 @@
       "title": "Mídia web",
       "pauseHidden": "Pausar áudio/vídeo quando oculto",
       "pauseHiddenHint": "Pausar o áudio e o vídeo da página web quando o protetor de tela for exibido, a tela desligar ou o app for para segundo plano — caso contrário, uma rádio web ou um vídeo poderia continuar tocando em segundo plano sem como ser alcançado. Desative para manter o áudio web tocando sem parar.",
+      "pausePage": "Pausar a página com a tela desligada",
+      "pausePageHint": "Interrompe a atividade própria da página (temporizadores, carregamento de imagens) enquanto a tela está realmente desligada (comando de desligar, bloqueio, botão de energia, agendamento), para que uma apresentação não continue baixando. Ela volta a rodar quando a tela liga. Desativado por padrão: um painel que precisa continuar atualizado deve deixá-lo desativado.",
       "intercom": "Modo de áudio bidirecional (interfone)",
       "intercomHint": "Ative para áudio bidirecional / talk-back via WebRTC (ex.: um card de interfone de campainha do Home Assistant / go2rtc). Enquanto a página web estiver usando o microfone, o FreeKiosk coloca o dispositivo no modo de áudio de comunicação para que o canal de retorno do microfone transmita, e depois restaura o áudio normal quando você parar de falar. Deixe desativado para a navegação normal — ele só entra em ação enquanto o microfone está em uso."
     },
@@ -1536,6 +1540,12 @@
       "reloadConfig": "Recarregar",
       "fileAccessOffTitle": "O acesso a arquivos está desligado",
       "fileAccessOffMessage": "Para abrir um arquivo local, ative antes Geral > Visualizador de PDF > Visualizador de PDF integrado. É essa configuração que dá ao navegador acesso aos arquivos do dispositivo.",
+      "allFilesNeededTitle": "É necessário acesso a todos os arquivos",
+      "allFilesNeededMessage": "Este arquivo está fora da pasta do FreeKiosk. Na próxima tela, permita que o FreeKiosk acesse todos os arquivos, depois volte e salve novamente.",
+      "allFilesOpenSettings": "Abrir configurações",
+      "allFilesCancel": "Cancelar",
+      "allFilesUnavailableTitle": "Arquivo fora da pasta do FreeKiosk",
+      "allFilesUnavailableMessage": "Esta versão do FreeKiosk não consegue ler arquivos fora da sua própria pasta. Copie o arquivo para Android/data/com.freekiosk/files/ no dispositivo ou escolha-o com \"Escolher um arquivo HTML local\".",
       "passwordNotSavedTitle": "Senha não salva",
       "basicAuthNotSavedMessage": "Não foi possível gravar a senha do HTTP Basic Auth no armazenamento seguro deste dispositivo. Todas as outras configurações desta tela foram salvas. Isso acontece em firmwares com o Android Keystore com defeito.",
       "downloadProgress": "{{percent}}% ({{done}} / {{total}} MB)",

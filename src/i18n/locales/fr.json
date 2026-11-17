@@ -104,6 +104,8 @@
       "dashboardActive": "Le mode Tableau de bord est actif. Configurez vos tuiles dans l'onglet Tableau de bord.",
       "placeholder": "https://exemple.com",
       "hint": "Exemple : https://www.freekiosk.app",
+      "pickLocalFile": "Choisir un fichier HTML local",
+      "pickLocalFileHint": "Le fichier est lu là où il se trouve : une page qu'une autre appli réécrit s'affiche à jour. Les images et scripts à côté ne se chargent pas : utilisez un fichier autonome, ou saisissez une adresse file:// pour un dossier.",
       "httpWarning": "SÉCURITÉ : Cette URL utilise HTTP (non chiffré).\nVos données peuvent être interceptées. Utilisez HTTPS à la place."
     },
     "auth": {
@@ -445,6 +447,8 @@
       "title": "Média web",
       "pauseHidden": "Mettre en pause audio/vidéo quand masqué",
       "pauseHiddenHint": "Mettre en pause l'audio et la vidéo de la page web quand l'économiseur d'écran s'affiche, que l'écran s'éteint, ou que l'application passe en arrière-plan — sinon une radio ou vidéo web pourrait continuer à jouer, inaccessible, en arrière-plan. Désactiver pour laisser l'audio web jouer en continu.",
+      "pausePage": "Mettre la page en pause écran éteint",
+      "pausePageHint": "Arrête l'activité propre de la page (minuteries, chargement d'images) quand l'écran est réellement éteint (commande d'extinction, verrouillage, bouton marche, planification), pour qu'un diaporama ne continue pas à télécharger. Elle reprend à l'allumage. Désactivé par défaut : un tableau de bord qui doit rester à jour doit le laisser désactivé.",
       "intercom": "Mode audio bidirectionnel (interphone)",
       "intercomHint": "À activer pour l'audio bidirectionnel WebRTC / talkie-walkie (ex. une carte interphone de sonnette Home Assistant / go2rtc). Pendant que la page web utilise activement le microphone, FreeKiosk bascule l'appareil en mode audio de communication pour que le canal retour du micro transmette, puis restaure l'audio normal quand vous arrêtez de parler. Laisser désactivé pour une navigation normale — ça ne s'active que quand le micro est utilisé."
     },
@@ -1536,6 +1540,12 @@
       "reloadConfig": "Recharger",
       "fileAccessOffTitle": "Accès aux fichiers désactivé",
       "fileAccessOffMessage": "Pour ouvrir un fichier local, activez d'abord Général > Lecteur PDF > Lecteur PDF intégré. C'est ce réglage qui donne au navigateur l'accès aux fichiers de l'appareil.",
+      "allFilesNeededTitle": "L'accès à tous les fichiers est nécessaire",
+      "allFilesNeededMessage": "Ce fichier est en dehors du dossier de FreeKiosk. Sur l'écran suivant, autorisez FreeKiosk à accéder à tous les fichiers, puis revenez et enregistrez à nouveau.",
+      "allFilesOpenSettings": "Ouvrir les réglages",
+      "allFilesCancel": "Annuler",
+      "allFilesUnavailableTitle": "Fichier hors du dossier de FreeKiosk",
+      "allFilesUnavailableMessage": "Cette version de FreeKiosk ne peut pas lire de fichiers hors de son propre dossier. Copiez le fichier dans Android/data/com.freekiosk/files/ sur l'appareil, ou choisissez-le avec « Choisir un fichier HTML local ».",
       "passwordNotSavedTitle": "Mot de passe non enregistré",
       "basicAuthNotSavedMessage": "Le mot de passe HTTP Basic Auth n'a pas pu être écrit dans le stockage sécurisé de cet appareil. Tous les autres réglages de cet écran ont été enregistrés. Cela arrive sur les firmwares dont le Keystore Android est défaillant.",
       "downloadProgress": "{{percent}} % ({{done}} / {{total}} Mo)",

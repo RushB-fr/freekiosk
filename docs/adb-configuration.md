@@ -181,7 +181,7 @@ Each app in the array supports these fields:
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `--es url "https://..."` | String | URL to display in kiosk WebView |
+| `--es url "https://..."` | String | URL to display in kiosk WebView. A local file is a `file:///...` address (needs `pdf_viewer_enabled`); outside FreeKiosk's own folder it also needs All files access: `adb shell appops set com.freekiosk MANAGE_EXTERNAL_STORAGE allow` (not in the Play Store build). See the [FAQ](faq.md) |
 
 ### Dashboard Parameters
 
@@ -243,6 +243,7 @@ Every key below is a straight passthrough: the value you pass is stored as-is.
 | `--ez allow_hardware_screenshot true` | Allow the Power + Volume Down screenshot while Lock Mode is on (Device Owner only, off by default, applies the next time Lock Mode starts) |
 | `--ez allow_usb_debug_dialog true` | Let the "Allow USB debugging?" prompt appear while Lock Mode is on (Device Owner only, off by default, applies the next time Lock Mode starts; see [the troubleshooting entry](#-the-allow-usb-debugging-prompt-does-not-appear-in-lock-mode)) |
 | `--ez keep_screen_on true` | Keep the display awake |
+| `--ez pause_page_screen_off true` | Pause the page's own activity (timers, image fetching) while the screen is really off; off by default. A screen-off command, a lock, the power button or a schedule counts, a dimmed screensaver does not |
 
 **WebView behavior**
 

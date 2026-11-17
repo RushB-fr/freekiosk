@@ -104,6 +104,8 @@
       "dashboardActive": "Tryb pulpitu jest aktywny. Skonfiguruj kafelki na karcie Pulpit.",
       "placeholder": "https://example.com",
       "hint": "Przykład: https://www.freekiosk.app",
+      "pickLocalFile": "Wybierz lokalny plik HTML",
+      "pickLocalFileHint": "Plik jest odczytywany tam, gdzie się znajduje, więc strona przepisywana przez inną aplikację jest zawsze aktualna. Obrazy i skrypty obok niego nie są ładowane: użyj jednego samodzielnego pliku lub wpisz adres file:// dla folderu.",
       "httpWarning": "BEZPIECZEŃSTWO: ten URL używa HTTP (bez szyfrowania).\nDane mogą zostać przechwycone. Użyj HTTPS."
     },
     "auth": {
@@ -445,6 +447,8 @@
       "title": "Multimedia WWW",
       "pauseHidden": "Wstrzymuj audio/wideo, gdy są ukryte",
       "pauseHiddenHint": "Wstrzymuj dźwięk i wideo strony WWW, gdy wyświetlany jest wygaszacz ekranu, ekran się wyłącza lub aplikacja przechodzi w tło – w przeciwnym razie radio internetowe lub wideo mogłoby grać w tle bez możliwości zatrzymania. Wyłącz, aby dźwięk WWW grał bez przerwy.",
+      "pausePage": "Wstrzymaj stronę, gdy ekran jest wyłączony",
+      "pausePageHint": "Zatrzymuje własną aktywność strony (liczniki, pobieranie obrazów), gdy ekran jest naprawdę wyłączony (polecenie wyłączenia, blokada, przycisk zasilania, harmonogram), aby pokaz slajdów nie pobierał dalej. Po włączeniu ekranu strona wznawia działanie. Domyślnie wyłączone: panel, który ma być stale aktualny, powinien mieć to wyłączone.",
       "intercom": "Tryb dwukierunkowego audio (domofon)",
       "intercomHint": "Włącz dla dwukierunkowego audio WebRTC / odpowiedzi głosowej (np. karta domofonu Home Assistant / go2rtc). Gdy strona WWW aktywnie używa mikrofonu, FreeKiosk przełącza urządzenie w tryb audio komunikacji, aby kanał zwrotny mikrofonu był przesyłany, a po zakończeniu mówienia przywraca normalne audio. Pozostaw wyłączone przy zwykłym przeglądaniu – działa tylko wtedy, gdy mikrofon jest używany."
     },
@@ -1538,6 +1542,12 @@
       "reloadConfig": "Wczytaj ponownie",
       "fileAccessOffTitle": "Dostęp do plików jest wyłączony",
       "fileAccessOffMessage": "Aby otworzyć plik lokalny, najpierw włącz Ogólne > Przeglądarka PDF > Wbudowana przeglądarka PDF. To ustawienie daje przeglądarce dostęp do plików na urządzeniu.",
+      "allFilesNeededTitle": "Wymagany dostęp do wszystkich plików",
+      "allFilesNeededMessage": "Ten plik znajduje się poza folderem FreeKiosk. Na następnym ekranie zezwól FreeKiosk na dostęp do wszystkich plików, następnie wróć i zapisz ponownie.",
+      "allFilesOpenSettings": "Otwórz ustawienia",
+      "allFilesCancel": "Anuluj",
+      "allFilesUnavailableTitle": "Plik poza folderem FreeKiosk",
+      "allFilesUnavailableMessage": "Ta wersja FreeKiosk nie może odczytywać plików spoza własnego folderu. Skopiuj plik do Android/data/com.freekiosk/files/ na urządzeniu lub wybierz go przez „Wybierz lokalny plik HTML”.",
       "passwordNotSavedTitle": "Hasło nie zostało zapisane",
       "basicAuthNotSavedMessage": "Nie udało się zapisać hasła HTTP Basic Auth w bezpiecznej pamięci tego urządzenia. Wszystkie pozostałe ustawienia na tym ekranie zostały zapisane. Zdarza się to w oprogramowaniu, w którym Android Keystore jest uszkodzony.",
       "downloadProgress": "{{percent}}% ({{done}} / {{total}} MB)",

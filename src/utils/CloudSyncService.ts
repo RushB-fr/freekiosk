@@ -277,6 +277,8 @@ class CloudSyncServiceClass {
             model: status.device.model,
             manufacturer: status.device.manufacturer,
             android_version: status.device.androidVersion,
+            // #300: lets the cloud match a tablet with the identifier its local REST API shows
+            ...(status.device.androidId ? { android_id: status.device.androidId } : {}),
             form_factor: formFactor(),
             free_storage_mb: status.device.freeStorageMb,
             free_memory_mb: status.device.freeMemoryMb,
@@ -377,10 +379,22 @@ class CloudSyncServiceClass {
       // Declare what this device can do so the dashboard shows only viable
       // actions from the start (refreshed later on every heartbeat).
       const capabilities = await getCapabilities().catch(() => [] as string[]);
+      // #300: the tablet's stable identifier, when it can be read; an older cloud ignores the field
+      const androidId = await NativeModules.KioskModule?.getSystemInfo?.()
+        .then((info: { androidId?: string }) => info?.androidId || '')
+        .catch(() => '');
       const response = await fetch(`${url}/api/v1/devices/enroll/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, device_info: { ...deviceInfo, capabilities, form_factor: formFactor() } }),
+        body: JSON.stringify({
+          token,
+          device_info: {
+            ...deviceInfo,
+            capabilities,
+            form_factor: formFactor(),
+            ...(androidId ? { android_id: androidId } : {}),
+          },
+        }),
       });
 
       const data = await response.json();

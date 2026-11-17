@@ -1630,7 +1630,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
         // Custom UA takes precedence if set, otherwise use a recent Chrome stable UA
         userAgent={customUserAgent?.trim() || defaultUserAgent()}
         
-        originWhitelist={pdfViewerEnabled ? ['http://*', 'https://*', 'file://*'] : ['http://*', 'https://*']}
+        originWhitelist={pdfViewerEnabled ? ['http://*', 'https://*', 'file://*', 'content://*'] : ['http://*', 'https://*']}
         mixedContentMode="always"
         // Left undefined when off, so the library default ('always') applies as before.
         overScrollMode={disableOverscroll ? 'never' : undefined}
@@ -1725,7 +1725,10 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
             return true;
           }
           
+          // content:// (#385) is the page picked with "Choose a local HTML file": a page may not
+          // navigate to one, as it may not to file://.
           if (urlLower.startsWith('file://') ||
+              urlLower.startsWith('content://') ||
               urlLower.startsWith('javascript:')) {
             console.warn('[FreeKiosk] Blocked dangerous URL scheme:', request.url);
             return false;

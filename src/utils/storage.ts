@@ -177,6 +177,7 @@ export const KEYS = {
   CUSTOM_USER_AGENT: '@kiosk_custom_user_agent',
   // #177 — Pause WebView audio/video when the page is hidden (screensaver / screen off / background)
   PAUSE_WEB_MEDIA_WHEN_HIDDEN: '@kiosk_pause_web_media_when_hidden',
+  PAUSE_PAGE_WHEN_SCREEN_OFF: '@kiosk_pause_page_screen_off', // #215
   // MQTT (Home Assistant integration)
   MQTT_ENABLED: '@kiosk_mqtt_enabled',
   MQTT_BROKER_URL: '@kiosk_mqtt_broker_url',
@@ -633,6 +634,7 @@ export const StorageService = {
         KEYS.PRINT_PAPER_SIZE,
         KEYS.DISABLE_USER_ZOOM,
         KEYS.PAUSE_WEB_MEDIA_WHEN_HIDDEN,
+        KEYS.PAUSE_PAGE_WHEN_SCREEN_OFF,
         KEYS.BETA_UPDATES_ENABLED,
         KEYS.MEDIA_PLAYER_ITEMS,
         KEYS.MEDIA_PLAYER_AUTOPLAY,
@@ -3016,6 +3018,27 @@ export const StorageService = {
     } catch (error) {
       console.error('Error getting pause web media when hidden:', error);
       return true;
+    }
+  },
+
+  // ============ Pause the page while the screen is off (#215) ============
+
+  savePausePageWhenScreenOff: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.PAUSE_PAGE_WHEN_SCREEN_OFF, value.toString());
+    } catch (error) {
+      console.error('Error saving pause page when screen off:', error);
+    }
+  },
+
+  getPausePageWhenScreenOff: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.PAUSE_PAGE_WHEN_SCREEN_OFF);
+      // Default OFF: a dashboard or a page with sound is meant to keep running
+      return value === 'true';
+    } catch (error) {
+      console.error('Error getting pause page when screen off:', error);
+      return false;
     }
   },
 

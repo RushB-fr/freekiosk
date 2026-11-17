@@ -54,6 +54,18 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     private val safetyHubPackage = "com.google.android.apps.safetyhub"
 
     companion object {
+        /**
+         * #300: Settings.Secure.ANDROID_ID, a stable identifier per tablet, to match it with its entry in
+         * FreeKiosk Cloud. On Android 8+ it is scoped to the app's signing key and the user: stable across
+         * reboots and updates, changed by a factory reset. Null when it cannot be read.
+         */
+        fun androidId(context: android.content.Context): String? = try {
+            android.provider.Settings.Secure.getString(context.contentResolver, android.provider.Settings.Secure.ANDROID_ID)
+                ?.takeIf { it.isNotBlank() }
+        } catch (e: Exception) {
+            null
+        }
+
         /** The WebView in [view]'s subtree (a WebViewComponent's host view, or a tile wrapper). */
         internal fun findWebView(view: View?): WebView? {
             if (view == null) return null
@@ -2125,6 +2137,7 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
         map.putString("serial", if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) "unknown" else
             @Suppress("DEPRECATION") (android.os.Build.SERIAL ?: ""))
         map.putLong("uptimeSeconds", android.os.SystemClock.elapsedRealtime() / 1000)
+        map.putString("androidId", androidId(reactApplicationContext) ?: "")
         promise.resolve(map)
     }
 

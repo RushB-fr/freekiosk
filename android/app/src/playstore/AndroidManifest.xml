@@ -47,6 +47,13 @@
         android:name="android.permission.SCHEDULE_EXACT_ALARM"
         tools:node="remove" />
 
+    <!-- Strip MANAGE_EXTERNAL_STORAGE (All files access): Play restricts it to a few app
+         categories. A Play build cannot open a file:// URL outside the app's own folder
+         (#385); the document picker, which needs no such permission, still works. -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:node="remove" />
+
     <!-- Strip READ_MEDIA_* (photo/video policy) -->
     <uses-permission
         android:name="android.permission.READ_MEDIA_VIDEO"

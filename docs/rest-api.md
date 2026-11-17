@@ -91,7 +91,7 @@ Returns complete device status in one call.
     "battery": { "level": 85, "charging": true, "temperature": 25.5 },
     "screen": { "on": true, "brightness": 75, "screensaverActive": false },
     "webview": { "currentUrl": "http://...", "canGoBack": false, "loading": false },
-    "device": { "model": "SM-T510", "manufacturer": "samsung", "android": "11" },
+    "device": { "ip": "192.168.1.50", "hostname": "freekiosk", "version": "2.1.0", "isDeviceOwner": true, "kioskMode": true, "manufacturer": "samsung", "model": "SM-T510", "androidVersion": "11", "apiLevel": 30, "processor": "qcom", "deviceName": "gta3xl", "product": "gta3xlwifixx", "uptime": 86400, "androidId": "a1b2c3d4e5f60718" },
     "wifi": { "connected": true, "ssid": "Home", "rssi": -45, "ip": "192.168.1.50" },
     "sensors": { "light": 150.5, "proximity": 5, "accelerometer": {...} },
     "autoBrightness": { "enabled": true, "min": 10, "max": 100, "currentLightLevel": 150.5 },
@@ -302,9 +302,18 @@ Device information.
   "data": {
     "ip": "192.168.1.50",
     "hostname": "freekiosk",
-    "version": "1.2.11",
+    "version": "2.1.0",
     "isDeviceOwner": true,
-    "kioskMode": true
+    "kioskMode": true,
+    "manufacturer": "samsung",
+    "model": "SM-T510",
+    "androidVersion": "11",
+    "apiLevel": 30,
+    "processor": "qcom",
+    "deviceName": "gta3xl",
+    "product": "gta3xlwifixx",
+    "uptime": 86400,
+    "androidId": "a1b2c3d4e5f60718"
   }
 }
 ```
@@ -316,8 +325,16 @@ Device information.
 
 | Field | Type | Description |
 |---|---|---|
+| **ip** | string | Local IP address |
+| **hostname** | string | Always `freekiosk` |
+| **version** | string | FreeKiosk version |
 | **isDeviceOwner** | boolean | Whether the app has Device Owner privileges (required for reboot, lock, true screen off) |
 | **kioskMode** | boolean | Whether kiosk lock task mode is currently active |
+| **manufacturer**, **model**, **deviceName**, **product**, **processor** | string | The values Android reports (`Build.MANUFACTURER`, `MODEL`, `DEVICE`, `PRODUCT`, `HARDWARE`) |
+| **androidVersion** | string | Android release, for example `11` |
+| **apiLevel** | number | Android API level, for example `30` |
+| **uptime** | number | Seconds since the device booted |
+| **androidId** | string | `Settings.Secure.ANDROID_ID`: a stable identifier per tablet, to match it with its entry in FreeKiosk Cloud (the cloud receives it as `android_id`). On Android 8+ it is scoped to FreeKiosk's signing key and the user: it survives reboots and updates and changes after a factory reset. Left out when Android does not give it |
 
 
 

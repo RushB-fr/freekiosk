@@ -728,6 +728,16 @@ index f83033b..a6616e3 100644
      fun setBasicAuthCredential(viewWrapper: RNCWebViewWrapper, credential: ReadableMap?) {
          var basicAuthCredential: RNCBasicAuthCredential? = null
          if (credential != null) {
+@@ -550,6 +602,9 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
+     fun setAllowFileAccess(viewWrapper: RNCWebViewWrapper, allowFileAccess: Boolean) {
+         val view = viewWrapper.webView
+         view.settings.allowFileAccess = allowFileAccess;
++        // FreeKiosk #385: a content:// document (the page picked with "Choose a local HTML file") is local
++        // content like a file: it follows the same switch, and stays off with it.
++        view.settings.allowContentAccess = allowFileAccess;
+     }
+ 
+     fun setAllowFileAccessFromFileURLs(viewWrapper: RNCWebViewWrapper, value: Boolean) {
 diff --git a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewWrapper.kt b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewWrapper.kt
 index 9f9d6f3..b68d263 100644
 --- a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewWrapper.kt
