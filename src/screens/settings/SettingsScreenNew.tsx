@@ -57,6 +57,7 @@ import { ManagedApp } from '../../types/managedApps';
 import { DEFAULT_MULTI_APP_APPEARANCE, MultiAppAppearance, isHexColor } from '../../types/multiAppAppearance';
 import { MediaItem, MediaFitMode, generateMediaItemId, detectMediaType } from '../../types/mediaPlayer';
 import FilePickerModule from '../../utils/FilePickerModule';
+import { hasUsableHost } from '../../utils/urlInput';
 
 const { KioskModule, RotationControlModule, AudioControlModule } = NativeModules;
 
@@ -1499,7 +1500,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
         return;
       }
       if (!urlLower.startsWith('http://') && !urlLower.startsWith('https://') && !urlLower.startsWith('file://')) {
-        if (finalUrl.includes('.')) {
+        if (hasUsableHost(finalUrl)) {
           finalUrl = 'https://' + finalUrl;
           setUrl(finalUrl);
           Alert.alert(t('screens.settingsMain.urlUpdatedTitle'), t('screens.settingsMain.urlUpdatedMessage', { url: finalUrl }));
