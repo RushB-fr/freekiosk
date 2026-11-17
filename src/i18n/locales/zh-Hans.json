@@ -1307,6 +1307,8 @@
       "loading": "正在加载...",
       "urlLabel": "URL：{{url}}",
       "errorReason": "原因：{{reason}}",
+      "blockedByFilter": "已被 URL 过滤器拦截",
+      "blockedByFilterHost": "已被 URL 过滤器拦截：{{host}}",
       "autoReloadText": "5 秒后自动重新加载...",
       "reloadNow": "立即重新加载",
       "fallbackSettingsHint": "点按设置按钮 5 次即可返回设置",

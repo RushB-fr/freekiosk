@@ -1307,6 +1307,8 @@
       "loading": "Chargement...",
       "urlLabel": "URL : {{url}}",
       "errorReason": "Cause : {{reason}}",
+      "blockedByFilter": "Bloqué par le filtre d'URL",
+      "blockedByFilterHost": "Bloqué par le filtre d'URL : {{host}}",
       "autoReloadText": "Rechargement automatique dans 5 secondes...",
       "reloadNow": "Recharger maintenant",
       "fallbackSettingsHint": "Appuyez 5× sur le bouton réglages pour revenir aux réglages",

@@ -203,6 +203,11 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   // Last top-frame (main document) URL requested — used to distinguish a fatal
   // main-page HTTP error from a harmless sub-resource error (favicon, analytics…).
   const lastTopFrameUrlRef = useRef<string | null>(null);
+  // #366: what the WebView shows. A navigation the URL filter blocks while no page is shown (the
+  // address redirects outside the whitelist) leaves a blank view; `blockedCandidateUrlRef` holds
+  // that address until the load that follows says whether the blank view is the result.
+  const pageShownRef = useRef<boolean>(false);
+  const blockedCandidateUrlRef = useRef<string | null>(null);
   // Every frame can postMessage, and all of them arrive under the main frame's URL. Only the main
   // frame is injected, so only it knows this nonce. Checks read the ref, so rotation bites at once.
   const [printerNonce, setPrinterNonce] = useState<string>(makePrinterNonce);
@@ -285,6 +290,26 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
     if (blockedUrlTimerRef.current) clearTimeout(blockedUrlTimerRef.current);
     blockedUrlTimerRef.current = setTimeout(() => setBlockedUrlMessage(null), 2000);
   }, [urlFilterShowFeedback]);
+
+  // #366: the main page was blocked by the URL filter and nothing is shown. Say so on the error
+  // screen instead of leaving a blank view, and retry like any other failure.
+  const showBlockedPage = (blockedUrl: string): void => {
+    const hostMatch = blockedUrl.match(/^https?:\/\/([^/?#]+)/i);
+    setErrorReason(
+      hideErrorUrl || !hostMatch
+        ? t('components.webView.blockedByFilter')
+        : t('components.webView.blockedByFilterHost', { host: hostMatch[1] }),
+    );
+    setError(true);
+    setLoading(false);
+    if (autoReload) {
+      setTimeout(() => {
+        setError(false);
+        setLoading(true);
+        setPageLoaded(false);
+      }, 5000);
+    }
+  };
 
   // Expose goBack, scrollToTop, and clearCache methods to parent via ref
   useImperativeHandle(ref, () => ({
@@ -1441,6 +1466,8 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
     setError(false);
     setLoading(true);
     setPageLoaded(false);
+    pageShownRef.current = false;
+    blockedCandidateUrlRef.current = null;
   };
 
   const handleNavigateToSettings = (): void => {
@@ -1629,6 +1656,17 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
             }, 10000);
           }
         }}
+        onLoad={(event) => {
+          const loadedUrl = event.nativeEvent.url;
+          if (error || loadedUrl === 'about:blank') return;
+          if (!pageShownRef.current && loadedUrl === blockedCandidateUrlRef.current) {
+            blockedCandidateUrlRef.current = null;
+            showBlockedPage(loadedUrl);
+          } else {
+            pageShownRef.current = true;
+            blockedCandidateUrlRef.current = null;
+          }
+        }}
         onLoadEnd={() => {
           // Don't mark as loaded when loading about:blank during error state
           if (!error) {
@@ -1743,6 +1781,12 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
           // URL Filtering (blacklist/whitelist)
           if (isUrlBlocked(request.url)) {
             showBlockedFeedback(request.url);
+            // Android sends no isTopFrame, so only an explicit false rules a frame out. Whether the
+            // main page was meant is settled by onLoad, which Android fires with this very address
+            // when it cancels the main-frame load, and with the page's own address otherwise.
+            if (request.isTopFrame !== false && !pageShownRef.current) {
+              blockedCandidateUrlRef.current = request.url;
+            }
             return false;
           }
 

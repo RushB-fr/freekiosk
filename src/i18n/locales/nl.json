@@ -1307,6 +1307,8 @@
       "loading": "Laden...",
       "urlLabel": "URL: {{url}}",
       "errorReason": "Oorzaak: {{reason}}",
+      "blockedByFilter": "Geblokkeerd door het URL-filter",
+      "blockedByFilterHost": "Geblokkeerd door het URL-filter: {{host}}",
       "autoReloadText": "Automatisch opnieuw laden over 5 seconden...",
       "reloadNow": "Nu opnieuw laden",
       "fallbackSettingsHint": "Tik 5× op de instellingenknop om terug te keren naar de instellingen",
