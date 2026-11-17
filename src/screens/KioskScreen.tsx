@@ -321,6 +321,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   const [zoomMode, setZoomMode] = useState<string>('standard');
   const [disableUserZoom, setDisableUserZoom] = useState<boolean>(false);
   const [disableOverscroll, setDisableOverscroll] = useState<boolean>(false);
+  const [pullToRefresh, setPullToRefresh] = useState<boolean>(false);
   const [sessionResetButtonEnabled, setSessionResetButtonEnabled] = useState<boolean>(false);
   const [customUserAgent, setCustomUserAgent] = useState<string>('');
   const [basicAuthUsername, setBasicAuthUsername] = useState<string>('');
@@ -2273,6 +2274,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       const savedDisableUserZoom = bool(K.DISABLE_USER_ZOOM, false);
       setDisableUserZoom(savedDisableUserZoom);
       setDisableOverscroll(bool(K.DISABLE_OVERSCROLL, false));
+      setPullToRefresh(bool(K.PULL_TO_REFRESH, false));
       setSessionResetButtonEnabled(bool(K.SESSION_RESET_BUTTON_ENABLED, false));
 
       // Load Custom User Agent
@@ -3467,6 +3469,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     hideErrorUrl,
     alwaysLoadFromNetwork,
     disableOverscroll,
+    pullToRefresh,
     silentPrintWindowPrint,
     keyboardMode,
     onJsExecuted,
@@ -3488,7 +3491,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     customUserAgent,
     basicAuthCredential,
     onRenderProcessGone: handleWebViewRenderProcessGone,
-  }), [autoReload, hideErrorUrl, alwaysLoadFromNetwork, disableOverscroll, silentPrintWindowPrint,
+  }), [autoReload, hideErrorUrl, alwaysLoadFromNetwork, disableOverscroll, pullToRefresh, silentPrintWindowPrint,
     keyboardMode, onJsExecuted, webViewBackButtonEnabled, urlFilterEnabled, urlFilterMode,
     urlFilterList, urlFilterShowFeedback, pdfViewerEnabled, windowPrintEnabled, printPaperSize,
     silentPrintEnabled, escPosWidthDots, escPosCut, escPosFeedLines, printOrigins, zoomLevel, zoomMode,

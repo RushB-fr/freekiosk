@@ -430,7 +430,9 @@
     "overscroll": {
       "title": "Bordes de la página",
       "disable": "Desactivar efecto de desplazamiento elástico",
-      "disableHint": "Elimina el estiramiento elástico que aparece al arrastrar más allá del principio o el final de una página, incluso en páginas sin desplazamiento."
+      "disableHint": "Elimina el estiramiento elástico que aparece al arrastrar más allá del principio o el final de una página, incluso en páginas sin desplazamiento.",
+      "pullToRefresh": "Deslizar para actualizar",
+      "pullToRefreshHint": "Arrastrar hacia abajo desde la parte superior de la página la recarga, como en un navegador. No hace nada si la página o la lista bajo el dedo está desplazada."
     },
     "userAgent": {
       "title": "User-Agent",

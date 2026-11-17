@@ -121,6 +121,8 @@ export const KEYS = {
   RESTART_BUTTON_LONG_PRESS_SECONDS: '@kiosk_restart_button_long_press_seconds',
   // WebView elastic stretch at the edges of the page (#233)
   DISABLE_OVERSCROLL: '@kiosk_disable_overscroll',
+  // Drag down from the top of the page to reload it, as in a browser
+  PULL_TO_REFRESH: '@kiosk_pull_to_refresh',
   // Floating "Reset session" button: wipes cookies and web storage, back to the start URL (#156)
   SESSION_RESET_BUTTON_ENABLED: '@kiosk_session_reset_button_enabled',
   // Auto-Brightness
@@ -670,6 +672,7 @@ export const StorageService = {
         KEYS.RESTART_BUTTON_ENABLED,
         KEYS.RESTART_BUTTON_LONG_PRESS_SECONDS,
         KEYS.DISABLE_OVERSCROLL,
+        KEYS.PULL_TO_REFRESH,
         KEYS.SESSION_RESET_BUTTON_ENABLED,
         // Auto-Brightness
         KEYS.AUTO_BRIGHTNESS_ENABLED,
@@ -2310,6 +2313,25 @@ export const StorageService = {
       return value ? JSON.parse(value) : false;
     } catch (error) {
       console.error('Error getting disable overscroll:', error);
+      return false;
+    }
+  },
+
+  // Pull to refresh. Off by default: in a kiosk a reload should not happen by accident.
+  savePullToRefresh: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.PULL_TO_REFRESH, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving pull to refresh:', error);
+    }
+  },
+
+  getPullToRefresh: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.PULL_TO_REFRESH);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting pull to refresh:', error);
       return false;
     }
   },
@@ -4035,6 +4057,7 @@ export const StorageService = {
           disableUserZoom: bool(KEYS.DISABLE_USER_ZOOM),
         },
         disableOverscroll: bool(KEYS.DISABLE_OVERSCROLL),
+        pullToRefresh: bool(KEYS.PULL_TO_REFRESH),
         customUserAgent: str(KEYS.CUSTOM_USER_AGENT),
         screensaver: {
           enabled: bool(KEYS.SCREENSAVER_ENABLED),
@@ -4309,6 +4332,7 @@ export const StorageService = {
         set(KEYS.DISABLE_USER_ZOOM, z.disableUserZoom);
       }
       set(KEYS.DISABLE_OVERSCROLL, d.disableOverscroll);
+      set(KEYS.PULL_TO_REFRESH, d.pullToRefresh);
       set(KEYS.CUSTOM_USER_AGENT, d.customUserAgent);
       const ss = d.screensaver as Record<string, unknown> | undefined;
       if (ss) {

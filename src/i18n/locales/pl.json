@@ -430,7 +430,9 @@
     "overscroll": {
       "title": "Krawędzie strony",
       "disable": "Wyłącz efekt przewijania poza krawędź",
-      "disableHint": "Usuń elastyczne rozciąganie widoczne przy przeciąganiu poza górę lub dół strony, także na stronach, które się nie przewijają."
+      "disableHint": "Usuń elastyczne rozciąganie widoczne przy przeciąganiu poza górę lub dół strony, także na stronach, które się nie przewijają.",
+      "pullToRefresh": "Pociągnij, aby odświeżyć",
+      "pullToRefreshHint": "Przeciągnięcie w dół od górnej krawędzi strony przeładowuje ją, jak w przeglądarce. Nie działa, gdy strona lub lista pod palcem jest przewinięta."
     },
     "userAgent": {
       "title": "User Agent",

@@ -430,7 +430,9 @@
     "overscroll": {
       "title": "Paginaranden",
       "disable": "Overscroll-effect uitschakelen",
-      "disableHint": "Verwijdert het elastische rekeffect dat verschijnt bij slepen voorbij de boven- of onderkant van een pagina, ook op pagina's die niet scrollen."
+      "disableHint": "Verwijdert het elastische rekeffect dat verschijnt bij slepen voorbij de boven- of onderkant van een pagina, ook op pagina's die niet scrollen.",
+      "pullToRefresh": "Omlaag trekken om te vernieuwen",
+      "pullToRefreshHint": "Vanaf de bovenkant van de pagina omlaag trekken laadt de pagina opnieuw, zoals in een browser. Doet niets als de pagina of de lijst onder je vinger gescrold is."
     },
     "userAgent": {
       "title": "User-Agent",

@@ -430,7 +430,9 @@
     "overscroll": {
       "title": "Seitenränder",
       "disable": "Overscroll-Effekt deaktivieren",
-      "disableHint": "Entfernt den elastischen Dehneffekt, der beim Ziehen über den oberen oder unteren Seitenrand hinaus erscheint, auch bei Seiten, die nicht scrollen."
+      "disableHint": "Entfernt den elastischen Dehneffekt, der beim Ziehen über den oberen oder unteren Seitenrand hinaus erscheint, auch bei Seiten, die nicht scrollen.",
+      "pullToRefresh": "Zum Aktualisieren nach unten ziehen",
+      "pullToRefreshHint": "Vom oberen Seitenrand nach unten ziehen lädt die Seite neu, wie im Browser. Wirkt nicht, wenn die Seite oder die Liste unter dem Finger gescrollt ist."
     },
     "userAgent": {
       "title": "User-Agent",

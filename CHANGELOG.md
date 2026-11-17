@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- 🔄 **Pull down to refresh.** Settings > Display > **Page Edges > Pull Down to Refresh** (WebView mode, off by default). A drag down from the top of the page reloads the page currently shown, as in a browser, with an arrow that follows the finger and turns blue once letting go will reload. It does nothing when the page, or a list under the finger, is scrolled (Home Assistant scrolls a list inside the page while the page itself stays at the top), when the page takes the gesture itself (a map, a slider), when the page opts out with `overscroll-behavior-y`, for a sideways drag or with two fingers. react-native-webview's own pull to refresh is iOS only, so the gesture is handled by a script injected into the main frame; it does not work inside an iframe from another site. Also available over ADB (`pull_to_refresh`), and part of the config export/import (`display.pullToRefresh`) and the backup. Covered by Jest tests of the gesture (10 cases) and of the config export/import.
+
 ### Changed
 - 📦 **The APK is half the size** (64 MB down to 30 MB). The native libraries were stored uncompressed, so all four processor architectures went into the download at full size. They are compressed now, and the installer unpacks only the one the device uses, so the app also takes less space once installed. QR provisioning downloads half as much. Play Store builds are unchanged: Play already delivers one architecture per device.
 - 📦 **1.4 MB less: only the icon font FreeKiosk uses is packaged.** All 19 fonts of react-native-vector-icons were included, the app only draws Material Design Icons.

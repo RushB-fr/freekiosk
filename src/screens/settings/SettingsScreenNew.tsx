@@ -251,6 +251,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
   const [zoomMode, setZoomMode] = useState<string>('standard');
   const [disableUserZoom, setDisableUserZoom] = useState<boolean>(false);
   const [disableOverscroll, setDisableOverscroll] = useState<boolean>(false);
+  const [pullToRefresh, setPullToRefresh] = useState<boolean>(false);
   const [sessionResetButtonEnabled, setSessionResetButtonEnabled] = useState<boolean>(false);
 
   // Custom User Agent
@@ -806,6 +807,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
     const savedDisableUserZoom = await StorageService.getDisableUserZoom();
     setDisableUserZoom(savedDisableUserZoom);
     setDisableOverscroll(await StorageService.getDisableOverscroll());
+    setPullToRefresh(await StorageService.getPullToRefresh());
     setSessionResetButtonEnabled(await StorageService.getSessionResetButtonEnabled());
 
     // Custom User Agent
@@ -1666,6 +1668,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
     await StorageService.saveWebViewZoomMode(zoomMode);
     await StorageService.saveDisableUserZoom(disableUserZoom);
     await StorageService.saveDisableOverscroll(disableOverscroll);
+    await StorageService.savePullToRefresh(pullToRefresh);
     await StorageService.saveSessionResetButtonEnabled(sessionResetButtonEnabled);
     await StorageService.saveCustomUserAgent(customUserAgent);
     await StorageService.savePauseWebMediaWhenHidden(pauseWebMediaWhenHidden);
@@ -2288,6 +2291,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
             onDisableUserZoomChange={setDisableUserZoom}
             disableOverscroll={disableOverscroll}
             onDisableOverscrollChange={setDisableOverscroll}
+            pullToRefresh={pullToRefresh}
+            onPullToRefreshChange={setPullToRefresh}
             customUserAgent={customUserAgent}
             onCustomUserAgentChange={setCustomUserAgent}
             pauseWebMediaWhenHidden={pauseWebMediaWhenHidden}

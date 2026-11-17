@@ -160,6 +160,7 @@ const BACKUP_KEYS = [
   '@kiosk_dashboard_tiles',
   '@kiosk_default_launcher',
   '@kiosk_disable_overscroll',
+  '@kiosk_pull_to_refresh',
   '@kiosk_disable_user_zoom',
   '@kiosk_http_basic_auth_username',
   '@kiosk_intercom_mode',

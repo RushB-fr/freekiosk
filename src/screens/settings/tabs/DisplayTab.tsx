@@ -83,6 +83,8 @@ interface DisplayTabProps {
   onDisableUserZoomChange: (value: boolean) => void;
   disableOverscroll: boolean;
   onDisableOverscrollChange: (value: boolean) => void;
+  pullToRefresh: boolean;
+  onPullToRefreshChange: (value: boolean) => void;
   
   // Custom User Agent
   customUserAgent: string;
@@ -196,6 +198,8 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
   onDisableUserZoomChange,
   disableOverscroll,
   onDisableOverscrollChange,
+  pullToRefresh,
+  onPullToRefreshChange,
   customUserAgent,
   onCustomUserAgentChange,
   pauseWebMediaWhenHidden,
@@ -1040,6 +1044,12 @@ const DisplayTab: React.FC<DisplayTabProps> = ({
             hint={t('display.overscroll.disableHint')}
             value={disableOverscroll}
             onValueChange={onDisableOverscrollChange}
+          />
+          <SettingsSwitch
+            label={t('display.overscroll.pullToRefresh')}
+            hint={t('display.overscroll.pullToRefreshHint')}
+            value={pullToRefresh}
+            onValueChange={onPullToRefreshChange}
           />
         </SettingsSection>
       )}

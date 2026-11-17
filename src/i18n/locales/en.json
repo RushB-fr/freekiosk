@@ -430,7 +430,9 @@
     "overscroll": {
       "title": "Page Edges",
       "disable": "Disable Overscroll Effect",
-      "disableHint": "Remove the elastic stretch shown when dragging past the top or bottom of a page, even on pages that do not scroll."
+      "disableHint": "Remove the elastic stretch shown when dragging past the top or bottom of a page, even on pages that do not scroll.",
+      "pullToRefresh": "Pull Down to Refresh",
+      "pullToRefreshHint": "Drag down from the top of the page to reload it, as in a browser. Does nothing when the page or the list under your finger is scrolled."
     },
     "userAgent": {
       "title": "User Agent",

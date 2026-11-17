@@ -430,7 +430,9 @@
     "overscroll": {
       "title": "Bordas da página",
       "disable": "Desativar efeito de rolagem elástica",
-      "disableHint": "Remover o efeito elástico que aparece ao arrastar além do topo ou da base de uma página, mesmo em páginas que não rolam."
+      "disableHint": "Remover o efeito elástico que aparece ao arrastar além do topo ou da base de uma página, mesmo em páginas que não rolam.",
+      "pullToRefresh": "Puxar para atualizar",
+      "pullToRefreshHint": "Arrastar para baixo a partir do topo da página a recarrega, como em um navegador. Não faz nada se a página ou a lista sob o dedo estiver rolada."
     },
     "userAgent": {
       "title": "User Agent",

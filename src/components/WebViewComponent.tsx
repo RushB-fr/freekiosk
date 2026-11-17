@@ -23,6 +23,7 @@ import UpdateModule from '../utils/UpdateModule';
 import Icon, { IconName } from './Icon';
 import RNFS from 'react-native-fs';
 import { WebView } from 'react-native-webview';
+import { pullToRefreshScript } from '../utils/pullToRefreshScript';
 // From src/, not lib/: Metro resolves react-native-webview to its src/ entry, and loading lib/ as
 // well registers the native view twice ("Tried to register two views with the same name RNCWebView").
 import NativeRNCWebView, { Commands as NativeWebViewCommands } from 'react-native-webview/src/RNCWebViewNativeComponent';
@@ -71,6 +72,7 @@ interface WebViewComponentProps {
   zoomMode?: string; // 'standard' (CSS zoom) | 'fit' (viewport reflow, #188)
   disableUserZoom?: boolean; // Prevent pinch-to-zoom and double-tap zoom
   disableOverscroll?: boolean; // Remove the elastic stretch at the edges of the page (#233)
+  pullToRefresh?: boolean; // Drag down from the top of the page reloads it, as in a browser
   customUserAgent?: string; // Custom User-Agent string (empty = default modern Chrome UA)
   basicAuthCredential?: { username: string; password: string };
   onRenderProcessGone?: (didCrash: boolean) => void; // #198 — renderer process died, ask parent to remount
@@ -153,6 +155,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   zoomMode = 'standard',
   disableUserZoom = false,
   disableOverscroll = false,
+  pullToRefresh = false,
   customUserAgent = '',
   basicAuthCredential,
   onRenderProcessGone,
@@ -212,6 +215,9 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   // frame is injected, so only it knows this nonce. Checks read the ref, so rotation bites at once.
   const [printerNonce, setPrinterNonce] = useState<string>(makePrinterNonce);
   const printerNonceRef = useRef<string>(printerNonce);
+  // Same reasoning: only the main frame's pull to refresh script knows it, so an iframe cannot
+  // post a reload.
+  const [pullRefreshToken] = useState<string>(makePrinterNonce);
 
   // Pre-compile URL filter patterns into RegExp for performance
   const compiledFilterPatterns = useMemo(() => {
@@ -782,6 +788,8 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
     })();
     ` : ''}
 
+    ${pullToRefresh ? pullToRefreshScript(pullRefreshToken) : ''}
+
     // Touch events avec throttling (for screensaver only, not for tap counting)
     document.addEventListener('touchstart', sendInteraction, true);
     document.addEventListener('touchmove', sendInteraction, true);
@@ -1320,6 +1328,8 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
     
     if (message === 'page-touch') {
       onPageTouch?.();
+    } else if (pullToRefresh && message === `pull-refresh:${pullRefreshToken}`) {
+      webViewRef.current?.reload();
     } else if (message === 'user-interaction' && onUserInteraction) {
       onUserInteraction();
     } else if (message.startsWith('{')) {

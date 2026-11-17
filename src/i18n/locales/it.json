@@ -430,7 +430,9 @@
     "overscroll": {
       "title": "Bordi della pagina",
       "disable": "Disattiva effetto overscroll",
-      "disableHint": "Rimuove l'effetto elastico mostrato trascinando oltre la parte superiore o inferiore di una pagina, anche nelle pagine che non scorrono."
+      "disableHint": "Rimuove l'effetto elastico mostrato trascinando oltre la parte superiore o inferiore di una pagina, anche nelle pagine che non scorrono.",
+      "pullToRefresh": "Trascina per aggiornare",
+      "pullToRefreshHint": "Trascinare verso il basso dalla parte superiore della pagina la ricarica, come in un browser. Non ha effetto se la pagina o l'elenco sotto il dito è scorso."
     },
     "userAgent": {
       "title": "User-Agent",
