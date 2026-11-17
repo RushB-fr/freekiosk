@@ -432,7 +432,9 @@
     "overscroll": {
       "title": "Bords de la page",
       "disable": "Désactiver l'effet d'étirement",
-      "disableHint": "Supprime l'effet élastique affiché quand on tire au-delà du haut ou du bas d'une page, même si elle ne défile pas."
+      "disableHint": "Supprime l'effet élastique affiché quand on tire au-delà du haut ou du bas d'une page, même si elle ne défile pas.",
+      "pullToRefresh": "Tirer pour actualiser",
+      "pullToRefreshHint": "Tirer vers le bas depuis le haut de la page la recharge, comme dans un navigateur. Sans effet quand la page ou la liste sous le doigt est défilée."
     },
     "userAgent": {
       "title": "User-Agent",

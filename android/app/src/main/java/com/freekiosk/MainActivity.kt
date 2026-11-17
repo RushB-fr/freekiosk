@@ -177,6 +177,7 @@ class MainActivity : ReactActivity() {
       "webview_zoom_mode" to "@kiosk_webview_zoom_mode",
       "disable_user_zoom" to "@kiosk_disable_user_zoom",
       "disable_overscroll" to "@kiosk_disable_overscroll",
+      "pull_to_refresh" to "@kiosk_pull_to_refresh",
       "session_reset_button_enabled" to "@kiosk_session_reset_button_enabled",
       "screensaver_enabled" to "@screensaver_enabled",
       "screensaver_delay" to "@screensaver_inactivity_delay",

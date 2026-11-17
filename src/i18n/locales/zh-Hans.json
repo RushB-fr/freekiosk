@@ -432,7 +432,9 @@
     "overscroll": {
       "title": "页面边缘",
       "disable": "禁用过度滚动效果",
-      "disableHint": "移除拖动超过页面顶部或底部时出现的弹性拉伸效果，即使页面无法滚动也是如此。"
+      "disableHint": "移除拖动超过页面顶部或底部时出现的弹性拉伸效果，即使页面无法滚动也是如此。",
+      "pullToRefresh": "下拉刷新",
+      "pullToRefreshHint": "从页面顶部向下拖动即可重新加载页面，与浏览器相同。页面或手指下的列表已滚动时无效。"
     },
     "userAgent": {
       "title": "User Agent",
