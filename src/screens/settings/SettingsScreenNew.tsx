@@ -258,6 +258,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
   // Custom User Agent
   const [customUserAgent, setCustomUserAgent] = useState<string>('');
   const [pauseWebMediaWhenHidden, setPauseWebMediaWhenHidden] = useState<boolean>(true);
+  const [pausePageWhenScreenOff, setPausePageWhenScreenOff] = useState<boolean>(false);
   const [intercomModeEnabled, setIntercomModeEnabled] = useState<boolean>(false);
   const [basicAuthUsername, setBasicAuthUsername] = useState<string>('');
   const [basicAuthPassword, setBasicAuthPassword] = useState<string>('');
@@ -815,6 +816,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
     setCustomUserAgent(savedCustomUserAgent);
     const savedPauseWebMediaWhenHidden = await StorageService.getPauseWebMediaWhenHidden();
     setPauseWebMediaWhenHidden(savedPauseWebMediaWhenHidden);
+    setPausePageWhenScreenOff(await StorageService.getPausePageWhenScreenOff());
     const savedIntercomMode = await StorageService.getIntercomMode();
     setIntercomModeEnabled(savedIntercomMode ?? false);
 
@@ -1703,6 +1705,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
     await StorageService.saveSessionResetButtonEnabled(sessionResetButtonEnabled);
     await StorageService.saveCustomUserAgent(customUserAgent);
     await StorageService.savePauseWebMediaWhenHidden(pauseWebMediaWhenHidden);
+    await StorageService.savePausePageWhenScreenOff(pausePageWhenScreenOff);
     await StorageService.saveHttpBasicAuthUsername(basicAuthUsername);
     // Checked rather than discarded: on a device whose Keystore is broken (#258) this
     // returns false, and saving the whole settings screen used to report success while
@@ -2326,6 +2329,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
             onCustomUserAgentChange={setCustomUserAgent}
             pauseWebMediaWhenHidden={pauseWebMediaWhenHidden}
             onPauseWebMediaWhenHiddenChange={setPauseWebMediaWhenHidden}
+            pausePageWhenScreenOff={pausePageWhenScreenOff}
+            onPausePageWhenScreenOffChange={setPausePageWhenScreenOff}
             intercomModeEnabled={intercomModeEnabled}
             onIntercomModeChange={toggleIntercomMode}
             screensaverEnabled={screensaverEnabled}

@@ -74,11 +74,13 @@ class ScreenStateReceiver(activity: Activity? = null) : BroadcastReceiver() {
             Intent.ACTION_SCREEN_ON -> {
                 Log.d(TAG, "Screen turned ON")
                 isScreenOn = true
+                (activityRef.get() as? MainActivity)?.onScreenStateChanged(true) // #215
                 publishMqttStatus()
             }
             Intent.ACTION_SCREEN_OFF -> {
                 Log.d(TAG, "Screen turned OFF")
                 isScreenOn = false
+                (activityRef.get() as? MainActivity)?.onScreenStateChanged(false) // #215
                 publishMqttStatus()
 
                 // Dismiss the soft keyboard so it doesn't persist after the screen wakes up.

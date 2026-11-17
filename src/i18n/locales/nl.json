@@ -445,6 +445,8 @@
       "title": "Webmedia",
       "pauseHidden": "Audio/video pauzeren wanneer verborgen",
       "pauseHiddenHint": "Audio en video van de webpagina pauzeren wanneer de schermbeveiliging verschijnt, het scherm uitgaat of de app naar de achtergrond gaat. Anders kan een webradio of video onbereikbaar op de achtergrond blijven spelen. Schakel uit om webaudio continu te laten spelen.",
+      "pausePage": "Pagina pauzeren terwijl het scherm uit is",
+      "pausePageHint": "Stopt de eigen activiteit van de pagina (timers, afbeeldingen ophalen) zolang het scherm echt uit is (uitschakelcommando, vergrendeling, aan/uit-knop, schema), zodat een diavoorstelling niet blijft downloaden. Bij het inschakelen gaat ze weer verder. Standaard uit: een dashboard dat actueel moet blijven, laat dit uit.",
       "intercom": "Modus voor tweeweg-audio (intercom)",
       "intercomHint": "Inschakelen voor WebRTC tweeweg-audio / terugspreken (bijv. een Home Assistant / go2rtc-deurbelintercomkaart). Zolang de webpagina actief de microfoon gebruikt, zet FreeKiosk het apparaat in de communicatie-audiomodus zodat het terugkanaal van de microfoon verzendt, en herstelt daarna de normale audio zodra je stopt met praten. Laat uitgeschakeld voor normaal browsen: het wordt alleen actief terwijl de microfoon in gebruik is."
     },

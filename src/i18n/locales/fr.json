@@ -445,6 +445,8 @@
       "title": "Média web",
       "pauseHidden": "Mettre en pause audio/vidéo quand masqué",
       "pauseHiddenHint": "Mettre en pause l'audio et la vidéo de la page web quand l'économiseur d'écran s'affiche, que l'écran s'éteint, ou que l'application passe en arrière-plan — sinon une radio ou vidéo web pourrait continuer à jouer, inaccessible, en arrière-plan. Désactiver pour laisser l'audio web jouer en continu.",
+      "pausePage": "Mettre la page en pause écran éteint",
+      "pausePageHint": "Arrête l'activité propre de la page (minuteries, chargement d'images) quand l'écran est réellement éteint (commande d'extinction, verrouillage, bouton marche, planification), pour qu'un diaporama ne continue pas à télécharger. Elle reprend à l'allumage. Désactivé par défaut : un tableau de bord qui doit rester à jour doit le laisser désactivé.",
       "intercom": "Mode audio bidirectionnel (interphone)",
       "intercomHint": "À activer pour l'audio bidirectionnel WebRTC / talkie-walkie (ex. une carte interphone de sonnette Home Assistant / go2rtc). Pendant que la page web utilise activement le microphone, FreeKiosk bascule l'appareil en mode audio de communication pour que le canal retour du micro transmette, puis restaure l'audio normal quand vous arrêtez de parler. Laisser désactivé pour une navigation normale — ça ne s'active que quand le micro est utilisé."
     },

@@ -445,6 +445,8 @@
       "title": "Web-Medien",
       "pauseHidden": "Audio/Video pausieren, wenn ausgeblendet",
       "pauseHiddenHint": "Audio und Video der Webseite pausieren, wenn der Bildschirmschoner angezeigt wird, der Bildschirm ausgeht oder die App in den Hintergrund wechselt. Sonst könnte ein Webradio oder Video unerreichbar im Hintergrund weiterlaufen. Deaktiviere die Option, damit Web-Audio durchgehend weiterläuft.",
+      "pausePage": "Seite pausieren, solange der Bildschirm aus ist",
+      "pausePageHint": "Hält die eigene Aktivität der Seite (Timer, Bildabruf) an, solange der Bildschirm wirklich aus ist (Ausschaltbefehl, Sperre, Ein-/Aus-Taste, Zeitplan), damit eine Diashow nicht weiter herunterlädt. Beim Einschalten läuft sie weiter. Standardmäßig aus: Ein Dashboard, das aktuell bleiben muss, sollte es ausgeschaltet lassen.",
       "intercom": "Modus für bidirektionales Audio (Gegensprechanlage)",
       "intercomHint": "Aktiviere dies für bidirektionales WebRTC-Audio / Rückkanal (z. B. eine Gegensprechanlagen-Karte einer Home-Assistant-/go2rtc-Türklingel). Solange die Webseite aktiv das Mikrofon nutzt, schaltet FreeKiosk das Gerät in den Kommunikations-Audiomodus, damit der Mikrofon-Rückkanal sendet, und stellt das normale Audio wieder her, wenn du aufhörst zu sprechen. Für normales Surfen deaktiviert lassen: Er greift nur, solange das Mikrofon genutzt wird."
     },
