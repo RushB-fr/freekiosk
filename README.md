@@ -131,6 +131,8 @@ Contributions are welcome.
 
 MIT License. See [LICENSE](LICENSE).
 
+The app also contains third-party software and assets under their own licenses (Apache-2.0, MIT, BSD, and a few Google components under Google's terms): see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), which also travels inside the APK.
+
 <div align="center">
   <img src="https://img.shields.io/github/stars/rushb-fr/freekiosk?style=social" alt="Stars">
   <img src="https://img.shields.io/github/forks/rushb-fr/freekiosk?style=social" alt="Forks">
