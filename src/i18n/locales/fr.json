@@ -104,6 +104,8 @@
       "dashboardActive": "Le mode Tableau de bord est actif. Configurez vos tuiles dans l'onglet Tableau de bord.",
       "placeholder": "https://exemple.com",
       "hint": "Exemple : https://www.freekiosk.app",
+      "pickLocalFile": "Choisir un fichier HTML local",
+      "pickLocalFileHint": "Le fichier est lu là où il se trouve : une page qu'une autre appli réécrit s'affiche à jour. Les images et scripts à côté ne se chargent pas : utilisez un fichier autonome, ou saisissez une adresse file:// pour un dossier.",
       "httpWarning": "SÉCURITÉ : Cette URL utilise HTTP (non chiffré).\nVos données peuvent être interceptées. Utilisez HTTPS à la place."
     },
     "auth": {
@@ -1534,6 +1536,12 @@
       "reloadConfig": "Recharger",
       "fileAccessOffTitle": "Accès aux fichiers désactivé",
       "fileAccessOffMessage": "Pour ouvrir un fichier local, activez d'abord Général > Lecteur PDF > Lecteur PDF intégré. C'est ce réglage qui donne au navigateur l'accès aux fichiers de l'appareil.",
+      "allFilesNeededTitle": "L'accès à tous les fichiers est nécessaire",
+      "allFilesNeededMessage": "Ce fichier est en dehors du dossier de FreeKiosk. Sur l'écran suivant, autorisez FreeKiosk à accéder à tous les fichiers, puis revenez et enregistrez à nouveau.",
+      "allFilesOpenSettings": "Ouvrir les réglages",
+      "allFilesCancel": "Annuler",
+      "allFilesUnavailableTitle": "Fichier hors du dossier de FreeKiosk",
+      "allFilesUnavailableMessage": "Cette version de FreeKiosk ne peut pas lire de fichiers hors de son propre dossier. Copiez le fichier dans Android/data/com.freekiosk/files/ sur l'appareil, ou choisissez-le avec « Choisir un fichier HTML local ».",
       "passwordNotSavedTitle": "Mot de passe non enregistré",
       "basicAuthNotSavedMessage": "Le mot de passe HTTP Basic Auth n'a pas pu être écrit dans le stockage sécurisé de cet appareil. Tous les autres réglages de cet écran ont été enregistrés. Cela arrive sur les firmwares dont le Keystore Android est défaillant.",
       "downloadProgress": "{{percent}} % ({{done}} / {{total}} Mo)",

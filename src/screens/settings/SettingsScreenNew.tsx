@@ -57,6 +57,7 @@ import { ManagedApp } from '../../types/managedApps';
 import { DEFAULT_MULTI_APP_APPEARANCE, MultiAppAppearance, isHexColor } from '../../types/multiAppAppearance';
 import { MediaItem, MediaFitMode, generateMediaItemId, detectMediaType } from '../../types/mediaPlayer';
 import FilePickerModule from '../../utils/FilePickerModule';
+import { normalizeLocalFileInput, isLocalDocumentUrl, needsAllFilesAccess } from '../../utils/localFileUrl';
 import { hasUsableHost } from '../../utils/urlInput';
 
 const { KioskModule, RotationControlModule, AudioControlModule } = NativeModules;
@@ -1484,6 +1485,12 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
     // URL validation for webview
     let finalUrl = url.trim();
     if (displayMode === 'webview' && !dashboardModeEnabled) {
+      // #385: a local file typed as /storage/a/b.html or file://storage/a/b.html is a file:/// address.
+      const normalizedFinalUrl = normalizeLocalFileInput(finalUrl);
+      if (normalizedFinalUrl !== finalUrl) {
+        finalUrl = normalizedFinalUrl;
+        setUrl(finalUrl);
+      }
       const urlLower = finalUrl.toLowerCase();
       if (urlLower.startsWith('javascript:') || urlLower.startsWith('data:')) {
         Alert.alert(t('screens.settingsMain.securityErrorTitle'), t('screens.settingsMain.urlNotAllowed'));
@@ -1492,14 +1499,40 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
       // #239: local files are supported, but only the PDF Viewer setting gives the WebView
       // file access. This check predates that and refused every file:// URL, so a local
       // page could only be set over ADB.
-      if (urlLower.startsWith('file://') && !pdfViewerEnabled) {
+      if (isLocalDocumentUrl(finalUrl) && !pdfViewerEnabled) {
         Alert.alert(
           t('screens.settingsMain.fileAccessOffTitle'),
           t('screens.settingsMain.fileAccessOffMessage'),
         );
         return;
       }
-      if (!urlLower.startsWith('http://') && !urlLower.startsWith('https://') && !urlLower.startsWith('file://')) {
+      // #385: a file outside FreeKiosk's own folder is refused (ERR_ACCESS_DENIED) until Android's
+      // "All files access" is on. Say so here, rather than leave a loading error to explain it.
+      if (needsAllFilesAccess(finalUrl)) {
+        const access = await FilePickerModule?.getAllFilesAccess?.().catch(() => null);
+        if (access && !access.granted) {
+          if (access.available) {
+            Alert.alert(
+              t('screens.settingsMain.allFilesNeededTitle'),
+              t('screens.settingsMain.allFilesNeededMessage'),
+              [
+                { text: t('screens.settingsMain.allFilesCancel'), style: 'cancel' },
+                {
+                  text: t('screens.settingsMain.allFilesOpenSettings'),
+                  onPress: () => { FilePickerModule.openAllFilesAccessSettings().catch(() => {}); },
+                },
+              ],
+            );
+          } else {
+            Alert.alert(
+              t('screens.settingsMain.allFilesUnavailableTitle'),
+              t('screens.settingsMain.allFilesUnavailableMessage'),
+            );
+          }
+          return;
+        }
+      }
+      if (!urlLower.startsWith('http://') && !urlLower.startsWith('https://') && !urlLower.startsWith('file://') && !urlLower.startsWith('content://')) {
         if (hasUsableHost(finalUrl)) {
           finalUrl = 'https://' + finalUrl;
           setUrl(finalUrl);

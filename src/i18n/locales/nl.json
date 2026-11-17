@@ -104,6 +104,8 @@
       "dashboardActive": "De dashboardmodus is actief. Stel je tegels in op het tabblad Dashboard.",
       "placeholder": "https://example.com",
       "hint": "Voorbeeld: https://www.freekiosk.app",
+      "pickLocalFile": "Kies een lokaal HTML-bestand",
+      "pickLocalFileHint": "Het bestand wordt gelezen waar het staat, dus een pagina die een andere app herschrijft wordt actueel getoond. Afbeeldingen en scripts ernaast worden niet geladen: gebruik één zelfstandig bestand of typ een file://-adres voor een map.",
       "httpWarning": "BEVEILIGING: deze URL gebruikt HTTP (niet versleuteld).\nJe gegevens kunnen worden onderschept. Gebruik in plaats daarvan HTTPS."
     },
     "auth": {
@@ -1534,6 +1536,12 @@
       "reloadConfig": "Opnieuw laden",
       "fileAccessOffTitle": "Bestandstoegang is uit",
       "fileAccessOffMessage": "Om een lokaal bestand te openen, schakel je eerst Algemeen > PDF-viewer > Inline PDF-viewer in. Die instelling geeft de browser toegang tot bestanden op het apparaat.",
+      "allFilesNeededTitle": "Toegang tot alle bestanden is nodig",
+      "allFilesNeededMessage": "Dit bestand staat buiten de map van FreeKiosk. Sta op het volgende scherm toe dat FreeKiosk alle bestanden mag openen, ga terug en sla opnieuw op.",
+      "allFilesOpenSettings": "Instellingen openen",
+      "allFilesCancel": "Annuleren",
+      "allFilesUnavailableTitle": "Bestand buiten de map van FreeKiosk",
+      "allFilesUnavailableMessage": "Deze versie van FreeKiosk kan geen bestanden buiten zijn eigen map lezen. Kopieer het bestand naar Android/data/com.freekiosk/files/ op het apparaat of kies het met 'Kies een lokaal HTML-bestand'.",
       "passwordNotSavedTitle": "Wachtwoord niet opgeslagen",
       "basicAuthNotSavedMessage": "Het HTTP Basic Auth-wachtwoord kon niet worden opgeslagen in de beveiligde opslag van dit apparaat. Alle andere instellingen op dit scherm zijn opgeslagen. Dit gebeurt op firmware waarvan de Android Keystore defect is.",
       "downloadProgress": "{{percent}}% ({{done}} / {{total}} MB)",

@@ -181,7 +181,7 @@ Each app in the array supports these fields:
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `--es url "https://..."` | String | URL to display in kiosk WebView |
+| `--es url "https://..."` | String | URL to display in kiosk WebView. A local file is a `file:///...` address (needs `pdf_viewer_enabled`); outside FreeKiosk's own folder it also needs All files access: `adb shell appops set com.freekiosk MANAGE_EXTERNAL_STORAGE allow` (not in the Play Store build). See the [FAQ](faq.md) |
 
 ### Dashboard Parameters
 

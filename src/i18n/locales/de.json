@@ -104,6 +104,8 @@
       "dashboardActive": "Der Dashboard-Modus ist aktiv. Konfiguriere deine Kacheln im Tab Dashboard.",
       "placeholder": "https://example.com",
       "hint": "Beispiel: https://www.freekiosk.app",
+      "pickLocalFile": "Lokale HTML-Datei auswählen",
+      "pickLocalFileHint": "Die Datei wird dort gelesen, wo sie liegt – eine Seite, die eine andere App neu schreibt, wird also aktuell angezeigt. Bilder und Skripte daneben werden nicht geladen: Nutzen Sie eine eigenständige Datei oder geben Sie eine file://-Adresse für einen Ordner ein.",
       "httpWarning": "SICHERHEIT: Diese URL verwendet HTTP (unverschlüsselt).\nDeine Daten können abgefangen werden. Verwende stattdessen HTTPS."
     },
     "auth": {
@@ -1534,6 +1536,12 @@
       "reloadConfig": "Neu laden",
       "fileAccessOffTitle": "Dateizugriff ist deaktiviert",
       "fileAccessOffMessage": "Um eine lokale Datei zu öffnen, aktiviere zuerst Allgemein > PDF-Viewer > Integrierter PDF-Viewer. Diese Einstellung gibt dem Browser Zugriff auf Dateien auf dem Gerät.",
+      "allFilesNeededTitle": "Zugriff auf alle Dateien erforderlich",
+      "allFilesNeededMessage": "Diese Datei liegt außerhalb des FreeKiosk-Ordners. Erlauben Sie FreeKiosk auf dem nächsten Bildschirm den Zugriff auf alle Dateien, kehren Sie dann zurück und speichern Sie erneut.",
+      "allFilesOpenSettings": "Einstellungen öffnen",
+      "allFilesCancel": "Abbrechen",
+      "allFilesUnavailableTitle": "Datei außerhalb des FreeKiosk-Ordners",
+      "allFilesUnavailableMessage": "Diese Version von FreeKiosk kann keine Dateien außerhalb ihres eigenen Ordners lesen. Kopieren Sie die Datei nach Android/data/com.freekiosk/files/ auf dem Gerät oder wählen Sie sie mit „Lokale HTML-Datei auswählen“.",
       "passwordNotSavedTitle": "Passwort nicht gespeichert",
       "basicAuthNotSavedMessage": "Das HTTP-Basic-Auth-Passwort konnte nicht im sicheren Speicher dieses Geräts abgelegt werden. Alle anderen Einstellungen auf diesem Bildschirm wurden gespeichert. Das passiert bei Firmware mit defektem Android Keystore.",
       "downloadProgress": "{{percent}}% ({{done}} / {{total}} MB)",

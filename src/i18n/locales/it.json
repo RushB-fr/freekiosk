@@ -104,6 +104,8 @@
       "dashboardActive": "La modalità Dashboard è attiva. Configura i tuoi riquadri nella scheda Dashboard.",
       "placeholder": "https://example.com",
       "hint": "Esempio: https://www.freekiosk.app",
+      "pickLocalFile": "Scegli un file HTML locale",
+      "pickLocalFileHint": "Il file viene letto dove si trova, quindi una pagina riscritta da un'altra app viene mostrata aggiornata. Le immagini e gli script accanto non si caricano: usa un file autonomo o scrivi un indirizzo file:// per una cartella.",
       "httpWarning": "SICUREZZA: questo URL usa HTTP (non cifrato).\nI tuoi dati possono essere intercettati. Usa HTTPS."
     },
     "auth": {
@@ -1535,6 +1537,12 @@
       "reloadConfig": "Ricarica",
       "fileAccessOffTitle": "Accesso ai file disattivato",
       "fileAccessOffMessage": "Per aprire un file locale, attiva prima Generale > Visualizzatore PDF > Visualizzatore PDF integrato. È questa impostazione che dà al browser l'accesso ai file del dispositivo.",
+      "allFilesNeededTitle": "Serve l'accesso a tutti i file",
+      "allFilesNeededMessage": "Questo file è fuori dalla cartella di FreeKiosk. Nella schermata successiva consenti a FreeKiosk di accedere a tutti i file, poi torna indietro e salva di nuovo.",
+      "allFilesOpenSettings": "Apri impostazioni",
+      "allFilesCancel": "Annulla",
+      "allFilesUnavailableTitle": "File fuori dalla cartella di FreeKiosk",
+      "allFilesUnavailableMessage": "Questa versione di FreeKiosk non può leggere file fuori dalla propria cartella. Copia il file in Android/data/com.freekiosk/files/ sul dispositivo, oppure scegli il file con «Scegli un file HTML locale».",
       "passwordNotSavedTitle": "Password non salvata",
       "basicAuthNotSavedMessage": "Non è stato possibile scrivere la password HTTP Basic Auth nell'archivio sicuro di questo dispositivo. Tutte le altre impostazioni di questa schermata sono state salvate. Succede su firmware con Android Keystore difettoso.",
       "downloadProgress": "{{percent}}% ({{done}} / {{total}} MB)",

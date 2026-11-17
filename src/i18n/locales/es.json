@@ -104,6 +104,8 @@
       "dashboardActive": "El modo panel está activo. Configura tus mosaicos en la pestaña Panel.",
       "placeholder": "https://example.com",
       "hint": "Ejemplo: https://www.freekiosk.app",
+      "pickLocalFile": "Elegir un archivo HTML local",
+      "pickLocalFileHint": "El archivo se lee donde está, así que una página que otra app reescribe se muestra actualizada. Las imágenes y scripts junto a él no se cargan: use un archivo autónomo o escriba una dirección file:// para una carpeta.",
       "httpWarning": "SEGURIDAD: Esta URL usa HTTP (sin cifrar).\nTus datos pueden ser interceptados. Usa HTTPS en su lugar."
     },
     "auth": {
@@ -1535,6 +1537,12 @@
       "reloadConfig": "Recargar",
       "fileAccessOffTitle": "Acceso a archivos desactivado",
       "fileAccessOffMessage": "Para abrir un archivo local, activa primero General > Visor de PDF > Visor de PDF integrado. Ese ajuste es el que da al navegador acceso a los archivos del dispositivo.",
+      "allFilesNeededTitle": "Se necesita acceso a todos los archivos",
+      "allFilesNeededMessage": "Este archivo está fuera de la carpeta de FreeKiosk. En la siguiente pantalla, permita que FreeKiosk acceda a todos los archivos, luego vuelva y guarde de nuevo.",
+      "allFilesOpenSettings": "Abrir ajustes",
+      "allFilesCancel": "Cancelar",
+      "allFilesUnavailableTitle": "Archivo fuera de la carpeta de FreeKiosk",
+      "allFilesUnavailableMessage": "Esta versión de FreeKiosk no puede leer archivos fuera de su propia carpeta. Copie el archivo en Android/data/com.freekiosk/files/ del dispositivo, o elíjalo con «Elegir un archivo HTML local».",
       "passwordNotSavedTitle": "Contraseña no guardada",
       "basicAuthNotSavedMessage": "No se pudo escribir la contraseña de HTTP Basic Auth en el almacenamiento seguro de este dispositivo. Todos los demás ajustes de esta pantalla se guardaron. Esto ocurre en firmwares cuyo Android Keystore está defectuoso.",
       "downloadProgress": "{{percent}} % ({{done}} / {{total}} MB)",
