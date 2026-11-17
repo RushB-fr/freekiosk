@@ -21,8 +21,14 @@ import kotlin.math.exp
  */
 class BlazeFaceDetector(context: Context) : AutoCloseable {
 
-    /** A face, with its box in the coordinates of the bitmap passed to [detect]. */
-    data class Face(val score: Float, val box: RectF)
+    /**
+     * A face, with its box in the coordinates of the bitmap passed to [detect]. Plain floats
+     * rather than RectF, so the decoding runs in a JVM unit test.
+     */
+    data class Face(val score: Float, val left: Float, val top: Float, val right: Float, val bottom: Float) {
+        val width get() = right - left
+        val height get() = bottom - top
+    }
 
     private val interpreter: Interpreter
     private val boxesIndex: Int
@@ -63,40 +69,7 @@ class BlazeFaceDetector(context: Context) : AutoCloseable {
         }
         input.rewind()
         interpreter.runForMultipleInputsOutputs(arrayOf<Any>(input), mapOf<Int, Any>(boxesIndex to boxes, scoresIndex to scores))
-
-        val found = ArrayList<Face>()
-        for (i in ANCHORS.indices) {
-            val score = 1f / (1f + exp(-scores[0][i][0].coerceIn(-100f, 100f)))
-            if (score < MIN_SCORE) continue
-            val r = boxes[0][i]
-            // Offsets are in input pixels around the anchor centre; anchors have a fixed size of 1
-            val cx = r[0] + ANCHORS[i].first * SIZE
-            val cy = r[1] + ANCHORS[i].second * SIZE
-            val halfW = r[2] / 2
-            val halfH = r[3] / 2
-            found += Face(score, RectF(
-                (cx - halfW - padX) / scale, (cy - halfH - padY) / scale,
-                (cx + halfW - padX) / scale, (cy + halfH - padY) / scale
-            ))
-        }
-        return withoutOverlaps(found)
-    }
-
-    /** Several anchors fire for one face: keep the best of each overlapping group. */
-    private fun withoutOverlaps(faces: List<Face>): List<Face> {
-        val kept = ArrayList<Face>()
-        for (face in faces.sortedByDescending { it.score }) {
-            if (kept.none { iou(it.box, face.box) > 0.3f }) kept += face
-        }
-        return kept
-    }
-
-    private fun iou(a: RectF, b: RectF): Float {
-        val w = minOf(a.right, b.right) - maxOf(a.left, b.left)
-        val h = minOf(a.bottom, b.bottom) - maxOf(a.top, b.top)
-        if (w <= 0 || h <= 0) return 0f
-        val inter = w * h
-        return inter / (a.width() * a.height() + b.width() * b.height() - inter)
+        return decode(boxes[0], scores[0], scale, padX, padY)
     }
 
     override fun close() {
@@ -106,14 +79,56 @@ class BlazeFaceDetector(context: Context) : AutoCloseable {
 
     companion object {
         private const val MODEL = "blaze_face_short_range.tflite"
-        private const val SIZE = 128
+        internal const val SIZE = 128
         private const val MIN_SCORE = 0.5f
+
+        /**
+         * Turns the model's outputs into faces in bitmap coordinates. [boxes] holds 16 regressors
+         * per anchor (box, then 6 keypoints), [scores] one raw logit per anchor; [scale], [padX]
+         * and [padY] undo the letterboxing done in [detect].
+         */
+        internal fun decode(boxes: Array<FloatArray>, scores: Array<FloatArray>, scale: Float, padX: Float, padY: Float): List<Face> {
+            val found = ArrayList<Face>()
+            for (i in ANCHORS.indices) {
+                val score = 1f / (1f + exp(-scores[i][0].coerceIn(-100f, 100f)))
+                if (score < MIN_SCORE) continue
+                val r = boxes[i]
+                // Offsets are in input pixels around the anchor centre; anchors have a fixed size of 1
+                val cx = r[0] + ANCHORS[i].first * SIZE
+                val cy = r[1] + ANCHORS[i].second * SIZE
+                val halfW = r[2] / 2
+                val halfH = r[3] / 2
+                found += Face(
+                    score,
+                    (cx - halfW - padX) / scale, (cy - halfH - padY) / scale,
+                    (cx + halfW - padX) / scale, (cy + halfH - padY) / scale
+                )
+            }
+            return withoutOverlaps(found)
+        }
+
+        /** Several anchors fire for one face: keep the best of each overlapping group. */
+        private fun withoutOverlaps(faces: List<Face>): List<Face> {
+            val kept = ArrayList<Face>()
+            for (face in faces.sortedByDescending { it.score }) {
+                if (kept.none { iou(it, face) > 0.3f }) kept += face
+            }
+            return kept
+        }
+
+        private fun iou(a: Face, b: Face): Float {
+            val w = minOf(a.right, b.right) - maxOf(a.left, b.left)
+            val h = minOf(a.bottom, b.bottom) - maxOf(a.top, b.top)
+            if (w <= 0 || h <= 0) return 0f
+            val inter = w * h
+            return inter / (a.width * a.height + b.width * b.height - inter)
+        }
 
         /**
          * Anchor centres (fractions of the input), in the model's output order: a 16x16 grid
          * with 2 anchors per cell (stride 8), then an 8x8 grid with 6 (three stride-16 layers).
          */
-        private val ANCHORS: List<Pair<Float, Float>> = buildList {
+        internal val ANCHORS: List<Pair<Float, Float>> = buildList {
             for ((grid, perCell) in listOf(16 to 2, 8 to 6)) {
                 for (y in 0 until grid) for (x in 0 until grid) repeat(perCell) {
                     add((x + 0.5f) / grid to (y + 0.5f) / grid)

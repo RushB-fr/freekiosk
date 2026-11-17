@@ -237,7 +237,7 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
             val ms = SystemClock.elapsedRealtime() - t
             // A hand close to the lens can pass for a face, but scores lower and fills the frame
             val faces = candidates.filter {
-                it.score >= FACE_MIN_SCORE && it.box.width() <= upright.width * FACE_MAX_WIDTH
+                it.score >= FACE_MIN_SCORE && it.width <= upright.width * FACE_MAX_WIDTH
             }
             android.util.Log.i(
                 "MotionDetection",
@@ -309,7 +309,7 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
     }
 
     private fun describeBlaze(faces: List<BlazeFaceDetector.Face>, frameWidth: Int) = faces.joinToString(prefix = "[", postfix = "]") {
-        "score=${"%.2f".format(Locale.ROOT, it.score)} width=${(it.box.width() * 100 / frameWidth).toInt()}%"
+        "score=${"%.2f".format(Locale.ROOT, it.score)} width=${(it.width * 100 / frameWidth).toInt()}%"
     }
 
     companion object {
