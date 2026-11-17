@@ -29,6 +29,7 @@
 
 | Version | Date | Channel | Highlights |
 |---|---|---|---|
+| **v2.1.0-beta.3** | 2026-11-17 | Beta | An APK half the size (64 MB down to 30 MB); a local file or a document picked on the device as the kiosk page; pull down to refresh; an option to pause the page while the screen is off; a stable Android ID in the REST API and the cloud; the loading error says why the page failed; third-party notices in the repository and the APK; many fixes |
 | **v2.1.0-beta.2** | 2026-11-06 | Beta | Polish and Simplified Chinese; full-screen dashboard tiles with two-finger gestures; screen orientation lock; screensaver fade-out and wake only for a face; the remote of a TV wakes the screensaver; the camera works while another app is in front; many REST, MQTT and screensaver fixes |
 | **v2.1.0-beta.1** | 2026-10-24 | Beta | Android TV, Google TV and Fire TV; digital signage playlists from FreeKiosk Cloud (with web pages and YouTube); German, Italian, Dutch and Spanish |
 | **v2.0.0** | 2026-10-22 | Stable | FreeKiosk Cloud (open beta), shared tablets, Brazilian Portuguese |
