@@ -36,6 +36,16 @@ import androidx.core.content.ContextCompat
 class MainActivity : ReactActivity() {
 
   companion object {
+    /**
+     * The activity that is alive, for a receiver declared in the manifest (the Screen Scheduler
+     * alarms), which cannot be handed one the way ScreenStateReceiver is. Reaching it through
+     * ReactNativeHost throws under the New Architecture (#364).
+     */
+    @Volatile
+    private var liveActivity: java.lang.ref.WeakReference<MainActivity>? = null
+
+    fun current(): MainActivity? = liveActivity?.get()?.takeUnless { it.isFinishing || it.isDestroyed }
+
     /** #280: delay before the alarm relaunches the app after an ADB config restart. */
     private const val ADB_RESTART_DELAY_MS = 1500L
 
@@ -272,6 +282,7 @@ class MainActivity : ReactActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(null)
+    liveActivity = java.lang.ref.WeakReference(this)
     hasStarted = true  // #222: tells BootLockActivity the hand-off really happened
 
     installTvFocusRing()
@@ -2482,6 +2493,9 @@ class MainActivity : ReactActivity() {
 
   override fun onDestroy() {
     super.onDestroy()
+    if (liveActivity?.get() === this) {
+      liveActivity = null
+    }
     pinningValveRunnable?.let { Handler(Looper.getMainLooper()).removeCallbacks(it) }
     pinningValveRunnable = null
 
