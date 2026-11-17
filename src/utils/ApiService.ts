@@ -63,6 +63,7 @@ class ApiServiceClass {
   private callbacks: ApiCallbacks = {};
   private eventEmitter: NativeEventEmitter | null = null;
   private commandSubscription: any = null;
+  private ownerCount = 0;
   private appStatus: AppStatus = {
     currentUrl: '',
     canGoBack: false,
@@ -80,7 +81,12 @@ class ApiServiceClass {
    * Initialize the API service and start listening for commands
    */
   async initialize(callbacks: ApiCallbacks): Promise<void> {
+    // KioskScreen can be mounted twice at once (MainActivity and the HOME alias). Count owners
+    // so an older instance unmounting cannot remove the listener a newer instance relies on.
+    this.ownerCount += 1;
     if (this.isInitialized) {
+      // Newest mount owns the callbacks (they close over its state).
+      this.callbacks = callbacks;
       console.log('ApiService: Already initialized');
       return;
     }
@@ -367,6 +373,11 @@ class ApiServiceClass {
    * Cleanup
    */
   destroy(): void {
+    this.ownerCount = Math.max(0, this.ownerCount - 1);
+    if (this.ownerCount > 0) {
+      console.log('ApiService: Destroy skipped, still owned by', this.ownerCount, 'screen(s)');
+      return;
+    }
     if (this.commandSubscription) {
       this.commandSubscription.remove();
       this.commandSubscription = null;

@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- An authenticated ADB configuration intent with `rest_api_key` now replaces the REST API key on a device that already had one. The key was written only to the legacy AsyncStorage entry, which is migrated solely when the Keychain is empty, so the server kept the old key. The pending config now stores it in the Keychain and restarts a running server with the new key.
+- REST control commands such as `POST /api/volume` no longer stop reaching the app when FreeKiosk is the HOME launcher. Two kiosk screens could mount at once, and the older one unmounting removed the shared command listener, so commands returned success but did nothing. The listener is now reference-counted per mounted screen.
+
 ### Added
 - Add an admin-controlled, boot-persistent wireless-debugging policy for Device Owner deployments. It keeps Android ADB and paired wireless debugging enabled independently of Lock Mode or the FreeKiosk process, makes trusted-host authorizations non-expiring, reports whether the legacy TCP 5555 listener is currently active, and clearly distinguishes Android's protected fixed-port provisioning from the setting FreeKiosk can enforce.
 - Add authenticated REST control parity for auto-brightness (including offset) and always-on motion detection, plus motion status reporting.

@@ -10,7 +10,8 @@ import StatusBar from '../components/StatusBar';
 import MotionDetector from '../components/MotionDetector';
 import ExternalAppOverlay from '../components/ExternalAppOverlay';
 import { StorageService } from '../utils/storage';
-import { saveSecurePin, saveSecureMqttPassword, getSecureBasicAuthPassword } from '../utils/secureStorage';
+import { saveSecurePin, saveSecureMqttPassword, saveSecureApiKey, getSecureBasicAuthPassword } from '../utils/secureStorage';
+import { httpServer } from '../utils/HttpServerModule';
 import KioskModule from '../utils/KioskModule';
 import AppLauncherModule from '../utils/AppLauncherModule';
 import OverlayServiceModule from '../utils/OverlayServiceModule';
@@ -1426,12 +1427,19 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           console.log('[KioskScreen] Found pending ADB config, applying to AsyncStorage...');
           const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
           const entries: [string, string][] = [];
+          let apiKeyChanged = false;
           for (const [key, value] of Object.entries(pendingConfig)) {
             if (typeof value === 'string') {
               if (key === '@kiosk_pin') {
                 // PIN must be saved to Keystore (not just AsyncStorage)
                 await saveSecurePin(value);
                 console.log('[KioskScreen] PIN saved to secure Keystore via pending ADB config');
+              } else if (key === '@kiosk_rest_api_key') {
+                // The REST server reads its key from the Keychain. A legacy AsyncStorage copy is
+                // only migrated when the Keychain is empty, so an ADB key change must go there.
+                await saveSecureApiKey(value);
+                apiKeyChanged = true;
+                console.log('[KioskScreen] REST API key saved to secure Keychain via pending ADB config');
               } else if (key === '@mqtt_password_pending') {
                 // MQTT password must be saved to Keychain (not AsyncStorage)
                 await saveSecureMqttPassword(value);
@@ -1448,6 +1456,11 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           }
           await KioskModule.clearPendingAdbConfig();
           console.log('[KioskScreen] Pending ADB config cleared');
+          if (apiKeyChanged && await httpServer.isRunning()) {
+            // The server may have auto-started with the previous key before this config applied.
+            await httpServer.stopServer();
+            await ApiService.autoStart();
+          }
         }
       } catch (pendingError) {
         console.log('[KioskScreen] No pending ADB config or error:', pendingError);
