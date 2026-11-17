@@ -22,6 +22,10 @@ const BACKUP_KEYS = [
   '@kiosk_url',
   '@kiosk_auto_reload',
   '@kiosk_enabled',
+  '@kiosk_hidden_mode_enabled',
+  '@kiosk_app_blocking_enabled',
+  '@kiosk_network_blocking_enabled',
+  '@kiosk_network_block_rules',
   '@kiosk_auto_launch',
   '@screensaver_enabled',
   '@screensaver_inactivity_enabled',
@@ -137,6 +141,8 @@ const BACKUP_KEYS = [
   '@kiosk_beta_updates_enabled',
   // Managed Apps (Multi-App mode, accessibility, keep-alive)
   '@kiosk_managed_apps',
+  '@kiosk_app_groups',
+  '@kiosk_blocked_apps',
   // Note: MQTT password is handled separately via Keychain (secure storage)
   // Legacy keys
   '@screensaver_delay',

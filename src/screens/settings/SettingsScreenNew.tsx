@@ -47,6 +47,9 @@ import ScreenScheduleRuleEditor from '../../components/settings/ScreenScheduleRu
 import { ScheduledEvent } from '../../types/planner';
 import { ScreenScheduleRule } from '../../types/screenScheduler';
 import { ManagedApp } from '../../types/managedApps';
+import { BlockedApp } from '../../types/blockedApps';
+import { NetworkBlockRule } from '../../types/networkBlocking';
+import { AppGroup } from '../../types/appGroups';
 import { MediaItem, MediaFitMode, generateMediaItemId, detectMediaType } from '../../types/mediaPlayer';
 import { DEFAULT_WALLPAPER_POSITION, WallpaperPosition } from '../../types/wallpaper';
 import FilePickerModule from '../../utils/FilePickerModule';
@@ -97,6 +100,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [pinMaxAttemptsText, setPinMaxAttemptsText] = useState<string>('5');
   const [autoReload, setAutoReload] = useState<boolean>(false);
   const [kioskEnabled, setKioskEnabled] = useState<boolean>(false);
+  const [hiddenModeEnabled, setHiddenModeEnabled] = useState<boolean>(false);
+  const [appBlockingEnabled, setAppBlockingEnabled] = useState<boolean>(false);
+  const [networkBlockingEnabled, setNetworkBlockingEnabled] = useState<boolean>(false);
   const [autoLaunchEnabled, setAutoLaunchEnabled] = useState<boolean>(false);
   const [screenLockCompatEnabled, setScreenLockCompatEnabled] = useState<boolean>(false);
   const [defaultLauncherEnabled, setDefaultLauncherEnabled] = useState<boolean>(false);
@@ -133,6 +139,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const [hasUsageStatsPermission, setHasUsageStatsPermission] = useState<boolean>(false);
   const [isDeviceOwner, setIsDeviceOwner] = useState<boolean>(false);
   const [managedApps, setManagedApps] = useState<ManagedApp[]>([]);
+  const [appGroups, setAppGroups] = useState<AppGroup[]>([]);
+  const [blockedApps, setBlockedApps] = useState<BlockedApp[]>([]);
+  const [networkBlockRules, setNetworkBlockRules] = useState<NetworkBlockRule[]>([]);
   const [externalAppMode, setExternalAppMode] = useState<'single' | 'multi'>('single');
   const [externalAppBackgroundColor, setExternalAppBackgroundColor] = useState<string>('#333');
   const [externalAppBackgroundImageEnabled, setExternalAppBackgroundImageEnabled] = useState<boolean>(true);
@@ -451,6 +460,9 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const savedUrl = await StorageService.getUrl();
     const savedAutoReload = await StorageService.getAutoReload();
     const savedKioskEnabled = await StorageService.getKioskEnabled();
+    const savedHiddenModeEnabled = await StorageService.getHiddenModeEnabled();
+    const savedAppBlockingEnabled = await StorageService.getAppBlockingEnabled();
+    const savedNetworkBlockingEnabled = await StorageService.getNetworkBlockingEnabled();
     const savedAutoLaunch = await StorageService.getAutoLaunch();
     const savedScreenLockCompat = await StorageService.getScreenLockCompat();
     const savedDefaultLauncher = await StorageService.getDefaultLauncher();
@@ -474,15 +486,16 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
 
     setAutoReload(savedAutoReload);
     setKioskEnabled(savedKioskEnabled);
+    setHiddenModeEnabled(savedHiddenModeEnabled && !savedKioskEnabled);
+    setAppBlockingEnabled(savedAppBlockingEnabled);
+    setNetworkBlockingEnabled(savedNetworkBlockingEnabled);
     setAutoLaunchEnabled(savedAutoLaunch ?? false);
     setScreenLockCompatEnabled(savedScreenLockCompat ?? false);
     setDefaultLauncherEnabled(savedDefaultLauncher ?? false);
     // Ensure BootReceiver component state matches the setting
     // This fixes installations where the component was previously disabled
     try {
-      if (savedAutoLaunch) {
-        await KioskModule.enableAutoLaunch();
-      }
+      await KioskModule.enableAutoLaunch();
     } catch (e) {
       // Silent fail
     }
@@ -574,6 +587,12 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     // Managed apps
     const savedManagedApps = await StorageService.getManagedApps();
     setManagedApps(savedManagedApps);
+    const savedAppGroups = await StorageService.getAppGroups();
+    setAppGroups(savedAppGroups);
+    const savedBlockedApps = await StorageService.getBlockedApps();
+    setBlockedApps(savedBlockedApps);
+    const savedNetworkBlockRules = await StorageService.getNetworkBlockRules();
+    setNetworkBlockRules(savedNetworkBlockRules);
     
     // External app sub-mode
     const savedExternalAppMode = await StorageService.getExternalAppMode();
@@ -893,6 +912,21 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       }
     } catch (error) {
       console.warn('Failed to toggle BootReceiver component:', error);
+    }
+  };
+
+  const toggleKioskMode = (value: boolean) => {
+    setKioskEnabled(value);
+    if (value) setHiddenModeEnabled(false);
+  };
+
+  const toggleHiddenMode = (value: boolean) => {
+    setHiddenModeEnabled(value);
+    if (value) {
+      setKioskEnabled(false);
+      // Hidden Mode promises background protection. Keep the independent toggle enabled
+      // so the Settings UI reflects the native policy applied to the saved block list.
+      setAppBlockingEnabled(true);
     }
   };
 
@@ -1282,12 +1316,12 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     const normalizedExternalAppBackgroundColor = externalAppBackgroundColor.trim();
 
     // Validation
-    if (displayMode === 'webview' && !url && !dashboardModeEnabled) {
+    if (!hiddenModeEnabled && displayMode === 'webview' && !url && !dashboardModeEnabled) {
       Alert.alert('Error', 'Please enter a URL');
       return;
     }
 
-    if (displayMode === 'media_player') {
+    if (!hiddenModeEnabled && displayMode === 'media_player') {
       if (mediaPlayerItems.length === 0) {
         Alert.alert('Error', 'Please add at least one media item (video or image URL)');
         return;
@@ -1306,7 +1340,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       }
     }
 
-    if (displayMode === 'external_app') {
+    if (!hiddenModeEnabled && displayMode === 'external_app') {
       if (!/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(normalizedExternalAppBackgroundColor)) {
         Alert.alert('Error', 'Background color must be a 3- or 6-digit hex color (for example, #333 or #333333)');
         return;
@@ -1353,7 +1387,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
 
     // URL validation for webview
     let finalUrl = url.trim();
-    if (displayMode === 'webview' && !dashboardModeEnabled) {
+    if (!hiddenModeEnabled && displayMode === 'webview' && !dashboardModeEnabled) {
       const urlLower = finalUrl.toLowerCase();
       if (urlLower.startsWith('file://') || urlLower.startsWith('javascript:') || urlLower.startsWith('data:')) {
         Alert.alert('Security Error', 'This type of URL is not allowed. Use http:// or https://');
@@ -1505,6 +1539,12 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
     await StorageService.saveExternalAppBackgroundPosition(externalAppBackgroundPosition);
     await StorageService.saveAutoRelaunchApp(autoRelaunchApp);
     await StorageService.saveManagedApps(managedApps);
+    await StorageService.saveAppGroups(appGroups);
+    await StorageService.saveBlockedApps(blockedApps);
+    await StorageService.saveAppBlockingEnabled(appBlockingEnabled);
+    await StorageService.saveNetworkBlockingEnabled(networkBlockingEnabled);
+    await StorageService.saveNetworkBlockRules(networkBlockRules);
+    await StorageService.saveHiddenModeEnabled(hiddenModeEnabled);
     await StorageService.saveOverlayButtonVisible(overlayButtonVisible);
     await StorageService.saveKeepScreenOn(keepScreenOn);
     await StorageService.saveAutoWakeOnScreenOff(autoWakeOnScreenOff);
@@ -1657,6 +1697,30 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
       }
     }
 
+    try {
+      await KioskModule.reconcileBackgroundPolicies();
+    } catch (error) {
+      console.error('[Settings] background policy reconciliation failed:', error);
+      if (appBlockingEnabled) {
+        Alert.alert('App Blocking failed', `Android did not apply the background policy: ${error}`);
+        return;
+      }
+    }
+
+    try {
+      await KioskModule.configureNetworkBlocking(
+        networkBlockingEnabled,
+        JSON.stringify(networkBlockRules),
+        false,
+      );
+    } catch (error) {
+      console.error('[Settings] network protection failed:', error);
+      if (networkBlockingEnabled) {
+        Alert.alert('Network Protection failed', `Android did not apply the network policy: ${error}`);
+        return;
+      }
+    }
+
     // Start/stop lock task
     if (kioskEnabled) {
       try {
@@ -1677,6 +1741,23 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
         : 'Configuration saved\nScreen pinning enabled';
       Alert.alert('Success', message, [
         { text: 'OK', onPress: () => { revokeSettingsAccess(); navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] }); } },
+      ]);
+    } else if (hiddenModeEnabled) {
+      try {
+        await KioskModule.stopLockTask();
+      } catch {}
+      Alert.alert('Success', 'Configuration saved\nHidden Mode is active', [
+        {
+          text: 'OK',
+          onPress: async () => {
+            revokeSettingsAccess();
+            try {
+              await KioskModule.enterHiddenMode();
+            } catch (error) {
+              Alert.alert('Hidden Mode', `Settings were saved, but FreeKiosk could not return Home: ${error}`);
+            }
+          },
+        },
       ]);
     } else {
       try {
@@ -1729,6 +1810,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
               setPinMaxAttemptsText('5');
               setAutoReload(false);
               setKioskEnabled(false);
+              setHiddenModeEnabled(false);
+              setAppBlockingEnabled(false);
               setAutoLaunchEnabled(false);
               setScreensaverEnabled(false);
               setInactivityDelay('10');
@@ -1925,6 +2008,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             loadingApps={loadingApps}
             managedApps={managedApps}
             onManagedAppsChange={setManagedApps}
+            appGroups={appGroups}
+            onAppGroupsChange={setAppGroups}
             externalAppMode={externalAppMode}
             onExternalAppModeChange={setExternalAppMode}
             externalAppBackgroundColor={externalAppBackgroundColor}
@@ -2177,11 +2262,21 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation }) => {
             isDeviceOwner={isDeviceOwner}
             navigation={navigation}
             kioskEnabled={kioskEnabled}
-            onKioskEnabledChange={setKioskEnabled}
+            onKioskEnabledChange={toggleKioskMode}
+            hiddenModeEnabled={hiddenModeEnabled}
+            onHiddenModeEnabledChange={toggleHiddenMode}
             allowPowerButton={allowPowerButton}
             onAllowPowerButtonChange={setAllowPowerButton}
             blockFactoryReset={blockFactoryReset}
             onBlockFactoryResetChange={setBlockFactoryReset}
+            appBlockingEnabled={appBlockingEnabled}
+            onAppBlockingEnabledChange={setAppBlockingEnabled}
+            blockedApps={blockedApps}
+            onBlockedAppsChange={setBlockedApps}
+            networkBlockingEnabled={networkBlockingEnabled}
+            onNetworkBlockingEnabledChange={setNetworkBlockingEnabled}
+            networkBlockRules={networkBlockRules}
+            onNetworkBlockRulesChange={setNetworkBlockRules}
             allowNotifications={allowNotifications}
             onAllowNotificationsChange={setAllowNotifications}
             allowSystemInfo={allowSystemInfo}

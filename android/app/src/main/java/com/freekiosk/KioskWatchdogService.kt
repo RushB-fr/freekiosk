@@ -1,14 +1,19 @@
 package com.freekiosk
 
+import android.Manifest
 import android.app.ActivityManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.admin.DevicePolicyManager
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.app.Service
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.database.sqlite.SQLiteDatabase
 import android.os.Build
 import android.os.Handler
@@ -17,8 +22,11 @@ import android.os.Looper
 import androidx.core.app.NotificationCompat
 
 /**
- * KioskWatchdogService — a START_STICKY foreground service that monitors FreeKiosk's
- * main process and relaunches it if it was killed (e.g. by the OOM killer).
+ * START_STICKY policy service with two deliberately separate operating paths:
+ *
+ *  • Lock Mode: preserve the existing foreground/lock-task watchdog behavior.
+ *  • Hidden/background mode: keep independent policies such as app blocking active
+ *    without launching or foregrounding the FreeKiosk Activity.
  *
  * Fixes #96: On low-RAM devices (e.g. 2 GB AndroidTV), the browser can consume
  * enough memory for the kernel to kill FreeKiosk. Without a watchdog, the kiosk
@@ -31,16 +39,37 @@ import androidx.core.app.NotificationCompat
  *  • If MainActivity has vanished and kiosk mode is enabled, relaunches it.
  *
  * The service is started from BootReceiver and from MainActivity.onCreate().
- * It stops itself if kiosk mode is disabled.
+ * It stops only when Lock Mode, Hidden Mode, and independent App Blocking are all off.
  */
 class KioskWatchdogService : Service() {
 
     companion object {
+        const val ACTION_OPEN_PROTECTED_SETTINGS = "com.freekiosk.action.OPEN_PROTECTED_SETTINGS"
+        const val EXTRA_OPEN_PROTECTED_SETTINGS = "openProtectedSettings"
+
         private const val TAG = "KioskWatchdog"
         private const val CHANNEL_ID = "freekiosk_watchdog"
+        private const val HIDDEN_MODE_CHANNEL_ID = "freekiosk_hidden_mode_status"
         private const val NOTIFICATION_ID = 2002
         private const val CHECK_INTERVAL_MS = 1_000L  // fast enough to hide escaped Settings screens
         private const val RELAUNCH_COOLDOWN_MS = 15_000L // min 15 s between relaunches
+
+        fun reconcileService(context: Context) {
+            val appContext = context.applicationContext
+            val serviceIntent = Intent(appContext, KioskWatchdogService::class.java)
+            if (BlockedAppPolicy.needsBackgroundService(appContext)) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    appContext.startForegroundService(serviceIntent)
+                } else {
+                    appContext.startService(serviceIntent)
+                }
+            } else {
+                appContext.stopService(serviceIntent)
+                val notifications =
+                    appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                notifications.cancel(NOTIFICATION_ID)
+            }
+        }
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -63,26 +92,39 @@ class KioskWatchdogService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
+        createNotificationChannels()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Only run when kiosk mode is enabled
-        if (!isKioskEnabled()) {
-            DebugLog.d(TAG, "Kiosk mode disabled — stopping watchdog")
+        val kioskEnabled = BlockedAppPolicy.isKioskEnabled(this)
+        val hiddenModeEnabled = BlockedAppPolicy.isHiddenModeEnabled(this)
+        val appBlockingEnabled = BlockedAppPolicy.isAppBlockingEnabled(this)
+        if (!kioskEnabled && !hiddenModeEnabled && !appBlockingEnabled) {
+            DebugLog.d(TAG, "No active foreground or background policy — stopping service")
+            BlockedAppPolicy.reconcile(this, kioskActive = false, blockingActive = false)
             stopSelf()
             return START_NOT_STICKY
         }
 
-        val notification = buildNotification()
+        ensureNotificationPermission()
+        val notification = buildNotification(
+            kioskEnabled = kioskEnabled,
+            hiddenModeEnabled = hiddenModeEnabled,
+            appBlockingEnabled = appBlockingEnabled,
+        )
         startForeground(NOTIFICATION_ID, notification)
-        KioskAlwaysOnPolicy.enforce(this)
+        if (kioskEnabled) KioskAlwaysOnPolicy.enforce(this) else KioskAlwaysOnPolicy.release()
+        BlockedAppPolicy.reconcile(this, kioskActive = kioskEnabled)
+        if (kioskEnabled) KioskForegroundGuard.restoreConfiguredChildAppVisibility(this)
 
         isRunning = true
         handler.removeCallbacks(checkRunnable)
         handler.postDelayed(checkRunnable, CHECK_INTERVAL_MS)
 
-        DebugLog.d(TAG, "Watchdog started (START_STICKY)")
+        DebugLog.d(
+            TAG,
+            "Policy service started: kiosk=$kioskEnabled hidden=$hiddenModeEnabled blocking=$appBlockingEnabled",
+        )
 
         // START_STICKY: Android will restart this service if the process is killed
         return START_STICKY
@@ -103,13 +145,32 @@ class KioskWatchdogService : Service() {
     // ────────────────────────────────────────────────────────────────────
 
     private fun checkAndRelaunch() {
-        // Re-check kiosk setting each cycle (user may have turned it off)
-        if (!isKioskEnabled()) {
-            DebugLog.d(TAG, "Kiosk mode disabled — stopping watchdog")
+        val kioskEnabled = BlockedAppPolicy.isKioskEnabled(this)
+        val hiddenModeEnabled = BlockedAppPolicy.isHiddenModeEnabled(this)
+        val appBlockingEnabled = BlockedAppPolicy.isAppBlockingEnabled(this)
+
+        // Hidden/background operation never relaunches FreeKiosk. Reconcile Device Owner
+        // policy and reject the extremely narrow already-running-app race only.
+        if (!kioskEnabled) {
             KioskAlwaysOnPolicy.release()
-            stopSelf()
+            BlockedAppPolicy.reconcile(this, kioskActive = false)
+            if (!hiddenModeEnabled && !appBlockingEnabled) {
+                DebugLog.d(TAG, "Background policies disabled — stopping service")
+                stopSelf()
+                return
+            }
+            if (appBlockingEnabled) {
+                val accessibilityForeground =
+                    FreeKioskAccessibilityService.currentForegroundPackage()
+                if (!BlockedAppGuard.rejectIfBlocked(this, accessibilityForeground)) {
+                    BlockedAppGuard.rejectIfBlocked(this, getForegroundPackageFromUsageEvents())
+                }
+            }
             return
         }
+
+        BlockedAppPolicy.reconcile(this, kioskActive = true)
+        KioskForegroundGuard.restoreConfiguredChildAppVisibility(this)
 
         // A child app owns the foreground window in External App mode, so MainActivity's
         // FLAG_KEEP_SCREEN_ON cannot control its timeout. Self-heal the service-owned lock.
@@ -125,11 +186,17 @@ class KioskWatchdogService : Service() {
             return
         }
 
+        // The Android package manager can keep a child Activity alive while replacing or
+        // reclaiming FreeKiosk's process. Reconstruct the volatile session from the strictly
+        // locked foreground app and repair the Close All windows before any early return below.
+        OverlayService.ensureMandatoryCloseControl(this)
+
         // Strict visible-app guard. Lock task remains the primary restriction; Usage
         // Access lets us correct vendor/system activities that appear above it anyway.
         if (KioskForegroundGuard.isProtectionActive(this)) {
             val foregroundPackage = getForegroundPackageFromUsageEvents()
             if (foregroundPackage != null) {
+                if (BlockedAppGuard.rejectIfBlocked(this, foregroundPackage)) return
                 if (KioskForegroundGuard.isAllowedForeground(this, foregroundPackage)) {
                     KioskForegroundGuard.noteAllowedForeground(this, foregroundPackage)
                     return
@@ -295,30 +362,13 @@ class KioskWatchdogService : Service() {
         }
     }
 
-    private fun isKioskEnabled(): Boolean {
-        return try {
-            val dbPath = getDatabasePath("RKStorage").absolutePath
-            val db = SQLiteDatabase.openDatabase(dbPath, null, SQLiteDatabase.OPEN_READONLY)
-            val cursor = db.rawQuery(
-                "SELECT value FROM catalystLocalStorage WHERE key = ?",
-                arrayOf("@kiosk_enabled"))
-            val enabled = if (cursor.moveToFirst()) cursor.getString(0) == "true" else false
-            cursor.close()
-            db.close()
-            enabled
-        } catch (e: Exception) {
-            DebugLog.d(TAG, "Cannot read kiosk_enabled: ${e.message}")
-            false
-        }
-    }
-
     // ────────────────────────────────────────────────────────────────────
     // Notification (required for foreground service)
     // ────────────────────────────────────────────────────────────────────
 
-    private fun createNotificationChannel() {
+    private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
+            val kioskChannel = NotificationChannel(
                 CHANNEL_ID,
                 "Kiosk Watchdog",
                 NotificationManager.IMPORTANCE_MIN   // silent, no badge
@@ -326,18 +376,100 @@ class KioskWatchdogService : Service() {
                 description = "Keeps FreeKiosk running in kiosk mode"
                 setShowBadge(false)
             }
+            // Keep this on a separate, low-importance channel. The old watchdog channel is
+            // already persisted as IMPORTANCE_MIN on existing installations, which allows
+            // Android to omit its small icon from the status bar.
+            val hiddenModeChannel = NotificationChannel(
+                HIDDEN_MODE_CHANNEL_ID,
+                "FreeKiosk Protection",
+                NotificationManager.IMPORTANCE_LOW,
+            ).apply {
+                description = "Shows when FreeKiosk background protection is active"
+                setShowBadge(false)
+                setSound(null, null)
+                enableVibration(false)
+            }
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            nm.createNotificationChannel(channel)
+            nm.createNotificationChannel(kioskChannel)
+            nm.createNotificationChannel(hiddenModeChannel)
         }
     }
 
-    private fun buildNotification(): Notification {
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("FreeKiosk")
-            .setContentText("Kiosk mode active")
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setPriority(NotificationCompat.PRIORITY_MIN)
+    private fun ensureNotificationPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+                PackageManager.PERMISSION_GRANTED) {
+            return
+        }
+
+        try {
+            val policyManager =
+                getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+            if (!policyManager.isDeviceOwnerApp(packageName)) return
+            val admin = ComponentName(this, DeviceAdminReceiver::class.java)
+            policyManager.setPermissionGrantState(
+                admin,
+                packageName,
+                Manifest.permission.POST_NOTIFICATIONS,
+                DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED,
+            )
+        } catch (error: Exception) {
+            DebugLog.errorProduction(
+                TAG,
+                "Could not grant Hidden Mode notification permission: ${error.message}",
+            )
+        }
+    }
+
+    private fun buildNotification(
+        kioskEnabled: Boolean,
+        hiddenModeEnabled: Boolean,
+        appBlockingEnabled: Boolean,
+    ): Notification {
+        val backgroundMode = hiddenModeEnabled || !kioskEnabled
+        val channelId = if (backgroundMode) HIDDEN_MODE_CHANNEL_ID else CHANNEL_ID
+        val protectedApps = if (appBlockingEnabled) {
+            BlockedAppPolicy.configuredInstalledPackages(this).size
+        } else {
+            0
+        }
+        val title = if (backgroundMode) "Protection is active" else "FreeKiosk"
+        val text = when {
+            hiddenModeEnabled && protectedApps > 0 ->
+                "$protectedApps blocked app${if (protectedApps == 1) "" else "s"} protected • Tap for parent settings"
+            hiddenModeEnabled -> "Tap for protected parent settings"
+            appBlockingEnabled && protectedApps > 0 ->
+                "$protectedApps blocked app${if (protectedApps == 1) "" else "s"} protected • Tap for parent settings"
+            appBlockingEnabled -> "Tap for protected parent settings"
+            else -> "Kiosk mode is active"
+        }
+        val contentIntent = PendingIntent.getActivity(
+            this,
+            NOTIFICATION_ID,
+            Intent(this, MainActivity::class.java).apply {
+                action = ACTION_OPEN_PROTECTED_SETTINGS
+                putExtra(EXTRA_OPEN_PROTECTED_SETTINGS, true)
+                putExtra("voluntaryReturn", true)
+                addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        return NotificationCompat.Builder(this, channelId)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setSmallIcon(if (backgroundMode) R.drawable.ic_hidden_mode_status else R.mipmap.ic_launcher)
+            .setContentIntent(contentIntent)
+            .setPriority(
+                if (backgroundMode) NotificationCompat.PRIORITY_LOW
+                else NotificationCompat.PRIORITY_MIN,
+            )
             .setOngoing(true)
+            .setAutoCancel(false)
+            .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setShowWhen(false)
             .setSilent(true)
             .build()
     }

@@ -10,8 +10,23 @@ export interface AppInfoAll extends AppInfo {
   hasLauncherActivity: boolean;
 }
 
+/** A MicroAppStation micro-app (URL turned into a launcher button). */
+export interface MicroAppInfo {
+  /** Host package (local.microstation) */
+  packageName: string;
+  microAppId: string;
+  name: string;
+  /** Only published micro-apps can be launched */
+  published: boolean;
+}
+
 interface IAppLauncherModule {
   launchExternalApp(packageName: string): Promise<boolean>;
+  /** Open one micro-app directly in its host, under the same lock-task rules as apps */
+  launchMicroApp(packageName: string, microAppId: string): Promise<boolean>;
+  /** Micro-apps offered by MicroAppStation; empty when it is not installed */
+  getMicroApps(): Promise<MicroAppInfo[]>;
+  getMicroAppIcon(packageName: string, microAppId: string, size: number): Promise<string>;
   isAppInstalled(packageName: string): Promise<boolean>;
   getInstalledApps(): Promise<AppInfo[]>;
   /** Returns all installed apps including non-UI user packages (fixes #112) */

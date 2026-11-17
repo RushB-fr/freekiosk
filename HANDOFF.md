@@ -2,28 +2,84 @@
 
 ## Repository
 
-- Working tree: `/root/android-apps/freekiosk`
+- Working tree: `/opt/freekiosk`
 - Branch: `main`
 - Origin: `https://github.com/DahmaniAdame/freekiosk.git`
 - Upstream: `https://github.com/RushB-fr/freekiosk.git`
 - Android package: `com.freekiosk`
 - Device Admin component: `com.freekiosk/.DeviceAdminReceiver`
-- Current source version: `1.2.53` (`versionCode 77`)
+- Current source version: `1.2.68` (`versionCode 92`)
 
 Preserve the current implementation. Before changing anything, inspect `git status`
 and the latest commit. Do not reset, clean, check out, or overwrite user work.
 
 ## Device inventory
 
-- `192.168.0.37:5555` — Samsung 75WAF interactive display.
-- `192.168.0.53:5555` — Test Galaxy S8+.
+- `192.168.0.37:5555` — Samsung 75WAF interactive display. FreeKiosk v1.2.66 is installed. The allowed-app visibility repair restored Disney+, Netflix, and Spectrum Shooter from an interrupted legacy hidden state; one-tap launches of all three were verified in strict `LOCKED` mode. Close All returned to the grid without re-hiding any allowed package.
+- `192.168.0.133:5555` — Galaxy S23+ (Samsung SM-S916B, serial `RZCWA0KH2NK`). Paired again on 2026-08-18 and restored to fixed ADB port 5555. FreeKiosk v1.2.65 is installed with Hidden Mode and its one-app YouTube block list enabled; the foreground watchdog and accessibility service are active, Usage Access and notifications are granted, Samsung Home is focused, and Lock Task is `NONE`. This phone is owned by the separate Nix DPC (`com.nix/.NixDeviceAdmin`), so FreeKiosk cannot use Device Owner package-hiding or managed-VPN APIs. YouTube (`com.google.android.youtube`) is therefore additionally and reversibly `disabled-user` for user 0: it has no resolvable launcher activity and launch attempts fail. The FreeKiosk notification reports `Protection is active` and `1 blocked app protected`.
+- `192.168.0.153:5555` — Test Galaxy Tab S8+ (Samsung SM-X800, serial `R52Y20DVCKN`). Its DHCP address changes between networks; it was previously `.53`. Hidden Mode and independent App Blocking are active. Current blocked-app list: Google Play Store (`com.android.vending`), YouTube (`com.google.android.youtube`), YouTube TV (`com.google.android.apps.youtube.unplugged`), and YouTube Music (`com.google.android.apps.youtube.music`). All four remain `hidden=true`, Samsung Home is focused, and Lock Task is `NONE`. FreeKiosk v1.2.65 is installed with independent Network Protection enabled and the eight-rule YouTube preset. Android reports `always_on_vpn_app=com.freekiosk`, a validated `VPN CONNECTED` network covering UIDs `0-99999`, and `bypassable=false`; the ongoing notification reports eight active rules. Live testing loaded `https://example.com` in Chrome, then showed `DNS_PROBE_FINISHED_NXDOMAIN` for `https://www.youtube.com`, while unrelated connectivity continued to work.
+- `192.168.0.207:5555` — Eilaf tablet: Samsung Galaxy Tab S6 Lite (SM-P620, serial `R52Y202P8AH`, Android 16). Set up 2026-11-17. FreeKiosk v1.2.68 is Device Owner (a hidden Meet/tachyon account had to be cleared first). Multi-app grid, Lock Mode `LOCKED`, PIN 1234, `@kiosk_default_launcher=true` so `KioskHomeActivity` is persistent HOME only while Lock Mode is on (boot shows FreeKiosk, never Samsung Home). Grid: row groups `Streaming` (Disney+, Netflix) and `Games` (Spectrum Shooter, Path Garden); HBO Max, Yle Areena, LogicLike and SketchBook were removed and uninstalled on request. Gotchas: an ADB config intent sent without `--ez kiosk_enabled true` left `@kiosk_enabled=false` after reboot, so always pass it; `POST /api/restart-ui` left the REST server dead (`Server is already running`) until a reboot, so prefer `am start ... --ez kioskSecurityRecovery true` to re-engage Lock Mode. The relay `192.168.10.151` must forward 8080 and the 30000-50000 wireless-debug range for `.207`, not only 5555.Voli and MicroStation were also installed but are not in the grid. REST API on 8080; key in `~/.config/freekiosk/eilaf.env` on the agent host. Wireless debugging survives reboot through the Device Owner policy; host cron `~/.local/bin/adb-fixed-port` (every minute) finds the TLS port via mDNS and re-runs `adb tcpip 5555`. Reboot test: 5555 back within ~100 s, Lock Mode `LOCKED`, API 200. The 75WAF grid list was inferred from its installed apps, not read from its settings (its REST API key is unknown here).
 
 Always use the explicit serial with `adb -s IP:5555` so commands cannot target the
 other connected device.
 
 ## Latest artifacts
 
-The APK files are intentionally ignored by Git. The current WAF artifact is:
+- `FreeKiosk-v1.2.68-arm64.apk` (2026-11-17), installed on the Eilaf tablet and the 75WAF. Fixes ADB `rest_api_key` being ignored when a Keychain key exists, and REST control commands silently dropped after a second kiosk-screen mount. Both devices have `@kiosk_max_volume_percent=55`. Verified on the Eilaf tablet: API volume 30 gave 26%, and 90 was clamped to 53% (8/15). 75WAF REST key was replaced (new key in `~/.config/freekiosk/waf.env` on the agent host); KioskControl on 192.168.10.77 needs it. The 75WAF firmware ignores Android stream-volume writes, so its cap is unverified.
+
+The APK files are intentionally ignored by Git. The current ARM64 artifact is:
+
+- `FreeKiosk-v1.2.66-arm64.apk`
+  - SHA-256: `8e0bfed46f797fea1e431d1a47878f21e33d868f8b1bd738d11436a56fd750ba`
+  - 24,956,195 bytes; ARM64-only release, signed with the existing certificate. Repairs configured allowed apps left hidden/suspended by an interrupted legacy Close All cycle without restoring explicitly blocked apps, makes Close All restore package visibility synchronously, and adds nine-point placement for the protected dashboard/PIN access zone across web, media, multi-app, native overlay, and WAF accessibility layers. TypeScript, 13 focused Jest tests, Android unit tests, release lint, and the ARM64 release build pass. Installed and live-tested on the 75WAF: the watchdog restored all three allowed packages, Disney+, Netflix, and Spectrum Shooter each launched on one tap, Close All returned to the grid while strict lock task stayed `LOCKED`, and every allowed package remained visible and launchable after closing.
+
+- `FreeKiosk-v1.2.65-arm64.apk`
+  - SHA-256: `d36c1d0212bb804d589325565cba390d0cf54b1a361f5b44684de35e3291f96e`
+  - 24,938,707 bytes; ARM64-only release, signed with the existing certificate. Adds independent Device Owner Network Protection: arbitrary domain-suffix, exact-IP, and CIDR deny rules; a one-tap YouTube preset; a persistent local split-tunnel `VpnService` that returns NXDOMAIN for blocked DNS queries and drops packets routed to configured or resolved destinations; device-encrypted policy; boot/package-update reconciliation; authenticated Settings/ADB configuration; backup coverage; and a parent-protected ongoing notification. TypeScript, 10 focused Jest tests, Android DNS codec/CIDR unit tests, release lint, and the Android arm64 release build pass. Installed and live-tested on the SM-X800 at `.153:5555`: Chrome loaded `example.com`, `www.youtube.com` failed with `DNS_PROBE_FINISHED_NXDOMAIN`, unrelated connectivity stayed live, Android retained FreeKiosk as its always-on non-bypassable VPN, all four blocked apps remained hidden, and the tablet was returned to Samsung Home with Lock Task `NONE`.
+
+- `FreeKiosk-v1.2.64-arm64.apk`
+  - SHA-256: `f7899db7f4d4556b5ffbd3e0f6fa92c8a50f4e64bf6b19a8a55a2ba7270ec650`
+  - 24,926,639 bytes; ARM64-only release, signed with the existing certificate. Changes the background notification title to `Protection is active` and makes its immutable tap intent a parent-only entry point: a warm tap routes globally to PIN, while a retained native one-shot request lets a cold launch mount PIN directly without flashing the kiosk. The request remains in the Activity intent until React consumes it, so process recreation cannot bypass or lose the protected route. TypeScript, focused ESLint, the blocked-app/group-layout Jest suites, and the Android release build pass. A functionally equivalent v1.2.64 build installed successfully on the SM-X800, but `.53` went offline before post-install checks and before this final hardened artifact could be synchronized.
+
+- `FreeKiosk-v1.2.63-arm64.apk`
+  - SHA-256: `6e308f60a2e123613220d533c039dc1aa56425f2dd81895c489a22d4e29e3e3a`
+  - 24,925,515 bytes; ARM64-only release, signed with the existing certificate and installed/live-tested only on the SM-X800 at `192.168.0.53:5555`. Hidden Mode now has a dedicated shield status icon and an ongoing public LOW-importance notification (`FreeKiosk Hidden Mode`, `Hidden Mode is on • 1 blocked app protected`); Device Owner policy granted `POST_NOTIFICATIONS`, which is policy-fixed. Hidden Mode makes a saved blocked-app list effective even if an older independent toggle was false, reasserts Device Owner hiding instead of preserving a visible guard-only package, and uses Accessibility Home plus Usage Access as immediate already-running-task fallbacks. Live upgrade testing began with Play Store resumed in the foreground and ended on Samsung Home with Play Store `hidden=true`; its launcher did not resolve, an explicit Activity launch returned Android Error type 3, and the package remained hidden in 15/15 consecutive samples. Lock Task remained `NONE` and the policy foreground service remained active.
+
+- `FreeKiosk-v1.2.62-arm64.apk`
+  - SHA-256: `f7d3c8914e2902e21c7ae073009a810c83f91908570b1f527e831e54122887ca`
+  - 24,924,906 bytes; ARM64-only release, signed with the existing certificate. Installed and live-tested only on the SM-X800 at `192.168.0.53:5555`. Fixes the Hidden Mode Play Store visibility loop by including Device Owner-hidden packages in installed-package lookup while still requiring Android's real `FLAG_INSTALLED`; the prior watchdog treated a hidden package as uninstalled and explicitly restored it on the next one-second tick. Play Store remained `hidden=true` in 30/30 consecutive samples, had no resolvable launcher Activity, rejected an explicit Activity launch, and left Samsung Home focused with Lock Task `NONE`. The foreground policy service remained active. Superseded by v1.2.63 after physical testing found that a legacy guard-only state could still leave Play Store visible and usable.
+
+- `FreeKiosk-v1.2.61-arm64.apk`
+  - SHA-256: `70bdd1cb4f7cc899767808cb69712404e6cf9aa14d4512a4ec7b0923ebd43835`
+  - 24,924,906 bytes; ARM64-only intermediate release, signed with the existing certificate and installed only on the SM-X800. Added persistent guard-only fallback for packages that genuinely reverse or refuse Device Owner hiding. Live testing showed the reported Play Store loop still occurred and exposed its actual cause: FreeKiosk's installed-package lookup excluded its own hidden target before the reversal fallback could run. Superseded by v1.2.62.
+
+- `FreeKiosk-v1.2.60-arm64.apk`
+  - SHA-256: `14b535123e511f1bb5f932ab9b2b6f9ec7d046fe545ace958fec78eefed13fda`
+  - 24,924,846 bytes; ARM64-only release, signed with the existing certificate. Installed and live-tested only on the SM-X800 at `192.168.0.53:5555`. Hidden Mode leaves Samsung Home resumed with Lock Task `NONE` while the foreground policy service remains active. Independent App Blocking hides ordinary packages through Device Owner policy, reconciles policy after settings/database contention, and evicts a blocked foreground app to Home. Testing exposed a one-second `com.android.vending` hide/unhide loop; this was initially attributed to Samsung but later traced to FreeKiosk's installed-package lookup excluding Device Owner-hidden packages. Superseded by v1.2.62.
+
+- `FreeKiosk-v1.2.59-arm64.apk`
+  - SHA-256: `dadc1a9448be46ebb4017c1d454d6040cd33bf1bf15fb6f1a29bf856b1549f0b`
+  - 24,921,006 bytes; ARM64-only release, signed with the existing production certificate. Installed and live-tested on the SM-X800 at `192.168.0.53:5555`. With Play Store selected, Lock Mode reached `LOCKED`, Samsung's unsuspendable `com.android.vending` changed to `hidden=true`, and its launcher could not resolve. Disabling Lock Mode returned `NONE`, restored `hidden=false`, and Play Store launched successfully. The tablet was left with Lock Mode off and Play Store retained in the blocked-app list.
+
+- `FreeKiosk-v1.2.58-arm64.apk`
+  - SHA-256: `34be0b7fa408cb44eefc8e7955f342d0b67661f194a13f1364196b5cf681b565`
+  - 24,921,006 bytes; ARM64-only release, signed with the same certificate as v1.2.57. Adds a Security → Blocked Apps picker and lifecycle-scoped Device Owner package suspension with reboot/update/watchdog reconciliation and full exit restoration. Installed on the SM-X800; testing established that Samsung refuses to suspend `com.android.vending`, which prompted the v1.2.59 hide fallback.
+
+- `FreeKiosk-v1.2.57-arm64.apk`
+  - SHA-256: `1d91875edee94af3b1ceba997f3532afd9380133b162df1c9bf86f192ac4ddea`
+  - 24,911,594 bytes; ARM64-only release, installed and live-tested on the Samsung 75WAF. Keeps the mandatory Close All control self-healing and aligns its ordinary-overlay fallback with the WAF accessibility-layer control at the true physical bottom-right, so the redundant safety layers render as one button. Verified through a real in-place Netflix allowed-app update while Disney+ remained foreground and strict lock task stayed `LOCKED`; both safety layers remained visible and the close action returned to the kiosk grid.
+
+- `FreeKiosk-v1.2.56-arm64.apk`
+  - SHA-256: `46ace6f3e775b3a51b889044d904197578a913a98761c4b2c85c68c64b4a9766`
+  - 24,911,594 bytes; ARM64-only release. Makes the mandatory bottom-right Close All control self-healing after process death, FreeKiosk or allowed-app updates, accessibility reconnects, and detached overlay windows, with a one-second watchdog checkpoint and overlapping application/accessibility safety layers on WAF.
+
+- `FreeKiosk-v1.2.55-arm64.apk`
+  - SHA-256: `032524e4ddc9d6c9262e72f0ad04a89ea1af74a26f7ce0e8543406b11174d04f`
+  - 24,911,498 bytes; ARM64-only release, installed and visually tested on the SM-X800. Keeps row groups as invisible layout structure by removing their child-facing names, tinted backgrounds, borders, and rounded containers while retaining labeled nested folders.
+
+- `FreeKiosk-v1.2.54-arm64.apk`
+  - SHA-256: `cc59e02d3e02f3adeb76cb07cc2a7d4f1e1c609465404106fc677ac0b19cf437`
+  - 24,911,798 bytes; ARM64-only release. Adds ordered multi-app row groups, wrapped multi-row sections, and arbitrarily nested folder groups with app/group ordering controls in Settings.
 
 - `FreeKiosk-v1.2.53-arm64.apk`
   - SHA-256: `6b173c1173231bad42e65c139db91b7fd1b8afc3bb67a44b108f6ef31766c7ae`
@@ -152,8 +208,8 @@ space; they are generated again by Gradle.
 - Display IP: `192.168.0.37`
 - Model: Samsung WAF interactive display, Android 14 / API 34, ARM64.
 - Only Android user `0` exists.
-- FreeKiosk 1.2.53 is installed in place and remains the Device Owner.
-- The display is left running Spectrum Shooter in strict Device Owner `LOCKED` state. The
+- FreeKiosk 1.2.66 is installed in place and remains the Device Owner.
+- The display is in strict Device Owner `LOCKED` state. The
   WAF chrome policy is active: density is 577dpi, both OEM side-menu
   settings are `0`, global immersive policy is `immersive.full=*`, and
   `enable_freeform_support`, `multi_cb`, and `side_button` are all `0`.

@@ -10,6 +10,7 @@ import Colors from '../theme/colors';
 export type IconName =
   // Navigation & General
   | 'home'
+  | 'home-outline'
   | 'cog'
   | 'cog-outline'
   | 'arrow-left'
@@ -35,6 +36,8 @@ export type IconName =
   | 'eye-off'
   // Web & URL
   | 'web'
+  | 'web-off'
+  | 'youtube'
   | 'earth'
   | 'link'
   | 'link-variant'
@@ -72,6 +75,7 @@ export type IconName =
   | 'pause'
   | 'stop'
   | 'pencil'
+  | 'pencil-outline'
   | 'delete'
   | 'delete-outline'
   | 'plus'
@@ -85,6 +89,7 @@ export type IconName =
   | 'information'
   | 'information-outline'
   | 'alert'
+  | 'alert-outline'
   | 'alert-circle'
   | 'alert-circle-outline'
   | 'help-circle'
@@ -169,7 +174,10 @@ export type IconName =
   | 'home-assistant'
   // Files & Folders
   | 'folder'
+  | 'folder-outline'
+  | 'folder-plus-outline'
   | 'folder-open-outline'
+  | 'view-agenda-outline'
   | 'file-document-outline'
   // Network & MQTT
   | 'lan-connect'

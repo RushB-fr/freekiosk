@@ -23,6 +23,7 @@ import android.os.PowerManager
 import android.view.WindowManager
 import com.facebook.react.bridge.UiThreadUtil
 import com.facebook.react.modules.core.DeviceEventManagerModule
+import java.util.concurrent.atomic.AtomicBoolean
 
 class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
@@ -35,6 +36,10 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
         // Store the current instance to allow sending events from MainActivity
         @Volatile
         private var currentInstance: KioskModule? = null
+
+        // Notification taps can cold-start MainActivity before React Native and its event
+        // listeners exist. Retain the one-shot request until the top-level navigator consumes it.
+        private val protectedSettingsRequestPending = AtomicBoolean(false)
         
         /**
          * Send an event to React Native from outside the module (e.g., from MainActivity)
@@ -49,6 +54,11 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
             } catch (e: Exception) {
                 android.util.Log.e("KioskModule", "Failed to send event '$eventName': ${e.message}")
             }
+        }
+
+        fun requestProtectedSettings() {
+            protectedSettingsRequestPending.set(true)
+            sendEventFromNative("openProtectedSettings", null)
         }
     }
 
@@ -122,6 +132,20 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     @ReactMethod
     fun isAdminSessionActive(promise: Promise) {
         promise.resolve(KioskForegroundGuard.isAdminSessionActive())
+    }
+
+    @ReactMethod
+    fun consumeProtectedSettingsRequest(promise: Promise) {
+        val pending = protectedSettingsRequestPending.getAndSet(false)
+        if (pending) {
+            // Keep the Activity intent authoritative until React actually consumes the
+            // request. If Android recreates the process first, MainActivity can rebuild
+            // the in-memory flag from this extra instead of falling through to Kiosk.
+            reactApplicationContext.currentActivity?.intent?.removeExtra(
+                KioskWatchdogService.EXTRA_OPEN_PROTECTED_SETTINGS,
+            )
+        }
+        promise.resolve(pending)
     }
 
     // #135 — Dismiss the soft keyboard at the window level. React Native's
@@ -525,9 +549,7 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                         }
                         KioskForegroundGuard.clearActiveKioskPackage(reactApplicationContext)
                         KioskAlwaysOnPolicy.release()
-                        reactApplicationContext.stopService(
-                            Intent(reactApplicationContext, KioskWatchdogService::class.java),
-                        )
+                        KioskWatchdogService.reconcileService(reactApplicationContext)
                         KioskSystemUiPolicy.restore(reactApplicationContext)
                         if (activityManager.lockTaskModeState != ActivityManager.LOCK_TASK_MODE_NONE) {
                             promise.reject("ERROR", "Android remained in lock-task mode after cleanup")
@@ -667,15 +689,114 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     @ReactMethod
     fun disableAutoLaunch(promise: Promise) {
         try {
+            // BOOT_COMPLETED delivery is also required by Hidden Mode and independent
+            // App Blocking. The persisted @kiosk_auto_launch flag controls whether the
+            // Activity opens; the receiver component itself must remain enabled.
             val componentName = ComponentName(reactApplicationContext, BootReceiver::class.java)
             reactApplicationContext.packageManager.setComponentEnabledSetting(
                 componentName,
-                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
                 PackageManager.DONT_KILL_APP
             )
             promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("ERROR_DISABLE_AUTO_LAUNCH", e)
+        }
+    }
+
+    @ReactMethod
+    fun reconcileBackgroundPolicies(promise: Promise) {
+        try {
+            val blocked = BlockedAppPolicy.reconcile(reactApplicationContext)
+            val expected = if (BlockedAppPolicy.isAppBlockingEnabled(reactApplicationContext)) {
+                BlockedAppPolicy.configuredInstalledPackages(reactApplicationContext)
+            } else {
+                emptySet()
+            }
+            val refused = expected - blocked
+            if (refused.isNotEmpty()) {
+                throw IllegalStateException(
+                    "Android refused to hide or suspend: ${refused.sorted().joinToString(", ")}",
+                )
+            }
+            KioskWatchdogService.reconcileService(reactApplicationContext)
+            promise.resolve(true)
+        } catch (error: Exception) {
+            promise.reject("ERROR", "Failed to reconcile background policies: ${error.message}")
+        }
+    }
+
+    @ReactMethod
+    fun configureNetworkBlocking(
+        enabled: Boolean,
+        rulesJson: String,
+        lockdown: Boolean,
+        promise: Promise,
+    ) {
+        try {
+            promise.resolve(networkBlockingStatusMap(
+                NetworkBlockPolicy.configure(
+                    reactApplicationContext,
+                    enabled,
+                    rulesJson,
+                    lockdown,
+                ),
+            ))
+        } catch (error: Exception) {
+            promise.reject("NETWORK_PROTECTION_ERROR", error.message, error)
+        }
+    }
+
+    @ReactMethod
+    fun getNetworkBlockingStatus(promise: Promise) {
+        try {
+            promise.resolve(networkBlockingStatusMap(NetworkBlockPolicy.status(reactApplicationContext)))
+        } catch (error: Exception) {
+            promise.reject("NETWORK_PROTECTION_ERROR", error.message, error)
+        }
+    }
+
+    private fun networkBlockingStatusMap(status: NetworkBlockPolicy.Status) =
+        com.facebook.react.bridge.Arguments.createMap().apply {
+            putBoolean("configured", status.configured)
+            putBoolean("deviceOwner", status.deviceOwner)
+            putBoolean("alwaysOn", status.alwaysOn)
+            putBoolean("lockdown", status.lockdown)
+            putBoolean("active", status.active)
+            putInt("ruleCount", status.ruleCount)
+            putInt("routedAddressCount", status.routedAddressCount)
+            if (status.error == null) putNull("error") else putString("error", status.error)
+        }
+
+    @ReactMethod
+    fun enterHiddenMode(promise: Promise) {
+        try {
+            BlockedAppPolicy.reconcile(
+                reactApplicationContext,
+                kioskActive = false,
+            )
+            KioskWatchdogService.reconcileService(reactApplicationContext)
+
+            val activity = reactApplicationContext.currentActivity
+            if (activity == null) {
+                promise.resolve(true)
+                return
+            }
+            activity.runOnUiThread {
+                try {
+                    val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                        addCategory(Intent.CATEGORY_HOME)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    }
+                    activity.startActivity(homeIntent)
+                    activity.moveTaskToBack(true)
+                    promise.resolve(true)
+                } catch (error: Exception) {
+                    promise.reject("ERROR", "Failed to enter Hidden Mode: ${error.message}")
+                }
+            }
+        } catch (error: Exception) {
+            promise.reject("ERROR", "Failed to enter Hidden Mode: ${error.message}")
         }
     }
 
@@ -755,6 +876,10 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                     } catch (e: Exception) {
                         android.util.Log.w("KioskModule", "Could not clear launcher policy before DO removal: ${e.message}")
                     }
+                    // An always-on VPN policy must be removed while FreeKiosk still owns the
+                    // device; afterward Android would reject the cleanup and could leave the
+                    // former network filter pinned in Settings.
+                    NetworkBlockPolicy.configure(reactApplicationContext, false, "[]", false)
                     dpm.clearDeviceOwnerApp(reactApplicationContext.packageName)
                     android.util.Log.d("KioskModule", "Device Owner removed successfully")
                     promise.resolve(true)

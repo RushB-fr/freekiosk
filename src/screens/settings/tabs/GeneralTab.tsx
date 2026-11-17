@@ -18,6 +18,7 @@ import {
   SettingsRadioGroup,
 } from '../../../components/settings';
 import { ManagedApp } from '../../../types/managedApps';
+import { AppGroup } from '../../../types/appGroups';
 import { Colors, Spacing, Typography } from '../../../theme';
 import AppLauncherModule, { AppInfo } from '../../../utils/AppLauncherModule';
 import { ScheduledEvent } from '../../../types/planner';
@@ -59,6 +60,8 @@ interface GeneralTabProps {
   // Managed apps (multi-app mode)
   managedApps: ManagedApp[];
   onManagedAppsChange: (apps: ManagedApp[]) => void;
+  appGroups: AppGroup[];
+  onAppGroupsChange: (groups: AppGroup[]) => void;
   
   // Permissions
   hasOverlayPermission: boolean;
@@ -193,6 +196,8 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
   pickingWallpaper,
   managedApps,
   onManagedAppsChange,
+  appGroups,
+  onAppGroupsChange,
   hasOverlayPermission,
   onRequestOverlayPermission,
   hasUsageStatsPermission,
@@ -832,14 +837,16 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
             <SettingsSection title="Applications" icon="view-grid">
               <SettingsInfoBox variant="info">
                 <Text style={styles.infoText}>
-                  {'📱 Add apps to display on the home screen grid.\n'}
-                  {'Apps are centered automatically and sorted alphabetically, with up to six per row. Kiosk users cannot rearrange them.\n\n'}
+                  {'📱 Assign apps to named rows such as Streaming Services and Games.\n'}
+                  {'Row groups wrap onto as many rows as they need. Nested groups open as folders, and groups/apps follow the order configured below.\n\n'}
                   {'Toggle options per app: show on home screen, launch on boot, keep alive, accessibility.'}
                 </Text>
               </SettingsInfoBox>
               <ManagedAppsSection
                 managedApps={managedApps}
                 onManagedAppsChange={onManagedAppsChange}
+                appGroups={appGroups}
+                onAppGroupsChange={onAppGroupsChange}
                 isDeviceOwner={isDeviceOwner}
               />
             </SettingsSection>
@@ -857,6 +864,8 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
               <ManagedAppsSection
                 managedApps={managedApps}
                 onManagedAppsChange={onManagedAppsChange}
+                appGroups={appGroups}
+                onAppGroupsChange={onAppGroupsChange}
                 isDeviceOwner={isDeviceOwner}
               />
             </SettingsSection>
@@ -1150,6 +1159,8 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
           <ManagedAppsSection
             managedApps={managedApps}
             onManagedAppsChange={onManagedAppsChange}
+            appGroups={appGroups}
+            onAppGroupsChange={onAppGroupsChange}
             isDeviceOwner={isDeviceOwner}
             showHomeScreenToggle={false}
           />

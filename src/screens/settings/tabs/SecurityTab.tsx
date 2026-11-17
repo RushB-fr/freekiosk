@@ -14,8 +14,12 @@ import {
   SettingsButton,
   SettingsModeSelector,
   UrlListEditor,
+  BlockedAppsSection,
+  NetworkBlockingSection,
 } from '../../../components/settings';
 import { Colors, Spacing, Typography } from '../../../theme';
+import { BlockedApp } from '../../../types/blockedApps';
+import { NetworkBlockRule } from '../../../types/networkBlocking';
 
 interface SecurityTabProps {
   displayMode: 'webview' | 'external_app' | 'media_player';
@@ -25,6 +29,8 @@ interface SecurityTabProps {
   // Lock mode
   kioskEnabled: boolean;
   onKioskEnabledChange: (value: boolean) => void;
+  hiddenModeEnabled: boolean;
+  onHiddenModeEnabledChange: (value: boolean) => void;
   
   // Power button
   allowPowerButton: boolean;
@@ -33,6 +39,18 @@ interface SecurityTabProps {
   // Block factory reset (Device Owner only) (#201)
   blockFactoryReset: boolean;
   onBlockFactoryResetChange: (value: boolean) => void;
+
+  // Independent Device Owner app blocking
+  appBlockingEnabled: boolean;
+  onAppBlockingEnabledChange: (value: boolean) => void;
+  blockedApps: BlockedApp[];
+  onBlockedAppsChange: (apps: BlockedApp[]) => void;
+
+  // Independent Device Owner network blocking
+  networkBlockingEnabled: boolean;
+  onNetworkBlockingEnabledChange: (value: boolean) => void;
+  networkBlockRules: NetworkBlockRule[];
+  onNetworkBlockRulesChange: (rules: NetworkBlockRule[]) => void;
   
   // Notifications (NFC support)
   allowNotifications: boolean;
@@ -49,7 +67,7 @@ interface SecurityTabProps {
   onReturnTapCountChange: (value: string) => void;
   returnTapTimeout: string;
   onReturnTapTimeoutChange: (value: string) => void;
-  returnButtonPosition: string; // 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+  returnButtonPosition: string; // Nine-point screen position for the dashboard/PIN access zone
   onReturnButtonPositionChange: (value: string) => void;
   kioskHomeButtonEnabled: boolean;
   onKioskHomeButtonEnabledChange: (value: boolean) => void;
@@ -117,10 +135,20 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
   navigation,
   kioskEnabled,
   onKioskEnabledChange,
+  hiddenModeEnabled,
+  onHiddenModeEnabledChange,
   allowPowerButton,
   onAllowPowerButtonChange,
   blockFactoryReset,
   onBlockFactoryResetChange,
+  appBlockingEnabled,
+  onAppBlockingEnabledChange,
+  blockedApps,
+  onBlockedAppsChange,
+  networkBlockingEnabled,
+  onNetworkBlockingEnabledChange,
+  networkBlockRules,
+  onNetworkBlockRulesChange,
   allowNotifications,
   onAllowNotificationsChange,
   allowSystemInfo,
@@ -190,6 +218,22 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
           value={kioskEnabled}
           onValueChange={onKioskEnabledChange}
         />
+
+        <View style={styles.divider} />
+        <SettingsSwitch
+          label="Hidden Mode"
+          hint="Keep FreeKiosk out of the foreground while background features such as App Blocking remain active. Lock Mode and Hidden Mode are mutually exclusive."
+          value={hiddenModeEnabled}
+          onValueChange={onHiddenModeEnabledChange}
+        />
+
+        {hiddenModeEnabled && (
+          <SettingsInfoBox variant="info">
+            <Text style={styles.infoText}>
+              FreeKiosk will return to Android Home after saving. Open FreeKiosk manually whenever you need to administer it.
+            </Text>
+          </SettingsInfoBox>
+        )}
         
         {!kioskEnabled && (
           <SettingsInfoBox variant="warning">
@@ -271,6 +315,26 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
           </>
         )}
       </SettingsSection>
+
+      <SettingsSection title="Blocked Apps" icon="shield-lock">
+        <BlockedAppsSection
+          blockedApps={blockedApps}
+          onBlockedAppsChange={onBlockedAppsChange}
+          isDeviceOwner={isDeviceOwner}
+          blockingEnabled={appBlockingEnabled}
+          onBlockingEnabledChange={onAppBlockingEnabledChange}
+        />
+      </SettingsSection>
+
+      <SettingsSection title="Network Protection" icon="web-off">
+        <NetworkBlockingSection
+          enabled={networkBlockingEnabled}
+          onEnabledChange={onNetworkBlockingEnabledChange}
+          rules={networkBlockRules}
+          onRulesChange={onNetworkBlockRulesChange}
+          isDeviceOwner={isDeviceOwner}
+        />
+      </SettingsSection>
       
       {/* Auto Launch */}
       <SettingsSection title="Auto Launch" icon="rocket-launch">
@@ -279,7 +343,14 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
           hint="Automatically launch FreeKiosk when the device starts"
           value={autoLaunchEnabled}
           onValueChange={onAutoLaunchChange}
+          disabled={hiddenModeEnabled}
         />
+
+        {hiddenModeEnabled && (
+          <SettingsInfoBox variant="info">
+            <Text style={styles.infoText}>Hidden Mode suppresses foreground launch at boot.</Text>
+          </SettingsInfoBox>
+        )}
         
         <SettingsInfoBox variant="info">
           <Text style={styles.infoText}>
@@ -350,7 +421,7 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
               value: 'button',
               label: 'Fixed Button',
               icon: 'square-outline',
-              hint: 'Tap N times on a corner button',
+              hint: 'Tap N times on a fixed screen zone',
             },
           ]}
           value={returnMode}
@@ -389,22 +460,23 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
         {returnMode === 'button' && (
           <>
             <View style={styles.divider} />
-            {displayMode === 'external_app' && (
-              <>
-                <SettingsRadioGroup
-                  hint="Button position on screen"
-                  options={[
-                    { value: 'top-left', label: 'Top Left', icon: 'arrow-top-left' },
-                    { value: 'top-right', label: 'Top Right', icon: 'arrow-top-right' },
-                    { value: 'bottom-left', label: 'Bottom Left', icon: 'arrow-bottom-left' },
-                    { value: 'bottom-right', label: 'Bottom Right', icon: 'arrow-bottom-right' },
-                  ]}
-                  value={returnButtonPosition}
-                  onValueChange={onReturnButtonPositionChange}
-                />
-                <View style={styles.divider} />
-              </>
-            )}
+            <SettingsRadioGroup
+              hint="Dashboard/PIN access zone position"
+              options={[
+                { value: 'top-left', label: 'Top Left', icon: 'arrow-top-left' },
+                { value: 'top-center', label: 'Top Center', icon: 'arrow-up' },
+                { value: 'top-right', label: 'Top Right', icon: 'arrow-top-right' },
+                { value: 'center-left', label: 'Center Left', icon: 'arrow-left' },
+                { value: 'center', label: 'Center', icon: 'gesture-tap-button' },
+                { value: 'center-right', label: 'Center Right', icon: 'arrow-right' },
+                { value: 'bottom-left', label: 'Bottom Left', icon: 'arrow-bottom-left' },
+                { value: 'bottom-center', label: 'Bottom Center', icon: 'arrow-down' },
+                { value: 'bottom-right', label: 'Bottom Right', icon: 'arrow-bottom-right' },
+              ]}
+              value={returnButtonPosition}
+              onValueChange={onReturnButtonPositionChange}
+            />
+            <View style={styles.divider} />
             <SettingsSwitch
               label="👁️ Show Button"
               hint={displayMode === 'external_app' 
@@ -430,8 +502,8 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
         
         <SettingsInfoBox variant="info">
           <Text style={styles.infoText}>
-            ℹ️ {returnMode === 'button' && displayMode === 'external_app' 
-              ? `Tap the return button (${returnButtonPosition}) ${returnTapCount || '5'} times to access settings`
+            ℹ️ {returnMode === 'button'
+              ? `Tap the dashboard/PIN access zone (${returnButtonPosition}) ${returnTapCount || '5'} times to access settings`
               : `Tap anywhere on screen ${returnTapCount || '5'} times within ${returnTapTimeout ? `${(parseInt(returnTapTimeout, 10) / 1000).toFixed(1)}s` : '1.5s'} to access settings`}
             {kioskEnabled && ' (PIN required)'}
           </Text>

@@ -31,7 +31,12 @@ import Icon from '../components/Icon';
 import { revokeSettingsAccess } from '../utils/authState';
 import { scheduleSettingsSnapshot } from '../utils/SettingsHistoryService';
 import { DEFAULT_WALLPAPER_POSITION, isWallpaperPosition, WallpaperPosition } from '../types/wallpaper';
+import { AppGroup } from '../types/appGroups';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import {
+  getAdminAccessPositionStyle,
+  normalizeAdminAccessPosition,
+} from '../types/adminAccessPosition';
 
 const { HttpServerModule } = NativeModules;
 
@@ -100,6 +105,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   
   // Managed Apps (multi-app mode, background apps, accessibility whitelist)
   const [managedApps, setManagedApps] = useState<import('../types/managedApps').ManagedApp[]>([]);
+  const [appGroups, setAppGroups] = useState<AppGroup[]>([]);
   const [externalAppMode, setExternalAppMode] = useState<'single' | 'multi'>('single');
   const [externalAppBackgroundColor, setExternalAppBackgroundColor] = useState<string>('#333');
   const [externalAppBackgroundImageEnabled, setExternalAppBackgroundImageEnabled] = useState<boolean>(true);
@@ -1585,6 +1591,8 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       // Load managed apps
       const savedManagedApps = await StorageService.getManagedApps();
       setManagedApps(savedManagedApps);
+      const savedAppGroups = await StorageService.getAppGroups();
+      setAppGroups(savedAppGroups);
       console.log('[KioskScreen] Loaded managed apps:', savedManagedApps.length);
       
       // Load external app sub-mode (single vs multi)
@@ -1612,7 +1620,9 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       const savedReturnTapCount = num(K.RETURN_TAP_COUNT, 5);
       const savedReturnTapTimeout = num(K.RETURN_TAP_TIMEOUT, 1500);
       const savedReturnMode = str(K.RETURN_MODE) ?? 'tap_anywhere';
-      const savedReturnButtonPosition = str(K.RETURN_BUTTON_POSITION) ?? 'bottom-right';
+      const savedReturnButtonPosition = normalizeAdminAccessPosition(
+        str(K.RETURN_BUTTON_POSITION),
+      );
       setReturnButtonVisible(savedReturnButtonVisible);
       setReturnTapCount(savedReturnTapCount);
       setReturnTapTimeout(savedReturnTapTimeout);
@@ -1968,7 +1978,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
               }
               return;
             }
-            await launchExternalApp(soleApp.packageName);
+            await launchExternalApp(soleApp.packageName, soleApp.microAppId);
           } else {
             console.log('[KioskScreen] Multi-app mode: showing app grid (' + homeScreenApps.length + ' apps)');
           }
@@ -2426,7 +2436,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     }
   };
 
-  const launchExternalApp = async (packageName: string): Promise<void> => {
+  const launchExternalApp = async (packageName: string, microAppId?: string): Promise<void> => {
     try {
       const isInstalled = await AppLauncherModule.isAppInstalled(packageName);
       if (!isInstalled) {
@@ -2436,10 +2446,20 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
 
       // Native launch atomically verifies Device Owner LOCKED state, records this exact
       // process-scoped selection, starts the return/admin overlay, then opens the app.
-      await AppLauncherModule.launchExternalApp(packageName);
+      if (microAppId) {
+        await AppLauncherModule.launchMicroApp(packageName, microAppId);
+      } else {
+        await AppLauncherModule.launchExternalApp(packageName);
+      }
       setIsAppLaunched(true);
     } catch (error) {
       console.error('[KioskScreen] Failed to launch app:', error);
+      if ((error as { code?: string })?.code === 'MICRO_APP_UNAVAILABLE') {
+        Alert.alert(
+          'App unavailable',
+          'This web app was removed or unpublished in MicroAppStation.',
+        );
+      }
       if ((error as { code?: string })?.code === 'LOCK_TASK_NOT_ACTIVE') {
         Alert.alert(
           'Secure kiosk setup required',
@@ -2488,7 +2508,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       // Multi-app mode: if only one home screen app, re-launch it directly
       const homeScreenApps = managedApps.filter(app => app.showOnHomeScreen);
       if (homeScreenApps.length === 1) {
-        await launchExternalApp(homeScreenApps[0].packageName);
+        await launchExternalApp(homeScreenApps[0].packageName, homeScreenApps[0].microAppId);
       } else {
         // Multiple apps: return to the app grid
         setIsAppLaunched(false);
@@ -2654,6 +2674,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         <ExternalAppOverlay
           externalAppPackage={externalAppPackage}
           managedApps={managedApps}
+          appGroups={appGroups}
           externalAppMode={externalAppMode}
           backgroundColor={externalAppBackgroundColor}
           backgroundImageEnabled={externalAppBackgroundImageEnabled}
@@ -2675,7 +2696,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           statusBarTheme={statusBarTheme}
           onReturnToApp={handleReturnToExternalApp}
           onGoToSettings={handleGoToSettings}
-          onLaunchApp={(pkg) => launchExternalApp(pkg)}
+          onLaunchApp={(pkg, microAppId) => launchExternalApp(pkg, microAppId)}
         />
       )}
 
@@ -2694,6 +2715,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         <TouchableOpacity 
           style={[
             styles.visualIndicator,
+            getAdminAccessPositionStyle(returnButtonPosition),
             {
               opacity: returnButtonVisible ? 1 : 0,
               backgroundColor: returnButtonVisible ? '#2196F3' : 'transparent',
@@ -2790,8 +2812,6 @@ const styles = StyleSheet.create({
   },
   visualIndicator: {
     position: 'absolute',
-    bottom: 20,
-    right: 20,
     width: 50,
     height: 50,
     backgroundColor: '#2196F3',

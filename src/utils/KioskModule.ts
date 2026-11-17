@@ -5,6 +5,10 @@ interface KioskModuleInterface {
   getAlwaysOnWirelessDebugStatus(): Promise<WirelessDebugStatus>;
   exitKioskMode(): Promise<boolean>;
   prepareKioskEnable(): Promise<boolean>;
+  reconcileBackgroundPolicies(): Promise<boolean>;
+  configureNetworkBlocking(enabled: boolean, rulesJson: string, lockdown: boolean): Promise<NetworkBlockingStatus>;
+  getNetworkBlockingStatus(): Promise<NetworkBlockingStatus>;
+  enterHiddenMode(): Promise<boolean>;
   startLockTask(externalAppPackage?: string | null, allowPowerButton?: boolean, allowNotifications?: boolean, allowSystemInfo?: boolean, allowEmergencyCall?: boolean): Promise<boolean>;
   stopLockTask(): Promise<boolean>;
   isInLockTaskMode(): Promise<boolean>;
@@ -54,6 +58,7 @@ interface KioskModuleInterface {
   // PIN/Settings suspend every external-app relaunch path until Kiosk is focused again.
   setAdminSessionActive(active: boolean): Promise<boolean>;
   isAdminSessionActive(): Promise<boolean>;
+  consumeProtectedSettingsRequest(): Promise<boolean>;
   // #135 — Dismiss the soft keyboard at the window level (works for WebView inputs too)
   hideKeyboard(): Promise<boolean>;
   // #177 — Pause/resume the content WebView's renderer (stops background audio/video).
@@ -69,6 +74,17 @@ export interface WirelessDebugStatus {
   adbEnabled: boolean;
   wirelessDebugEnabled: boolean;
   legacyPort5555Active: boolean;
+  error: string | null;
+}
+
+export interface NetworkBlockingStatus {
+  configured: boolean;
+  deviceOwner: boolean;
+  alwaysOn: boolean;
+  lockdown: boolean;
+  active: boolean;
+  ruleCount: number;
+  routedAddressCount: number;
   error: string | null;
 }
 

@@ -104,6 +104,8 @@ class MainActivity : ReactActivity() {
     // Keep managed-device debugging available even when kiosk/auto-launch are disabled. The
     // device-encrypted setting defaults ON and can be controlled from the admin Advanced tab.
     WirelessDebugPolicy.reapply(this)
+    runCatching { NetworkBlockPolicy.reconcile(this) }
+      .onFailure { DebugLog.errorProduction("MainActivity", "Network Protection reconcile failed: ${it.message}") }
     adminComponent = ComponentName(this, DeviceAdminReceiver::class.java)
     FreeKioskAccessibilityService.ensureEnabledForDeviceOwner(this)
 
@@ -158,6 +160,19 @@ class MainActivity : ReactActivity() {
 
     // Check if we need to navigate to PIN
     handleNavigationIntent(intent)
+
+    if (intent?.getBooleanExtra("enter_hidden_mode_after_config", false) == true) {
+      Handler(Looper.getMainLooper()).postDelayed({
+        if (BlockedAppPolicy.isHiddenModeEnabled(this) && !BlockedAppPolicy.isKioskEnabled(this)) {
+          KioskWatchdogService.reconcileService(this)
+          startActivity(Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_HOME)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+          })
+          moveTaskToBack(true)
+        }
+      }, 3500L)
+    }
   }
 
   override fun onNewIntent(intent: Intent?) {
@@ -178,23 +193,32 @@ class MainActivity : ReactActivity() {
 
   private fun handleNavigationIntent(intent: Intent?) {
     val shouldNavigateToPin = intent?.getBooleanExtra("navigateToPin", false) == true
+    val shouldOpenProtectedSettings =
+      intent?.getBooleanExtra(KioskWatchdogService.EXTRA_OPEN_PROTECTED_SETTINGS, false) == true
     val isVoluntary = intent?.getBooleanExtra("voluntaryReturn", false) == true
     val isSecurityRecovery =
       intent?.getBooleanExtra("kioskSecurityRecovery", false) == true
     
-    if (shouldNavigateToPin || isVoluntary || isSecurityRecovery) {
+    if (shouldNavigateToPin || shouldOpenProtectedSettings || isVoluntary || isSecurityRecovery) {
       // IMPORTANT: Mettre le flag AVANT tout traitement async
       blockAutoRelaunch = true
-      if (shouldNavigateToPin || isVoluntary) {
+      if (shouldNavigateToPin || shouldOpenProtectedSettings || isVoluntary) {
         KioskForegroundGuard.beginAdminSession(this)
       } else {
         KioskForegroundGuard.clearActiveKioskPackage(this)
       }
-      DebugLog.d("MainActivity", "handleNavigationIntent: set blockAutoRelaunch=true (pin=$shouldNavigateToPin, voluntary=$isVoluntary, recovery=$isSecurityRecovery)")
+      DebugLog.d("MainActivity", "handleNavigationIntent: set blockAutoRelaunch=true (pin=$shouldNavigateToPin, protectedSettings=$shouldOpenProtectedSettings, voluntary=$isVoluntary, recovery=$isSecurityRecovery)")
     }
     if (isSecurityRecovery) {
       hideSystemUI()
       ensureStrictKioskLock("watchdog/overlay recovery")
+    }
+    if (shouldOpenProtectedSettings) {
+      // The notification is a parent-admin entry point, never a shortcut to the
+      // child-facing kiosk. Native state blocks every external-app relaunch while
+      // the persistent one-shot request bridges both warm and cold React starts.
+      stopOverlayService()
+      KioskModule.requestProtectedSettings()
     }
     // NOTE: navigateToPin event is sent directly by OverlayService via KioskModule.
     // No delayed duplicate send needed here - it caused double-navigation issues.
@@ -578,15 +602,7 @@ class MainActivity : ReactActivity() {
         DebugLog.d("MainActivity", "Could not unmute audio streams: ${e.message}")
       }
 
-      val samsungUpdateApps = arrayOf(
-        "com.samsung.android.app.updatecenter",
-        "com.sec.android.fotaclient",
-        "com.wssyncmldm",
-        "com.samsung.android.sdm.config",
-        "com.sec.android.soagent"
-      )
-      
-      devicePolicyManager.setPackagesSuspended(adminComponent, samsungUpdateApps, true)
+      BlockedAppPolicy.reconcile(this, kioskActive = true)
       
       val policy = android.app.admin.SystemUpdatePolicy.createPostponeInstallPolicy()
       devicePolicyManager.setSystemUpdatePolicy(adminComponent, policy)
@@ -634,15 +650,7 @@ class MainActivity : ReactActivity() {
         )
       }
 
-      val samsungUpdateApps = arrayOf(
-        "com.samsung.android.app.updatecenter",
-        "com.sec.android.fotaclient",
-        "com.wssyncmldm",
-        "com.samsung.android.sdm.config",
-        "com.sec.android.soagent"
-      )
-      
-      devicePolicyManager.setPackagesSuspended(adminComponent, samsungUpdateApps, false)
+      BlockedAppPolicy.reconcile(this, kioskActive = false)
       WafKioskChromePolicy.restoreForAdmin(this)
       devicePolicyManager.setSystemUpdatePolicy(adminComponent, null)
       KioskSystemUiPolicy.restore(this)
@@ -1412,27 +1420,21 @@ class MainActivity : ReactActivity() {
   }
 
   /**
-   * Ensure the BootReceiver component is enabled when auto-launch is ON.
-   * Fixes a regression where toggleAutoLaunch stopped calling enableAutoLaunch(),
-   * leaving the component disabled in PackageManager even though AsyncStorage says "true".
+   * Keep BootReceiver enabled independently of UI auto-launch. Hidden Mode and App Blocking
+   * need boot/package-update delivery even when FreeKiosk must stay out of the foreground.
    */
   private fun ensureBootReceiverEnabled() {
     try {
-      val autoLaunchValue = getAsyncStorageValue("@kiosk_auto_launch", "false")
-      val autoLaunchEnabled = autoLaunchValue == "true"
-      
-      if (autoLaunchEnabled) {
-        val componentName = ComponentName(this, BootReceiver::class.java)
-        val currentState = packageManager.getComponentEnabledSetting(componentName)
-        if (currentState != PackageManager.COMPONENT_ENABLED_STATE_ENABLED && 
-            currentState != PackageManager.COMPONENT_ENABLED_STATE_DEFAULT) {
-          packageManager.setComponentEnabledSetting(
-            componentName,
-            PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-            PackageManager.DONT_KILL_APP
-          )
-          DebugLog.d("MainActivity", "BootReceiver re-enabled (was disabled)")
-        }
+      val componentName = ComponentName(this, BootReceiver::class.java)
+      val currentState = packageManager.getComponentEnabledSetting(componentName)
+      if (currentState != PackageManager.COMPONENT_ENABLED_STATE_ENABLED &&
+          currentState != PackageManager.COMPONENT_ENABLED_STATE_DEFAULT) {
+        packageManager.setComponentEnabledSetting(
+          componentName,
+          PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+          PackageManager.DONT_KILL_APP
+        )
+        DebugLog.d("MainActivity", "BootReceiver re-enabled for background policies")
       }
     } catch (e: Exception) {
       DebugLog.d("MainActivity", "Error ensuring BootReceiver state: ${e.message}")
@@ -1440,21 +1442,12 @@ class MainActivity : ReactActivity() {
   }
 
   /**
-   * Start KioskWatchdogService if kiosk mode is enabled (#96).
-   * Uses START_STICKY so Android restarts FreeKiosk after an OOM kill.
+   * Reconcile the shared Lock Mode / Hidden Mode / App Blocking policy service.
    */
   private fun startKioskWatchdogIfNeeded() {
     try {
-      val kioskEnabled = isKioskEnabled()
-      if (!kioskEnabled) return
-
-      val serviceIntent = Intent(this, KioskWatchdogService::class.java)
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        startForegroundService(serviceIntent)
-      } else {
-        startService(serviceIntent)
-      }
-      DebugLog.d("MainActivity", "KioskWatchdogService started")
+      KioskWatchdogService.reconcileService(this)
+      DebugLog.d("MainActivity", "Policy service reconciled")
     } catch (e: Exception) {
       DebugLog.d("MainActivity", "Error starting KioskWatchdogService: ${e.message}")
     }
@@ -1466,11 +1459,8 @@ class MainActivity : ReactActivity() {
    */
   private fun stopKioskWatchdog() {
     try {
-      val serviceIntent = Intent(this, KioskWatchdogService::class.java)
-      stopService(serviceIntent)
-      val nm = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-      nm.cancel(2002) // KioskWatchdogService.NOTIFICATION_ID
-      DebugLog.d("MainActivity", "KioskWatchdogService stopped and notification cleared")
+      KioskWatchdogService.reconcileService(this)
+      DebugLog.d("MainActivity", "Policy service reconciled after kiosk exit")
     } catch (e: Exception) {
       DebugLog.d("MainActivity", "Error stopping KioskWatchdogService: ${e.message}")
     }
@@ -1510,13 +1500,15 @@ class MainActivity : ReactActivity() {
     // here and was silently ignored (#193). Keep this list in sync with the extras read below.
     val adbConfigKeys = arrayOf(
       "lock_package", "url", "pin", "config",
-      "kiosk_enabled", "auto_launch", "auto_start", "screensaver_enabled", "auto_relaunch",
+      "kiosk_enabled", "hidden_mode_enabled", "app_blocking_enabled",
+      "network_blocking_enabled", "network_block_rules",
+      "auto_launch", "auto_start", "screensaver_enabled", "auto_relaunch",
       "test_mode", "back_button_mode", "status_bar", "pin_mode",
       "rest_api_enabled", "rest_api_port", "rest_api_key",
       "mqtt_enabled", "mqtt_broker_url", "mqtt_port", "mqtt_username", "mqtt_password",
       "mqtt_client_id", "mqtt_base_topic", "mqtt_discovery_prefix", "mqtt_status_interval",
       "mqtt_allow_control", "mqtt_device_name",
-      "external_app_mode", "managed_apps"
+      "external_app_mode", "managed_apps", "app_groups", "blocked_apps"
     )
     if (adbConfigKeys.none { intent.hasExtra(it) }) return false
     
@@ -1611,6 +1603,34 @@ class MainActivity : ReactActivity() {
     if (intent.hasExtra("kiosk_enabled")) {
       val kioskEnabled = intent.getBooleanExtra("kiosk_enabled", false)
       editor.putString("@kiosk_enabled", kioskEnabled.toString())
+    }
+
+    if (intent.hasExtra("hidden_mode_enabled")) {
+      val hiddenModeEnabled = intent.getBooleanExtra("hidden_mode_enabled", false)
+      editor.putString("@kiosk_hidden_mode_enabled", hiddenModeEnabled.toString())
+      if (hiddenModeEnabled) editor.putString("@kiosk_enabled", "false")
+    }
+
+    if (intent.hasExtra("app_blocking_enabled")) {
+      editor.putString(
+        "@kiosk_app_blocking_enabled",
+        intent.getBooleanExtra("app_blocking_enabled", false).toString(),
+      )
+    }
+
+    if (intent.hasExtra("network_blocking_enabled")) {
+      editor.putString(
+        "@kiosk_network_blocking_enabled",
+        intent.getBooleanExtra("network_blocking_enabled", false).toString(),
+      )
+    }
+    intent.getStringExtra("network_block_rules")?.let { rulesJson ->
+      try {
+        editor.putString("@kiosk_network_block_rules", org.json.JSONArray(rulesJson).toString())
+      } catch (error: Exception) {
+        showAdbToast("❌ ADB Config: Invalid network_block_rules JSON")
+        return false
+      }
     }
     
     // Handle auto_launch as string or auto_start as boolean
@@ -1740,8 +1760,18 @@ class MainActivity : ReactActivity() {
             validApp.put("packageName", pkg)
             validApp.put("displayName", displayName)
             validApp.put("showOnHomeScreen", appObj.optBoolean("showOnHomeScreen", true))
-            validApp.put("launchOnBoot", appObj.optBoolean("launchOnBoot", false))
-            validApp.put("keepAlive", appObj.optBoolean("keepAlive", false))
+            if (appObj.has("groupId") && !appObj.isNull("groupId")) {
+              validApp.put("groupId", appObj.optString("groupId"))
+            } else {
+              validApp.put("groupId", org.json.JSONObject.NULL)
+            }
+            validApp.put("displayOrder", appObj.optInt("displayOrder", i))
+            val microAppId = appObj.optString("microAppId", "")
+            val isMicroApp = microAppId.isNotEmpty() && MicroAppCatalog.isValidId(microAppId)
+            if (isMicroApp) validApp.put("microAppId", microAppId)
+            // A micro-app opens through its own intent; boot/keep-alive would open the host editor.
+            validApp.put("launchOnBoot", !isMicroApp && appObj.optBoolean("launchOnBoot", false))
+            validApp.put("keepAlive", !isMicroApp && appObj.optBoolean("keepAlive", false))
             validApp.put("allowAccessibility", appObj.optBoolean("allowAccessibility", false))
             validatedApps.put(validApp)
             android.util.Log.i("FreeKiosk-ADB", "Managed app added: $pkg ($displayName)")
@@ -1760,12 +1790,40 @@ class MainActivity : ReactActivity() {
         showAdbToast("❌ ADB Config: Invalid managed_apps JSON")
       }
     }
+
+    intent.getStringExtra("app_groups")?.let { jsonStr ->
+      try {
+        val groups = org.json.JSONArray(jsonStr)
+        editor.putString("@kiosk_app_groups", groups.toString())
+        android.util.Log.i("FreeKiosk-ADB", "App groups configured: ${groups.length()} groups")
+      } catch (e: Exception) {
+        android.util.Log.e("FreeKiosk-ADB", "Invalid app_groups JSON: ${e.message}")
+        showAdbToast("❌ ADB Config: Invalid app_groups JSON")
+      }
+    }
+
+    // Apps suspended only during Lock Mode. An empty array intentionally clears the list.
+    intent.getStringExtra("blocked_apps")?.let { jsonStr ->
+      try {
+        val validatedApps = validateBlockedApps(org.json.JSONArray(jsonStr))
+        editor.putString("@kiosk_blocked_apps", validatedApps.toString())
+        android.util.Log.i("FreeKiosk-ADB", "Blocked apps configured: ${validatedApps.length()} apps")
+      } catch (e: Exception) {
+        android.util.Log.e("FreeKiosk-ADB", "Invalid blocked_apps JSON: ${e.message}")
+        showAdbToast("❌ ADB Config: Invalid blocked_apps JSON")
+      }
+    }
     
     // Mark that there is pending config
     editor.putBoolean("has_pending_config", true)
     
     // Use commit() (synchronous) instead of apply() to ensure data is written before process kill
     editor.commit()
+
+    // Background policy changes must become effective before the ADB-triggered process
+    // restart. The ordinary pending-config bridge is intentionally asynchronous and can
+    // otherwise leave the watchdog observing the previous value for this restart window.
+    applyBackgroundPolicyConfigDirectly(intent, configJson)
     
     // Verify
     val verifyPrefs = getSharedPreferences("FreeKioskPendingConfig", Context.MODE_PRIVATE)
@@ -1808,6 +1866,13 @@ class MainActivity : ReactActivity() {
       val restartIntent = packageManager.getLaunchIntentForPackage(packageName)
       restartIntent?.apply {
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        val hiddenFromJson = configJson?.let {
+          runCatching { org.json.JSONObject(it).optBoolean("hidden_mode_enabled", false) }.getOrDefault(false)
+        } ?: false
+        putExtra(
+          "enter_hidden_mode_after_config",
+          intent.getBooleanExtra("hidden_mode_enabled", false) || hiddenFromJson,
+        )
       }
       
       if (intent.getBooleanExtra("auto_start", false) && lockPackage != null) {
@@ -1898,6 +1963,73 @@ class MainActivity : ReactActivity() {
     db.insertWithOnConflict("catalystLocalStorage", null, contentValues, SQLiteDatabase.CONFLICT_REPLACE)
   }
 
+  private fun applyBackgroundPolicyConfigDirectly(intent: Intent, configJson: String?) {
+    val json = configJson?.let { raw ->
+      runCatching { org.json.JSONObject(raw) }.getOrNull()
+    }
+    fun requestedBoolean(extra: String): Boolean? = when {
+      intent.hasExtra(extra) -> intent.getBooleanExtra(extra, false)
+      json?.has(extra) == true -> json.optBoolean(extra, false)
+      else -> null
+    }
+
+    var kioskEnabled = requestedBoolean("kiosk_enabled")
+    val hiddenModeEnabled = requestedBoolean("hidden_mode_enabled")
+    val appBlockingEnabled = requestedBoolean("app_blocking_enabled")
+    val networkBlockingEnabled = requestedBoolean("network_blocking_enabled")
+    val requestedNetworkRules = when {
+      intent.hasExtra("network_block_rules") -> intent.getStringExtra("network_block_rules")
+      json?.has("network_block_rules") == true -> json.optJSONArray("network_block_rules")?.toString()
+      else -> null
+    }
+    if (hiddenModeEnabled == true) kioskEnabled = false
+    if (kioskEnabled == true && hiddenModeEnabled == null) {
+      // Match the Settings UI invariant even when the ADB command enables Lock Mode
+      // without mentioning the currently saved Hidden Mode value.
+      openAsyncStorageDb()?.use { database ->
+        setAsyncStorageValue(database, "@kiosk_hidden_mode_enabled", "false")
+      }
+    }
+
+    if (kioskEnabled == null && hiddenModeEnabled == null && appBlockingEnabled == null &&
+        networkBlockingEnabled == null && requestedNetworkRules == null) return
+
+    openAsyncStorageDb()?.use { database ->
+      database.beginTransaction()
+      try {
+        kioskEnabled?.let { setAsyncStorageValue(database, "@kiosk_enabled", it.toString()) }
+        hiddenModeEnabled?.let {
+          setAsyncStorageValue(database, "@kiosk_hidden_mode_enabled", it.toString())
+        }
+        appBlockingEnabled?.let {
+          setAsyncStorageValue(database, "@kiosk_app_blocking_enabled", it.toString())
+        }
+        networkBlockingEnabled?.let {
+          setAsyncStorageValue(database, "@kiosk_network_blocking_enabled", it.toString())
+        }
+        requestedNetworkRules?.let {
+          setAsyncStorageValue(database, "@kiosk_network_block_rules", it)
+        }
+        database.setTransactionSuccessful()
+      } finally {
+        database.endTransaction()
+      }
+    }
+    BlockedAppPolicy.reconcile(this)
+    KioskWatchdogService.reconcileService(this)
+    if (networkBlockingEnabled != null || requestedNetworkRules != null) {
+      val effectiveEnabled = networkBlockingEnabled ?: getAsyncStorageValue(
+        "@kiosk_network_blocking_enabled",
+        "false",
+      ).toBoolean()
+      val effectiveRules = requestedNetworkRules ?: getAsyncStorageValue(
+        "@kiosk_network_block_rules",
+        "[]",
+      )
+      NetworkBlockPolicy.configure(this, effectiveEnabled, effectiveRules, false)
+    }
+  }
+
   /**
    * Apply full JSON configuration to SharedPreferences (pending config)
    */
@@ -1908,6 +2040,9 @@ class MainActivity : ReactActivity() {
       "lock_package" to "@kiosk_external_app_package",
       "display_mode" to "@kiosk_display_mode",
       "kiosk_enabled" to "@kiosk_enabled",
+      "hidden_mode_enabled" to "@kiosk_hidden_mode_enabled",
+      "app_blocking_enabled" to "@kiosk_app_blocking_enabled",
+      "network_blocking_enabled" to "@kiosk_network_blocking_enabled",
       "auto_launch" to "@kiosk_auto_launch",
       "auto_relaunch" to "@kiosk_auto_relaunch_app",
       "screensaver_enabled" to "@screensaver_enabled",
@@ -1950,6 +2085,9 @@ class MainActivity : ReactActivity() {
     if (config.has("lock_package") && !config.has("display_mode")) {
       editor.putString("@kiosk_display_mode", "external_app")
     }
+    if (config.optBoolean("hidden_mode_enabled", false)) {
+      editor.putString("@kiosk_enabled", "false")
+    }
 
     // MQTT password requires special handling (goes to secure Keychain, not AsyncStorage)
     if (config.has("mqtt_password")) {
@@ -1976,8 +2114,18 @@ class MainActivity : ReactActivity() {
             validApp.put("packageName", pkg)
             validApp.put("displayName", displayName)
             validApp.put("showOnHomeScreen", appObj.optBoolean("showOnHomeScreen", true))
-            validApp.put("launchOnBoot", appObj.optBoolean("launchOnBoot", false))
-            validApp.put("keepAlive", appObj.optBoolean("keepAlive", false))
+            if (appObj.has("groupId") && !appObj.isNull("groupId")) {
+              validApp.put("groupId", appObj.optString("groupId"))
+            } else {
+              validApp.put("groupId", org.json.JSONObject.NULL)
+            }
+            validApp.put("displayOrder", appObj.optInt("displayOrder", i))
+            val microAppId = appObj.optString("microAppId", "")
+            val isMicroApp = microAppId.isNotEmpty() && MicroAppCatalog.isValidId(microAppId)
+            if (isMicroApp) validApp.put("microAppId", microAppId)
+            // A micro-app opens through its own intent; boot/keep-alive would open the host editor.
+            validApp.put("launchOnBoot", !isMicroApp && appObj.optBoolean("launchOnBoot", false))
+            validApp.put("keepAlive", !isMicroApp && appObj.optBoolean("keepAlive", false))
             validApp.put("allowAccessibility", appObj.optBoolean("allowAccessibility", false))
             validatedApps.put(validApp)
           } catch (e: android.content.pm.PackageManager.NameNotFoundException) {
@@ -1992,10 +2140,72 @@ class MainActivity : ReactActivity() {
       }
     }
 
+    if (config.has("app_groups")) {
+      try {
+        editor.putString("@kiosk_app_groups", config.getJSONArray("app_groups").toString())
+      } catch (e: Exception) {
+        android.util.Log.e("FreeKiosk-ADB", "Invalid app_groups in JSON config: ${e.message}")
+      }
+    }
+
+    if (config.has("blocked_apps")) {
+      try {
+        editor.putString(
+          "@kiosk_blocked_apps",
+          validateBlockedApps(config.getJSONArray("blocked_apps")).toString()
+        )
+      } catch (e: Exception) {
+        android.util.Log.e("FreeKiosk-ADB", "Invalid blocked_apps in JSON config: ${e.message}")
+      }
+    }
+
+    if (config.has("network_block_rules")) {
+      try {
+        editor.putString(
+          "@kiosk_network_block_rules",
+          config.getJSONArray("network_block_rules").toString(),
+        )
+      } catch (e: Exception) {
+        android.util.Log.e("FreeKiosk-ADB", "Invalid network_block_rules in JSON config: ${e.message}")
+      }
+    }
+
     // If external_app_mode is set to multi, ensure display_mode is external_app
     if (config.optString("external_app_mode") == "multi" && !config.has("display_mode")) {
       editor.putString("@kiosk_display_mode", "external_app")
     }
+  }
+
+  /** Validate ADB/JSON blocked-app input and resolve stable display names. */
+  private fun validateBlockedApps(apps: org.json.JSONArray): org.json.JSONArray {
+    val result = org.json.JSONArray()
+    val seen = mutableSetOf<String>()
+    val packagePattern = Regex("^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$")
+    for (index in 0 until apps.length()) {
+      val entry = apps.opt(index)
+      val packageName = when (entry) {
+        is String -> entry.trim()
+        is org.json.JSONObject -> entry.optString("packageName").trim()
+        else -> ""
+      }
+      if (!packagePattern.matches(packageName) || packageName == this.packageName || !seen.add(packageName)) {
+        continue
+      }
+      try {
+        val appInfo = packageManager.getApplicationInfo(packageName, 0)
+        val suppliedName = (entry as? org.json.JSONObject)?.optString("displayName").orEmpty().trim()
+        result.put(org.json.JSONObject().apply {
+          put("packageName", packageName)
+          put(
+            "displayName",
+            suppliedName.ifEmpty { packageManager.getApplicationLabel(appInfo).toString() }
+          )
+        })
+      } catch (_: android.content.pm.PackageManager.NameNotFoundException) {
+        android.util.Log.w("FreeKiosk-ADB", "Blocked app not installed, skipping: $packageName")
+      }
+    }
+    return result
   }
   
   /**

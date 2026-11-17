@@ -2,11 +2,16 @@ import BaseAsyncStorage from '@react-native-async-storage/async-storage';
 import { BlockingRegion } from '../types/blockingOverlay';
 import { ScreenScheduleRule } from '../types/screenScheduler';
 import { DashboardTile } from '../types/dashboard';
+import { normalizeAdminAccessPosition } from '../types/adminAccessPosition';
 import { ManagedApp } from '../types/managedApps';
+import { BlockedApp, normalizeBlockedApps } from '../types/blockedApps';
+import { AppGroup } from '../types/appGroups';
+import { normalizeAppGroups } from './appGroupLayout';
 import { MediaItem, MediaFitMode } from '../types/mediaPlayer';
 import { saveSecureApiKey, getSecureApiKey, clearSecureApiKey, clearSecureMqttPassword } from './secureStorage';
 import { scheduleSettingsSnapshot } from './SettingsHistoryService';
 import { DEFAULT_WALLPAPER_POSITION, isWallpaperPosition, WallpaperPosition } from '../types/wallpaper';
+import { NetworkBlockRule, normalizeNetworkBlockRules } from '../types/networkBlocking';
 
 // All configuration writes in this service pass through this wrapper so a
 // debounced, import-compatible history snapshot is created after each change.
@@ -35,6 +40,10 @@ const KEYS = {
   PIN: '@kiosk_pin',
   AUTO_RELOAD: '@kiosk_auto_reload',
   KIOSK_ENABLED: '@kiosk_enabled',
+  HIDDEN_MODE_ENABLED: '@kiosk_hidden_mode_enabled',
+  APP_BLOCKING_ENABLED: '@kiosk_app_blocking_enabled',
+  NETWORK_BLOCKING_ENABLED: '@kiosk_network_blocking_enabled',
+  NETWORK_BLOCK_RULES: '@kiosk_network_block_rules',
   AUTO_LAUNCH: '@kiosk_auto_launch',
   SCREEN_LOCK_COMPAT: '@kiosk_screen_lock_compat',
   DEFAULT_LAUNCHER: '@kiosk_default_launcher',
@@ -102,7 +111,7 @@ const KEYS = {
   RETURN_TAP_COUNT: '@kiosk_return_tap_count',
   RETURN_TAP_TIMEOUT: '@kiosk_return_tap_timeout',
   RETURN_MODE: '@kiosk_return_mode', // 'tap_anywhere' | 'button'
-  RETURN_BUTTON_POSITION: '@kiosk_return_button_position', // 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+  RETURN_BUTTON_POSITION: '@kiosk_return_button_position', // Nine-point dashboard/PIN access position
   KIOSK_HOME_BUTTON_ENABLED: '@kiosk_home_button_enabled',
   KIOSK_HOME_BUTTON_POSITION: '@kiosk_home_button_position', // 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
   VOLUME_UP_5TAP_ENABLED: '@kiosk_volume_up_5tap_enabled',
@@ -174,6 +183,9 @@ const KEYS = {
   BETA_UPDATES_ENABLED: '@kiosk_beta_updates_enabled',
   // Managed Apps (multi-app mode, background apps, accessibility whitelist)
   MANAGED_APPS: '@kiosk_managed_apps',
+  APP_GROUPS: '@kiosk_app_groups',
+  // Apps hidden by Device Owner while independent App Blocking is active
+  BLOCKED_APPS: '@kiosk_blocked_apps',
   // Media Player
   MEDIA_PLAYER_ITEMS: '@kiosk_media_player_items',
   MEDIA_PLAYER_AUTOPLAY: '@kiosk_media_player_autoplay',
@@ -285,6 +297,80 @@ export const StorageService = {
     }
   },
 
+  saveHiddenModeEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.HIDDEN_MODE_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving hidden mode:', error);
+    }
+  },
+
+  getHiddenModeEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.HIDDEN_MODE_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting hidden mode:', error);
+      return false;
+    }
+  },
+
+  saveAppBlockingEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.APP_BLOCKING_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving app blocking:', error);
+    }
+  },
+
+  getAppBlockingEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.APP_BLOCKING_ENABLED);
+      if (value !== null) return JSON.parse(value);
+      // Migration: an existing selected list represented an active blocking policy.
+      return (await StorageService.getBlockedApps()).length > 0;
+    } catch (error) {
+      console.error('Error getting app blocking:', error);
+      return false;
+    }
+  },
+
+  saveNetworkBlockingEnabled: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.NETWORK_BLOCKING_ENABLED, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving network blocking:', error);
+    }
+  },
+
+  getNetworkBlockingEnabled: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.NETWORK_BLOCKING_ENABLED);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting network blocking:', error);
+      return false;
+    }
+  },
+
+  saveNetworkBlockRules: async (rules: NetworkBlockRule[]): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.NETWORK_BLOCK_RULES, JSON.stringify(normalizeNetworkBlockRules(rules)));
+    } catch (error) {
+      console.error('Error saving network block rules:', error);
+    }
+  },
+
+  getNetworkBlockRules: async (): Promise<NetworkBlockRule[]> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.NETWORK_BLOCK_RULES);
+      return normalizeNetworkBlockRules(value ? JSON.parse(value) : []);
+    } catch (error) {
+      console.error('Error getting network block rules:', error);
+      return [];
+    }
+  },
+
   //AUTOLAUNCH
   saveAutoLaunch: async (value: boolean): Promise<void> => {
     try {
@@ -369,6 +455,8 @@ export const StorageService = {
         KEYS.PIN,
         KEYS.AUTO_RELOAD,
         KEYS.KIOSK_ENABLED,
+        KEYS.HIDDEN_MODE_ENABLED,
+        KEYS.APP_BLOCKING_ENABLED,
         KEYS.AUTO_LAUNCH,
         KEYS.SCREENSAVER_ENABLED,
         KEYS.SCREENSAVER_INACTIVITY_ENABLED,
@@ -505,6 +593,8 @@ export const StorageService = {
         KEYS.HTTP_BASIC_AUTH_USERNAME,
         // Managed Apps
         KEYS.MANAGED_APPS,
+        KEYS.APP_GROUPS,
+        KEYS.BLOCKED_APPS,
         // Legacy keys
         KEYS.SCREENSAVER_DELAY,
         KEYS.MOTION_DETECTION_ENABLED,
@@ -1025,16 +1115,59 @@ export const StorageService = {
       if (!value) return [];
       const parsed = JSON.parse(value);
       // Ensure backward compatibility: add missing fields with defaults
-      return parsed.map((app: any) => ({
-        packageName: app.packageName || '',
-        displayName: app.displayName || app.packageName || '',
-        showOnHomeScreen: app.showOnHomeScreen ?? true,
-        launchOnBoot: app.launchOnBoot ?? false,
-        keepAlive: app.keepAlive ?? false,
-        allowAccessibility: app.allowAccessibility ?? false,
-      }));
+      return parsed.map((app: any, index: number) => {
+        const microAppId = typeof app.microAppId === 'string' && app.microAppId ? app.microAppId : undefined;
+        return {
+          packageName: app.packageName || '',
+          displayName: app.displayName || app.packageName || '',
+          ...(microAppId ? { microAppId } : {}),
+          showOnHomeScreen: app.showOnHomeScreen ?? true,
+          groupId: typeof app.groupId === 'string' && app.groupId ? app.groupId : null,
+          displayOrder: Number.isFinite(app.displayOrder) ? Number(app.displayOrder) : index,
+          // Package-wide behaviors never apply to a micro-app entry (see createMicroApp).
+          launchOnBoot: !microAppId && (app.launchOnBoot ?? false),
+          keepAlive: !microAppId && (app.keepAlive ?? false),
+          allowAccessibility: !microAppId && (app.allowAccessibility ?? false),
+        };
+      });
     } catch (error) {
       console.error('Error getting managed apps:', error);
+      return [];
+    }
+  },
+
+  saveBlockedApps: async (apps: BlockedApp[]): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.BLOCKED_APPS, JSON.stringify(normalizeBlockedApps(apps)));
+    } catch (error) {
+      console.error('Error saving blocked apps:', error);
+    }
+  },
+
+  getBlockedApps: async (): Promise<BlockedApp[]> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.BLOCKED_APPS);
+      return normalizeBlockedApps(value ? JSON.parse(value) : []);
+    } catch (error) {
+      console.error('Error getting blocked apps:', error);
+      return [];
+    }
+  },
+
+  saveAppGroups: async (groups: AppGroup[]): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.APP_GROUPS, JSON.stringify(normalizeAppGroups(groups)));
+    } catch (error) {
+      console.error('Error saving app groups:', error);
+    }
+  },
+
+  getAppGroups: async (): Promise<AppGroup[]> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.APP_GROUPS);
+      return normalizeAppGroups(value ? JSON.parse(value) : []);
+    } catch (error) {
+      console.error('Error getting app groups:', error);
       return [];
     }
   },
@@ -1704,7 +1837,10 @@ export const StorageService = {
   // RETURN BUTTON POSITION
   saveReturnButtonPosition: async (value: string): Promise<void> => {
     try {
-      await AsyncStorage.setItem(KEYS.RETURN_BUTTON_POSITION, value);
+      await AsyncStorage.setItem(
+        KEYS.RETURN_BUTTON_POSITION,
+        normalizeAdminAccessPosition(value),
+      );
     } catch (error) {
       console.error('Error saving return button position:', error);
     }
@@ -1713,7 +1849,7 @@ export const StorageService = {
   getReturnButtonPosition: async (): Promise<string> => {
     try {
       const value = await AsyncStorage.getItem(KEYS.RETURN_BUTTON_POSITION);
-      return value || 'bottom-right'; // Default bottom-right
+      return normalizeAdminAccessPosition(value);
     } catch (error) {
       console.error('Error getting return button position:', error);
       return 'bottom-right';

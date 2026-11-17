@@ -1,6 +1,6 @@
 {
   "name": "FreeKiosk",
-  "version": "1.2.53",
+  "version": "1.2.68",
   "private": true,
   "scripts": {
     "android": "react-native run-android",

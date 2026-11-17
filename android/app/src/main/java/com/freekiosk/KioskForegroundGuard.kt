@@ -6,6 +6,8 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.database.sqlite.SQLiteDatabase
 import android.os.Handler
 import android.os.Looper
@@ -41,6 +43,15 @@ object KioskForegroundGuard {
      */
     @Volatile
     private var activeKioskPackage: String? = null
+
+    /**
+     * Exact intent used to open [activeKioskPackage] when it is not the package's own
+     * launcher entry (e.g. one MicroAppStation micro-app). Recovery reuses it so a child
+     * returns to the same micro-app instead of the host's editor. Process-scoped like
+     * the package itself.
+     */
+    @Volatile
+    private var activeLaunchIntent: Intent? = null
 
     /**
      * True while FreeKiosk is showing the PIN or authenticated administration UI.
@@ -153,12 +164,19 @@ object KioskForegroundGuard {
      * The time limit only bridges native/AsyncStorage and OEM window-order races;
      * the persistent lock-task allowlist remains the long-term policy boundary.
      */
-    fun authorizeKioskLaunch(context: Context, packageName: String) {
+    fun authorizeKioskLaunch(
+        context: Context,
+        packageName: String,
+        launchIntent: Intent? = null,
+    ) {
         if (packageName.isBlank() || packageName == context.packageName) return
         clearLegacyPersistedState(context)
         adminSessionActive = false
         activeKioskPackage?.takeIf { it != packageName }?.let(temporaryAllowedPackages::remove)
         activeKioskPackage = packageName
+        activeLaunchIntent = launchIntent
+            ?.takeIf { it.`package` == packageName || it.component?.packageName == packageName }
+            ?.let(::Intent)
         temporaryAllowedPackages[packageName] = System.currentTimeMillis() + 15_000L
         lastUserFacingPackage = packageName
     }
@@ -167,12 +185,58 @@ object KioskForegroundGuard {
         clearLegacyPersistedState(context)
         activeKioskPackage?.let(temporaryAllowedPackages::remove)
         activeKioskPackage = null
+        activeLaunchIntent = null
         lastUserFacingPackage = null
+    }
+
+    /**
+     * Intent that returns the child to the active selection. A MicroAppStation host
+     * without its recorded micro-app intent yields null: its launcher Activity is the
+     * micro-app editor, which must never open inside the child kiosk.
+     */
+    fun getRelaunchIntent(context: Context, packageName: String): Intent? {
+        activeLaunchIntent
+            ?.takeIf { packageName == activeKioskPackage }
+            ?.let { return Intent(it) }
+        if (MicroAppCatalog.isHostPackage(packageName)) return null
+        return context.packageManager.getLaunchIntentForPackage(packageName)
     }
 
     fun getActiveKioskPackage(context: Context): String? {
         clearLegacyPersistedState(context)
         return activeKioskPackage
+    }
+
+    /**
+     * Rebuild the process-scoped child session after FreeKiosk's process was replaced or
+     * reclaimed while Android kept an allowed app visible inside strict lock task.
+     *
+     * This deliberately does not persist a package across reboot. Recovery is permitted only
+     * when the currently resumed Activity is still a configured child-facing app, kiosk mode
+     * is saved as enabled, and Device Owner lock task is already fully LOCKED. A normal boot
+     * therefore still fails closed to the FreeKiosk grid, while an in-place APK update can
+     * immediately restore the mandatory close control above the still-running child app.
+     */
+    fun recoverActiveKioskPackageFromForeground(context: Context): String? {
+        clearLegacyPersistedState(context)
+        if (adminSessionActive || !isStrictLockTaskActive(context)) return null
+        if (readStorageValue(context, "@kiosk_enabled", "false") != "true") return null
+
+        activeKioskPackage?.let { active ->
+            if (active != context.packageName && getLockTaskPackages(context).contains(active)) {
+                return active
+            }
+        }
+
+        val foregroundPackage = getTopRunningPackage(context)
+            ?.takeIf { it != context.packageName }
+            ?: return null
+        if (!getUserFacingPackages(context).contains(foregroundPackage)) return null
+        if (!getLockTaskPackages(context).contains(foregroundPackage)) return null
+
+        authorizeKioskLaunch(context, foregroundPackage)
+        Log.w(TAG, "Recovered active child session from foreground: $foregroundPackage")
+        return foregroundPackage
     }
 
     fun beginAdminSession(context: Context) {
@@ -300,7 +364,7 @@ object KioskForegroundGuard {
         val activePackage = getActiveKioskPackage(context)
         val targetPackage = activePackage
             ?.takeIf { canRelaunchActiveExternalPackage(context, it) }
-            ?.takeIf { context.packageManager.getLaunchIntentForPackage(it) != null }
+            ?.takeIf { getRelaunchIntent(context, it) != null }
             ?: context.packageName
 
         // Avoid delivering CLEAR_TOP to the already-visible FreeKiosk activity. In a
@@ -318,7 +382,7 @@ object KioskForegroundGuard {
             val intent = if (targetPackage == context.packageName) {
                 Intent(context, MainActivity::class.java)
             } else {
-                context.packageManager.getLaunchIntentForPackage(targetPackage)
+                getRelaunchIntent(context, targetPackage)
                     ?: Intent(context, MainActivity::class.java)
             }.apply {
                 addFlags(
@@ -352,6 +416,75 @@ object KioskForegroundGuard {
             packages.addAll(readHomeScreenManagedApps(context))
         }
         return packages
+    }
+
+    /**
+     * Repair child apps left hidden or suspended by an interrupted legacy Close All cycle.
+     * Explicitly blocked apps always win and are never restored here.
+     */
+    fun restoreConfiguredChildAppVisibility(
+        context: Context,
+        requestedPackage: String? = null,
+    ): Set<String> {
+        val appContext = context.applicationContext
+        val dpm = appContext.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
+            ?: return emptySet()
+        if (!dpm.isDeviceOwnerApp(appContext.packageName)) return emptySet()
+
+        val blockedPackages = if (BlockedAppPolicy.isAppBlockingEnabled(appContext)) {
+            BlockedAppPolicy.configuredInstalledPackages(appContext)
+        } else {
+            emptySet()
+        }
+        val configuredPackages = getUserFacingPackages(appContext)
+            .asSequence()
+            .filter { it != appContext.packageName && it !in blockedPackages }
+            .filter { requestedPackage == null || it == requestedPackage }
+            .toSet()
+        if (configuredPackages.isEmpty()) return emptySet()
+
+        val admin = ComponentName(appContext, DeviceAdminReceiver::class.java)
+        val packageManager = appContext.packageManager
+        val restored = mutableSetOf<String>()
+        configuredPackages.forEach { packageName ->
+            val applicationInfo = try {
+                packageManager.getApplicationInfo(
+                    packageName,
+                    PackageManager.MATCH_DISABLED_COMPONENTS or
+                        PackageManager.MATCH_UNINSTALLED_PACKAGES,
+                )
+            } catch (_: PackageManager.NameNotFoundException) {
+                return@forEach
+            }
+            if (applicationInfo.flags and ApplicationInfo.FLAG_INSTALLED == 0) return@forEach
+
+            try {
+                if (dpm.isApplicationHidden(admin, packageName) &&
+                    dpm.setApplicationHidden(admin, packageName, false)) {
+                    restored.add(packageName)
+                }
+            } catch (error: Exception) {
+                Log.e(TAG, "Could not restore hidden child app $packageName: ${error.message}")
+            }
+
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N &&
+                applicationInfo.flags and ApplicationInfo.FLAG_SUSPENDED != 0) {
+                try {
+                    val failures = dpm.setPackagesSuspended(
+                        admin,
+                        arrayOf(packageName),
+                        false,
+                    )
+                    if (!failures.contains(packageName)) restored.add(packageName)
+                } catch (error: Exception) {
+                    Log.e(TAG, "Could not resume child app $packageName: ${error.message}")
+                }
+            }
+        }
+        if (restored.isNotEmpty()) {
+            Log.w(TAG, "Restored configured child-app visibility: ${restored.sorted()}")
+        }
+        return restored
     }
 
     private fun getPreferredKioskPackage(

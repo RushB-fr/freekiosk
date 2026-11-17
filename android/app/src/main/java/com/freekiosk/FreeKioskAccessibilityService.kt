@@ -61,6 +61,7 @@ class FreeKioskAccessibilityService : AccessibilityService() {
     private var wafRightEdgeShield: View? = null
     private var wafCloseAppButton: View? = null
     private var wafAdminTapTarget: View? = null
+    private var wafAdminPosition: String? = null
     private var wafEdgesMaskSystemBars = false
     private val wafEdgeHandler = Handler(Looper.getMainLooper())
     private val wafEdgeReconcile = object : Runnable {
@@ -85,6 +86,14 @@ class FreeKioskAccessibilityService : AccessibilityService() {
             private set
         
         fun isRunning(): Boolean = instance != null
+
+        /** The accessibility global Home action is allowed even when Android rejects a
+         * background Activity launch from the watchdog foreground service. */
+        fun returnHomeForBlockedApp(): Boolean =
+            instance?.performGlobalAction(GLOBAL_ACTION_HOME) == true
+
+        /** Best-effort live foreground owner used alongside UsageEvents by Hidden Mode. */
+        fun currentForegroundPackage(): String? = instance?.getActualTopPackage()
 
         fun refreshWafEdgeShields() {
             instance?.updateWafEdgeShields()
@@ -676,6 +685,11 @@ class FreeKioskAccessibilityService : AccessibilityService() {
         }
         
         Log.i(TAG, "FreeKiosk Accessibility Service connected (API ${Build.VERSION.SDK_INT})")
+        getActualTopPackage()?.let { BlockedAppGuard.rejectIfBlocked(this, it) }
+        // Accessibility is often the first FreeKiosk component rebound after an in-place APK
+        // update. If Android kept an allowed child Activity visible, restore its overlay
+        // service immediately instead of waiting for a new app launch.
+        OverlayService.ensureMandatoryCloseControl(this)
         wafEdgeHandler.removeCallbacks(wafEdgeReconcile)
         wafEdgeHandler.post(wafEdgeReconcile)
     }
@@ -705,6 +719,7 @@ class FreeKioskAccessibilityService : AccessibilityService() {
         updateWafEdgeShields()
         val eventPackage = event.packageName?.toString()
         if (eventPackage.isNullOrBlank()) return
+        if (BlockedAppGuard.rejectIfBlocked(this, eventPackage)) return
         // Overlay windows are attributed to com.freekiosk while the child Activity remains
         // the real foreground owner. Publish the Activity owner so the close control cannot
         // flap every time an overlay window is re-pinned.
@@ -762,6 +777,7 @@ class FreeKioskAccessibilityService : AccessibilityService() {
         }
 
         val shouldMaskSystemBars = externalChildSessionActive
+        val configuredAdminPosition = AdminAccessPosition.read(this)
         val edgesReady =
             wafTopEdgeShield?.isAttachedToWindow == true &&
                 wafBottomEdgeShield?.isAttachedToWindow == true &&
@@ -770,7 +786,8 @@ class FreeKioskAccessibilityService : AccessibilityService() {
                 wafEdgesMaskSystemBars == shouldMaskSystemBars
         val controlsReady = if (externalChildSessionActive) {
             wafCloseAppButton?.isAttachedToWindow == true &&
-                wafAdminTapTarget?.isAttachedToWindow == true
+                wafAdminTapTarget?.isAttachedToWindow == true &&
+                wafAdminPosition == configuredAdminPosition
         } else {
             wafCloseAppButton == null && wafAdminTapTarget == null
         }
@@ -829,11 +846,14 @@ class FreeKioskAccessibilityService : AccessibilityService() {
             // control first, tiny transparent admin corner second (above it).
             removeWafExternalControls(windowManager)
             wafCloseAppButton = addWafCloseButton(windowManager)
-            // Keep the legacy multi-tap admin target reachable at the extreme corner.
-            // It is intentionally added after the visible Close All control so its tiny
-            // 8 dp hit area owns only the final corner pixels; the rest of the 32 dp square
-            // remains a normal one-tap close target.
-            wafAdminTapTarget = addWafAdminTapTarget(windowManager)
+            // Add after Close All so the configured admin zone owns its exact target. At
+            // bottom-right it remains a tiny corner subset; the other eight anchors use the
+            // full 32 dp zone because they do not overlap the mandatory close control.
+            wafAdminTapTarget = addWafAdminTapTarget(
+                windowManager,
+                configuredAdminPosition,
+            )
+            wafAdminPosition = configuredAdminPosition
         } else {
             removeWafExternalControls(windowManager)
         }
@@ -882,9 +902,14 @@ class FreeKioskAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun addWafAdminTapTarget(windowManager: WindowManager): View? {
+    private fun addWafAdminTapTarget(
+        windowManager: WindowManager,
+        position: String,
+    ): View? {
         val density = resources.displayMetrics.density
-        val sizePx = (8 * density).toInt().coerceAtLeast(16)
+        val sizePx = (AdminAccessPosition.externalTargetDp(position) * density)
+            .toInt()
+            .coerceAtLeast(16)
         val target = View(this).apply {
             setBackgroundColor(Color.TRANSPARENT)
             isClickable = true
@@ -899,7 +924,7 @@ class FreeKioskAccessibilityService : AccessibilityService() {
                 WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             PixelFormat.TRANSLUCENT,
         ).apply {
-            gravity = Gravity.BOTTOM or Gravity.END
+            gravity = AdminAccessPosition.gravity(position)
             x = 0
             y = 0
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -939,5 +964,6 @@ class FreeKioskAccessibilityService : AccessibilityService() {
         }
         wafCloseAppButton = null
         wafAdminTapTarget = null
+        wafAdminPosition = null
     }
 }

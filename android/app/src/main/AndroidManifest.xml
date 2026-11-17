@@ -66,6 +66,8 @@
             <action android:name="com.android.phone.EmergencyDialer.DIAL" />
         </intent>
         <package android:name="com.android.phone" />
+        <!-- MicroAppStation catalog provider (micro-apps on the multi-app home screen). -->
+        <package android:name="local.microstation" />
     </queries>
 
     <application
@@ -182,6 +184,13 @@
           <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
           <category android:name="android.intent.category.DEFAULT" />
         </intent-filter>
+        <intent-filter>
+          <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+        </intent-filter>
+        <intent-filter>
+          <action android:name="android.intent.action.PACKAGE_REPLACED" />
+          <data android:scheme="package" />
+        </intent-filter>
       </receiver>
 
       <!-- Service d'overlay pour bouton retour en mode External App -->
@@ -215,6 +224,23 @@
         <property
           android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
           android:value="kiosk_watchdog"/>
+      </service>
+
+      <!-- Device-wide domain/IP denylist. Device Owner configures this as the always-on VPN;
+           only DNS endpoints and blocked destinations enter the split tunnel. -->
+      <service
+        android:name=".NetworkBlockVpnService"
+        android:permission="android.permission.BIND_VPN_SERVICE"
+        android:enabled="true"
+        android:exported="false"
+        android:directBootAware="true"
+        android:foregroundServiceType="specialUse">
+        <intent-filter>
+          <action android:name="android.net.VpnService" />
+        </intent-filter>
+        <property
+          android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+          android:value="device_wide_network_filter"/>
       </service>
 
       <!-- Receiver for silent installation results (disabled in Play Store builds) -->

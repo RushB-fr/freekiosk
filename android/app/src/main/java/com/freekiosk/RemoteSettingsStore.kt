@@ -23,6 +23,8 @@ object RemoteSettingsStore {
         Definition("@kiosk_url", "string"),
         Definition("@kiosk_auto_reload", "boolean"),
         Definition("@kiosk_enabled", "boolean"),
+        Definition("@kiosk_hidden_mode_enabled", "boolean"),
+        Definition("@kiosk_app_blocking_enabled", "boolean"),
         Definition("@kiosk_auto_launch", "boolean"),
         Definition("@kiosk_screen_lock_compat", "boolean"),
         Definition("@kiosk_default_launcher", "boolean"),
@@ -132,6 +134,8 @@ object RemoteSettingsStore {
         Definition("@kiosk_mqtt_motion_always_on", "boolean"),
         Definition("@kiosk_beta_updates_enabled", "boolean"),
         Definition("@kiosk_managed_apps", "json"),
+        Definition("@kiosk_app_groups", "json"),
+        Definition("@kiosk_blocked_apps", "json"),
         Definition("@kiosk_media_player_items", "json"),
         Definition("@kiosk_media_player_autoplay", "boolean"),
         Definition("@kiosk_media_player_loop", "boolean"),
@@ -208,6 +212,19 @@ object RemoteSettingsStore {
             unset.add(key)
         }
 
+        val kioskRequested = encodedValues["@kiosk_enabled"] == "true"
+        val hiddenRequested = encodedValues["@kiosk_hidden_mode_enabled"] == "true"
+        if (kioskRequested && hiddenRequested) {
+            throw IllegalArgumentException("Lock Mode and Hidden Mode cannot both be enabled")
+        }
+        if (hiddenRequested) {
+            encodedValues["@kiosk_enabled"] = "false"
+            unset.remove("@kiosk_enabled")
+        } else if (kioskRequested) {
+            encodedValues["@kiosk_hidden_mode_enabled"] = "false"
+            unset.remove("@kiosk_hidden_mode_enabled")
+        }
+
         val path = context.getDatabasePath(DATABASE_NAME).absolutePath
         SQLiteDatabase.openDatabase(path, null, SQLiteDatabase.OPEN_READWRITE).use { database ->
             database.beginTransaction()
@@ -236,6 +253,31 @@ object RemoteSettingsStore {
         }
 
         val changed = encodedValues.keys + unset
+        val backgroundPolicyKeys = setOf(
+            "@kiosk_enabled",
+            "@kiosk_hidden_mode_enabled",
+            "@kiosk_app_blocking_enabled",
+            "@kiosk_blocked_apps",
+        )
+        var backgroundPolicyWarning: String? = null
+        if (changed.any { it in backgroundPolicyKeys }) {
+            runCatching {
+                val blocked = BlockedAppPolicy.reconcile(context)
+                val expected = if (BlockedAppPolicy.isAppBlockingEnabled(context)) {
+                    BlockedAppPolicy.configuredInstalledPackages(context)
+                } else {
+                    emptySet()
+                }
+                val refused = expected - blocked
+                if (refused.isNotEmpty()) {
+                    backgroundPolicyWarning =
+                        "Android refused to hide or suspend: ${refused.sorted().joinToString(", ")}"
+                }
+                KioskWatchdogService.reconcileService(context)
+            }.onFailure { error ->
+                backgroundPolicyWarning = "Background policy reconciliation failed: ${error.message}"
+            }
+        }
         return JSONObject().apply {
             put("updated", JSONArray(encodedValues.keys.toList()))
             put("unset", JSONArray(unset.toList()))
@@ -244,6 +286,7 @@ object RemoteSettingsStore {
                 if (changed.isNotEmpty()) {
                     put("Changes are saved. Restart the FreeKiosk UI to apply them.")
                 }
+                backgroundPolicyWarning?.let { put(it) }
                 if ("@kiosk_enabled" in changed) {
                     put("Lock Mode changes take effect after the FreeKiosk UI restarts.")
                 }
@@ -325,7 +368,7 @@ object RemoteSettingsStore {
             key.contains("volume_up_5tap") || key.contains("back_button_") ||
             key.contains("keyboard_mode") || key.contains("pin_mode") ||
             key.contains("pin_max_attempts") -> "Access & Escape"
-        key.contains("allow_") || key.contains("block_factory") ||
+        key.contains("allow_") || key.contains("block_factory") || key.contains("blocked_apps") ||
             key.contains("default_launcher") || key.contains("screen_lock") ||
             key == "@kiosk_enabled" -> "Lock Mode & Security"
         else -> "General"

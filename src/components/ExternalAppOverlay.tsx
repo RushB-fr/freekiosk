@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, FlatList, useWindowDimensions, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, useWindowDimensions, Dimensions } from 'react-native';
 import StatusBar from './StatusBar';
-import AppLauncherModule, { AppInfo } from '../utils/AppLauncherModule';
-import { ManagedApp } from '../types/managedApps';
+import AppLauncherModule from '../utils/AppLauncherModule';
+import { ManagedApp, getManagedAppKey } from '../types/managedApps';
+import { AppGroup } from '../types/appGroups';
+import { getAppsInGroup, getChildGroups, getGroupPath, normalizeAppGroups } from '../utils/appGroupLayout';
 import { DEFAULT_WALLPAPER_POSITION, WallpaperPosition } from '../types/wallpaper';
+import { getAdminAccessPositionStyle } from '../types/adminAccessPosition';
 
 const DEFAULT_WALLPAPER = require('../assets/images/wallpaper.png');
 
@@ -12,6 +15,8 @@ interface ExternalAppOverlayProps {
   externalAppPackage: string | null;
   /** Managed apps list for multi-app home screen */
   managedApps?: ManagedApp[];
+  /** Row and nested-folder definitions for the multi-app home screen. */
+  appGroups?: AppGroup[];
   /** External app sub-mode: single (classic) or multi (grid) */
   externalAppMode?: 'single' | 'multi';
   /** Background color for the external-app kiosk screens */
@@ -32,7 +37,7 @@ interface ExternalAppOverlayProps {
   returnTapTimeout?: number;
   /** Whether the return button is visible (button mode only) */
   returnButtonVisible?: boolean;
-  /** Button position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' */
+  /** Fixed dashboard/PIN access position using the shared nine-point screen grid. */
   returnButtonPosition?: string;
   showStatusBar?: boolean;
   showBattery?: boolean;
@@ -44,12 +49,13 @@ interface ExternalAppOverlayProps {
   onReturnToApp: () => void;
   onGoToSettings: () => void;
   /** Called when user taps an app in the multi-app grid */
-  onLaunchApp?: (packageName: string) => void;
+  onLaunchApp?: (packageName: string, microAppId?: string) => void;
 }
 
 const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
   externalAppPackage,
   managedApps = [],
+  appGroups = [],
   externalAppMode = 'single',
   backgroundColor = '#333',
   backgroundImageEnabled = true,
@@ -100,6 +106,7 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
 
   const [appLabels, setAppLabels] = useState<Record<string, string>>({});
   const [appIcons, setAppIcons] = useState<Record<string, string>>({});
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const defaultWallpaperSize = Image.resolveAssetSource(DEFAULT_WALLPAPER);
   const [wallpaperSize, setWallpaperSize] = useState({
     width: defaultWallpaperSize.width,
@@ -220,29 +227,26 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
     }, returnTapTimeout);
   }, [returnTapCount, returnTapTimeout, onGoToSettings]);
 
-  // Button position style (same positions as WebView / OverlayService)
-  const buttonPositionStyle = useMemo(() => {
-    switch (returnButtonPosition) {
-      case 'top-left': return { top: 20, left: 20 };
-      case 'top-right': return { top: 20, right: 20 };
-      case 'bottom-left': return { bottom: 20, left: 20 };
-      case 'bottom-right':
-      default: return { bottom: 20, right: 20 };
-    }
-  }, [returnButtonPosition]);
+  const buttonPositionStyle = useMemo(
+    () => getAdminAccessPositionStyle(returnButtonPosition),
+    [returnButtonPosition],
+  );
   
-  // Only show multi-app grid when explicitly in multi mode.
-  const homeScreenApps = useMemo(
-    () => externalAppMode === 'multi'
-      ? managedApps.filter(app => app.showOnHomeScreen)
-      : [],
-    [externalAppMode, managedApps],
+  // Only show the organized app home when explicitly in multi mode. Invalid/deleted group
+  // references fail safely into the root Apps row so an allowed app can never disappear.
+  const normalizedGroups = useMemo(() => normalizeAppGroups(appGroups), [appGroups]);
+  const validGroupIds = useMemo(
+    () => new Set(normalizedGroups.map(group => group.id)),
+    [normalizedGroups],
   );
+  const homeScreenApps = useMemo(() => externalAppMode === 'multi'
+    ? managedApps
+      .filter(app => app.showOnHomeScreen)
+      .map(app => app.groupId && !validGroupIds.has(app.groupId) ? { ...app, groupId: null } : app)
+    : [],
+  [externalAppMode, managedApps, validGroupIds]);
   const isMultiAppMode = externalAppMode === 'multi' && homeScreenApps.length > 0;
-  const appGridNumColumns = Math.max(
-    1,
-    Math.min(maxColumnsForWidth, homeScreenApps.length || 1),
-  );
+  const appGridNumColumns = Math.max(1, maxColumnsForWidth);
   const appGridAvailableWidth =
     windowWidth -
     APP_GRID_HORIZONTAL_PADDING * 2 -
@@ -253,28 +257,56 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
   );
 
   const homeScreenAppPackagesKey = homeScreenApps
-    .map(app => app.packageName)
+    .map(getManagedAppKey)
     .sort()
     .join('|');
+
+  useEffect(() => {
+    if (activeGroupId && !validGroupIds.has(activeGroupId)) {
+      setActiveGroupId(null);
+    }
+  }, [activeGroupId, validGroupIds]);
   
   // Resolve app labels and icons for display
   useEffect(() => {
     const resolveLabelsAndIcons = async () => {
       const labels: Record<string, string> = {};
       const icons: Record<string, string> = {};
-      const appsToResolve = isMultiAppMode ? homeScreenApps : 
+      const appsToResolve: Array<Pick<ManagedApp, 'packageName' | 'displayName' | 'microAppId'>> =
+        isMultiAppMode ? homeScreenApps :
         (externalAppPackage ? [{ packageName: externalAppPackage, displayName: '' }] : []);
-      
+      // Live micro-app names so a rename in MicroAppStation shows without re-adding.
+      const microAppNames = new Map<string, string>();
+      if (appsToResolve.some(app => app.microAppId)) {
+        try {
+          (await AppLauncherModule.getMicroApps()).forEach(app => {
+            if (app.name) microAppNames.set(getManagedAppKey(app), app.name);
+          });
+        } catch {
+          // Host unavailable — keep the saved display names
+        }
+      }
+
       await Promise.all(appsToResolve.map(async (app) => {
+        const key = getManagedAppKey(app);
+        if (app.microAppId) {
+          labels[key] = microAppNames.get(key) || app.displayName || 'Micro-app';
+          try {
+            icons[key] = await AppLauncherModule.getMicroAppIcon(app.packageName, app.microAppId, 128);
+          } catch {
+            // No icon available — fallback to initials
+          }
+          return;
+        }
         try {
           const label = await AppLauncherModule.getPackageLabel(app.packageName);
-          labels[app.packageName] = label;
+          labels[key] = label;
         } catch {
-          labels[app.packageName] = ('displayName' in app && app.displayName) || app.packageName;
+          labels[key] = app.displayName || app.packageName;
         }
         try {
           const icon = await AppLauncherModule.getAppIcon(app.packageName, 128);
-          icons[app.packageName] = icon;
+          icons[key] = icon;
         } catch {
           // No icon available — fallback to initials
         }
@@ -283,35 +315,25 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
       setAppIcons(icons);
     };
     resolveLabelsAndIcons();
-  }, [homeScreenAppPackagesKey, externalAppPackage, isMultiAppMode]);
+  }, [homeScreenAppPackagesKey, externalAppPackage, homeScreenApps, isMultiAppMode]);
 
-  const sortedHomeScreenApps = useMemo(() => {
-    const appName = (app: ManagedApp) =>
-      appLabels[app.packageName] || app.displayName || app.packageName;
-
-    return [...homeScreenApps].sort((firstApp, secondApp) =>
-      appName(firstApp).localeCompare(appName(secondApp), undefined, {
-        sensitivity: 'base',
-        numeric: true,
-      }),
-    );
-  }, [appLabels, homeScreenApps]);
-
-  const handleAppPress = (packageName: string) => {
+  const handleAppPress = (item: ManagedApp) => {
     if (onLaunchApp) {
-      onLaunchApp(packageName);
+      onLaunchApp(item.packageName, item.microAppId);
     }
   };
 
-  const renderAppIcon = ({ item }: { item: ManagedApp }) => {
-    const label = appLabels[item.packageName] || item.displayName || item.packageName.split('.').pop() || '?';
+  const renderAppIcon = (item: ManagedApp) => {
+    const key = getManagedAppKey(item);
+    const label = appLabels[key] || item.displayName || item.packageName.split('.').pop() || '?';
     const initials = label.substring(0, 2).toUpperCase();
-    const iconUri = appIcons[item.packageName];
+    const iconUri = appIcons[key];
     
     return (
       <TouchableOpacity
+        key={key}
         style={[styles.appIconContainer, { width: appTileWidth }]}
-        onPress={() => handleAppPress(item.packageName)}
+        onPress={() => handleAppPress(item)}
         activeOpacity={0.7}
       >
         {iconUri ? (
@@ -331,6 +353,69 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
       </TouchableOpacity>
     );
   };
+
+  const renderNestedGroup = (group: AppGroup, depth: number) => (
+    <TouchableOpacity
+      key={group.id}
+      style={[styles.nestedGroupCard, { marginLeft: Math.min(depth, 3) * 12 }]}
+      activeOpacity={0.75}
+      onPress={() => setActiveGroupId(group.id)}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${group.name} group`}
+    >
+      <View style={styles.nestedFolderIcon}>
+        <Text style={styles.nestedFolderGlyph}>▦</Text>
+      </View>
+      <View style={styles.nestedGroupInfo}>
+        <Text style={styles.nestedGroupName}>{group.name}</Text>
+        <Text style={styles.nestedGroupCount}>
+          {getAppsInGroup(homeScreenApps, group.id).length} apps
+          {getChildGroups(normalizedGroups, group.id).length > 0
+            ? ` · ${getChildGroups(normalizedGroups, group.id).length} groups`
+            : ''}
+        </Text>
+      </View>
+      <Text style={styles.nestedChevron}>›</Text>
+    </TouchableOpacity>
+  );
+
+  const renderGroupNode = (group: AppGroup, depth = 0): React.ReactNode => {
+    if (group.displayMode === 'nested') return renderNestedGroup(group, depth);
+    const apps = getAppsInGroup(homeScreenApps, group.id);
+    const children = getChildGroups(normalizedGroups, group.id);
+    return (
+      <View key={group.id} style={[styles.appGroupSection, depth > 0 && styles.childGroupSection]}>
+        {apps.length > 0 && (
+          <View style={styles.appTileWrap}>{apps.map(renderAppIcon)}</View>
+        )}
+        {apps.length === 0 && children.length === 0 && (
+          <Text style={styles.emptyGroupText}>No apps in this group</Text>
+        )}
+        {children.map(child => renderGroupNode(child, depth + 1))}
+      </View>
+    );
+  };
+
+  const activeGroup = activeGroupId
+    ? normalizedGroups.find(group => group.id === activeGroupId) ?? null
+    : null;
+  const currentParentId = activeGroup?.id ?? null;
+  const currentApps = getAppsInGroup(homeScreenApps, currentParentId);
+  const currentGroups = getChildGroups(normalizedGroups, currentParentId);
+
+  const renderOrganizedContent = () => (
+    <>
+      {currentApps.length > 0 && (
+        <View style={styles.appGroupSection}>
+          <View style={styles.appTileWrap}>{currentApps.map(renderAppIcon)}</View>
+        </View>
+      )}
+      {currentGroups.map(group => renderGroupNode(group))}
+      {currentApps.length === 0 && currentGroups.length === 0 && (
+        <Text style={styles.emptyGroupText}>No apps in this group</Text>
+      )}
+    </>
+  );
 
   // Keep the kiosk home rendered behind the external task. Android places the
   // selected app above this activity; if a vendor build refuses the launch, the
@@ -357,17 +442,29 @@ const ExternalAppOverlay: React.FC<ExternalAppOverlayProps> = ({
           />
           <Text style={styles.multiAppTitle}>FreeKiosk</Text>
         </View>
-        <FlatList
-          key={`app-grid-${appGridNumColumns}`}
-          data={sortedHomeScreenApps}
-          renderItem={renderAppIcon}
-          keyExtractor={item => item.packageName}
-          numColumns={appGridNumColumns}
+        {activeGroup && (
+          <View style={styles.nestedHeader}>
+            <TouchableOpacity
+              style={styles.nestedBackButton}
+              onPress={() => setActiveGroupId(activeGroup.parentGroupId)}
+              accessibilityRole="button"
+              accessibilityLabel="Back to parent group"
+            >
+              <Text style={styles.nestedBackGlyph}>‹</Text>
+            </TouchableOpacity>
+            <View style={styles.nestedHeaderText}>
+              <Text style={styles.nestedEyebrow}>APP GROUP</Text>
+              <Text style={styles.nestedTitle} numberOfLines={1}>{getGroupPath(normalizedGroups, activeGroup.id)}</Text>
+            </View>
+          </View>
+        )}
+        <ScrollView
           style={styles.appGridList}
           contentContainerStyle={styles.appGrid}
-          columnWrapperStyle={appGridNumColumns > 1 ? styles.appGridRow : undefined}
           showsVerticalScrollIndicator={false}
-        />
+        >
+          {renderOrganizedContent()}
+        </ScrollView>
         
         {/* Test mode warning */}
         {backButtonMode === 'test' && (
@@ -683,11 +780,120 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 16,
     paddingVertical: 24,
-    gap: 20,
+    gap: 16,
   },
-  appGridRow: {
+  appGroupSection: {
+    width: '100%',
+    maxWidth: 1040,
+    alignSelf: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  childGroupSection: {
+    marginTop: 12,
+  },
+  appTileWrap: {
+    width: '100%',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 12,
+    alignItems: 'flex-start',
+    columnGap: 12,
+    rowGap: 8,
+  },
+  nestedGroupCard: {
+    width: '100%',
+    maxWidth: 1040,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(9, 22, 31, 0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: 14,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    marginBottom: 4,
+  },
+  nestedFolderIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(239, 108, 34, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 108, 34, 0.55)',
+    marginRight: 12,
+  },
+  nestedFolderGlyph: {
+    color: '#FF9A59',
+    fontSize: 23,
+    fontWeight: '700',
+  },
+  nestedGroupInfo: {
+    flex: 1,
+  },
+  nestedGroupName: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  nestedGroupCount: {
+    color: 'rgba(255, 255, 255, 0.65)',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  nestedChevron: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 30,
+    lineHeight: 32,
+    marginLeft: 10,
+  },
+  nestedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 4,
+    backgroundColor: 'rgba(4, 12, 18, 0.62)',
+  },
+  nestedBackButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    marginRight: 12,
+  },
+  nestedBackGlyph: {
+    color: '#fff',
+    fontSize: 34,
+    lineHeight: 36,
+  },
+  nestedHeaderText: {
+    flex: 1,
+  },
+  nestedEyebrow: {
+    color: '#FF9A59',
+    fontSize: 9,
+    letterSpacing: 1.2,
+    fontWeight: '700',
+  },
+  nestedTitle: {
+    color: '#fff',
+    fontSize: 19,
+    fontWeight: '700',
+    marginTop: 1,
+  },
+  emptyGroupText: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 13,
+    textAlign: 'center',
+    paddingVertical: 18,
   },
   appIconContainer: {
     alignSelf: 'center',

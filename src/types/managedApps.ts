@@ -14,9 +14,22 @@ export interface ManagedApp {
   /** Human-readable display name (cached from PackageManager) */
   displayName: string;
 
+  /**
+   * MicroAppStation micro-app id. When set, this entry is one URL "app" hosted by
+   * `packageName` (local.microstation) and opens directly into that micro-app.
+   * Several entries can share the host package, so use getManagedAppKey() for identity.
+   */
+  microAppId?: string;
+
   // --- #67: Multi-App Mode ---
   /** Show this app on the kiosk home screen grid */
   showOnHomeScreen: boolean;
+
+  /** Optional home-screen group. null/undefined keeps the app in the root Apps row. */
+  groupId?: string | null;
+
+  /** Explicit position inside its group (or the root Apps row). */
+  displayOrder?: number;
 
   // --- #37: Background Apps ---
   /** Launch this app in the background on device boot */
@@ -42,10 +55,41 @@ export function createManagedApp(
     packageName,
     displayName,
     showOnHomeScreen: true,
+    groupId: null,
+    displayOrder: 0,
     launchOnBoot: false,
     keepAlive: false,
     allowAccessibility: false,
     ...overrides,
+  };
+}
+
+/** Stable identity of a managed entry; micro-apps share their host package name. */
+export function getManagedAppKey(app: Pick<ManagedApp, 'packageName' | 'microAppId'>): string {
+  return app.microAppId ? `${app.packageName}#${app.microAppId}` : app.packageName;
+}
+
+export function isMicroApp(app: Pick<ManagedApp, 'microAppId'>): boolean {
+  return Boolean(app.microAppId);
+}
+
+/**
+ * Create a home-screen entry for a MicroAppStation micro-app. Boot launch, keep-alive and
+ * accessibility apply to whole packages, so they stay off: they would open the host's
+ * editor rather than this micro-app.
+ */
+export function createMicroApp(
+  packageName: string,
+  microAppId: string,
+  displayName: string,
+  overrides?: Partial<ManagedApp>,
+): ManagedApp {
+  return {
+    ...createManagedApp(packageName, displayName, overrides),
+    microAppId,
+    launchOnBoot: false,
+    keepAlive: false,
+    allowAccessibility: false,
   };
 }
 

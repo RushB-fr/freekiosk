@@ -22,6 +22,24 @@ class AppLauncherModule(reactContext: ReactApplicationContext) : ReactContextBas
 
     @ReactMethod
     fun launchExternalApp(packageName: String, promise: Promise) {
+        launchAllowedApp(packageName, null, promise)
+    }
+
+    /**
+     * Launch one MicroAppStation micro-app directly into its web view. The host package is
+     * what Android lock task, the allowlist, and the return overlay track; the exact
+     * micro-app intent is recorded so recovery reopens it rather than the host's editor.
+     */
+    @ReactMethod
+    fun launchMicroApp(packageName: String, microAppId: String, promise: Promise) {
+        if (!MicroAppCatalog.isHostPackage(packageName) || !MicroAppCatalog.isValidId(microAppId)) {
+            promise.reject("INVALID_MICRO_APP", "Not a MicroAppStation micro-app: $packageName/$microAppId")
+            return
+        }
+        launchAllowedApp(packageName, microAppId, promise)
+    }
+
+    private fun launchAllowedApp(packageName: String, microAppId: String?, promise: Promise) {
         try {
             // PIN/Settings own the foreground until the route explicitly returns to
             // Kiosk. Reject delayed AppState, API, or timer callbacks that were queued
@@ -34,12 +52,38 @@ class AppLauncherModule(reactContext: ReactApplicationContext) : ReactContextBas
                 return
             }
 
+            KioskForegroundGuard.restoreConfiguredChildAppVisibility(
+                reactApplicationContext,
+                packageName,
+            )
             val pm = reactApplicationContext.packageManager
-            val launchIntent = pm.getLaunchIntentForPackage(packageName)
+            val microAppIntent = microAppId?.let { MicroAppCatalog.launchIntent(packageName, it) }
+            if (microAppId != null) {
+                // The host silently finishes for an unpublished or deleted micro-app, which
+                // would bounce straight back and spin the relaunch watchdog.
+                val entry = MicroAppCatalog.find(reactApplicationContext, microAppId)
+                if (entry == null || !entry.published || microAppIntent?.resolveActivity(pm) == null) {
+                    promise.reject(
+                        "MICRO_APP_UNAVAILABLE",
+                        "Micro-app $microAppId is missing or unpublished in $packageName"
+                    )
+                    return
+                }
+            }
+            val launchIntent = if (microAppIntent != null) {
+                // CLEAR_TASK: start the micro-app fresh instead of stacking it on another
+                // micro-app left in the shared host task.
+                Intent(microAppIntent).addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                )
+            } else {
+                pm.getLaunchIntentForPackage(packageName)?.apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                }
+            }
 
             if (launchIntent != null) {
-                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                launchIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
 
                 val currentActivity = reactApplicationContext.currentActivity
                 val kioskProtectionRequired =
@@ -243,7 +287,8 @@ class AppLauncherModule(reactContext: ReactApplicationContext) : ReactContextBas
                 // The selection is process-scoped and cannot survive into a stale reboot loop.
                 KioskForegroundGuard.authorizeKioskLaunch(
                     reactApplicationContext,
-                    packageName
+                    packageName,
+                    microAppIntent,
                 )
                 MainActivity.blockAutoRelaunch = false
                 KioskForegroundGuard.noteAllowedForeground(reactApplicationContext, packageName)
@@ -284,6 +329,10 @@ class AppLauncherModule(reactContext: ReactApplicationContext) : ReactContextBas
     @ReactMethod
     fun isAppInstalled(packageName: String, promise: Promise) {
         try {
+            KioskForegroundGuard.restoreConfiguredChildAppVisibility(
+                reactApplicationContext,
+                packageName,
+            )
             val pm = reactApplicationContext.packageManager
             pm.getPackageInfo(packageName, 0)
             promise.resolve(true)
@@ -414,6 +463,45 @@ class AppLauncherModule(reactContext: ReactApplicationContext) : ReactContextBas
                 promise.reject("APP_NOT_FOUND", "Application with package name $packageName is not installed")
             } catch (e: Exception) {
                 promise.reject("ERROR_GET_ICON", "Failed to get app icon: ${e.message}")
+            }
+        }
+    }
+
+    /** Micro-apps offered by MicroAppStation; empty when the host is not installed. */
+    @ReactMethod
+    fun getMicroApps(promise: Promise) {
+        executor.execute {
+            try {
+                val result = Arguments.createArray()
+                MicroAppCatalog.list(reactApplicationContext)
+                    .sortedBy { it.name.lowercase() }
+                    .forEach { entry ->
+                        result.pushMap(Arguments.createMap().apply {
+                            putString("packageName", MicroAppCatalog.HOST_PACKAGE)
+                            putString("microAppId", entry.id)
+                            putString("name", entry.name)
+                            putBoolean("published", entry.published)
+                        })
+                    }
+                promise.resolve(result)
+            } catch (e: Exception) {
+                promise.reject("ERROR_GET_MICRO_APPS", "Failed to list micro-apps: ${e.message}")
+            }
+        }
+    }
+
+    @ReactMethod
+    fun getMicroAppIcon(packageName: String, microAppId: String, size: Int, promise: Promise) {
+        executor.execute {
+            val icon = if (MicroAppCatalog.isHostPackage(packageName)) {
+                MicroAppCatalog.iconDataUri(reactApplicationContext, microAppId, size)
+            } else {
+                null
+            }
+            if (icon != null) {
+                promise.resolve(icon)
+            } else {
+                promise.reject("ICON_NOT_FOUND", "No icon for micro-app $microAppId")
             }
         }
     }

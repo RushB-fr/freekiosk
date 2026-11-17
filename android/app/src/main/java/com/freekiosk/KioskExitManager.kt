@@ -30,13 +30,6 @@ object KioskExitManager {
     private const val PENDING_CONFIG_PREFS = "FreeKioskPendingConfig"
     private const val WATCHDOG_NOTIFICATION_ID = 2002
     private const val PROCESS_KILL_DELAY_MS = 750L
-    private val SAMSUNG_UPDATE_PACKAGES = arrayOf(
-        "com.samsung.android.app.updatecenter",
-        "com.sec.android.fotaclient",
-        "com.wssyncmldm",
-        "com.samsung.android.sdm.config",
-        "com.sec.android.soagent",
-    )
 
     /**
      * Schedule an exit after [delayMs]. The REST API uses a short delay so NanoHTTPD can flush its
@@ -165,9 +158,8 @@ object KioskExitManager {
                     )
                 }.onFailure { warnings.addWarning("restore lock-task features", it) }
             }
-            runCatching {
-                policyManager.setPackagesSuspended(admin, SAMSUNG_UPDATE_PACKAGES, false)
-            }.onFailure { warnings.addWarning("resume Samsung update packages", it) }
+            runCatching { BlockedAppPolicy.reconcile(context, kioskActive = false) }
+                .onFailure { warnings.addWarning("reconcile independent blocked packages", it) }
             runCatching { policyManager.setSystemUpdatePolicy(admin, null) }
                 .onFailure { warnings.addWarning("restore system-update policy", it) }
         }
@@ -177,6 +169,9 @@ object KioskExitManager {
         // the Device Owner calls above so REST exits remain complete without a foreground UI.
         runCatching { activity?.disableKioskRestrictions() }
             .onFailure { warnings.addWarning("disable kiosk restrictions", it) }
+
+        runCatching { KioskWatchdogService.reconcileService(context) }
+            .onFailure { warnings.addWarning("restart background policy service", it) }
 
         if (activityManager.lockTaskModeState != ActivityManager.LOCK_TASK_MODE_NONE) {
             val warning = "stop lock task: Android still reports lock-task mode after cleanup"

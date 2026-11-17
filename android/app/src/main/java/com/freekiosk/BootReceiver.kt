@@ -91,6 +91,25 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED ||
+            intent.action == Intent.ACTION_PACKAGE_REPLACED) {
+            DebugLog.d("BootReceiver", "Package update detected: ${intent.data}")
+            WirelessDebugPolicy.reapply(context)
+            runCatching { NetworkBlockPolicy.reconcile(context) }
+                .onFailure { DebugLog.errorProduction("BootReceiver", "Network Protection reconcile failed: ${it.message}") }
+            reEnableAccessibilityIfDeviceOwner(context)
+            val kioskEnabled = isKioskEnabled(context)
+            BlockedAppPolicy.reconcile(context, kioskActive = kioskEnabled)
+            startKioskWatchdogIfNeeded(context)
+            if (kioskEnabled) {
+                // Android may leave the allowed child task in LOCKED state while replacing
+                // FreeKiosk. Recreate both the watchdog and mandatory Close All overlay from
+                // the verified foreground package without requiring the child app to reopen.
+                OverlayService.ensureMandatoryCloseControl(context)
+            }
+            return
+        }
+
         if (intent.action == Intent.ACTION_BOOT_COMPLETED ||
             intent.action == "android.intent.action.QUICKBOOT_POWERON" ||
             intent.action == "android.intent.action.REBOOT" ||
@@ -101,6 +120,8 @@ class BootReceiver : BroadcastReceiver() {
             // This policy is deliberately independent of Lock Mode / auto-launch. Admin access
             // must remain available even while the kiosk UI is stopped or before CE unlock.
             WirelessDebugPolicy.reapply(context)
+            runCatching { NetworkBlockPolicy.reconcile(context) }
+                .onFailure { DebugLog.errorProduction("BootReceiver", "Network Protection reconcile failed: ${it.message}") }
 
             // ── LOCKED_BOOT_COMPLETED: CE (user-encrypted) storage is NOT yet available ──
             // Any read from RKStorage (SQLite) will fail and return its safe default (false).
@@ -135,6 +156,17 @@ class BootReceiver : BroadcastReceiver() {
 
             // Re-enable accessibility service if Device Owner (includes managed apps whitelist)
             reEnableAccessibilityIfDeviceOwner(context)
+
+            val kioskEnabled = isKioskEnabled(context)
+            BlockedAppPolicy.reconcile(context, kioskActive = kioskEnabled)
+            // App Blocking and Hidden Mode need the background path even when auto-launch is off.
+            startKioskWatchdogIfNeeded(context)
+
+            if (BlockedAppPolicy.isHiddenModeEnabled(context) && !kioskEnabled) {
+                DebugLog.d("BootReceiver", "Hidden Mode active — keeping FreeKiosk UI in background")
+                updateDeBootFlag(context, false)
+                return
+            }
 
             // Check if auto-launch is enabled before doing anything else
             if (!isAutoLaunchEnabled(context)) {
@@ -272,22 +304,13 @@ class BootReceiver : BroadcastReceiver() {
         }, 3000) // 3 second delay to ensure system is ready
     }
 
-    /**
-     * Start KioskWatchdogService if kiosk mode is enabled (#96).
-     * The service uses START_STICKY so Android restarts it after OOM kills.
-     */
+    /** Reconcile the shared Lock Mode / Hidden Mode / App Blocking policy service. */
     private fun startKioskWatchdogIfNeeded(context: Context) {
-        if (!isKioskEnabled(context)) return
         try {
-            val serviceIntent = Intent(context, KioskWatchdogService::class.java)
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                context.startForegroundService(serviceIntent)
-            } else {
-                context.startService(serviceIntent)
-            }
-            DebugLog.d("BootReceiver", "KioskWatchdogService started")
+            KioskWatchdogService.reconcileService(context)
+            DebugLog.d("BootReceiver", "Policy service reconciled")
         } catch (e: Exception) {
-            DebugLog.errorProduction("BootReceiver", "Failed to start KioskWatchdogService: ${e.message}")
+            DebugLog.errorProduction("BootReceiver", "Failed to reconcile policy service: ${e.message}")
         }
     }
     
