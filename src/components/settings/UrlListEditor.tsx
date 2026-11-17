@@ -15,6 +15,7 @@ import {
 import { Colors, Spacing, Typography } from '../../theme';
 import Icon from '../Icon';
 import { useTranslation } from 'react-i18next';
+import { hasUsableHost } from '../../utils/urlInput';
 
 interface UrlListEditorProps {
   urls: string[];
@@ -48,8 +49,8 @@ const UrlListEditor: React.FC<UrlListEditorProps> = ({
       return trimmed.length >= 2;
     }
     
-    // Basic validation - must have a domain
-    if (!trimmed.includes('.')) return false;
+    // Basic validation - must name a host (a dot is not needed: myserver:1124, #385)
+    if (!hasUsableHost(trimmed)) return false;
     
     // Reject dangerous protocols
     if (trimmed.startsWith('file://') || 

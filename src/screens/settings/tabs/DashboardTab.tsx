@@ -19,6 +19,7 @@ import { getTileColor, MATERIAL_PALETTE } from '../../../utils/dashboardColors';
 import { StorageService } from '../../../utils/storage';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTranslation } from 'react-i18next';
+import { hasUsableHost } from '../../../utils/urlInput';
 
 interface DashboardTabProps {
   dashboardModeEnabled: boolean;
@@ -137,7 +138,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ dashboardModeEnabled }) => 
       return;
     }
     if (!urlLower.startsWith('http://') && !urlLower.startsWith('https://')) {
-      if (finalUrl.includes('.')) {
+      if (hasUsableHost(finalUrl)) {
         finalUrl = 'https://' + finalUrl;
       } else {
         Alert.alert(t('dashboard.errors.invalidUrl'), t('dashboard.errors.enterValidUrl'));
