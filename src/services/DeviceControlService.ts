@@ -42,6 +42,8 @@ export interface DeviceInfo {
   model: string;
   manufacturer: string;
   androidVersion: string;
+  /** #300: Settings.Secure.ANDROID_ID, a stable identifier per tablet. Absent when unreadable. */
+  androidId?: string;
 }
 
 export interface WifiStatus {
@@ -228,6 +230,7 @@ class DeviceControlServiceClass {
     let model = '';
     let manufacturer = '';
     let androidVersion = '';
+    let androidId = '';
     let uptime = 0;
     try {
       if (KioskModule?.getStorageInfo) {
@@ -243,6 +246,7 @@ class DeviceControlServiceClass {
         model = sys.model || '';
         manufacturer = sys.manufacturer || '';
         androidVersion = sys.androidVersion || '';
+        androidId = sys.androidId || '';
         uptime = sys.uptimeSeconds || 0;
       }
     } catch (error) {
@@ -261,6 +265,7 @@ class DeviceControlServiceClass {
       model,
       manufacturer,
       androidVersion,
+      ...(androidId ? { androidId } : {}),
     };
   }
 

@@ -475,6 +475,8 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             put("deviceName", Build.DEVICE)
             put("product", Build.PRODUCT)
             put("uptime", android.os.SystemClock.elapsedRealtime() / 1000)
+            // #300: a stable identifier per tablet (see KioskModule.androidId), left out when unreadable
+            com.freekiosk.KioskModule.androidId(reactContext)?.let { put("androidId", it) }
         }
         status.put("device", deviceStatus)
         
