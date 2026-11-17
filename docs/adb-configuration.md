@@ -230,7 +230,7 @@ Every key below is a straight passthrough: the value you pass is stored as-is.
 | `--es overlay_button_position "bottom-right"` | Corner for that button |
 | `--ei pin_max_attempts 5` | Wrong-PIN attempts before lockout |
 | `--es screen_orientation "landscape"` | FreeKiosk's orientation: `auto` (follow the device), `portrait`, `landscape`, `reverse_portrait` or `reverse_landscape`. Not applied to an external app |
-| `--es keyboard_mode "default"` | On-screen keyboard: `default`, `force_numeric`, `smart` or `none` (no on-screen keyboard; a scanner still types into the fields) |
+| `--es keyboard_mode "default"` | On-screen keyboard: `default`, `force_numeric`, `smart` or `none` (no on-screen keyboard; a scanner still types into the fields). Some third-party keyboards (SwiftKey on a Huawei MediaPad M5 Lite, reported in #148) still show their suggestion bar and capitalize the first character of every scan: install a blank input method ("Null Keyboard") and make it the default, keeping your usual keyboard enabled to type the PIN |
 
 **Lockdown**
 
