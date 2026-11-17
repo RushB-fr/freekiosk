@@ -109,6 +109,20 @@ export function defaultUserAgent(): string {
   return `Mozilla/5.0 (Linux; Android 13; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0${mobile} Safari/537.36`;
 }
 
+/**
+ * Why the page failed to load, for the error screen (#143): the description Android gives, such
+ * as "net::ERR_NAME_NOT_RESOLVED" or "SSL error: The host name does not match the certificate".
+ * Before, every failure read the same "Loading Error", and the cause stayed in the logs.
+ * It carries no address, so it is safe next to "Hide the URL on the error screen".
+ */
+export function loadErrorReason(nativeEvent: { description?: unknown } | null | undefined): string | null {
+  const description = typeof nativeEvent?.description === 'string' ? nativeEvent.description.trim() : '';
+  if (!description) {
+    return null;
+  }
+  return description.length > 200 ? description.slice(0, 200) + '…' : description;
+}
+
 const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(({ 
   url, 
   autoReload,
@@ -154,6 +168,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   const containerViewRef = useRef<View>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<boolean>(false);
+  const [errorReason, setErrorReason] = useState<string | null>(null);
   // The loading overlay follows the device's dark theme, so a dark dashboard is not
   // preceded by a white flash on every load.
   const darkLoading = useColorScheme() === 'dark';
@@ -1350,6 +1365,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
 
   const handleError = (event: WebViewErrorEvent): void => {
     console.error('[FreeKiosk] WebView error:', event.nativeEvent);
+    setErrorReason(loadErrorReason(event.nativeEvent));
     setError(true);
     setLoading(false);
     
@@ -1387,6 +1403,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
     // Show the error overlay (with the fallback settings button) for any other
     // main-page HTTP error code, regardless of autoReload — otherwise the user is stranded
     // with no way back to settings when the page can't load (#180).
+    setErrorReason('HTTP ' + statusCode);
     setError(true);
     setLoading(false);
     webViewRef.current?.injectJavaScript('window.location.href = "about:blank"; true;');
@@ -1857,6 +1874,9 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
           <Text style={styles.errorText}>{t('components.webView.loadingError')}</Text>
           {!hideErrorUrl && (
             <Text style={styles.errorSubtext}>{t('components.webView.urlLabel', { url })}</Text>
+          )}
+          {errorReason !== null && (
+            <Text style={styles.errorSubtext}>{t('components.webView.errorReason', { reason: errorReason })}</Text>
           )}
           {autoReload && (
             <Text style={styles.helpText}>

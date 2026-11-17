@@ -1306,6 +1306,7 @@
       "loadingError": "Błąd wczytywania",
       "loading": "Wczytywanie...",
       "urlLabel": "URL: {{url}}",
+      "errorReason": "Przyczyna: {{reason}}",
       "autoReloadText": "Automatyczne przeładowanie za 5 sekund...",
       "reloadNow": "Przeładuj teraz",
       "fallbackSettingsHint": "Dotknij 5× przycisku ustawień, aby wrócić do ustawień",
