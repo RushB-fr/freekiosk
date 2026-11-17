@@ -16,7 +16,7 @@
     feature. Many cheap Android TV boxes ship a ROM that omits it; without it
     DevicePolicyManagerService runs with mHasFeature = false, so setDeviceOwner()
     returns false and setActiveAdmin() becomes a silent no-op (`dpm
-    set-active-admin` still prints "Success" — it does not check the result).
+    set-active-admin` still prints "Success" - it does not check the result).
     With -Fix, and on a device that grants `adb root`, the script declares the
     feature in /system/etc/permissions and reboots.
 
@@ -94,7 +94,7 @@ if (-not $deviceLines) { throw "No device in 'device' state. Check 'adb devices'
 
 if (-not $Serial) {
     if ($deviceLines.Count -gt 1) {
-        throw "$($deviceLines.Count) devices attached — pass -Serial to pick one."
+        throw "$($deviceLines.Count) devices attached - pass -Serial to pick one."
     }
     $Serial = ($deviceLines[0] -split '\s+')[0]
 }
@@ -119,7 +119,7 @@ if ($Remove) {
         Write-Bad $out.Trim()
         if ($out -match 'non-test admin|SecurityException') {
             Write-Warn "the installed APK is not android:testOnly=`"true`", so the device owner"
-            Write-Warn "cannot be removed over adb — a factory reset is the only way to clear it"
+            Write-Warn "cannot be removed over adb - a factory reset is the only way to clear it"
         }
     }
     return
@@ -135,7 +135,7 @@ Write-Step "Preflight"
 if ((Invoke-Shell "pm list packages $package") -match [regex]::Escape("package:$package")) {
     Write-Ok "$package is installed"
 } else {
-    Write-Bad "$package is NOT installed — install the APK first"
+    Write-Bad "$package is NOT installed - install the APK first"
     $blockers += 'package-missing'
 }
 
@@ -143,7 +143,7 @@ if ((Invoke-Shell "pm list packages $package") -match [regex]::Escape("package:$
 #    replaced after removing the existing one (or a factory reset).
 $policy = Invoke-Shell 'dumpsys device_policy'
 if ($policy -match 'Device Owner:') {
-    Write-Bad "a device owner is already set — factory reset to change it (-Remove works only on testOnly builds)"
+    Write-Bad "a device owner is already set - factory reset to change it (-Remove works only on testOnly builds)"
     ($policy -split "`n" | Select-String 'admin=' | Select-Object -First 1) |
         ForEach-Object { Write-Host "           $($_.ToString().Trim())" }
     $blockers += 'has-device-owner'
@@ -151,7 +151,7 @@ if ($policy -match 'Device Owner:') {
     Write-Ok "no existing device owner"
 }
 if ($policy -match 'Profile Owner:') {
-    Write-Bad "a profile owner is set on this user — remove it first"
+    Write-Bad "a profile owner is set on this user - remove it first"
     $blockers += 'has-profile-owner'
 }
 
@@ -161,7 +161,7 @@ $users = @((Invoke-Shell 'pm list users') -split "`n" | Select-String 'UserInfo\
 if ($users.Count -le 1) {
     Write-Ok "single user on device"
 } else {
-    Write-Bad "$($users.Count) users exist — remove secondary users (pm remove-user <id>)"
+    Write-Bad "$($users.Count) users exist - remove secondary users (pm remove-user <id>)"
     $users | ForEach-Object { Write-Host "           $($_.ToString().Trim())" }
     $blockers += 'multi-user'
 }
@@ -173,11 +173,11 @@ if ($accounts -match 'Accounts:\s*(\d+)') {
     if ($n -eq 0) {
         Write-Ok "no accounts on device"
     } else {
-        Write-Bad "$n account(s) present — remove every account under Settings > Accounts"
+        Write-Bad "$n account(s) present - remove every account under Settings > Accounts"
         $blockers += 'accounts'
     }
 } else {
-    Write-Warn "could not read account count from dumpsys — remove all accounts if provisioning fails"
+    Write-Warn "could not read account count from dumpsys - remove all accounts if provisioning fails"
 }
 
 # 5. device_admin system feature present? Absent on many Android TV ROMs.
@@ -185,7 +185,7 @@ $hasFeature = (Invoke-Shell 'pm list features') -match [regex]::Escape($FeatureN
 if ($hasFeature) {
     Write-Ok "$FeatureName is declared"
 } else {
-    Write-Bad "$FeatureName is MISSING — DevicePolicyManagerService is disabled on this ROM"
+    Write-Bad "$FeatureName is MISSING - DevicePolicyManagerService is disabled on this ROM"
     $blockers += 'no-feature'
 }
 
@@ -206,7 +206,7 @@ if ($blockers -contains 'no-feature') {
     Start-Sleep -Seconds 2
     Invoke-Adb wait-for-device | Out-Null
     if ((Invoke-Shell 'id') -notmatch 'uid=0') {
-        Write-Bad "adb root unavailable ($($rootOut.Trim())) — this ROM is locked down; the box cannot be provisioned without reflashing"
+        Write-Bad "adb root unavailable ($($rootOut.Trim())) - this ROM is locked down; the box cannot be provisioned without reflashing"
         return
     }
     Write-Ok "running adbd as root"
