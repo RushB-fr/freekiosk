@@ -247,6 +247,17 @@ tasks.whenTaskAdded { task ->
 project.ext.vectoricons = [iconFontNames: ['MaterialCommunityIcons.ttf']]
 apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")
 
+// The third-party notices travel with the APK, as the Apache-2.0 and BSD-3-Clause licenses of what it
+// carries (PDF.js, the icon font, NanoHTTPD, HiveMQ...) ask for their texts to be passed on. One source:
+// THIRD-PARTY-NOTICES.md at the root of the repository, copied into the assets at build time.
+def thirdPartyNoticesDir = layout.buildDirectory.dir('generated/third-party-notices')
+def copyThirdPartyNotices = tasks.register('copyThirdPartyNotices', Copy) {
+    from rootProject.file('../THIRD-PARTY-NOTICES.md')
+    into thirdPartyNoticesDir
+}
+android.sourceSets.main.assets.srcDir(thirdPartyNoticesDir)
+tasks.named('preBuild') { dependsOn(copyThirdPartyNotices) }
+
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
