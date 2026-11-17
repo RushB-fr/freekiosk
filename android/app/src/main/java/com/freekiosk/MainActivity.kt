@@ -286,6 +286,7 @@ class MainActivity : ReactActivity() {
     hasStarted = true  // #222: tells BootLockActivity the hand-off really happened
 
     installTvFocusRing()
+    installTvAlertFocus()
 
     // Keep screen always on
     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -1273,6 +1274,30 @@ class MainActivity : ReactActivity() {
         cornerRadius = 8 * density
       }
     }
+  }
+
+  // ===== Android TV: an alert opens with its button focused (#365) =====
+  // React Native's Alert is a native dialog, and the system leaves its buttons unfocused. With a
+  // remote, OK then does nothing until DOWN has moved the focus onto a button, so a message such
+  // as "Invalid URL" looked stuck. This puts the focus on a button as the dialog starts: the
+  // negative one when there is one (Stay, Cancel), so a press of OK never confirms a destructive
+  // choice such as "Leave without saving" by accident, otherwise the only button.
+  private fun installTvAlertFocus() {
+    if (!isTelevision) return
+    supportFragmentManager.registerFragmentLifecycleCallbacks(
+      object : androidx.fragment.app.FragmentManager.FragmentLifecycleCallbacks() {
+        override fun onFragmentStarted(fm: androidx.fragment.app.FragmentManager, f: androidx.fragment.app.Fragment) {
+          val decor = (f as? androidx.fragment.app.DialogFragment)?.dialog?.window?.decorView ?: return
+          decor.post {
+            listOf(android.R.id.button2, android.R.id.button1, android.R.id.button3)
+              .mapNotNull { decor.findViewById<View>(it) }
+              .firstOrNull { it.visibility == View.VISIBLE && it.isFocusable }
+              ?.requestFocus()
+          }
+        }
+      },
+      false,
+    )
   }
 
   // ===== Android TV: Back x5 opens the PIN screen =====
