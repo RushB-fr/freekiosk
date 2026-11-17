@@ -3,10 +3,12 @@ package com.freekiosk
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
+import android.media.ExifInterface
 import android.media.FaceDetector
 import android.os.SystemClock
 import com.facebook.react.bridge.*
 import java.io.File
+import java.util.Locale
 import java.util.concurrent.Executors
 import kotlin.math.abs
 
@@ -41,9 +43,6 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
      */
     private var lastMotionAt = 0L
 
-    /** Rotation that last found a face. The camera does not turn, so it is tried first. */
-    private var faceRotation = 0
-
     override fun getName(): String {
         return "MotionDetectionModule"
     }
@@ -71,6 +70,8 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
                     inPreferredConfig = Bitmap.Config.RGB_565 // Use less memory
                 }
                 val currentBitmap = BitmapFactory.decodeFile(imagePath, options)
+                // Only the face check needs it, and only before the file is gone
+                val uprightRotation = if (requireFace) exifRotation(imagePath) else 0
 
                 // Delete file after loading (do this early to free disk space)
                 try {
@@ -106,7 +107,7 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
 
                     triggered = if (requireFace) {
                         // Fail closed: a broken face check must not wake the screen, but say why
-                        runCatching { updateWindowAndCheckFace(hasMotion, currentBitmap) }
+                        runCatching { updateWindowAndCheckFace(hasMotion, currentBitmap, uprightRotation) }
                             .onFailure { android.util.Log.w("MotionDetection", "Face check failed", it) }
                             .getOrDefault(false)
                     } else {
@@ -222,46 +223,93 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
     }
 
     /** Motion (re)opens the face window; inside it, a frame with a face triggers. */
-    private fun updateWindowAndCheckFace(motion: Boolean, frame: Bitmap): Boolean {
+    private fun updateWindowAndCheckFace(motion: Boolean, frame: Bitmap, rotation: Int): Boolean {
         val now = SystemClock.elapsedRealtime()
         if (motion) lastMotionAt = now
         if (lastMotionAt == 0L || now - lastMotionAt > FACE_WINDOW_MS) return false
-        val faces = countFaces(frame)
-        android.util.Log.d("MotionDetection", "Face gate: motion=$motion, faces=$faces, rotation=$faceRotation")
-        return faces > 0
+        val upright = uprightForFaces(frame, rotation)
+        try {
+            val blazeFace = blazeFace() ?: return findFaces(upright).also {
+                android.util.Log.i("MotionDetection", "Face gate (FaceDetector): motion=$motion, rotation=$rotation, faces=${describe(it)}")
+            }.isNotEmpty()
+            val t = SystemClock.elapsedRealtime()
+            val candidates = blazeFace.detect(upright)
+            val ms = SystemClock.elapsedRealtime() - t
+            // A hand close to the lens can pass for a face, but scores lower and fills the frame
+            val faces = candidates.filter {
+                it.score >= FACE_MIN_SCORE && it.box.width() <= upright.width * FACE_MAX_WIDTH
+            }
+            android.util.Log.i(
+                "MotionDetection",
+                "Face gate: motion=$motion, rotation=$rotation, faces=${faces.size}, candidates=${describeBlaze(candidates, upright.width)}, ${ms}ms"
+            )
+            return faces.isNotEmpty()
+        } finally {
+            upright.recycle()
+        }
     }
 
-    /** Faces in the frame, trying each rotation since the sensor may not be upright. */
-    private fun countFaces(frame: Bitmap): Int {
-        val scale = minOf(1f, FACE_MAX_SIDE.toFloat() / maxOf(frame.width, frame.height))
-        // FaceDetector wants an even width; both sides even keeps it even after a 90° turn
-        val w = (frame.width * scale).toInt() and 1.inv()
-        val h = (frame.height * scale).toInt() and 1.inv()
-        val small = Bitmap.createScaledBitmap(frame, w, h, true)
-        try {
-            for (rotation in listOf(faceRotation) + (listOf(0, 90, 270, 180) - faceRotation)) {
-                var turned = if (rotation == 0) small
-                    else Bitmap.createBitmap(small, 0, 0, w, h, Matrix().apply { postRotate(rotation.toFloat()) }, false)
-                val confident = try {
-                    if (turned.config != Bitmap.Config.RGB_565) {
-                        // FaceDetector only takes RGB_565
-                        turned = turned.copy(Bitmap.Config.RGB_565, false).also { if (turned !== small) turned.recycle() }
-                    }
-                    val faces = arrayOfNulls<FaceDetector.Face>(MAX_FACES)
-                    val found = FaceDetector(turned.width, turned.height, MAX_FACES).findFaces(turned, faces)
-                    faces.take(found).count { it != null && it.confidence() >= FaceDetector.Face.CONFIDENCE_THRESHOLD }
-                } finally {
-                    if (turned !== small) turned.recycle()
-                }
-                if (confident > 0) {
-                    faceRotation = rotation
-                    return confident
-                }
+    private var blazeFaceDetector: BlazeFaceDetector? = null
+    private var blazeFaceUnavailable = false
+
+    /**
+     * BlazeFace, loaded on first use since nobody else needs the model in memory. Null where
+     * LiteRT or the model cannot load: the face check then falls back to android.media.FaceDetector,
+     * which misses most faces but never stops the check working. Tried once, not on every frame.
+     */
+    private fun blazeFace(): BlazeFaceDetector? {
+        if (blazeFaceUnavailable) return null
+        return blazeFaceDetector ?: runCatching { BlazeFaceDetector(reactApplicationContext) }
+            .onSuccess { blazeFaceDetector = it }
+            .onFailure {
+                blazeFaceUnavailable = true
+                android.util.Log.w("MotionDetection", "BlazeFace unavailable, using FaceDetector", it)
             }
-            return 0
-        } finally {
-            if (small !== frame) small.recycle()
+            .getOrNull()
+    }
+
+    /**
+     * Clockwise turn that makes the photo upright. The detector only finds upright faces, and
+     * trying all four turns let a hand in an upside-down frame pass for one. CameraX records the
+     * turn in EXIF rather than turning the pixels; the Camera2 fallback turns the pixels itself
+     * and records nothing, so 0 is right there. Mirroring does not matter to the detector.
+     */
+    private fun exifRotation(path: String): Int = runCatching {
+        when (ExifInterface(path).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
+            ExifInterface.ORIENTATION_ROTATE_90, ExifInterface.ORIENTATION_TRANSVERSE -> 90
+            ExifInterface.ORIENTATION_ROTATE_180, ExifInterface.ORIENTATION_FLIP_VERTICAL -> 180
+            ExifInterface.ORIENTATION_ROTATE_270, ExifInterface.ORIENTATION_TRANSPOSE -> 270
+            else -> 0
         }
+    }.getOrDefault(0)
+
+    /** A new upright copy of the frame, capped at FACE_MAX_SIDE, as FaceDetector takes it. */
+    private fun uprightForFaces(frame: Bitmap, rotation: Int): Bitmap {
+        val scale = minOf(1f, FACE_MAX_SIDE.toFloat() / maxOf(frame.width, frame.height))
+        val matrix = Matrix().apply { postScale(scale, scale); postRotate(rotation.toFloat()) }
+        val turned = Bitmap.createBitmap(frame, 0, 0, frame.width, frame.height, matrix, true)
+        if (turned !== frame && turned.config == Bitmap.Config.RGB_565 && turned.width % 2 == 0) return turned
+        // createBitmap hands back the frame itself when nothing changes, and FaceDetector wants
+        // RGB_565 with an even width: draw into a fresh one, dropping an odd last column
+        val copy = Bitmap.createBitmap(turned.width and 1.inv(), turned.height, Bitmap.Config.RGB_565)
+        android.graphics.Canvas(copy).drawBitmap(turned, 0f, 0f, null)
+        if (turned !== frame) turned.recycle()
+        return copy
+    }
+
+    /** Confident faces in an upright RGB_565 bitmap. */
+    private fun findFaces(bitmap: Bitmap): List<FaceDetector.Face> {
+        val faces = arrayOfNulls<FaceDetector.Face>(MAX_FACES)
+        val found = FaceDetector(bitmap.width, bitmap.height, MAX_FACES).findFaces(bitmap, faces)
+        return faces.take(found).filterNotNull().filter { it.confidence() >= FaceDetector.Face.CONFIDENCE_THRESHOLD }
+    }
+
+    private fun describe(faces: List<FaceDetector.Face>) = faces.joinToString(prefix = "[", postfix = "]") {
+        "eyes=${"%.0f".format(Locale.ROOT, it.eyesDistance())} conf=${"%.2f".format(Locale.ROOT, it.confidence())}"
+    }
+
+    private fun describeBlaze(faces: List<BlazeFaceDetector.Face>, frameWidth: Int) = faces.joinToString(prefix = "[", postfix = "]") {
+        "score=${"%.2f".format(Locale.ROOT, it.score)} width=${(it.box.width() * 100 / frameWidth).toInt()}%"
     }
 
     companion object {
@@ -271,11 +319,24 @@ class MotionDetectionModule(reactContext: ReactApplicationContext) : ReactContex
         // decoding the file at a smaller inSampleSize for the face check.
         private const val FACE_MAX_SIDE = 640
         private const val FACE_WINDOW_MS = 10_000L
+        // From a first test (7 frames): faces scored 0.87-0.93 at 29-37% of the frame width,
+        // a hand right at the lens 0.61 at 79%. Field test (32 wakes in a day): real faces,
+        // half profiles and faces across the room included, woke at 0.80 and above; a back of
+        // a head scored 0.77 and a window frame 0.76. At 0.78, five days missed 39 approaches
+        // that 0.75 would have woken, mostly blurred or backlit frontal faces at 0.75-0.78.
+        // 0.76 then ran three days on the test tablet and woke well enough to keep.
+        private const val FACE_MIN_SCORE = 0.76f
+        private const val FACE_MAX_WIDTH = 0.6f
         private const val MAX_FACES = 3
     }
 
     override fun onCatalystInstanceDestroy() {
         super.onCatalystInstanceDestroy()
+        // On the executor, after any check still running there, which may be using it
+        executor.execute {
+            blazeFaceDetector?.close()
+            blazeFaceDetector = null
+        }
         executor.shutdown()
         synchronized(bitmapLock) {
             previousBitmap?.let {

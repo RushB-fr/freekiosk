@@ -392,7 +392,9 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 if (cameraPhotoModule == null) {
                     cameraPhotoModule = CameraPhotoModule(reactContext.applicationContext)
                 }
-                val inputStream = cameraPhotoModule?.capturePhoto(cameraFacing, quality)
+                // Upright, like the CameraX path: the motion detector's face check only finds
+                // upright faces, and the raw sensor frame is usually turned 90°
+                val inputStream = cameraPhotoModule?.capturePhoto(cameraFacing, quality, CameraPhotoModule.ROTATION_DEFAULT)
                 if (inputStream == null) {
                     promise.reject("CAPTURE_FAILED", "Camera2 photo capture returned null")
                     return@Thread
