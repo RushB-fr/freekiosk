@@ -2,8 +2,12 @@ package com.freekiosk
 
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
 import android.provider.OpenableColumns
+import android.provider.Settings
 import android.util.Log
 import android.webkit.MimeTypeMap
 import com.facebook.react.bridge.*
@@ -25,6 +29,7 @@ class FilePickerModule(reactContext: ReactApplicationContext) :
         private const val PICK_MEDIA_REQUEST = 9001
         private const val PICK_JSON_REQUEST = 9002
         private const val SAVE_JSON_REQUEST = 9003
+        private const val PICK_HTML_REQUEST = 9004
         private const val MEDIA_DIR = "media_player"
     }
 
@@ -166,6 +171,85 @@ class FilePickerModule(reactContext: ReactApplicationContext) :
     }
 
     /**
+     * Open the document picker for an HTML page to show as the kiosk page (#385). Unlike the media
+     * picker the file is not copied: the app keeps a persistent read permission on it and the
+     * WebView loads the content:// address, so a page another app rewrites is read fresh each time.
+     * Returns { uri, name }.
+     */
+    @ReactMethod
+    fun pickHtmlDocument(promise: Promise) {
+        val activity = reactApplicationContext.currentActivity
+        if (activity == null) {
+            promise.reject("NO_ACTIVITY", "No activity available")
+            return
+        }
+        if (pickPromise != null) {
+            promise.reject("PICKER_BUSY", "A file picker is already open")
+            return
+        }
+        pickPromise = promise
+        try {
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "*/*"
+                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("text/html", "application/xhtml+xml"))
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+            }
+            activity.startActivityForResult(intent, PICK_HTML_REQUEST)
+        } catch (e: Exception) {
+            pickPromise = null
+            promise.reject("PICKER_ERROR", "Failed to open file picker: ${e.message}")
+        }
+    }
+
+    /**
+     * Whether a file:// address outside the app's own folder can be read (#385).
+     * { available, granted }: `available` is false in a Play Store build, which has no All files
+     * access to ask for; `granted` is the Android 11+ "All files access", or the storage read
+     * permission before that.
+     */
+    @ReactMethod
+    fun getAllFilesAccess(promise: Promise) {
+        val result = Arguments.createMap()
+        result.putBoolean("available", BuildConfig.ENABLE_ALL_FILES_ACCESS)
+        val granted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Environment.isExternalStorageManager()
+        } else {
+            reactApplicationContext.checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) ==
+                PackageManager.PERMISSION_GRANTED
+        }
+        result.putBoolean("granted", granted)
+        promise.resolve(result)
+    }
+
+    /** Open Android's "All files access" screen for this app (app details before Android 11). */
+    @ReactMethod
+    fun openAllFilesAccessSettings(promise: Promise) {
+        val context = reactApplicationContext
+        val packageUri = Uri.parse("package:${context.packageName}")
+        val intents = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            listOf(
+                Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, packageUri),
+                Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION),
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, packageUri),
+            )
+        } else {
+            listOf(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, packageUri))
+        }
+        for (intent in intents) {
+            try {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+                promise.resolve(true)
+                return
+            } catch (e: Exception) {
+                Log.w(TAG, "Settings screen not available: ${e.message}")
+            }
+        }
+        promise.resolve(false)
+    }
+
+    /**
      * Open the Android "Save As" dialog (ACTION_CREATE_DOCUMENT) for JSON export.
      * Uses SAF to bypass Scoped Storage restrictions on Android 10+.
      * Writes `content` to the URI chosen by the user via ContentResolver.
@@ -277,7 +361,7 @@ class FilePickerModule(reactContext: ReactApplicationContext) :
     // ==================== Activity Result Handling ====================
 
     override fun onActivityResult(activity: Activity, requestCode: Int, resultCode: Int, data: Intent?) {
-        if (requestCode != PICK_MEDIA_REQUEST && requestCode != PICK_JSON_REQUEST && requestCode != SAVE_JSON_REQUEST) return
+        if (requestCode != PICK_MEDIA_REQUEST && requestCode != PICK_JSON_REQUEST && requestCode != SAVE_JSON_REQUEST && requestCode != PICK_HTML_REQUEST) return
 
         val promise = pickPromise ?: return
         pickPromise = null
@@ -289,6 +373,24 @@ class FilePickerModule(reactContext: ReactApplicationContext) :
         }
 
         try {
+            if (requestCode == PICK_HTML_REQUEST) {
+                val uri = data.data
+                if (uri == null) {
+                    promise.reject("NO_URI", "No file URI received")
+                    return
+                }
+                // Keep the permission across restarts and reboots: the address is loaded each
+                // time the kiosk starts.
+                reactApplicationContext.contentResolver.takePersistableUriPermission(
+                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                val result = Arguments.createMap()
+                result.putString("uri", uri.toString())
+                result.putString("name", queryDisplayName(uri) ?: "")
+                promise.resolve(result)
+                return
+            }
+
             // Handle JSON file save - write content to the URI chosen by the user
             if (requestCode == SAVE_JSON_REQUEST) {
                 val uri = data.data
@@ -377,6 +479,17 @@ class FilePickerModule(reactContext: ReactApplicationContext) :
     }
 
     // ==================== Internal Helpers ====================
+
+    private fun queryDisplayName(uri: Uri): String? {
+        return try {
+            reactApplicationContext.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (nameIdx >= 0 && cursor.moveToFirst()) cursor.getString(nameIdx) else null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
 
     private fun getOrCreateMediaDir(): File {
         val dir = File(reactApplicationContext.filesDir, MEDIA_DIR)

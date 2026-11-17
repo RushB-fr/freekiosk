@@ -23,6 +23,11 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <!-- #385: lets a file:// URL reach shared storage (Settings > "All files access"). Not in Play
+         Store builds: src/playstore strips it. -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
     <!-- Android 13+ granular media permissions for Media Player local file picker.
          Removed in Play Store builds via src/playstore overlay (tools:node="remove"). -->
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />

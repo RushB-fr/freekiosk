@@ -104,6 +104,8 @@
       "dashboardActive": "仪表板模式已启用。请在“仪表板”选项卡中配置磁贴。",
       "placeholder": "https://example.com",
       "hint": "示例：https://www.freekiosk.app",
+      "pickLocalFile": "选择本地 HTML 文件",
+      "pickLocalFileHint": "文件在原位置读取，因此被其他应用重写的页面会显示最新内容。其旁边的图片和脚本不会加载：请使用单个独立文件，或为文件夹输入 file:// 地址。",
       "httpWarning": "安全提示：此 URL 使用 HTTP（未加密）。\n数据可能被截获。请改用 HTTPS。"
     },
     "auth": {
@@ -1534,6 +1536,12 @@
       "reloadConfig": "重新加载",
       "fileAccessOffTitle": "文件访问已关闭",
       "fileAccessOffMessage": "要打开本地文件，请先开启“常规 > PDF 查看器 > 内嵌 PDF 查看器”。正是该设置让浏览器能够访问设备上的文件。",
+      "allFilesNeededTitle": "需要访问所有文件的权限",
+      "allFilesNeededMessage": "此文件位于 FreeKiosk 自己的文件夹之外。在下一个界面中允许 FreeKiosk 访问所有文件，然后返回并再次保存。",
+      "allFilesOpenSettings": "打开设置",
+      "allFilesCancel": "取消",
+      "allFilesUnavailableTitle": "文件位于 FreeKiosk 文件夹之外",
+      "allFilesUnavailableMessage": "此版本的 FreeKiosk 无法读取自己文件夹之外的文件。请将文件复制到设备上的 Android/data/com.freekiosk/files/，或使用“选择本地 HTML 文件”选择它。",
       "passwordNotSavedTitle": "密码未保存",
       "basicAuthNotSavedMessage": "无法将 HTTP Basic Auth 密码写入此设备的安全存储。此界面上的其他设置均已保存。这种情况出现在 Android Keystore 损坏的固件上。",
       "downloadProgress": "{{percent}}%（{{done}} / {{total}} MB）",

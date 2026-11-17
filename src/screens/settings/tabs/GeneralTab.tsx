@@ -31,6 +31,7 @@ import { generateMediaItemId, detectMediaType, isLocalMedia, getMediaDisplayName
 import { useFilePickerAvailable } from '../../../utils/useFilePickerAvailable';
 import MediaCacheStatus from '../../../components/settings/MediaCacheStatus';
 import SignageManagedNotice from '../../../components/settings/SignageManagedNotice';
+import FilePickerModule from '../../../utils/FilePickerModule';
 import type { PickedFile } from '../../../utils/FilePickerModule';
 import { useTranslation } from 'react-i18next';
 import { LANGUAGE_OPTIONS, type SupportedLanguage } from '../../../i18n';
@@ -339,6 +340,19 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
 }) => {
   const { t } = useTranslation();
   const filePickerAvailable = useFilePickerAvailable();
+
+  // #385: pick an HTML page on the device. The address is a content:// document the app keeps a
+  // permission on, so a page another app rewrites is read fresh each time.
+  const handlePickLocalPage = async (): Promise<void> => {
+    try {
+      const picked = await FilePickerModule.pickHtmlDocument();
+      onUrlChange(picked.uri);
+    } catch (error: any) {
+      if (error?.code !== 'PICKER_CANCELLED') {
+        Alert.alert(t('screens.settingsMain.error'), t('screens.settingsMain.pickMediaError', { error: error?.message || error }));
+      }
+    }
+  };
 
   return (
     <View>
@@ -690,6 +704,18 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
                 keyboardType="url"
                 hint={t('general.urlSection.hint')}
               />
+
+              {filePickerAvailable === true && (
+                <>
+                  <SettingsButton
+                    title={t('general.urlSection.pickLocalFile')}
+                    icon="file-document-outline"
+                    variant="outline"
+                    onPress={handlePickLocalPage}
+                  />
+                  <Text style={styles.infoText}>{t('general.urlSection.pickLocalFileHint')}</Text>
+                </>
+              )}
 
               {url.trim().toLowerCase().startsWith('http://') && (
                 <SettingsInfoBox variant="warning">

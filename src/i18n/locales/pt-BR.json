@@ -104,6 +104,8 @@
       "dashboardActive": "O modo Painel está ativo. Configure os blocos na aba Painel.",
       "placeholder": "https://exemplo.com",
       "hint": "Exemplo: https://www.freekiosk.app",
+      "pickLocalFile": "Escolher um arquivo HTML local",
+      "pickLocalFileHint": "O arquivo é lido onde está, então uma página que outro app reescreve é exibida atualizada. Imagens e scripts ao lado dele não carregam: use um arquivo autônomo ou digite um endereço file:// para uma pasta.",
       "httpWarning": "SEGURANÇA: esta URL usa HTTP (sem criptografia).\nSeus dados podem ser interceptados. Use HTTPS."
     },
     "auth": {
@@ -1534,6 +1536,12 @@
       "reloadConfig": "Recarregar",
       "fileAccessOffTitle": "O acesso a arquivos está desligado",
       "fileAccessOffMessage": "Para abrir um arquivo local, ative antes Geral > Visualizador de PDF > Visualizador de PDF integrado. É essa configuração que dá ao navegador acesso aos arquivos do dispositivo.",
+      "allFilesNeededTitle": "É necessário acesso a todos os arquivos",
+      "allFilesNeededMessage": "Este arquivo está fora da pasta do FreeKiosk. Na próxima tela, permita que o FreeKiosk acesse todos os arquivos, depois volte e salve novamente.",
+      "allFilesOpenSettings": "Abrir configurações",
+      "allFilesCancel": "Cancelar",
+      "allFilesUnavailableTitle": "Arquivo fora da pasta do FreeKiosk",
+      "allFilesUnavailableMessage": "Esta versão do FreeKiosk não consegue ler arquivos fora da sua própria pasta. Copie o arquivo para Android/data/com.freekiosk/files/ no dispositivo ou escolha-o com \"Escolher um arquivo HTML local\".",
       "passwordNotSavedTitle": "Senha não salva",
       "basicAuthNotSavedMessage": "Não foi possível gravar a senha do HTTP Basic Auth no armazenamento seguro deste dispositivo. Todas as outras configurações desta tela foram salvas. Isso acontece em firmwares com o Android Keystore com defeito.",
       "downloadProgress": "{{percent}}% ({{done}} / {{total}} MB)",

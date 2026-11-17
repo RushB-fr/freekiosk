@@ -104,6 +104,8 @@
       "dashboardActive": "Dashboard mode is active. Configure your tiles in the Dashboard tab.",
       "placeholder": "https://example.com",
       "hint": "Example: https://www.freekiosk.app",
+      "pickLocalFile": "Choose a local HTML file",
+      "pickLocalFileHint": "The file is read where it is, so a page that another app rewrites is shown fresh. Images and scripts next to it do not load: use one self-contained file, or type a file:// address for a folder.",
       "httpWarning": "SECURITY: This URL uses HTTP (unencrypted).\nYour data can be intercepted. Use HTTPS instead."
     },
     "auth": {
@@ -1534,6 +1536,12 @@
       "reloadConfig": "Reload",
       "fileAccessOffTitle": "File access is off",
       "fileAccessOffMessage": "To open a local file, turn on General > PDF Viewer > Inline PDF Viewer first. That setting is what gives the browser access to files on the device.",
+      "allFilesNeededTitle": "Access to all files is needed",
+      "allFilesNeededMessage": "This file is outside FreeKiosk's own folder. On the next screen, allow FreeKiosk to access all files, then come back and save again.",
+      "allFilesOpenSettings": "Open settings",
+      "allFilesCancel": "Cancel",
+      "allFilesUnavailableTitle": "File outside FreeKiosk's folder",
+      "allFilesUnavailableMessage": "This version of FreeKiosk cannot read files outside its own folder. Copy the file to Android/data/com.freekiosk/files/ on the device, or choose it with \"Choose a local HTML file\".",
       "passwordNotSavedTitle": "Password not saved",
       "basicAuthNotSavedMessage": "The HTTP Basic Auth password could not be written to secure storage on this device. Every other setting on this screen was saved. This happens on firmwares whose Android Keystore is broken.",
       "downloadProgress": "{{percent}}% ({{done}} / {{total}} MB)",
