@@ -1306,6 +1306,7 @@
       "loadingError": "Loading Error",
       "loading": "Loading...",
       "urlLabel": "URL: {{url}}",
+      "errorReason": "Reason: {{reason}}",
       "autoReloadText": "Automatic reload in 5 seconds...",
       "reloadNow": "Reload Now",
       "fallbackSettingsHint": "Tap the settings button 5× to return to settings",

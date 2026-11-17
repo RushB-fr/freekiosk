@@ -1306,6 +1306,7 @@
       "loadingError": "Laadfout",
       "loading": "Laden...",
       "urlLabel": "URL: {{url}}",
+      "errorReason": "Oorzaak: {{reason}}",
       "autoReloadText": "Automatisch opnieuw laden over 5 seconden...",
       "reloadNow": "Nu opnieuw laden",
       "fallbackSettingsHint": "Tik 5× op de instellingenknop om terug te keren naar de instellingen",

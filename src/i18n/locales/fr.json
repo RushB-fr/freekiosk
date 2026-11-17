@@ -1306,6 +1306,7 @@
       "loadingError": "Erreur de chargement",
       "loading": "Chargement...",
       "urlLabel": "URL : {{url}}",
+      "errorReason": "Cause : {{reason}}",
       "autoReloadText": "Rechargement automatique dans 5 secondes...",
       "reloadNow": "Recharger maintenant",
       "fallbackSettingsHint": "Appuyez 5× sur le bouton réglages pour revenir aux réglages",
