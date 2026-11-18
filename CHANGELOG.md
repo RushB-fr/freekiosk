@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ***
 
-## [2.1.0-beta.3] - 2026-11-17
+## [2.1.0-beta.3] - 2026-11-18
 
 ### Added
 - ☁️ **"Pause the page while the screen is off" travels with the cloud config** (#215). The option added in #403 stays a device choice until now: it is exported in `general.pausePageWhenScreenOff` and imported from it, like `pauseWebMediaWhenHidden` next to it, so FreeKiosk Cloud can show it and change it once its editor has the key. A config that does not carry the key (an older cloud, or a profile that has never been opened in the editor) leaves the device's own choice alone. Covered by Jest tests (default off, import and export back, switching it off, a config without the key). The cloud ignores a key it does not know yet and keeps it in the stored config, so nothing breaks before the cloud knows the key (read from its config sync code).
