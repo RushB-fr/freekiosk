@@ -34,6 +34,7 @@ export interface ApiCallbacks {
   onExecuteJs?: (code: string) => void;
   onReboot?: () => void;
   onClearCache?: () => void;
+  onOpenSettings?: () => void;
   onRemoteKey?: (key: string) => void;
   onAutoBrightnessEnable?: (min: number, max: number, offset?: number) => void;
   onAutoBrightnessDisable?: () => void;
@@ -443,6 +444,11 @@ class ApiServiceClass {
       case 'clearCache':
         if (!cb.onClearCache) return fail('Handler unavailable');
         cb.onClearCache();
+        return ok();
+
+      case 'openSettings':
+        if (!cb.onOpenSettings) return fail('Handler unavailable');
+        cb.onOpenSettings();
         return ok();
 
       case 'remoteKey':

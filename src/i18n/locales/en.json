@@ -525,6 +525,8 @@
       "tapAnywhereHint": "Tap N times in the same area (taps must be grouped)",
       "fixedButton": "Fixed Button",
       "fixedButtonHint": "Tap N times on a corner button",
+      "cornerSequence": "Corner Taps",
+      "cornerSequenceHint": "Tap the top-left corner twice, then the bottom-right corner twice, within 3 seconds. Nothing is shown and an on-screen keypad cannot trigger it",
       "numTaps": "Number of Taps (2-20)",
       "numTapsHintButton": "Tap this many times to access settings",
       "numTapsHintAnywhere": "Tap anywhere on screen this many times rapidly to access settings",
@@ -545,6 +547,7 @@
       "volumeAltHintOther": "Also allow pressing Volume Up/Down button multiple times to access settings",
       "infoButtonMode": "Tap the return button ({{position}}) {{count}} times to access settings",
       "infoAnywhereMode": "Tap anywhere on screen {{count}} times within {{timeout}} to access settings",
+      "infoCornerMode": "Tap the top-left corner twice, then the bottom-right corner twice, within 3 seconds to access settings",
       "pinRequired": " (PIN required)"
     },
     "touchBlocking": {
@@ -616,6 +619,7 @@
       "title": "Return to Settings",
       "buttonLine": "• Tap the return button ({{position}}) {{count}} times{{invisible}}",
       "anywhereLine": "• Tap {{count}} times anywhere on the screen within {{timeout}}{{visual}}",
+      "cornerLine": "• Tap the top-left corner twice, then the bottom-right corner twice, within 3 seconds",
       "invisible": " (invisible)",
       "visualIndicator": " (visual indicator visible)",
       "recentApps": "• Or use the recent apps selector",

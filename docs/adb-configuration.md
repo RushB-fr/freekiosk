@@ -219,7 +219,7 @@ Every key below is a straight passthrough: the value you pass is stored as-is.
 
 | Parameter | Description |
 |-----------|-------------|
-| `--es return_mode "tap_anywhere"` | How to reach settings: `tap_anywhere` (tap the screen `return_tap_count` times, the default) or `button` (fixed button). Any other value leaves no way in |
+| `--es return_mode "tap_anywhere"` | How to reach settings: `tap_anywhere` (tap the screen `return_tap_count` times, the default), `button` (fixed button) or `corner_sequence` (tap the top-left corner twice, then the bottom-right corner twice, within 3 seconds; WebView and media player only, App mode counts taps instead). Any other value leaves no way in |
 | `--es return_button_position "top-left"` | Fixed-button corner: `top-left`, `top-right`, `bottom-left`, `bottom-right` |
 | `--ei return_tap_count 5` | Number of taps to open settings |
 | `--ei return_tap_timeout 1500` | Time window, in milliseconds, to complete **all** the taps, counted from the first one (default 1500). The Settings screen accepts 500 to 5000; over ADB any value works. Raise it before you drive the gesture from a script, see [Scripting the settings gesture](#scripting-the-settings-gesture) |

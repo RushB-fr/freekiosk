@@ -140,6 +140,7 @@ class KioskHttpServer(
                 isGetOrPost && uri == "/api/clearCache" -> handleClearCache()
                 isGetOrPost && uri == "/api/lock" -> handleLockDevice()
                 isGetOrPost && uri == "/api/restart-ui" -> handleRestartUi()
+                isGetOrPost && uri == "/api/open-settings" -> handleOpenSettings()
                 isGetOrPost && uri == "/api/audio/stop" -> handleAudioStop()
                 isGetOrPost && uri == "/api/audio/beep" -> handleAudioBeep()
 
@@ -235,6 +236,7 @@ class KioskHttpServer(
                     put("/api/clearCache - Clear WebView cache, cookies and storage")
                     put("/api/lock - Lock device (Device Owner)")
                     put("/api/restart-ui - Restart the app UI")
+                    put("/api/open-settings - Open the settings PIN screen")
                     put("/api/audio/stop - Stop audio playback")
                     put("/api/audio/beep - Play beep sound")
                     put("/api/rotation/start - Start URL rotation")
@@ -568,6 +570,12 @@ class KioskHttpServer(
     private fun handleClearCache(): Response {
         checkControlAllowed()?.let { return it }
         val result = commandHandler("clearCache", null)
+        return jsonSuccess(result)
+    }
+
+    private fun handleOpenSettings(): Response {
+        checkControlAllowed()?.let { return it }
+        val result = commandHandler("openSettings", null)
         return jsonSuccess(result)
     }
 

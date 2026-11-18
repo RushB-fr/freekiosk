@@ -13,7 +13,7 @@ import { SignagePlaylist } from '../utils/SignagePlaylist';
 import StatusBar from '../components/StatusBar';
 import MotionDetector from '../components/MotionDetector';
 import ProximityDetectionModule, { onProximityNear as onProximityNearEvent } from '../utils/ProximityDetectionModule';
-import ExternalAppOverlay from '../components/ExternalAppOverlay';
+import ExternalAppOverlay, { returnButtonPositionStyle } from '../components/ExternalAppOverlay';
 import { DEFAULT_MULTI_APP_APPEARANCE, MultiAppAppearance, parseMultiAppAppearance } from '../types/multiAppAppearance';
 import { StorageService, toPrintOrigins, clampScreensaverFadeSeconds } from '../utils/storage';
 import { saveSecurePin, saveSecureMqttPassword, saveSecureApiKey, getSecureBasicAuthPassword } from '../utils/secureStorage';
@@ -883,6 +883,21 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           }
           setWebViewKey(prev => prev + 1);
           console.log('[API] Cache cleared (native + WebView remount)');
+        },
+        onOpenSettings: () => {
+          // Already on the PIN or settings screen: navigate() would pull a person in the
+          // settings back to the PIN
+          if (!navigation.isFocused()) return;
+          console.log('[API] Open settings');
+          // Same steps as the native navigateToPin event (5 taps over an external app)
+          isNavigatingToPinRef.current = true;
+          if (appLaunchTimeoutRef.current) {
+            clearTimeout(appLaunchTimeoutRef.current);
+            appLaunchTimeoutRef.current = null;
+          }
+          setIsScreensaverActive(false);
+          OverlayServiceModule.stopOverlayService().catch(() => {});
+          navigation.navigate('Pin');
         },
         onRemoteKey: async (key: string) => {
           try {
@@ -3719,6 +3734,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         <TouchableOpacity 
           style={[
             styles.visualIndicator,
+            returnButtonPositionStyle(returnButtonPosition),
             {
               opacity: returnButtonVisible ? 1 : 0,
               backgroundColor: returnButtonVisible ? '#2b7fff' : 'transparent',
@@ -3871,8 +3887,6 @@ const styles = StyleSheet.create({
   },
   visualIndicator: {
     position: 'absolute',
-    bottom: 20,
-    right: 20,
     width: 50,
     height: 50,
     backgroundColor: '#2b7fff',

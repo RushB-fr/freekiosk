@@ -525,6 +525,8 @@
       "tapAnywhereHint": "Tocca N volte nella stessa area (i tocchi devono essere ravvicinati)",
       "fixedButton": "Pulsante fisso",
       "fixedButtonHint": "Tocca N volte un pulsante in un angolo",
+      "cornerSequence": "Tocchi negli angoli",
+      "cornerSequenceHint": "Tocca due volte l'angolo in alto a sinistra, poi due volte quello in basso a destra, entro 3 secondi. Non viene mostrato nulla e una tastiera a schermo non può attivarlo",
       "numTaps": "Numero di tocchi (2-20)",
       "numTapsHintButton": "Tocca questo numero di volte per accedere alle Impostazioni",
       "numTapsHintAnywhere": "Tocca rapidamente questo numero di volte in qualsiasi punto dello schermo per accedere alle Impostazioni",
@@ -545,6 +547,7 @@
       "volumeAltHintOther": "Consenti anche di premere più volte il tasto Volume su/giù per accedere alle Impostazioni",
       "infoButtonMode": "Tocca il pulsante di ritorno ({{position}}) {{count}} volte per accedere alle Impostazioni",
       "infoAnywhereMode": "Tocca {{count}} volte in qualsiasi punto dello schermo entro {{timeout}} per accedere alle Impostazioni",
+      "infoCornerMode": "Tocca due volte l'angolo in alto a sinistra, poi due volte quello in basso a destra, entro 3 secondi per accedere alle impostazioni",
       "pinRequired": " (PIN richiesto)"
     },
     "touchBlocking": {
@@ -616,6 +619,7 @@
       "title": "Ritorno alle Impostazioni",
       "buttonLine": "• Tocca il pulsante di ritorno ({{position}}) {{count}} volte{{invisible}}",
       "anywhereLine": "• Tocca {{count}} volte in qualsiasi punto dello schermo entro {{timeout}}{{visual}}",
+      "cornerLine": "• Tocca due volte l'angolo in alto a sinistra, poi due volte quello in basso a destra, entro 3 secondi",
       "invisible": " (invisibile)",
       "visualIndicator": " (indicatore visivo visibile)",
       "recentApps": "• Oppure usa il selettore delle app recenti",

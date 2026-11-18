@@ -525,6 +525,8 @@
       "tapAnywhereHint": "Toucher N fois dans la même zone (les appuis doivent être groupés)",
       "fixedButton": "Bouton fixe",
       "fixedButtonHint": "Toucher N fois un bouton dans un coin",
+      "cornerSequence": "Taps dans les coins",
+      "cornerSequenceHint": "Touchez deux fois le coin supérieur gauche, puis deux fois le coin inférieur droit, en moins de 3 secondes. Rien n'est affiché et un clavier à l'écran ne peut pas le déclencher",
       "numTaps": "Nombre d'appuis (2-20)",
       "numTapsHintButton": "Toucher ce nombre de fois pour accéder aux réglages",
       "numTapsHintAnywhere": "Toucher n'importe où sur l'écran ce nombre de fois rapidement pour accéder aux réglages",
@@ -545,6 +547,7 @@
       "volumeAltHintOther": "Autoriser aussi l'appui multiple sur le bouton Volume haut/bas pour accéder aux réglages",
       "infoButtonMode": "Touchez le bouton retour ({{position}}) {{count}} fois pour accéder aux réglages",
       "infoAnywhereMode": "Touchez n'importe où sur l'écran {{count}} fois en {{timeout}} pour accéder aux réglages",
+      "infoCornerMode": "Touchez deux fois le coin supérieur gauche, puis deux fois le coin inférieur droit, en moins de 3 secondes pour accéder aux réglages",
       "pinRequired": " (PIN requis)"
     },
     "touchBlocking": {
@@ -616,6 +619,7 @@
       "title": "Retour aux réglages",
       "buttonLine": "• Touchez le bouton retour ({{position}}) {{count}} fois{{invisible}}",
       "anywhereLine": "• Touchez {{count}} fois n'importe où sur l'écran en {{timeout}}{{visual}}",
+      "cornerLine": "• Touchez deux fois le coin supérieur gauche, puis deux fois le coin inférieur droit, en moins de 3 secondes",
       "invisible": " (invisible)",
       "visualIndicator": " (indicateur visuel visible)",
       "recentApps": "• Ou utilisez le sélecteur d'applications récentes",
