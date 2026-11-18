@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+***
+
+## [2.1.0-beta.3] - 2026-11-18
+
 ### Added
 - ☁️ **"Pause the page while the screen is off" travels with the cloud config** (#215). The option added in #403 stays a device choice until now: it is exported in `general.pausePageWhenScreenOff` and imported from it, like `pauseWebMediaWhenHidden` next to it, so FreeKiosk Cloud can show it and change it once its editor has the key. A config that does not carry the key (an older cloud, or a profile that has never been opened in the editor) leaves the device's own choice alone. Covered by Jest tests (default off, import and export back, switching it off, a config without the key). The cloud ignores a key it does not know yet and keeps it in the stored config, so nothing breaks before the cloud knows the key (read from its config sync code).
 - 🔄 **Pull down to refresh.** Settings > Display > **Page Edges > Pull Down to Refresh** (WebView mode, off by default). A drag down from the top of the page reloads the page currently shown, as in a browser, with an arrow that follows the finger and turns blue once letting go will reload. It does nothing when the page, or a list under the finger, is scrolled (Home Assistant scrolls a list inside the page while the page itself stays at the top), when the page takes the gesture itself (a map, a slider), when the page opts out with `overscroll-behavior-y`, for a sideways drag or with two fingers. react-native-webview's own pull to refresh is iOS only, so the gesture is handled by a script injected into the main frame; it does not work inside an iframe from another site. Also available over ADB (`pull_to_refresh`), and part of the config export/import (`display.pullToRefresh`) and the backup. Covered by Jest tests of the gesture (10 cases) and of the config export/import.
