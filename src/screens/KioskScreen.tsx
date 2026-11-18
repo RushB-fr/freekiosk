@@ -60,6 +60,9 @@ const MOTION_PRE_CHECK_DELAY_MS = 10_000;
 // Camera2 frames); make it depend on the capture interval if 4 s proves too short.
 const FADE_MOTION_SETTLE_MS = 4000;
 
+// Delay of the second brightness read after a screensaver change (see the read-back effect).
+const BRIGHTNESS_READ_BACK_SETTLE_MS = 800;
+
 /** Every direct brightness write goes through here: it supersedes a running screensaver fade. */
 const setBrightnessLevel = (level: number) => {
   cancelBrightnessRamp();
@@ -1205,9 +1208,14 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   // made outside FreeKiosk between two of these transitions is still not picked up. A
   // poll would cost a wake-up every few seconds on a battery-powered kiosk for a value
   // that only moves when something asks it to.
+  //
+  // Read twice. When the screensaver goes off, the effect that restores the default
+  // brightness runs at the same moment as this one, so the first read can still see the
+  // screensaver's dim level: on a tablet /api/brightness answered 1 while the display was
+  // back at 80 %. The second read, once the restore has landed, reports the real level.
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const readBack = async () => {
       try {
         const actual = await RNBrightness.getBrightnessLevel();
         if (!cancelled) {
@@ -1222,9 +1230,12 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           setEffectiveBrightness(defaultBrightness);
         }
       }
-    })();
+    };
+    readBack();
+    const settled = setTimeout(readBack, BRIGHTNESS_READ_BACK_SETTLE_MS);
     return () => {
       cancelled = true;
+      clearTimeout(settled);
     };
   }, [defaultBrightness, isScreensaverActive]);
 
