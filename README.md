@@ -11,7 +11,7 @@
   </p>
   
   <p>
-    <img src="https://img.shields.io/badge/Version-2.0.0-blue.svg" alt="Version 2.0.0">
+    <a href="https://github.com/rushb-fr/freekiosk/releases/latest"><img src="https://img.shields.io/github/v/release/rushb-fr/freekiosk?label=Version&color=blue" alt="Latest stable version"></a>
     <a href="https://github.com/rushb-fr/freekiosk/releases"><img src="https://img.shields.io/github/downloads/rushb-fr/freekiosk/total.svg" alt="Downloads"></a>
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT">
     <img src="https://img.shields.io/badge/Android-8.0%2B-green.svg" alt="Android 8.0+">
@@ -31,6 +31,11 @@ FreeKiosk is an open-source kiosk platform for Android tablets, built for teams 
 </p>
 
 <p align="center">
+  <strong>Running more than one tablet?</strong> FreeKiosk Cloud manages a whole fleet from one dashboard, and the first device is free:
+  <a href="https://cloud.freekiosk.app/accounts/signup/">create a free account</a> or <a href="https://freekiosk.app/cloud/">see what it does</a>.
+</p>
+
+<p align="center">
   <img src="docs/screenshots/any-web-page-full-screen.png" alt="FreeKiosk showing a web page full screen on a tablet (demo page)" width="49%">
   <img src="docs/screenshots/lock-it-down.png" alt="FreeKiosk Security settings with Lock Mode on (demo)" width="49%">
 </p>
@@ -45,7 +50,8 @@ Instead of burying everything in one long page, this README gives you the essent
 - ✅ Native REST API and MQTT integration
 - ✅ Headless ADB provisioning for mass rollout
 - ✅ Privacy-first: no mandatory tracking layer
-- ✅ Available in English, French and Brazilian Portuguese
+- ✅ Optional [FreeKiosk Cloud](#-freekiosk-cloud-open-beta) to manage a fleet from one dashboard (first device free)
+- ✅ Available in 9 languages in the current pre-release (English, French, German, Spanish, Italian, Dutch, Brazilian Portuguese, Polish, Simplified Chinese); Google Play 2.0.0 has English, French and Brazilian Portuguese
 
 ## ✨ Key capabilities
 
