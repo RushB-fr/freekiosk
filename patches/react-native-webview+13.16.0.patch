@@ -126,6 +126,47 @@ index 07f73fd..877e13e 100644
      }
  
      private PermissionAwareActivity getPermissionAwareActivity() {
+diff --git a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebView.java b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebView.java
+index 80c6803..dc8f001 100644
+--- a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebView.java
++++ b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebView.java
+@@ -312,11 +312,35 @@ public class RNCWebView extends WebView implements LifecycleEventListener {
+         if (getSettings().getJavaScriptEnabled() &&
+                 injectedJSBeforeContentLoaded != null &&
+                 !TextUtils.isEmpty(injectedJSBeforeContentLoaded)) {
+-            evaluateJavascriptWithFallback("(function() {\n" + injectedJSBeforeContentLoaded + ";\n})();");
++            // FreeKiosk #177: already registered as a document-start script, which ran first.
++            if (documentStartScriptHandler == null) {
++                evaluateJavascriptWithFallback("(function() {\n" + injectedJSBeforeContentLoaded + ";\n})();");
++            }
+             injectJavascriptObject();  // re-inject the Javascript object in case it has been overwritten.
+         }
+     }
+ 
++    // FreeKiosk #177: with injectedJavaScriptBeforeContentLoadedForMainFrameOnly={false}, register
++    // the script as a real document-start script in every frame, cross-origin iframes included,
++    // instead of evaluating it from onPageStarted in the main frame only (and after the page's
++    // first scripts may have run). Called from onAfterUpdateTransaction, so a changed script is in
++    // place before a source set in the same update loads. Without DOCUMENT_START_SCRIPT the
++    // onPageStarted path above stays.
++    private androidx.webkit.ScriptHandler documentStartScriptHandler = null;
++    private String documentStartScript = null;
++
++    public void updateDocumentStartScript() {
++        String script = injectedJavaScriptBeforeContentLoadedForMainFrameOnly ? null : injectedJSBeforeContentLoaded;
++        if (TextUtils.equals(script, documentStartScript)) return;
++        if (documentStartScriptHandler != null) documentStartScriptHandler.remove();
++        documentStartScriptHandler = null;
++        documentStartScript = null;
++        if (TextUtils.isEmpty(script) || !WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) return;
++        documentStartScriptHandler = WebViewCompat.addDocumentStartJavaScript(
++                this, "(function() {\n" + script + ";\n})();", java.util.Collections.singleton("*"));
++        documentStartScript = script;
++    }
++
+     protected String injectedJavaScriptObject = null;
+ 
+     public void setInjectedJavaScriptObject(String obj) {
 diff --git a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
 index 0287e1c..88d1fa8 100644
 --- a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
@@ -627,7 +668,7 @@ index 0287e1c..88d1fa8 100644
          event.putBoolean("loading", !mLastLoadFailed && webView.getProgress() != 100);
          event.putString("title", webView.getTitle());
 diff --git a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewManagerImpl.kt b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewManagerImpl.kt
-index f83033b..a6616e3 100644
+index f83033b..8189cfc 100644
 --- a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewManagerImpl.kt
 +++ b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewManagerImpl.kt
 @@ -92,14 +92,53 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
@@ -728,7 +769,16 @@ index f83033b..a6616e3 100644
      fun setBasicAuthCredential(viewWrapper: RNCWebViewWrapper, credential: ReadableMap?) {
          var basicAuthCredential: RNCBasicAuthCredential? = null
          if (credential != null) {
-@@ -550,6 +602,9 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
+@@ -269,6 +321,8 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
+     }
+ 
+     fun onAfterUpdateTransaction(viewWrapper: RNCWebViewWrapper) {
++        // FreeKiosk #177: before loadSource, so the first page already gets the script.
++        viewWrapper.webView.updateDocumentStartScript()
+         mPendingSource?.let { source ->
+             loadSource(viewWrapper, source)
+         }
+@@ -550,6 +604,9 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
      fun setAllowFileAccess(viewWrapper: RNCWebViewWrapper, allowFileAccess: Boolean) {
          val view = viewWrapper.webView
          view.settings.allowFileAccess = allowFileAccess;

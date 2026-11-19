@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- 🔇 **"Pause audio/video when hidden" no longer puts the page to sleep** (#177). It called `WebView.onPause()`, which also hides the page: `requestAnimationFrame` and CSS animations stopped, timers ran at most once a second, and a page reacting to `visibilitychange` went to sleep (Home Assistant closes its connection after 5 minutes hidden). Now a script in the page pauses the audio and video, also an `Audio` object never put in the page, suspends Web Audio (`AudioContext`), mutes the camera and microphone of a page that uses them (WebRTC), and refuses `play()` and `AudioContext.resume()` until the screensaver goes away, while the page keeps running. A page that loads in the meantime (auto reload, URL rotation, a URL set over REST or MQTT) starts paused. The script runs before the page's own scripts in every frame, cross-origin iframes such as a YouTube embed included, where the WebView supports document-start scripts (`WebViewFeature.DOCUMENT_START_SCRIPT`); otherwise only in the main page, and only once the page has started loading. As before, audio and video stay paused afterwards; Web Audio, camera and microphone come back. Putting the page to sleep remains the job of "Pause the page while the screen is off".
+
 ***
 
 ## [2.1.0-beta.3] - 2026-11-18
