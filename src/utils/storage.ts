@@ -104,7 +104,7 @@ export const KEYS = {
   // Return to Settings
   RETURN_TAP_COUNT: '@kiosk_return_tap_count',
   RETURN_TAP_TIMEOUT: '@kiosk_return_tap_timeout',
-  RETURN_MODE: '@kiosk_return_mode', // 'tap_anywhere' | 'button'
+  RETURN_MODE: '@kiosk_return_mode', // 'tap_anywhere' | 'button' | 'corner_sequence'
   RETURN_BUTTON_POSITION: '@kiosk_return_button_position', // 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
   VOLUME_UP_5TAP_ENABLED: '@kiosk_volume_up_5tap_enabled',
   // Blocking Overlays

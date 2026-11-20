@@ -752,6 +752,7 @@ class KioskMqttClient(
             "reboot" -> "reboot" to null
             "clear_cache" -> "clearCache" to null
             "lock" -> "lockDevice" to null
+            "open_settings" -> "openSettings" to null
 
             "url" -> "setUrl" to JSONObject().put("url", payload)
             "tts" -> "tts" to JSONObject().put("text", payload)

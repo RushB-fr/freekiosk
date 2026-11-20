@@ -525,6 +525,8 @@
       "tapAnywhereHint": "Dotknij N razy w tym samym obszarze (dotknięcia muszą być skupione)",
       "fixedButton": "Stały przycisk",
       "fixedButtonHint": "Dotknij N razy przycisku w rogu",
+      "cornerSequence": "Stuknięcia w rogi",
+      "cornerSequenceHint": "Stuknij dwa razy w lewy górny róg, a potem dwa razy w prawy dolny, w ciągu 3 sekund. Nic nie jest wyświetlane, a klawiatura ekranowa nie może tego wywołać",
       "numTaps": "Liczba dotknięć (2-20)",
       "numTapsHintButton": "Dotknij tyle razy, aby otworzyć ustawienia",
       "numTapsHintAnywhere": "Szybko dotknij tyle razy w dowolnym miejscu ekranu, aby otworzyć ustawienia",
@@ -545,6 +547,7 @@
       "volumeAltHintOther": "Pozwól również otwierać ustawienia wielokrotnym naciśnięciem przycisku Głośniej/Ciszej",
       "infoButtonMode": "Dotknij przycisku powrotu ({{position}}) {{count}} razy, aby otworzyć ustawienia",
       "infoAnywhereMode": "Dotknij {{count}} razy w dowolnym miejscu ekranu w ciągu {{timeout}}, aby otworzyć ustawienia",
+      "infoCornerMode": "Stuknij dwa razy w lewy górny róg, a potem dwa razy w prawy dolny, w ciągu 3 sekund, aby otworzyć ustawienia",
       "pinRequired": " (wymagany PIN)"
     },
     "touchBlocking": {
@@ -616,6 +619,7 @@
       "title": "Powrót do ustawień",
       "buttonLine": "• Dotknij przycisku powrotu ({{position}}) {{count}} razy{{invisible}}",
       "anywhereLine": "• Dotknij {{count}} razy w dowolnym miejscu ekranu w ciągu {{timeout}}{{visual}}",
+      "cornerLine": "• Stuknij dwa razy w lewy górny róg, a potem dwa razy w prawy dolny, w ciągu 3 sekund",
       "invisible": " (niewidoczny)",
       "visualIndicator": " (widoczny wskaźnik)",
       "recentApps": "• Lub użyj przełącznika ostatnich aplikacji",

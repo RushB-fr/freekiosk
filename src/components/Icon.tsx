@@ -151,6 +151,7 @@ export type IconName =
   | 'speedometer'
   | 'gesture-tap'
   | 'gesture-tap-button'
+  | 'gesture-double-tap'
   | 'undo'
   | 'arrow-u-left-top'
   // Arrow directions

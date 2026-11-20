@@ -281,7 +281,7 @@ All entities are grouped under one HA device:
 
 
 
-#### Buttons (14)
+#### Buttons (15)
 
 
 
@@ -292,6 +292,7 @@ All entities are grouped under one HA device:
 | **Reboot** | `.../set/reboot` | mdi:restart |
 | **Clear Cache** | `.../set/clear_cache` | mdi:delete-sweep |
 | **Lock** | `.../set/lock` | mdi:lock |
+| **Open Settings** | `.../set/open_settings` | mdi:cog |
 | **Remote Up** | `.../set/remote_up` | mdi:arrow-up-bold |
 | **Remote Down** | `.../set/remote_down` | mdi:arrow-down-bold |
 | **Remote Left** | `.../set/remote_left` | mdi:arrow-left-bold |
@@ -397,6 +398,7 @@ Commands are sent by publishing to `{baseTopic}/{topicId}/set/{entity}`.
 | **reboot** | reboot | any | Reboot device (Device Owner required) |
 | **clear_cache** | clearCache | any | Clear WebView cache |
 | **lock** | lockDevice | any | Lock device screen |
+| **open_settings** | openSettings | any | Open the PIN screen to the settings (the PIN is still asked for) |
 | **url** | setUrl | URL string | Navigate to URL |
 | **mode** | setMode | JSON: `{"mode":"webview","url":"https://..."}`, `{"mode":"external_app","package":"com.app"}` (omit `package` for the stored multi-app config), or `{"mode":"media_player"}` | Switch display mode at runtime (webview / external_app / media_player) |
 | **tts** | tts | text string | Text-to-speech (handled natively) |

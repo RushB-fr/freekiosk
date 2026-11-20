@@ -1030,6 +1030,14 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             "getLocation" -> {
                 return getLocationInfo()
             }
+            "openSettings" -> {
+                // KioskScreen opens the PIN screen. Behind an external app its JS thread is
+                // frozen, so bring FreeKiosk forward first, as setMode does below; then on to JS.
+                if (!isAppInForeground()) {
+                    MainActivity.blockAutoRelaunch = true
+                    bringAppToFront()
+                }
+            }
             "setMode" -> {
                 // #209: The actual mode switch runs in the JS onSetMode handler, but when
                 // FreeKiosk is backgrounded behind an external app the JS thread is frozen,

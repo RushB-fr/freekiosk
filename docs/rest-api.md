@@ -695,6 +695,9 @@ Lock device screen. Uses `DevicePolicyManager.lockNow()` (Device Owner) or `GLOB
 #### `GET|POST /api/restart-ui`
 Restart the FreeKiosk app UI. Calls `activity.recreate()` to fully restart the React Native activity without rebooting the device. Useful for troubleshooting UI issues remotely.
 
+#### `GET|POST /api/open-settings`
+Open the PIN screen on the tablet, as the return gesture does, so a person at the screen can enter the settings with nothing on the dashboard to tap. The PIN is still asked for. Over an external app, FreeKiosk is brought to the front first. Does nothing while the PIN or settings screen is already open.
+
 
 ### Audio Control (POST)
 
@@ -1045,6 +1048,10 @@ rest_command:
   
   tablet_restart_ui:
     url: http://TABLET_IP:8080/api/restart-ui
+    method: POST
+  
+  tablet_open_settings:
+    url: http://TABLET_IP:8080/api/open-settings
     method: POST
   
   tablet_tts:

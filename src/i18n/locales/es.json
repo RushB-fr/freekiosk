@@ -525,6 +525,8 @@
       "tapAnywhereHint": "Toca N veces en la misma zona (los toques deben estar agrupados)",
       "fixedButton": "Botón fijo",
       "fixedButtonHint": "Toca N veces un botón en una esquina",
+      "cornerSequence": "Toques en las esquinas",
+      "cornerSequenceHint": "Toca dos veces la esquina superior izquierda y luego dos veces la inferior derecha, en menos de 3 segundos. No se muestra nada y un teclado en pantalla no puede activarlo",
       "numTaps": "Número de toques (2-20)",
       "numTapsHintButton": "Toca esta cantidad de veces para acceder a la configuración",
       "numTapsHintAnywhere": "Toca rápidamente en cualquier lugar de la pantalla esta cantidad de veces para acceder a la configuración",
@@ -545,6 +547,7 @@
       "volumeAltHintOther": "Permite también presionar el botón Subir/Bajar volumen varias veces para acceder a la configuración",
       "infoButtonMode": "Toca el botón de retorno ({{position}}) {{count}} veces para acceder a la configuración",
       "infoAnywhereMode": "Toca en cualquier lugar de la pantalla {{count}} veces en {{timeout}} para acceder a la configuración",
+      "infoCornerMode": "Toca dos veces la esquina superior izquierda y luego dos veces la inferior derecha, en menos de 3 segundos, para acceder a la configuración",
       "pinRequired": " (se requiere PIN)"
     },
     "touchBlocking": {
@@ -616,6 +619,7 @@
       "title": "Volver a la configuración",
       "buttonLine": "• Toca el botón de retorno ({{position}}) {{count}} veces{{invisible}}",
       "anywhereLine": "• Toca {{count}} veces en cualquier lugar de la pantalla en {{timeout}}{{visual}}",
+      "cornerLine": "• Toca dos veces la esquina superior izquierda y luego dos veces la inferior derecha, en menos de 3 segundos",
       "invisible": " (invisible)",
       "visualIndicator": " (indicador visual visible)",
       "recentApps": "• O usa el selector de apps recientes",

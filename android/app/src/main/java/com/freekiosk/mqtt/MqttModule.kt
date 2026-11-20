@@ -328,6 +328,11 @@ class MqttModule(private val reactContext: ReactApplicationContext) :
                             bringAppToFront()
                         }
                     }
+                    // Same reason: KioskScreen opens the PIN screen, which needs its JS thread
+                    "openSettings" -> if (!isAppInForeground()) {
+                        MainActivity.blockAutoRelaunch = true
+                        bringAppToFront()
+                    }
                 }
                 // The toast is already shown above, and the JS handler would show it again
                 if (command != "toast") emitCommand(command, params)

@@ -525,6 +525,8 @@
       "tapAnywhereHint": "在同一区域点按 N 次（点按必须集中）",
       "fixedButton": "固定按钮",
       "fixedButtonHint": "在角落按钮上点按 N 次",
+      "cornerSequence": "角落点击",
+      "cornerSequenceHint": "3 秒内先点击左上角两次，再点击右下角两次。屏幕上不显示任何内容，屏幕键盘也无法误触发",
       "numTaps": "点按次数（2-20）",
       "numTapsHintButton": "点按此次数即可进入设置",
       "numTapsHintAnywhere": "在屏幕任意位置快速点按此次数即可进入设置",
@@ -545,6 +547,7 @@
       "volumeAltHintOther": "也允许多次按音量加/减键进入设置",
       "infoButtonMode": "点按返回按钮（{{position}}）{{count}} 次即可进入设置",
       "infoAnywhereMode": "在 {{timeout}} 内点按屏幕任意位置 {{count}} 次即可进入设置",
+      "infoCornerMode": "3 秒内先点击左上角两次，再点击右下角两次，即可进入设置",
       "pinRequired": "（需要 PIN）"
     },
     "touchBlocking": {
@@ -616,6 +619,7 @@
       "title": "返回设置",
       "buttonLine": "• 点按返回按钮（{{position}}）{{count}} 次{{invisible}}",
       "anywhereLine": "• 在 {{timeout}} 内点按屏幕任意位置 {{count}} 次{{visual}}",
+      "cornerLine": "• 3 秒内先点击左上角两次，再点击右下角两次",
       "invisible": "（不可见）",
       "visualIndicator": "（显示可见指示）",
       "recentApps": "• 或使用最近应用选择器",

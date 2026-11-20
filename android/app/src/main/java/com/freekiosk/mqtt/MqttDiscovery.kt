@@ -335,6 +335,7 @@ class MqttDiscovery(
             ButtonDef("reboot", "Reboot", "$baseTopic/$topicId/set/reboot", "mdi:restart"),
             ButtonDef("clear_cache", "Clear Cache", "$baseTopic/$topicId/set/clear_cache", "mdi:delete-sweep"),
             ButtonDef("lock", "Lock", "$baseTopic/$topicId/set/lock", "mdi:lock"),
+            ButtonDef("open_settings", "Open Settings", "$baseTopic/$topicId/set/open_settings", "mdi:cog"),
             // Remote control buttons
             ButtonDef("remote_up", "Remote Up", "$baseTopic/$topicId/set/remote_up", "mdi:arrow-up-bold"),
             ButtonDef("remote_down", "Remote Down", "$baseTopic/$topicId/set/remote_down", "mdi:arrow-down-bold"),

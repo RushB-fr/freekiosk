@@ -525,6 +525,8 @@
       "tapAnywhereHint": "Tik N keer in hetzelfde gebied (de tikken moeten gegroepeerd zijn)",
       "fixedButton": "Vaste knop",
       "fixedButtonHint": "Tik N keer op een knop in een hoek",
+      "cornerSequence": "Hoektikken",
+      "cornerSequenceHint": "Tik twee keer in de linkerbovenhoek en daarna twee keer in de rechteronderhoek, binnen 3 seconden. Er wordt niets getoond en een schermtoetsenbord kan het niet activeren",
       "numTaps": "Aantal tikken (2-20)",
       "numTapsHintButton": "Tik zo vaak om de instellingen te openen",
       "numTapsHintAnywhere": "Tik zo vaak snel achter elkaar ergens op het scherm om de instellingen te openen",
@@ -545,6 +547,7 @@
       "volumeAltHintOther": "Sta ook toe dat je de instellingen opent door meerdere keren op de knop Volume omhoog/omlaag te drukken",
       "infoButtonMode": "Tik {{count}} keer op de terugknop ({{position}}) om de instellingen te openen",
       "infoAnywhereMode": "Tik {{count}} keer ergens op het scherm binnen {{timeout}} om de instellingen te openen",
+      "infoCornerMode": "Tik twee keer in de linkerbovenhoek en daarna twee keer in de rechteronderhoek, binnen 3 seconden, om de instellingen te openen",
       "pinRequired": " (pincode vereist)"
     },
     "touchBlocking": {
@@ -616,6 +619,7 @@
       "title": "Terug naar instellingen",
       "buttonLine": "• Tik {{count}} keer op de terugknop ({{position}}){{invisible}}",
       "anywhereLine": "• Tik {{count}} keer ergens op het scherm binnen {{timeout}}{{visual}}",
+      "cornerLine": "• Tik twee keer in de linkerbovenhoek en daarna twee keer in de rechteronderhoek, binnen 3 seconden",
       "invisible": " (onzichtbaar)",
       "visualIndicator": " (visuele indicator zichtbaar)",
       "recentApps": "• Of gebruik de selector voor recente apps",
