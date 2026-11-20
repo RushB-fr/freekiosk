@@ -77,6 +77,7 @@ interface WebViewComponentProps {
   onRenderProcessGone?: (didCrash: boolean) => void; // #198 — renderer process died, ask parent to remount
   inactive?: boolean; // Kept loaded but hidden (dashboard): no speech, no print
   initialMediaPaused?: boolean; // #177: mounted while media is paused (behind the screensaver)
+  mediaGuard?: boolean; // #177: install the media guard in the page (only when "Pause audio/video when hidden" is on)
 }
 
 export interface WebViewComponentRef {
@@ -156,6 +157,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   onRenderProcessGone,
   inactive = false,
   initialMediaPaused = false,
+  mediaGuard = false,
 }, ref) => {
   const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp>();
@@ -1687,7 +1689,9 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
         injectedJavaScript={combinedInjectedJavaScript}
         // #177: the media guard as a document-start script in every frame, cross-origin iframes
         // too (our react-native-webview patch); main frame only without DOCUMENT_START_SCRIPT.
-        injectedJavaScriptBeforeContentLoaded={mediaPaused ? MEDIA_PAUSE_JS : MEDIA_GUARD_JS}
+        // Only with the option on: the guard wraps play(), Audio, AudioContext and getUserMedia, which
+        // a page should not see changed when nobody asked to pause its media.
+        injectedJavaScriptBeforeContentLoaded={mediaGuard ? (mediaPaused ? MEDIA_PAUSE_JS : MEDIA_GUARD_JS) : undefined}
         injectedJavaScriptBeforeContentLoadedForMainFrameOnly={false}
         // Android ignores this (injection runs from onPageFinished), but the nonce rests on it.
         injectedJavaScriptForMainFrameOnly={true}

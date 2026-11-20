@@ -3506,11 +3506,12 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     customUserAgent,
     basicAuthCredential,
     onRenderProcessGone: handleWebViewRenderProcessGone,
+    mediaGuard: pauseWebMediaWhenHidden,
   }), [autoReload, hideErrorUrl, alwaysLoadFromNetwork, disableOverscroll, pullToRefresh, silentPrintWindowPrint,
     keyboardMode, onJsExecuted, webViewBackButtonEnabled, urlFilterEnabled, urlFilterMode,
     urlFilterList, urlFilterShowFeedback, pdfViewerEnabled, windowPrintEnabled, printPaperSize,
     silentPrintEnabled, escPosWidthDots, escPosCut, escPosFeedLines, printOrigins, zoomLevel, zoomMode,
-    disableUserZoom, customUserAgent, basicAuthCredential, handleWebViewRenderProcessGone]);
+    disableUserZoom, customUserAgent, basicAuthCredential, handleWebViewRenderProcessGone, pauseWebMediaWhenHidden]);
 
   // Latest callbacks for the kept tiles' handlers, which are created once per tile.
   const keptTileCallbacksRef = useRef({ onUserInteraction, markUserInteraction });
