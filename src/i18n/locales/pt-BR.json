@@ -525,6 +525,8 @@
       "tapAnywhereHint": "Toque N vezes na mesma área (os toques precisam ficar agrupados)",
       "fixedButton": "Botão fixo",
       "fixedButtonHint": "Toque N vezes em um botão no canto",
+      "cornerSequence": "Toques nos cantos",
+      "cornerSequenceHint": "Toque duas vezes no canto superior esquerdo e depois duas vezes no inferior direito, em até 3 segundos. Nada é exibido e um teclado na tela não consegue acionar",
       "numTaps": "Número de toques (2-20)",
       "numTapsHintButton": "Toque essa quantidade de vezes para acessar as configurações",
       "numTapsHintAnywhere": "Toque rapidamente essa quantidade de vezes em qualquer lugar da tela para acessar as configurações",
@@ -545,6 +547,7 @@
       "volumeAltHintOther": "Também permitir pressionar o botão Volume +/- várias vezes para acessar as configurações",
       "infoButtonMode": "Toque no botão de retorno ({{position}}) {{count}} vezes para acessar as configurações",
       "infoAnywhereMode": "Toque {{count}} vezes em qualquer lugar da tela em até {{timeout}} para acessar as configurações",
+      "infoCornerMode": "Toque duas vezes no canto superior esquerdo e depois duas vezes no inferior direito, em até 3 segundos, para acessar as configurações",
       "pinRequired": " (PIN necessário)"
     },
     "touchBlocking": {
@@ -616,6 +619,7 @@
       "title": "Voltar às configurações",
       "buttonLine": "• Toque no botão de retorno ({{position}}) {{count}} vezes{{invisible}}",
       "anywhereLine": "• Toque {{count}} vezes em qualquer lugar da tela em até {{timeout}}{{visual}}",
+      "cornerLine": "• Toque duas vezes no canto superior esquerdo e depois duas vezes no inferior direito, em até 3 segundos",
       "invisible": " (invisível)",
       "visualIndicator": " (indicador visual visível)",
       "recentApps": "• Ou use o seletor de apps recentes",

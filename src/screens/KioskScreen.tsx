@@ -13,7 +13,7 @@ import { SignagePlaylist } from '../utils/SignagePlaylist';
 import StatusBar from '../components/StatusBar';
 import MotionDetector from '../components/MotionDetector';
 import ProximityDetectionModule, { onProximityNear as onProximityNearEvent } from '../utils/ProximityDetectionModule';
-import ExternalAppOverlay from '../components/ExternalAppOverlay';
+import ExternalAppOverlay, { returnButtonPositionStyle } from '../components/ExternalAppOverlay';
 import { DEFAULT_MULTI_APP_APPEARANCE, MultiAppAppearance, parseMultiAppAppearance } from '../types/multiAppAppearance';
 import { StorageService, toPrintOrigins, clampScreensaverFadeSeconds } from '../utils/storage';
 import { saveSecurePin, saveSecureMqttPassword, saveSecureApiKey, getSecureBasicAuthPassword } from '../utils/secureStorage';
@@ -59,6 +59,9 @@ const MOTION_PRE_CHECK_DELAY_MS = 10_000;
 // NOTE: fixed settle time for the camera's auto-exposure after the fade (about two
 // Camera2 frames); make it depend on the capture interval if 4 s proves too short.
 const FADE_MOTION_SETTLE_MS = 4000;
+
+// Delay of the second brightness read after a screensaver change (see the read-back effect).
+const BRIGHTNESS_READ_BACK_SETTLE_MS = 800;
 
 /** Every direct brightness write goes through here: it supersedes a running screensaver fade. */
 const setBrightnessLevel = (level: number) => {
@@ -660,13 +663,17 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   // #177 — Pause WebView audio/video while the screensaver overlay is shown (the page keeps
   // running underneath, so a web radio would otherwise stay audible and uncontrollable), and
   // resume the renderer when it's dismissed. Opt-in (default on); WebView mode only.
+  // webMediaPausedRef: the last call, handed to a WebView remounted meanwhile (webViewKey:
+  // reload, REST/MQTT setUrl, URL planner) so its first page already starts paused.
+  const webMediaPausedRef = useRef(false);
+  const setWebMediaPaused = (paused: boolean) => {
+    webMediaPausedRef.current = paused;
+    if (paused) webViewRef.current?.pauseMedia();
+    else webViewRef.current?.resumeMedia();
+  };
   useEffect(() => {
     if (!pauseWebMediaWhenHidden || displayMode !== 'webview') return;
-    if (isScreensaverActive) {
-      webViewRef.current?.pauseMedia();
-    } else {
-      webViewRef.current?.resumeMedia();
-    }
+    setWebMediaPaused(isScreensaverActive);
   }, [isScreensaverActive, pauseWebMediaWhenHidden, displayMode]);
 
   // #177 — Pause WebView audio/video when the whole app is backgrounded (e.g. system screen
@@ -676,9 +683,9 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     if (!pauseWebMediaWhenHidden || displayMode !== 'webview') return;
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'background') {
-        webViewRef.current?.pauseMedia();
+        setWebMediaPaused(true);
       } else if (state === 'active' && !isScreensaverActiveRef.current) {
-        webViewRef.current?.resumeMedia();
+        setWebMediaPaused(false);
       }
     });
     return () => sub.remove();
@@ -883,6 +890,21 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           }
           setWebViewKey(prev => prev + 1);
           console.log('[API] Cache cleared (native + WebView remount)');
+        },
+        onOpenSettings: () => {
+          // Already on the PIN or settings screen: navigate() would pull a person in the
+          // settings back to the PIN
+          if (!navigation.isFocused()) return;
+          console.log('[API] Open settings');
+          // Same steps as the native navigateToPin event (5 taps over an external app)
+          isNavigatingToPinRef.current = true;
+          if (appLaunchTimeoutRef.current) {
+            clearTimeout(appLaunchTimeoutRef.current);
+            appLaunchTimeoutRef.current = null;
+          }
+          setIsScreensaverActive(false);
+          OverlayServiceModule.stopOverlayService().catch(() => {});
+          navigation.navigate('Pin');
         },
         onRemoteKey: async (key: string) => {
           try {
@@ -1205,9 +1227,14 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
   // made outside FreeKiosk between two of these transitions is still not picked up. A
   // poll would cost a wake-up every few seconds on a battery-powered kiosk for a value
   // that only moves when something asks it to.
+  //
+  // Read twice. When the screensaver goes off, the effect that restores the default
+  // brightness runs at the same moment as this one, so the first read can still see the
+  // screensaver's dim level: on a tablet /api/brightness answered 1 while the display was
+  // back at 80 %. The second read, once the restore has landed, reports the real level.
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const readBack = async () => {
       try {
         const actual = await RNBrightness.getBrightnessLevel();
         if (!cancelled) {
@@ -1222,9 +1249,12 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
           setEffectiveBrightness(defaultBrightness);
         }
       }
-    })();
+    };
+    readBack();
+    const settled = setTimeout(readBack, BRIGHTNESS_READ_BACK_SETTLE_MS);
     return () => {
       cancelled = true;
+      clearTimeout(settled);
     };
   }, [defaultBrightness, isScreensaverActive]);
 
@@ -3491,11 +3521,12 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
     customUserAgent,
     basicAuthCredential,
     onRenderProcessGone: handleWebViewRenderProcessGone,
+    mediaGuard: pauseWebMediaWhenHidden,
   }), [autoReload, hideErrorUrl, alwaysLoadFromNetwork, disableOverscroll, pullToRefresh, silentPrintWindowPrint,
     keyboardMode, onJsExecuted, webViewBackButtonEnabled, urlFilterEnabled, urlFilterMode,
     urlFilterList, urlFilterShowFeedback, pdfViewerEnabled, windowPrintEnabled, printPaperSize,
     silentPrintEnabled, escPosWidthDots, escPosCut, escPosFeedLines, printOrigins, zoomLevel, zoomMode,
-    disableUserZoom, customUserAgent, basicAuthCredential, handleWebViewRenderProcessGone]);
+    disableUserZoom, customUserAgent, basicAuthCredential, handleWebViewRenderProcessGone, pauseWebMediaWhenHidden]);
 
   // Latest callbacks for the kept tiles' handlers, which are created once per tile.
   const keptTileCallbacksRef = useRef({ onUserInteraction, markUserInteraction });
@@ -3539,6 +3570,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
       ref={webViewRef}
       key={webViewKey}
       url={url}
+      initialMediaPaused={webMediaPausedRef.current}
       {...sharedWebViewProps}
       reportPageTouches={urlRotationEnabled && urlRotationPauseOnTouch}
       onPageTouch={() => { lastPageTouchRef.current = Date.now(); }}
@@ -3585,6 +3617,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
                       url={tile.url}
                       {...sharedWebViewProps}
                       inactive={!active}
+                      initialMediaPaused={active && webMediaPausedRef.current}
                       jsToExecute={active ? jsToExecute : ''}
                       onUserInteraction={active ? handlers.onUserInteraction : undefined}
                       onNavigationStateChange={handlers.onNavigationStateChange}
@@ -3719,6 +3752,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
         <TouchableOpacity 
           style={[
             styles.visualIndicator,
+            returnButtonPositionStyle(returnButtonPosition),
             {
               opacity: returnButtonVisible ? 1 : 0,
               backgroundColor: returnButtonVisible ? '#2b7fff' : 'transparent',
@@ -3871,8 +3905,6 @@ const styles = StyleSheet.create({
   },
   visualIndicator: {
     position: 'absolute',
-    bottom: 20,
-    right: 20,
     width: 50,
     height: 50,
     backgroundColor: '#2b7fff',

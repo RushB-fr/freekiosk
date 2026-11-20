@@ -525,6 +525,8 @@
       "tapAnywhereHint": "N-mal im selben Bereich tippen (die Berührungen müssen gruppiert erfolgen)",
       "fixedButton": "Feste Schaltfläche",
       "fixedButtonHint": "N-mal auf eine Schaltfläche in einer Ecke tippen",
+      "cornerSequence": "Ecken-Taps",
+      "cornerSequenceHint": "Zweimal in die linke obere Ecke tippen, dann zweimal in die rechte untere, innerhalb von 3 Sekunden. Nichts wird angezeigt, und eine Bildschirmtastatur kann es nicht auslösen",
       "numTaps": "Anzahl der Berührungen (2-20)",
       "numTapsHintButton": "So oft tippen, um die Einstellungen zu öffnen",
       "numTapsHintAnywhere": "So oft schnell irgendwo auf den Bildschirm tippen, um die Einstellungen zu öffnen",
@@ -545,6 +547,7 @@
       "volumeAltHintOther": "Erlaubt zusätzlich, die Einstellungen durch mehrfaches Drücken der Taste Lauter/Leiser zu öffnen",
       "infoButtonMode": "Tippe {{count}}-mal auf die Zurück-Schaltfläche ({{position}}), um die Einstellungen zu öffnen",
       "infoAnywhereMode": "Tippe {{count}}-mal innerhalb von {{timeout}} irgendwo auf den Bildschirm, um die Einstellungen zu öffnen",
+      "infoCornerMode": "Zweimal in die linke obere Ecke, dann zweimal in die rechte untere Ecke tippen (innerhalb von 3 Sekunden), um die Einstellungen zu öffnen",
       "pinRequired": " (PIN erforderlich)"
     },
     "touchBlocking": {
@@ -616,6 +619,7 @@
       "title": "Zurück zu den Einstellungen",
       "buttonLine": "• Tippe {{count}}-mal auf die Zurück-Schaltfläche ({{position}}){{invisible}}",
       "anywhereLine": "• Tippe {{count}}-mal innerhalb von {{timeout}} irgendwo auf den Bildschirm{{visual}}",
+      "cornerLine": "• Zweimal in die linke obere Ecke, dann zweimal in die rechte untere Ecke tippen, innerhalb von 3 Sekunden",
       "invisible": " (unsichtbar)",
       "visualIndicator": " (visuelle Markierung sichtbar)",
       "recentApps": "• Oder verwende die Auswahl der letzten Apps",

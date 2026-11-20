@@ -104,7 +104,7 @@ export const KEYS = {
   // Return to Settings
   RETURN_TAP_COUNT: '@kiosk_return_tap_count',
   RETURN_TAP_TIMEOUT: '@kiosk_return_tap_timeout',
-  RETURN_MODE: '@kiosk_return_mode', // 'tap_anywhere' | 'button'
+  RETURN_MODE: '@kiosk_return_mode', // 'tap_anywhere' | 'button' | 'corner_sequence'
   RETURN_BUTTON_POSITION: '@kiosk_return_button_position', // 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
   VOLUME_UP_5TAP_ENABLED: '@kiosk_volume_up_5tap_enabled',
   // Blocking Overlays
@@ -4044,6 +4044,7 @@ export const StorageService = {
         dashboardKeepTilesLoaded: bool(KEYS.DASHBOARD_KEEP_TILES_LOADED),
         dashboardStartTile: str(KEYS.DASHBOARD_START_TILE, ''),
         pauseWebMediaWhenHidden: bool(KEYS.PAUSE_WEB_MEDIA_WHEN_HIDDEN, true),
+        pausePageWhenScreenOff: bool(KEYS.PAUSE_PAGE_WHEN_SCREEN_OFF, false), // #215
         restartButton: {
           enabled: bool(KEYS.RESTART_BUTTON_ENABLED),
           longPressSeconds: num(KEYS.RESTART_BUTTON_LONG_PRESS_SECONDS, 5),
@@ -4314,6 +4315,7 @@ export const StorageService = {
       set(KEYS.DASHBOARD_KEEP_TILES_LOADED, g.dashboardKeepTilesLoaded);
       set(KEYS.DASHBOARD_START_TILE, g.dashboardStartTile);
       set(KEYS.PAUSE_WEB_MEDIA_WHEN_HIDDEN, g.pauseWebMediaWhenHidden);
+      set(KEYS.PAUSE_PAGE_WHEN_SCREEN_OFF, g.pausePageWhenScreenOff);
       const rb = g.restartButton as Record<string, unknown> | undefined;
       if (rb) {
         set(KEYS.RESTART_BUTTON_ENABLED, rb.enabled);

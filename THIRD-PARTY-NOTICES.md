@@ -11,6 +11,7 @@ dependency is added or removed, update it in the same pull request.
 |---|---|---|---|---|
 | [PDF.js](https://github.com/mozilla/pdf.js) | 3.11.174 | `android/app/src/main/assets/pdfjs/pdf.min.js`, `pdf.worker.min.js` | Apache-2.0 | Copyright 2023 Mozilla Foundation |
 | [Material Design Icons](https://pictogrammers.com/library/mdi/) font (as packaged by react-native-vector-icons 10.3.0, which builds it from MDI 6.5.95) | 6.5.95 | `MaterialCommunityIcons.ttf`, copied into the APK at build time (`android/app/build.gradle`) | Apache-2.0 (Pictogrammers Free License: the icons and the fonts are Apache-2.0) | Pictogrammers; the font file itself carries no copyright line |
+| [BlazeFace short range](https://developers.google.com/edge/mediapipe/solutions/vision/face_detector) face detection model, from MediaPipe | as published by MediaPipe | `android/app/src/main/assets/blaze_face_short_range.tflite` | Apache-2.0 | The MediaPipe authors (Google) |
 
 **PDF.js is not modified.** The two files are byte for byte the ones in the `pdfjs-dist@3.11.174` package
 (`build/pdf.min.js` and `build/pdf.worker.min.js`), checked by SHA-256 on 2026-11-17:
@@ -64,6 +65,7 @@ build-time tools and are not in the JavaScript bundle shipped in the APK (checke
 | `org.nanohttpd:nanohttpd` | 2.3.1 | BSD-3-Clause | Copyright (c) 2012-2013 by Paul S. Hawke, 2001,2005-2013 by Jarno Elonen, 2010 by Konstantinos Togias |
 | `com.hivemq:hivemq-mqtt-client` | 1.3.12 | Apache-2.0 | HiveMQ and the HiveMQ Community |
 | `io.netty:netty-*` (pulled in by the HiveMQ client) | 4.1.130.Final | Apache-2.0 | The Netty project; see the artifacts |
+| `com.google.ai.edge.litert:litert` (runs the BlazeFace model; ARM only) | 1.4.0 | Apache-2.0 | Google; see the artifact |
 
 React Native, AndroidX and the other transitive libraries that Gradle pulls in come with their own licenses,
 published with each artifact. On 2026-11-17 we read the license declared by each of the 178 libraries of the release
@@ -129,7 +131,7 @@ Redistribution and use in source and binary forms, with or without modification,
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-### Apache License 2.0 (PDF.js, Material Design Icons, AndroidX, HiveMQ MQTT Client)
+### Apache License 2.0 (PDF.js, Material Design Icons, AndroidX, HiveMQ MQTT Client, LiteRT, the BlazeFace model)
 
 ```
 

@@ -53,7 +53,7 @@ interface SecurityTabProps {
   onAllowSystemInfoChange: (value: boolean) => void;
   
   // Return to Settings
-  returnMode: string; // 'tap_anywhere' | 'button'
+  returnMode: string; // 'tap_anywhere' | 'button' | 'corner_sequence'
   onReturnModeChange: (value: string) => void;
   returnTapCount: string;
   onReturnTapCountChange: (value: string) => void;
@@ -189,6 +189,10 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
   lockscreenRotationLockAvailable,
 }) => {
   const { t } = useTranslation();
+  // The corner sequence is detected over FreeKiosk's own screen only: over an external app
+  // the overlay counts N taps instead
+  const cornerAvailable = displayMode !== 'external_app';
+  const returnModeShown = returnMode === 'corner_sequence' && !cornerAvailable ? 'tap_anywhere' : returnMode;
 
   return (
     <View>
@@ -419,59 +423,65 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
               icon: 'square-outline',
               hint: t('security.returnToSettings.fixedButtonHint'),
             },
+            ...(cornerAvailable ? [{
+              value: 'corner_sequence',
+              label: t('security.returnToSettings.cornerSequence'),
+              icon: 'gesture-double-tap' as const,
+              hint: t('security.returnToSettings.cornerSequenceHint'),
+            }] : []),
           ]}
-          value={returnMode}
+          value={returnModeShown}
           onValueChange={onReturnModeChange}
         />
         <View style={styles.divider} />
 
-        <SettingsInput
-          label={t('security.returnToSettings.numTaps')}
-          hint={returnMode === 'button' ? t('security.returnToSettings.numTapsHintButton') : t('security.returnToSettings.numTapsHintAnywhere')}
-          value={returnTapCount}
-          onChangeText={(text) => {
-            const filtered = text.replace(/[^0-9]/g, '');
-            onReturnTapCountChange(filtered);
-          }}
-          keyboardType="numeric"
-          placeholder="5"
-          maxLength={2}
-          error={returnTapCount !== '' && (parseInt(returnTapCount, 10) < 2 || parseInt(returnTapCount, 10) > 20) ? t('security.returnToSettings.numTapsError') : undefined}
-        />
+        {returnModeShown !== 'corner_sequence' && (
+          <>
+            <SettingsInput
+              label={t('security.returnToSettings.numTaps')}
+              hint={returnModeShown === 'button' ? t('security.returnToSettings.numTapsHintButton') : t('security.returnToSettings.numTapsHintAnywhere')}
+              value={returnTapCount}
+              onChangeText={(text) => {
+                const filtered = text.replace(/[^0-9]/g, '');
+                onReturnTapCountChange(filtered);
+              }}
+              keyboardType="numeric"
+              placeholder="5"
+              maxLength={2}
+              error={returnTapCount !== '' && (parseInt(returnTapCount, 10) < 2 || parseInt(returnTapCount, 10) > 20) ? t('security.returnToSettings.numTapsError') : undefined}
+            />
 
-        <SettingsInput
-          label={t('security.returnToSettings.timeout')}
-          hint={t('security.returnToSettings.timeoutHint')}
-          value={returnTapTimeout}
-          onChangeText={(text) => {
-            const filtered = text.replace(/[^0-9]/g, '');
-            onReturnTapTimeoutChange(filtered);
-          }}
-          keyboardType="numeric"
-          placeholder="1500"
-          maxLength={4}
-          error={returnTapTimeout !== '' && (parseInt(returnTapTimeout, 10) < 500 || parseInt(returnTapTimeout, 10) > 5000) ? t('security.returnToSettings.timeoutError') : undefined}
-        />
+            <SettingsInput
+              label={t('security.returnToSettings.timeout')}
+              hint={t('security.returnToSettings.timeoutHint')}
+              value={returnTapTimeout}
+              onChangeText={(text) => {
+                const filtered = text.replace(/[^0-9]/g, '');
+                onReturnTapTimeoutChange(filtered);
+              }}
+              keyboardType="numeric"
+              placeholder="1500"
+              maxLength={4}
+              error={returnTapTimeout !== '' && (parseInt(returnTapTimeout, 10) < 500 || parseInt(returnTapTimeout, 10) > 5000) ? t('security.returnToSettings.timeoutError') : undefined}
+            />
+          </>
+        )}
 
-        {returnMode === 'button' && (
+        {returnModeShown === 'button' && (
           <>
             <View style={styles.divider} />
-            {displayMode === 'external_app' && (
-              <>
-                <SettingsRadioGroup
-                  hint={t('security.returnToSettings.buttonPositionHint')}
-                  options={[
-                    { value: 'top-left', label: t('security.returnToSettings.topLeft'), icon: 'arrow-top-left' },
-                    { value: 'top-right', label: t('security.returnToSettings.topRight'), icon: 'arrow-top-right' },
-                    { value: 'bottom-left', label: t('security.returnToSettings.bottomLeft'), icon: 'arrow-bottom-left' },
-                    { value: 'bottom-right', label: t('security.returnToSettings.bottomRight'), icon: 'arrow-bottom-right' },
-                  ]}
-                  value={returnButtonPosition}
-                  onValueChange={onReturnButtonPositionChange}
-                />
-                <View style={styles.divider} />
-              </>
-            )}
+            <SettingsRadioGroup
+              hint={t('security.returnToSettings.buttonPositionHint')}
+              options={[
+                { value: 'top-left', label: t('security.returnToSettings.topLeft'), icon: 'arrow-top-left' },
+                { value: 'top-right', label: t('security.returnToSettings.topRight'), icon: 'arrow-top-right' },
+                { value: 'bottom-left', label: t('security.returnToSettings.bottomLeft'), icon: 'arrow-bottom-left' },
+                { value: 'bottom-right', label: t('security.returnToSettings.bottomRight'), icon: 'arrow-bottom-right' },
+              ]}
+              value={returnButtonPosition}
+              onValueChange={onReturnButtonPositionChange}
+            />
+            <View style={styles.divider} />
             <SettingsSwitch
               label={t('security.returnToSettings.showButton')}
               icon="eye"
@@ -499,8 +509,10 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
 
         <SettingsInfoBox variant="info">
           <Text style={styles.infoText}>
-            {returnMode === 'button' && displayMode === 'external_app'
+            {returnModeShown === 'button'
               ? t('security.returnToSettings.infoButtonMode', { position: returnButtonPosition, count: returnTapCount || '5' })
+              : returnModeShown === 'corner_sequence'
+              ? t('security.returnToSettings.infoCornerMode')
               : t('security.returnToSettings.infoAnywhereMode', { count: returnTapCount || '5', timeout: returnTapTimeout ? `${(parseInt(returnTapTimeout, 10) / 1000).toFixed(1)}s` : '1.5s' })}
             {kioskEnabled && t('security.returnToSettings.pinRequired')}
           </Text>
@@ -779,12 +791,14 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
         <Text style={styles.infoText}>
           {Platform.isTV
             ? (displayMode === 'external_app' ? t('security.returnInfo.tvExternal') : t('security.returnInfo.tvBack'))
-            : displayMode === 'external_app' && returnMode === 'button'
+            : returnModeShown === 'button'
             ? t('security.returnInfo.buttonLine', {
                 position: returnButtonPosition,
                 count: returnTapCount || '5',
                 invisible: overlayButtonVisible ? '' : t('security.returnInfo.invisible'),
               })
+            : returnModeShown === 'corner_sequence'
+            ? t('security.returnInfo.cornerLine')
             : t('security.returnInfo.anywhereLine', {
                 count: returnTapCount || '5',
                 timeout: returnTapTimeout ? `${(parseInt(returnTapTimeout, 10) / 1000).toFixed(1)}s` : '1.5s',

@@ -869,6 +869,8 @@ class MainActivity : ReactActivity() {
     super.onResume()
     // #215: never leave the page frozen if the screen-on broadcast was missed.
     if (pageTimersPaused) setPageTimersPaused(false)
+    // A wake interrupted by a restart never cancelled its notification.
+    ScreenController.cancelWakeNotification(this)
     // The lock screen comes back after the screen was off; a swipe-only one is dismissed again.
     KeyguardHelper.dismissIfInsecure(this)
 
@@ -1451,7 +1453,8 @@ class MainActivity : ReactActivity() {
   // the existing Volume-Up x5 escape hatch.
   //
   // To revert this feature entirely: delete this whole block (fields + methods +
-  // the dispatchTouchEvent override below). Nothing else references it.
+  // the dispatchTouchEvent override below), but keep the corner_sequence return
+  // mode's lines (cornerSequence*): that mode has no other path to the settings.
   // Disable at runtime: set AsyncStorage `@kiosk_tap_to_settings_native_enabled`
   // to "false".
   // ============================================================================
@@ -1477,6 +1480,11 @@ class MainActivity : ReactActivity() {
   private var tapSettingsEnabled = false
   private var tapSettingsRequiredTaps = 5
   private var tapSettingsTimeoutMs = 1500L
+  // "corner_sequence" return mode: handled only here, the page script has no part in it
+  private var cornerSequenceEnabled = false
+  private val cornerSequenceDetector by lazy {
+    CornerSequenceDetector(CornerSequenceDetector.CORNER_DP * resources.displayMetrics.density)
+  }
 
   private fun refreshTapSettingsConfig() {
     val now = System.currentTimeMillis()
@@ -1486,15 +1494,17 @@ class MainActivity : ReactActivity() {
       val featureEnabled = getAsyncStorageValue("@kiosk_tap_to_settings_native_enabled", "true") == "true"
       val displayMode = getAsyncStorageValue("@kiosk_display_mode", "webview")
       val returnMode = getAsyncStorageValue("@kiosk_return_mode", "tap_anywhere")
+      val pageMode = displayMode == "webview" || displayMode == "media_player"
       // Only active where the JS path is the sole escape: WebView/media + tap_anywhere.
       // (button mode has its own RN return button; external_app uses OverlayService.)
-      tapSettingsEnabled = featureEnabled &&
-        (displayMode == "webview" || displayMode == "media_player") &&
-        returnMode == "tap_anywhere"
+      tapSettingsEnabled = featureEnabled && pageMode && returnMode == "tap_anywhere"
+      // Not behind the #180 switch: this is the corner mode's only path
+      cornerSequenceEnabled = pageMode && returnMode == "corner_sequence"
       tapSettingsRequiredTaps = getAsyncStorageValue("@kiosk_return_tap_count", "5").toIntOrNull()?.coerceIn(2, 20) ?: 5
       tapSettingsTimeoutMs = getAsyncStorageValue("@kiosk_return_tap_timeout", "1500").toLongOrNull()?.coerceIn(500L, 5000L) ?: 1500L
     } catch (e: Exception) {
       tapSettingsEnabled = false
+      cornerSequenceEnabled = false
     }
   }
 
@@ -1540,6 +1550,13 @@ class MainActivity : ReactActivity() {
       refreshTapSettingsConfig()
       if (tapSettingsEnabled) {
         handleTapForSettings(ev.rawX, ev.rawY)
+      }
+      val decor = window.decorView
+      if (cornerSequenceEnabled &&
+        cornerSequenceDetector.onTap(ev.x, ev.y, decor.width, decor.height, ev.eventTime)) {
+        android.util.Log.d("MainActivity", "Corner sequence detected - navigating to PIN")
+        blockAutoRelaunch = true
+        Handler(Looper.getMainLooper()).postDelayed({ sendNavigateToPinEvent() }, 100)
       }
     }
     // Dashboard tile navigation (not part of #180; keep if #180 is reverted).

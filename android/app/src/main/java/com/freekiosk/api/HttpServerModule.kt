@@ -392,9 +392,10 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
                 if (cameraPhotoModule == null) {
                     cameraPhotoModule = CameraPhotoModule(reactContext.applicationContext)
                 }
-                // Upright, like the CameraX path: the motion detector's face check only finds
+                // Upright from the sensor and the screen, like the CameraX path (ROTATION_AUTO, not the Camera
+                // Rotation setting of the stream, which would turn it again): the face check only finds
                 // upright faces, and the raw sensor frame is usually turned 90°
-                val inputStream = cameraPhotoModule?.capturePhoto(cameraFacing, quality, CameraPhotoModule.ROTATION_DEFAULT)
+                val inputStream = cameraPhotoModule?.capturePhoto(cameraFacing, quality, CameraPhotoModule.ROTATION_AUTO)
                 if (inputStream == null) {
                     promise.reject("CAPTURE_FAILED", "Camera2 photo capture returned null")
                     return@Thread
@@ -1031,6 +1032,14 @@ class HttpServerModule(private val reactContext: ReactApplicationContext) :
             }
             "getLocation" -> {
                 return getLocationInfo()
+            }
+            "openSettings" -> {
+                // KioskScreen opens the PIN screen. Behind an external app its JS thread is
+                // frozen, so bring FreeKiosk forward first, as setMode does below; then on to JS.
+                if (!isAppInForeground()) {
+                    MainActivity.blockAutoRelaunch = true
+                    bringAppToFront()
+                }
             }
             "setMode" -> {
                 // #209: The actual mode switch runs in the JS onSetMode handler, but when
