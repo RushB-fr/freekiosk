@@ -77,6 +77,10 @@
      read where it is (the address is a `content://` document that FreeKiosk keeps the permission on, also after a
      restart), so a page that another app rewrites is shown fresh. It needs no extra permission, but the images and
      scripts next to the page do not load: use one self-contained file. A TV without a document picker has no such button.
+     The permission is on that one file: if another app replaces it with a new file (delete, then create, as some sync
+     apps do) the page fails with `net::ERR_FILE_NOT_FOUND` until you pick it again, whereas a file rewritten in place
+     keeps working. Checked on an Android 14 tablet: after `adb push` over the file the page failed, and loaded again
+     after picking the file again.
 
 **Q: How do I change the URL?**
 - **A:** Tap 5 times bottom-right → Enter PIN → Settings → Change URL.

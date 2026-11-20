@@ -426,6 +426,12 @@ editor writes, so a rule built on a tablet and read back from the cloud is a val
 adb shell am start -n com.freekiosk/.MainActivity --es pin "1234" --es cloud_token "TOKEN"
 ```
 
+**Enrolling resets all local settings.** The Settings screen warns about it before a manual enrollment; the ADB
+route does not ask. The tablet is then configured from the cloud (a profile, or the settings you push), so set what
+you need from the cloud, or send the ADB settings after the enrollment: a change made on the tablet is synced up to
+the cloud. Settings sent in the same command as `cloud_token` are lost too (checked on a tablet: a URL and the REST API
+settings sent with the token were gone once it had enrolled).
+
 The token is never written to logcat. The enrollment runs the next time the app starts, and
 only on a tablet that is not enrolled yet: sent to a tablet that is already enrolled, the
 token is queued and then ignored (unenroll it first from Settings, Advanced, Cloud). If the

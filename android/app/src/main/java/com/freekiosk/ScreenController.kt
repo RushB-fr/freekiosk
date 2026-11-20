@@ -17,6 +17,18 @@ object ScreenController {
     private const val WAKE_NOTIF_ID = 0xF00D
     private var wakeLock: PowerManager.WakeLock? = null
 
+    /**
+     * Takes the "Waking screen" notification down. turnScreenOn() cancels it itself after 3 s, but that
+     * timer dies with the process: an app restarted within those 3 s left the notification on the
+     * screen. MainActivity calls this when it comes to the front, which a wake always ends with.
+     */
+    fun cancelWakeNotification(context: Context) {
+        try {
+            (context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager)
+                .cancel(WAKE_NOTIF_ID)
+        } catch (_: Exception) {}
+    }
+
     fun turnScreenOn(reactContext: ReactApplicationContext) {
         UiThreadUtil.runOnUiThread {
             try {

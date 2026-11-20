@@ -10,7 +10,6 @@ import {
   ScrollView,
   Linking,
   NativeModules,
-  findNodeHandle,
   DeviceEventEmitter,
   Platform,
   useColorScheme,
@@ -18,12 +17,12 @@ import {
 
 const { HttpServerModule } = NativeModules;
 
-import KioskModule from '../utils/KioskModule';
 import UpdateModule from '../utils/UpdateModule';
 import Icon, { IconName } from './Icon';
 import RNFS from 'react-native-fs';
 import { WebView } from 'react-native-webview';
 import { pullToRefreshScript } from '../utils/pullToRefreshScript';
+import { MEDIA_GUARD_JS, MEDIA_PAUSE_JS, MEDIA_RESUME_JS } from '../utils/mediaGuard';
 // From src/, not lib/: Metro resolves react-native-webview to its src/ entry, and loading lib/ as
 // well registers the native view twice ("Tried to register two views with the same name RNCWebView").
 import NativeRNCWebView, { Commands as NativeWebViewCommands } from 'react-native-webview/src/RNCWebViewNativeComponent';
@@ -77,6 +76,8 @@ interface WebViewComponentProps {
   basicAuthCredential?: { username: string; password: string };
   onRenderProcessGone?: (didCrash: boolean) => void; // #198 — renderer process died, ask parent to remount
   inactive?: boolean; // Kept loaded but hidden (dashboard): no speech, no print
+  initialMediaPaused?: boolean; // #177: mounted while media is paused (behind the screensaver)
+  mediaGuard?: boolean; // #177: install the media guard in the page (only when "Pause audio/video when hidden" is on)
 }
 
 export interface WebViewComponentRef {
@@ -88,11 +89,6 @@ export interface WebViewComponentRef {
   pauseMedia: () => void;
   resumeMedia: () => void;
 }
-
-// #177 — Pause any HTML5 media playing in the page. Injected on pause as a reliable
-// complement to the native WebView.onPause() (which alone doesn't stop <audio> on every
-// OEM WebView). Ends with `true;` to silence react-native-webview's injection warning.
-const MEDIA_PAUSE_JS = `(function(){try{document.querySelectorAll('audio,video').forEach(function(m){try{m.pause();}catch(e){}});}catch(e){}})();true;`;
 
 // Page messages ignored from a dashboard tile kept loaded in the background.
 const HIDDEN_TILE_IGNORED_MESSAGES = ['SPEECH_SYNTH_SPEAK', 'SPEECH_SYNTH_CANCEL', 'PRINT_REQUEST'];
@@ -160,15 +156,15 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   basicAuthCredential,
   onRenderProcessGone,
   inactive = false,
+  initialMediaPaused = false,
+  mediaGuard = false,
 }, ref) => {
   const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp>();
   const webViewRef = useRef<WebView>(null);
-  // #190 — Host-view ref for pauseMedia/resumeMedia. react-native-webview's ref is a
-  // methods-only imperative handle, NOT a ReactComponent: passing it to findNodeHandle
-  // throws and crashes the app (JavascriptException on screensaver activation). The
-  // native pauseWebView() walks the subtree for the WebView, so the container's tag works.
-  const containerViewRef = useRef<View>(null);
+  // #177 — Set by pauseMedia/resumeMedia; picks the media guard's document-start script, so a page
+  // loaded while paused starts paused.
+  const [mediaPaused, setMediaPaused] = useState<boolean>(initialMediaPaused);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<boolean>(false);
   const [errorReason, setErrorReason] = useState<string | null>(null);
@@ -345,32 +341,16 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
         console.log('[WebView] Cache cleared via ref');
       }
     },
-    // #177 — Stop background audio/video when the page is hidden (screensaver / screen off
-    // / app backgrounded). JS-level pause of <audio>/<video> + native renderer suspend.
+    // #177 — Stop audio/video when the page is hidden (screensaver / screen off / app
+    // backgrounded) without hiding the page: timers, animations and connections keep running.
     pauseMedia: () => {
-      const wv = webViewRef.current;
-      if (!wv) return;
-      wv.injectJavaScript(MEDIA_PAUSE_JS);
-      // #190 — resolve the tag from the container host view, never from the WebView ref
-      // (a methods-only imperative handle that makes findNodeHandle throw → app crash)
-      try {
-        const node = findNodeHandle(containerViewRef.current);
-        if (node != null) {
-          KioskModule.pauseWebView?.(node).catch(() => {});
-        }
-      } catch {}
+      setMediaPaused(true);
+      webViewRef.current?.injectJavaScript(MEDIA_PAUSE_JS);
     },
-    // Resume only re-enables the WebView renderer; media is intentionally left paused so
-    // audio doesn't auto-restart on its own (the page/user decides).
+    // Media stays paused (the page/user decides); AudioContexts and camera/microphone come back.
     resumeMedia: () => {
-      const wv = webViewRef.current;
-      if (!wv) return;
-      try {
-        const node = findNodeHandle(containerViewRef.current);
-        if (node != null) {
-          KioskModule.resumeWebView?.(node).catch(() => {});
-        }
-      } catch {}
+      setMediaPaused(false);
+      webViewRef.current?.injectJavaScript(MEDIA_RESUME_JS);
     }
   }));
 
@@ -1617,9 +1597,7 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
   }
 
   return (
-    // Not flattened away: pauseMedia/resumeMedia resolve the native WebView through this view's
-    // tag, and a collapsed View has no native view, so the renderer was never paused (#177/#190).
-    <View style={styles.container} ref={containerViewRef} collapsable={false}>
+    <View style={styles.container}>
       <WebView
         ref={webViewRef}
         nativeConfig={{ component: NativeWebViewWithRef as any }}
@@ -1709,6 +1687,12 @@ const WebViewComponent = forwardRef<WebViewComponentRef, WebViewComponentProps>(
         javaScriptEnabled={true}
         domStorageEnabled={true}
         injectedJavaScript={combinedInjectedJavaScript}
+        // #177: the media guard as a document-start script in every frame, cross-origin iframes
+        // too (our react-native-webview patch); main frame only without DOCUMENT_START_SCRIPT.
+        // Only with the option on: the guard wraps play(), Audio, AudioContext and getUserMedia, which
+        // a page should not see changed when nobody asked to pause its media.
+        injectedJavaScriptBeforeContentLoaded={mediaGuard ? (mediaPaused ? MEDIA_PAUSE_JS : MEDIA_GUARD_JS) : undefined}
+        injectedJavaScriptBeforeContentLoadedForMainFrameOnly={false}
         // Android ignores this (injection runs from onPageFinished), but the nonce rests on it.
         injectedJavaScriptForMainFrameOnly={true}
 
