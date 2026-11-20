@@ -505,6 +505,10 @@ const MotionDetector: React.FC<MotionDetectorProps> = ({
         device={device}
         isActive={isCameraActive}
         photo={true}
+        // The face check needs the photo upright. 'device' reads the accelerometer, which reports
+        // nothing for a tablet leaning back on a stand, and then stays at portrait; the screen
+        // rotation is what a kiosk is mounted by.
+        outputOrientation="preview"
         lowLightBoost={device.supportsLowLightBoost}
         onInitialized={handleCameraInitialized}
         onStarted={handleCameraStarted}
