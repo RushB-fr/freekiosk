@@ -115,6 +115,26 @@ class ApiServiceClass {
     motionDetected: false,
   };
   private isInitialized = false;
+  // The kiosk screens relying on the service (see retain() / release()).
+  private owners = 0;
+
+  /** A kiosk screen starts relying on the service (pair with release()). */
+  retain(): void {
+    this.owners += 1;
+  }
+
+  /**
+   * That screen is gone: the command listener and MQTT stop with the last one only. The kiosk
+   * screen can be mounted twice in a row (an ADB config restarts the activity) and the first
+   * one's cleanup runs after the second one's start, which must not cut what the second uses.
+   */
+  release(): void {
+    this.owners = Math.max(0, this.owners - 1);
+    if (this.owners === 0) {
+      this.stopMqtt();
+      this.destroy();
+    }
+  }
 
   /**
    * Initialize the API service and start listening for commands

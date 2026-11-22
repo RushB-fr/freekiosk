@@ -732,6 +732,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
 
   // API Service initialization - connect REST API to app controls
   useEffect(() => {
+    ApiService.retain();
     const initApiService = async () => {
       await ApiService.initialize({
         onSetBrightness: async (value: number) => {
@@ -1112,8 +1113,7 @@ const KioskScreen: React.FC<KioskScreenProps> = ({ navigation }) => {
 
     return () => {
       mqttAppStateSubscription.remove();
-      ApiService.stopMqtt();
-      ApiService.destroy();
+      ApiService.release();
     };
   }, []);
 
