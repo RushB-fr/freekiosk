@@ -129,6 +129,7 @@ class MainActivity : ReactActivity() {
       "auto_relaunch" to "@kiosk_auto_relaunch_app",
       "auto_relaunch_app" to "@kiosk_auto_relaunch_app",
       "keep_screen_on" to "@kiosk_keep_screen_on",
+      "auto_wake_on_screen_off" to "@kiosk_auto_wake_on_screen_off",
       "keyboard_mode" to "@kiosk_keyboard_mode",
       "screen_orientation" to "@kiosk_screen_orientation",
       "pin_max_attempts" to "@kiosk_pin_max_attempts",
