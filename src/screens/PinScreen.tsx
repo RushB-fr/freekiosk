@@ -32,8 +32,10 @@ const PinScreen: React.FC<PinScreenProps> = ({ navigation, route }) => {
   // Block Android back gesture/button on PIN screen to prevent bypassing PIN (#93)
   useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      // Navigate back to Kiosk instead of allowing default back behavior
-      navigation.navigate('Kiosk');
+      // Navigate back to Kiosk instead of allowing default back behavior.
+      // popTo, not navigate: in React Navigation 7 navigate() pushes a second Kiosk screen
+      // on top of the one under this page, and the first one stays mounted with its WebViews.
+      navigation.popTo('Kiosk');
       return true;
     });
     return () => backHandler.remove();
@@ -108,8 +110,8 @@ const PinScreen: React.FC<PinScreenProps> = ({ navigation, route }) => {
         console.error('[PinScreen] Failed to relaunch external app:', error);
       }
     }
-    // Navigate back to Kiosk screen
-    navigation.navigate('Kiosk');
+    // Back to the Kiosk screen under this page (popTo: see the back handler above)
+    navigation.popTo('Kiosk');
   };
 
   // Wait for migration before showing PIN input
