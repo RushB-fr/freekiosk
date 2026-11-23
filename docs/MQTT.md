@@ -483,6 +483,32 @@ If the connection is lost unexpectedly, the broker publishes `"offline"` to the 
 MQTT and the REST API can run simultaneously. Both use the same internal command handler and status data. Enabling MQTT does not disable the REST API.
 
 
+## Home Assistant on another network (Nabu Casa)
+
+FreeKiosk talks to an **MQTT broker**, never to the Home Assistant API. `mqtt.publish` is a Home Assistant service that publishes to the same broker, so there is no Home Assistant token or session to configure in FreeKiosk.
+
+Nabu Casa remote access forwards the Home Assistant web interface only. It does not carry MQTT traffic, so the tablet cannot use it as a broker address. If the tablet is not on the same network as Home Assistant, give it a path to the broker:
+
+
+
+| Step | Action |
+|---|---|
+| **1** | In Home Assistant, install the **Mosquitto broker** add-on and add the MQTT integration |
+| **2** | Make the broker reachable from the tablet: put both on a VPN (Tailscale, WireGuard), **or** expose it with TLS on port **8883** |
+| **3** | In **Settings > Advanced > MQTT**, enter the broker address, port, username and password |
+| **4** | Press **Connect**. Home Assistant discovers the tablet, and `mqtt.publish` automations drive it as in the examples below |
+
+
+
+> [!NOTE]
+> FreeKiosk enables TLS when the port is 8883 and not otherwise. It uses the system certificate store, so the broker needs a certificate that Android trusts (a self-signed certificate is not accepted).
+
+> [!CAUTION]
+> Do not expose a plain-text broker (port 1883) to the Internet. The state, the commands and, when enabled, the screenshots and camera pictures would cross the network in clear. Use a VPN, or TLS on 8883 with a username, a password and the topic ACLs described in [Images](#-images-screenshot--camera).
+
+If the tablet and Home Assistant share a network, skip step 2 and use the broker's local address.
+
+
 ## Testing with MQTT CLI
 
 
