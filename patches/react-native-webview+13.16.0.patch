@@ -168,7 +168,7 @@ index 80c6803..dc8f001 100644
  
      public void setInjectedJavaScriptObject(String obj) {
 diff --git a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
-index 0287e1c..88d1fa8 100644
+index 0287e1c..0da28f8 100644
 --- a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
 +++ b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
 @@ -1,9 +1,11 @@
@@ -200,7 +200,7 @@ index 0287e1c..88d1fa8 100644
  import com.reactnativecommunity.webview.events.SubResourceErrorEvent;
  import com.reactnativecommunity.webview.events.TopHttpErrorEvent;
  import com.reactnativecommunity.webview.events.TopLoadingErrorEvent;
-@@ -35,14 +40,28 @@ import com.reactnativecommunity.webview.events.TopShouldStartLoadWithRequestEven
+@@ -35,14 +40,33 @@ import com.reactnativecommunity.webview.events.TopShouldStartLoadWithRequestEven
  import android.webkit.CookieManager;
  import android.webkit.CookieSyncManager;
  
@@ -224,17 +224,23 @@ index 0287e1c..88d1fa8 100644
      protected boolean mLastLoadFailed = false;
      protected RNCWebView.ProgressChangedFilter progressChangedFilter = null;
 +
++    // FreeKiosk: last main-frame navigation target (shouldOverrideUrlLoading / onPageStarted).
++    // webView.getUrl() keeps the OLD page for a navigation started by the page itself (link,
++    // window.open, redirect), so it cannot tell a main-frame SSL error from a sub-resource one.
++    private volatile String mMainFrameNavUrl = null;
++
 +    // FreeKiosk: Track current page URL for PDF proxy (thread-safe)
 +    private final AtomicReference<String> mCurrentPageUrl = new AtomicReference<>("");
      protected @Nullable RNCBasicAuthCredential basicAuthCredential = null;
  
      public void setBasicAuthCredential(@Nullable RNCBasicAuthCredential credential) {
-@@ -86,10 +105,136 @@ public class RNCWebViewClient extends WebViewClient {
+@@ -86,10 +110,137 @@ public class RNCWebViewClient extends WebViewClient {
        super.onPageStarted(webView, url, favicon);
        mLastLoadFailed = false;
  
 +      // FreeKiosk: Track current URL for PDF proxy
 +      mCurrentPageUrl.set(url != null ? url : "");
++      mMainFrameNavUrl = url;
 +
        RNCWebView reactWebView = (RNCWebView) webView;
        reactWebView.callInjectedJavaScriptBeforeContentLoaded();
@@ -366,7 +372,17 @@ index 0287e1c..88d1fa8 100644
      @Override
      public boolean shouldOverrideUrlLoading(WebView view, String url) {
          final RNCWebView rncWebView = (RNCWebView) view;
-@@ -155,25 +300,38 @@ public class RNCWebViewClient extends WebViewClient {
+@@ -143,6 +294,9 @@ public class RNCWebViewClient extends WebViewClient {
+     @Override
+     public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+         final String url = request.getUrl().toString();
++        if (request.isForMainFrame()) {
++            mMainFrameNavUrl = url;
++        }
+         return this.shouldOverrideUrlLoading(view, url);
+     }
+ 
+@@ -155,25 +309,41 @@ public class RNCWebViewClient extends WebViewClient {
          super.onReceivedHttpAuthRequest(view, handler, host, realm);
      }
  
@@ -375,11 +391,14 @@ index 0287e1c..88d1fa8 100644
 +     * Handles three cases:
 +     *  - topWindowUrl is null/empty: initial navigation, webView.getUrl() not set yet
 +     *  - exact match: normal case
++     *  - the URL is the main-frame navigation target we saw start (link, popup, redirect to
++     *    another host: getUrl() still returns the previous page there)
 +     *  - same host: redirect chain (e.g. http://host → https://host or /path change)
 +     */
 +    private boolean isMainFrameRequest(String topWindowUrl, String failingUrl) {
 +        if (topWindowUrl == null || topWindowUrl.isEmpty()) return true;
 +        if (topWindowUrl.equalsIgnoreCase(failingUrl)) return true;
++        if (failingUrl != null && failingUrl.equalsIgnoreCase(mMainFrameNavUrl)) return true;
 +        try {
 +            android.net.Uri topUri = android.net.Uri.parse(topWindowUrl);
 +            android.net.Uri failUri = android.net.Uri.parse(failingUrl);
@@ -415,7 +434,7 @@ index 0287e1c..88d1fa8 100644
          switch (code) {
              case SslError.SSL_DATE_INVALID:
                  description = "The date of the certificate is invalid";
-@@ -200,26 +358,230 @@ public class RNCWebViewClient extends WebViewClient {
+@@ -200,26 +370,230 @@ public class RNCWebViewClient extends WebViewClient {
  
          description = descriptionPrefix + description;
  
@@ -658,7 +677,7 @@ index 0287e1c..88d1fa8 100644
      public void onReceivedSubResourceSslError(
        WebView webView,
        int errorCode,
-@@ -314,8 +676,6 @@ public class RNCWebViewClient extends WebViewClient {
+@@ -314,8 +688,6 @@ public class RNCWebViewClient extends WebViewClient {
      protected WritableMap createWebViewEvent(WebView webView, String url) {
          WritableMap event = Arguments.createMap();
          event.putDouble("target", RNCWebViewWrapper.getReactTagFromWebView(webView));
