@@ -36,10 +36,7 @@
 - **A:** No! Android's actual requirement is that **no user accounts** are active on the device. Simply remove all accounts (Google, Samsung, Microsoft, SIM profiles), run the `dpm` command, then sign back in. A factory reset is only needed as a fallback if account removal alone doesn't work (some devices retain hidden accounts).
 
 **Q: Can I remove Device Owner?**
-- **A:** Yes! In FreeKiosk settings, use the "⚠️ Remove Device Owner" button (NOT "Exit Kiosk Mode"). Or via ADB:
-  ```bash
-  adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver
-  ```
+- **A:** Yes! In FreeKiosk settings (5 taps, PIN), Advanced tab, use the "⚠️ Remove Device Owner" button (NOT "Exit Kiosk Mode"). ADB cannot do it: `adb shell dpm remove-active-admin` is refused for the released app (`SecurityException: Attempt to remove non-test admin`), because Android only allows it for an app built `android:testOnly`.
 
 **Q: Does Device Owner void warranty?**
 - **A:** No. Device Owner is an official Android feature with no system modifications.
@@ -86,7 +83,7 @@
 - **A:** Tap 5 times bottom-right → Enter PIN → Settings → Change URL.
 
 **Q: I forgot my PIN code. What do I do?**
-- **A:** If Device Owner is active: You'll need to factory reset (or use ADB to remove Device Owner first). This is by design for security.
+- **A:** If Device Owner is active: You'll need to factory reset. ADB cannot remove Device Owner without the app (`dpm remove-active-admin` is refused for a released build). This is by design for security.
 
 **Q: Can I rotate between multiple URLs?**
 - **A:** Not yet, but planned for v1.1! You can use a single URL pointing to a page that rotates content.
