@@ -13,11 +13,19 @@
 ## Table of Contents
 
 - [Overview](#overview)
-- [Configuration](#configuration)
-- [Getting Started](#getting-started)
-- [Features](#features)
+- [Enabling MQTT](#enabling-mqtt)
+- [Configuration Options](#configuration-options)
+- [Topic Structure](#topic-structure)
+- [Home Assistant MQTT Discovery](#home-assistant-mqtt-discovery)
+- [Command Reference](#command-reference)
+- [Motion Detection](#motion-detection)
+- [Connection Behavior](#connection-behavior)
+- [Home Assistant on another network (Nabu Casa)](#home-assistant-on-another-network-nabu-casa)
+- [Testing with MQTT CLI](#testing-with-mqtt-cli)
+- [🏠 Home Assistant Examples](#-home-assistant-examples)
 - [Troubleshooting](#troubleshooting)
-- [Related Resources](#related-resources)
+- [Technical Details](#technical-details)
+- [See Also](#see-also)
 
 
 

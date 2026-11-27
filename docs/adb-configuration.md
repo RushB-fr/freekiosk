@@ -15,14 +15,17 @@
 
 - [Overview](#overview)
 - [Security Model](#security-model)
+- [Quoting JSON values](#quoting-json-values)
 - [Quick Start](#quick-start)
-- [Configuration Parameters](#configuration-parameters)
-- [Device States](#device-states)
-- [Common Commands](#common-commands)
 - [Command Reference](#command-reference)
-- [Advanced Scenarios](#advanced-scenarios)
+- [Waiting for Configuration Completion](#waiting-for-configuration-completion)
+- [Examples](#examples)
+- [JSON Configuration Format](#json-configuration-format)
+- [Complete Provisioning Script](#complete-provisioning-script)
+- [💻 PowerShell Script (Windows)](#-powershell-script-windows)
 - [Troubleshooting](#troubleshooting)
-- [Related Resources](#related-resources)
+- [Security Considerations](#security-considerations)
+- [See Also](#see-also)
 
 
 
