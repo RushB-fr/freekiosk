@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import KioskScreen from '../screens/KioskScreen';
@@ -6,9 +7,14 @@ import PinScreen from '../screens/PinScreen';
 // v1.2: Use new settings screen with Material tabs
 import { SettingsScreen } from '../screens/settings';
 import BlockingOverlaysScreen from '../screens/settings/BlockingOverlaysScreen';
+import SetupWizardScreen from '../screens/SetupWizardScreen';
+import { isFreshInstall } from '../utils/setupWizard';
+import { Colors } from '../theme';
 
 export type RootStackParamList = {
   Kiosk: undefined;
+  // The guided first launch, shown once on a tablet where nothing is configured
+  Setup: undefined;
   // initialTab: the Settings tab to open once the PIN is entered (e.g. 'advanced' for Cloud)
   Pin: { initialTab?: string } | undefined;
   Settings: { initialTab?: string } | undefined;
@@ -18,10 +24,27 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const AppNavigator: React.FC = () => {
+  // A tablet where nothing is configured starts on the setup wizard, every other one on the kiosk.
+  // The answer comes from the storage, a few milliseconds: a plain background until then.
+  const [initialRoute, setInitialRoute] = useState<'Kiosk' | 'Setup' | null>(null);
+  useEffect(() => {
+    let active = true;
+    isFreshInstall().then((fresh) => {
+      if (active) setInitialRoute(fresh ? 'Setup' : 'Kiosk');
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (!initialRoute) {
+    return <View style={{ flex: 1, backgroundColor: Colors.background }} />;
+  }
+
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName="Kiosk"
+        initialRouteName={initialRoute}
         screenOptions={{
           headerShown: false,
         }}
@@ -31,6 +54,14 @@ const AppNavigator: React.FC = () => {
           component={KioskScreen}
           options={{
             headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="Setup"
+          component={SetupWizardScreen}
+          options={{
+            headerShown: false,
+            gestureEnabled: false,
           }}
         />
         <Stack.Screen 

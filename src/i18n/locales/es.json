@@ -1566,5 +1566,74 @@
       "installFailedTitle": "Actualización no instalada",
       "installFailedMessage": "La actualización se descargó, pero Android se negó a instalarla: {{message}}"
     }
+  },
+  "setup": {
+    "progress": "Paso {{current}} de {{total}}",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "errorGeneric": "Algo salió mal al guardar. Inténtalo de nuevo.",
+    "welcome": {
+      "title": "Te damos la bienvenida a FreeKiosk",
+      "text": "Muestra una sola página web en este dispositivo y mantén a los visitantes en ella. La configuración lleva alrededor de un minuto.",
+      "start": "Configurar esta tableta",
+      "startTv": "Configurar esta TV",
+      "cloudConnect": "Conectar a FreeKiosk Cloud",
+      "advanced": "Conozco FreeKiosk: abrir todos los ajustes"
+    },
+    "url": {
+      "title": "¿Qué página debe mostrar?",
+      "text": "Escribe la dirección de la página. Se abre a pantalla completa.",
+      "label": "Dirección de la página",
+      "hint": "Por ejemplo tu panel o una aplicación web. Un servidor local también sirve: http://192.168.1.20:8123",
+      "errorEmpty": "Escribe la dirección de la página.",
+      "errorInvalid": "Esto no parece una dirección web. Prueba algo como https://example.com",
+      "errorBlocked": "Este tipo de dirección no está permitido."
+    },
+    "pin": {
+      "titleChoose": "Elige tu PIN",
+      "textChoose": "De {{min}} a {{max}} dígitos. Vuelve a abrir los ajustes: guárdalo en un lugar seguro.",
+      "titleConfirm": "Confirma tu PIN",
+      "textConfirm": "Escribe el mismo PIN otra vez.",
+      "label": "PIN",
+      "confirm": "Confirmar",
+      "errorLength": "El PIN debe tener de {{min}} a {{max}} dígitos.",
+      "errorMismatch": "Los dos PIN son distintos. Elige tu PIN de nuevo.",
+      "errorSave": "No se pudo guardar el PIN en este dispositivo. Inténtalo de nuevo."
+    },
+    "alive": {
+      "title": "Mantenerlo en marcha",
+      "text": "Dos cosas ayudan al quiosco a seguir activo tras un reinicio o una larga inactividad.",
+      "autoLaunchTitle": "Iniciar FreeKiosk al reiniciar el dispositivo",
+      "autoLaunchText": "Recomendado: tras un corte de corriente, la página vuelve sola.",
+      "batteryTitle": "No dejar que Android pause la app",
+      "batteryText": "Permite que FreeKiosk ignore la optimización de batería, para que la página siga funcionando.",
+      "batteryAllow": "Permitir"
+    },
+    "lock": {
+      "title": "Bloquear el dispositivo",
+      "text": "Un quiosco solo sirve si los visitantes no pueden salir de la página.",
+      "lockTitle": "Bloquear este dispositivo (recomendado)",
+      "lockText": "Android te pide confirmar una vez. Para salir de la página usarás el gesto secreto y tu PIN.",
+      "lockTextOwner": "El bloqueo completo está disponible en este dispositivo: los visitantes no pueden salir de la página.",
+      "laterTitle": "Ahora no",
+      "laterText": "Puedes bloquearlo más tarde en los ajustes, pestaña Seguridad.",
+      "fullTitle": "¿Quieres un bloqueo completo?",
+      "fullText": "El modo Device Owner también bloquea la barra de navegación y el menú de apagado. Necesita un ordenador, una sola vez.",
+      "fullLink": "Leer la guía"
+    },
+    "ready": {
+      "title": "Tu quiosco está listo",
+      "text": "Los visitantes solo ven la página. Así vuelves a los ajustes.",
+      "settingsTitle": "Abrir los ajustes",
+      "tapStep": "Toca {{count}} veces rápido en el mismo lugar, en {{seconds}} segundos.",
+      "pinStep": "Después introduce tu PIN.",
+      "practiceHint": "Pruébalo aquí: toca {{count}} veces",
+      "practiceDone": "Ese es el gesto",
+      "volume": "También puedes pulsar 5 veces Subir volumen.",
+      "tvBack": "Pulsa Atrás 5 veces seguidas y luego introduce tu PIN.",
+      "pinningNote": "Android te pedirá confirmar el bloqueo.",
+      "start": "Iniciar el quiosco",
+      "openSettings": "Abrir primero los ajustes"
+    }
   }
 }

@@ -1567,5 +1567,74 @@
       "installFailedTitle": "Aktualizacja nie została zainstalowana",
       "installFailedMessage": "Aktualizacja została pobrana, ale Android odmówił jej instalacji: {{message}}"
     }
+  },
+  "setup": {
+    "progress": "Krok {{current}} z {{total}}",
+    "back": "Wstecz",
+    "next": "Dalej",
+    "errorGeneric": "Podczas zapisywania coś poszło nie tak. Spróbuj ponownie.",
+    "welcome": {
+      "title": "Witamy w FreeKiosk",
+      "text": "Pokaż jedną stronę internetową na tym urządzeniu i zatrzymaj na niej odwiedzających. Konfiguracja zajmuje około minuty.",
+      "start": "Skonfiguruj ten tablet",
+      "startTv": "Skonfiguruj ten telewizor",
+      "cloudConnect": "Połącz z FreeKiosk Cloud",
+      "advanced": "Znam FreeKiosk: otwórz wszystkie ustawienia"
+    },
+    "url": {
+      "title": "Jaką stronę wyświetlić?",
+      "text": "Wpisz adres strony. Otworzy się na pełnym ekranie.",
+      "label": "Adres strony",
+      "hint": "Na przykład Twój panel lub aplikacja webowa. Serwer lokalny też działa: http://192.168.1.20:8123",
+      "errorEmpty": "Wpisz adres strony.",
+      "errorInvalid": "To nie wygląda na adres internetowy. Spróbuj na przykład https://example.com",
+      "errorBlocked": "Ten rodzaj adresu jest niedozwolony."
+    },
+    "pin": {
+      "titleChoose": "Wybierz swój PIN",
+      "textChoose": "Od {{min}} do {{max}} cyfr. Otwiera ustawienia ponownie: zachowaj go w bezpiecznym miejscu.",
+      "titleConfirm": "Potwierdź swój PIN",
+      "textConfirm": "Wpisz ten sam PIN jeszcze raz.",
+      "label": "PIN",
+      "confirm": "Potwierdź",
+      "errorLength": "PIN musi mieć od {{min}} do {{max}} cyfr.",
+      "errorMismatch": "Oba PIN-y się różnią. Wybierz PIN jeszcze raz.",
+      "errorSave": "Nie udało się zapisać PIN-u na tym urządzeniu. Spróbuj ponownie."
+    },
+    "alive": {
+      "title": "Utrzymaj działanie",
+      "text": "Dwie rzeczy pomagają kioskowi pozostać włączonym po restarcie lub długim bezruchu.",
+      "autoLaunchTitle": "Uruchom FreeKiosk po restarcie urządzenia",
+      "autoLaunchText": "Zalecane: po awarii zasilania strona wraca sama.",
+      "batteryTitle": "Nie pozwól, by Android wstrzymał aplikację",
+      "batteryText": "Pozwól FreeKiosk ignorować optymalizację baterii, aby strona działała dalej.",
+      "batteryAllow": "Zezwól"
+    },
+    "lock": {
+      "title": "Zablokuj urządzenie",
+      "text": "Kiosk ma sens tylko wtedy, gdy odwiedzający nie mogą opuścić strony.",
+      "lockTitle": "Zablokuj to urządzenie (zalecane)",
+      "lockText": "Android poprosi o jednorazowe potwierdzenie. Aby opuścić stronę, użyjesz tajnego gestu i swojego PIN-u.",
+      "lockTextOwner": "Pełna blokada jest dostępna na tym urządzeniu: odwiedzający nie mogą opuścić strony.",
+      "laterTitle": "Nie teraz",
+      "laterText": "Możesz zablokować je później w ustawieniach, zakładka Bezpieczeństwo.",
+      "fullTitle": "Chcesz pełnej blokady?",
+      "fullText": "Tryb Device Owner blokuje też pasek nawigacji i menu zasilania. Wymaga komputera, jednorazowo.",
+      "fullLink": "Przeczytaj poradnik"
+    },
+    "ready": {
+      "title": "Twój kiosk jest gotowy",
+      "text": "Odwiedzający widzą tylko stronę. Oto jak wrócić do ustawień.",
+      "settingsTitle": "Otwórz ustawienia",
+      "tapStep": "Dotknij {{count}} razy szybko w tym samym miejscu, w ciągu {{seconds}} s.",
+      "pinStep": "Następnie wpisz swój PIN.",
+      "practiceHint": "Spróbuj tutaj: dotknij {{count}} razy",
+      "practiceDone": "To jest ten gest",
+      "volume": "Możesz też nacisnąć 5 razy Głośniej.",
+      "tvBack": "Naciśnij 5 razy z rzędu Wstecz, a następnie wpisz swój PIN.",
+      "pinningNote": "Android poprosi o potwierdzenie blokady.",
+      "start": "Uruchom kiosk",
+      "openSettings": "Najpierw otwórz ustawienia"
+    }
   }
 }

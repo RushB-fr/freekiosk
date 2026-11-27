@@ -1565,5 +1565,74 @@
       "installFailedTitle": "Update niet geïnstalleerd",
       "installFailedMessage": "De update is gedownload maar Android weigerde hem te installeren: {{message}}"
     }
+  },
+  "setup": {
+    "progress": "Stap {{current}} van {{total}}",
+    "back": "Terug",
+    "next": "Volgende",
+    "errorGeneric": "Er ging iets mis bij het opslaan. Probeer het opnieuw.",
+    "welcome": {
+      "title": "Welkom bij FreeKiosk",
+      "text": "Toon één webpagina op dit apparaat en houd bezoekers erop. Instellen duurt ongeveer een minuut.",
+      "start": "Deze tablet instellen",
+      "startTv": "Deze tv instellen",
+      "cloudConnect": "Verbinden met FreeKiosk Cloud",
+      "advanced": "Ik ken FreeKiosk: alle instellingen openen"
+    },
+    "url": {
+      "title": "Welke pagina moet het tonen?",
+      "text": "Typ het adres van de pagina. Die opent op volledig scherm.",
+      "label": "Adres van de pagina",
+      "hint": "Bijvoorbeeld je dashboard of een webapp. Een lokale server kan ook: http://192.168.1.20:8123",
+      "errorEmpty": "Voer het adres van de pagina in.",
+      "errorInvalid": "Dit lijkt niet op een webadres. Probeer bijvoorbeeld https://example.com",
+      "errorBlocked": "Dit soort adres is niet toegestaan."
+    },
+    "pin": {
+      "titleChoose": "Kies je pincode",
+      "textChoose": "{{min}} tot {{max}} cijfers. Hiermee open je de instellingen weer: bewaar hem op een veilige plek.",
+      "titleConfirm": "Bevestig je pincode",
+      "textConfirm": "Typ dezelfde pincode nog een keer.",
+      "label": "Pincode",
+      "confirm": "Bevestigen",
+      "errorLength": "De pincode moet {{min}} tot {{max}} cijfers hebben.",
+      "errorMismatch": "De twee pincodes verschillen. Kies je pincode opnieuw.",
+      "errorSave": "De pincode kon niet op dit apparaat worden opgeslagen. Probeer het opnieuw."
+    },
+    "alive": {
+      "title": "Laat het draaien",
+      "text": "Twee dingen helpen de kiosk aan te blijven na een herstart of lange stilstand.",
+      "autoLaunchTitle": "FreeKiosk starten wanneer het apparaat herstart",
+      "autoLaunchText": "Aanbevolen: na een stroomstoring komt de pagina vanzelf terug.",
+      "batteryTitle": "Laat Android de app niet pauzeren",
+      "batteryText": "Sta FreeKiosk toe de batterijoptimalisatie te negeren, zodat de pagina blijft draaien.",
+      "batteryAllow": "Toestaan"
+    },
+    "lock": {
+      "title": "Het apparaat vergrendelen",
+      "text": "Een kiosk heeft alleen zin als bezoekers de pagina niet kunnen verlaten.",
+      "lockTitle": "Dit apparaat vergrendelen (aanbevolen)",
+      "lockText": "Android vraagt je één keer om te bevestigen. Om de pagina te verlaten gebruik je het geheime gebaar en je pincode.",
+      "lockTextOwner": "Volledige vergrendeling is beschikbaar op dit apparaat: bezoekers kunnen de pagina niet verlaten.",
+      "laterTitle": "Nu niet",
+      "laterText": "Je kunt het later vergrendelen in de instellingen, tabblad Beveiliging.",
+      "fullTitle": "Een volledige vergrendeling?",
+      "fullText": "De Device Owner-modus blokkeert ook de navigatiebalk en het aan/uit-menu. Daarvoor is eenmalig een computer nodig.",
+      "fullLink": "Lees de handleiding"
+    },
+    "ready": {
+      "title": "Je kiosk is klaar",
+      "text": "Bezoekers zien alleen de pagina. Zo kom je terug bij de instellingen.",
+      "settingsTitle": "De instellingen openen",
+      "tapStep": "Tik {{count}} keer snel op dezelfde plek, binnen {{seconds}} seconden.",
+      "pinStep": "Voer daarna je pincode in.",
+      "practiceHint": "Probeer het hier: tik {{count}} keer",
+      "practiceDone": "Dat is het gebaar",
+      "volume": "Je kunt ook 5 keer op Volume omhoog drukken.",
+      "tvBack": "Druk 5 keer achter elkaar op Terug en voer dan je pincode in.",
+      "pinningNote": "Android vraagt je de vergrendeling te bevestigen.",
+      "start": "De kiosk starten",
+      "openSettings": "Eerst de instellingen openen"
+    }
   }
 }

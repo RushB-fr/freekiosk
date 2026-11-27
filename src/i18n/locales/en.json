@@ -1565,5 +1565,74 @@
       "installFailedTitle": "Update not installed",
       "installFailedMessage": "The update was downloaded but Android refused to install it: {{message}}"
     }
+  },
+  "setup": {
+    "progress": "Step {{current}} of {{total}}",
+    "back": "Back",
+    "next": "Next",
+    "errorGeneric": "Something went wrong while saving. Please try again.",
+    "welcome": {
+      "title": "Welcome to FreeKiosk",
+      "text": "Show one web page on this device and keep visitors on it. Setting it up takes about a minute.",
+      "start": "Set up this tablet",
+      "startTv": "Set up this TV",
+      "cloudConnect": "Connect to FreeKiosk Cloud",
+      "advanced": "I know FreeKiosk: open all the settings"
+    },
+    "url": {
+      "title": "Which page should it show?",
+      "text": "Type the address of the page. It opens full screen.",
+      "label": "Page address",
+      "hint": "For example your dashboard or a web app. A local server works too: http://192.168.1.20:8123",
+      "errorEmpty": "Enter the address of the page.",
+      "errorInvalid": "This does not look like a web address. Try something like https://example.com",
+      "errorBlocked": "This kind of address is not allowed."
+    },
+    "pin": {
+      "titleChoose": "Choose your PIN",
+      "textChoose": "{{min}} to {{max}} digits. It opens the settings again: keep it somewhere safe.",
+      "titleConfirm": "Confirm your PIN",
+      "textConfirm": "Type the same PIN once more.",
+      "label": "PIN",
+      "confirm": "Confirm",
+      "errorLength": "The PIN must have {{min}} to {{max}} digits.",
+      "errorMismatch": "The two PINs differ. Choose your PIN again.",
+      "errorSave": "The PIN could not be saved on this device. Try again."
+    },
+    "alive": {
+      "title": "Keep it running",
+      "text": "Two things help the kiosk stay on after a restart or a long idle time.",
+      "autoLaunchTitle": "Start FreeKiosk when the device restarts",
+      "autoLaunchText": "Recommended: after a power cut the page comes back by itself.",
+      "batteryTitle": "Do not let Android pause the app",
+      "batteryText": "Allow FreeKiosk to ignore battery optimisation, so the page keeps running.",
+      "batteryAllow": "Allow"
+    },
+    "lock": {
+      "title": "Lock the device",
+      "text": "A kiosk is only useful if visitors cannot leave the page.",
+      "lockTitle": "Lock this device (recommended)",
+      "lockText": "Android asks you to confirm once: tap Got it. To leave the page you will use the secret gesture and your PIN.",
+      "lockTextOwner": "Full lockdown is available on this device: visitors cannot leave the page.",
+      "laterTitle": "Not now",
+      "laterText": "You can lock it later in the settings, Security tab.",
+      "fullTitle": "Want a complete lockdown?",
+      "fullText": "Device Owner mode also blocks the navigation bar and the power menu. It needs a computer, once.",
+      "fullLink": "Read the guide"
+    },
+    "ready": {
+      "title": "Your kiosk is ready",
+      "text": "Visitors only see the page. Here is how you get back to the settings.",
+      "settingsTitle": "Open the settings",
+      "tapStep": "Tap {{count}} times quickly at the same spot, within {{seconds}} seconds.",
+      "pinStep": "Then enter your PIN.",
+      "practiceHint": "Try it here: tap {{count}} times",
+      "practiceDone": "That is the gesture",
+      "volume": "You can also press Volume Up 5 times.",
+      "tvBack": "Press Back 5 times in a row, then enter your PIN.",
+      "pinningNote": "Android will ask you to confirm the lock: tap Got it.",
+      "start": "Start the kiosk",
+      "openSettings": "Open the settings first"
+    }
   }
 }

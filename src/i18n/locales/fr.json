@@ -1565,5 +1565,74 @@
       "installFailedTitle": "Mise à jour non installée",
       "installFailedMessage": "La mise à jour a été téléchargée, mais Android a refusé de l'installer : {{message}}"
     }
+  },
+  "setup": {
+    "progress": "Étape {{current}} sur {{total}}",
+    "back": "Retour",
+    "next": "Suivant",
+    "errorGeneric": "Un problème est survenu pendant l'enregistrement. Réessayez.",
+    "welcome": {
+      "title": "Bienvenue dans FreeKiosk",
+      "text": "Affichez une seule page web sur cet appareil et gardez les visiteurs dessus. La configuration prend environ une minute.",
+      "start": "Configurer cette tablette",
+      "startTv": "Configurer cette TV",
+      "cloudConnect": "Se connecter à FreeKiosk Cloud",
+      "advanced": "Je connais FreeKiosk : ouvrir tous les réglages"
+    },
+    "url": {
+      "title": "Quelle page afficher ?",
+      "text": "Saisissez l'adresse de la page. Elle s'ouvre en plein écran.",
+      "label": "Adresse de la page",
+      "hint": "Par exemple votre tableau de bord ou une application web. Un serveur local fonctionne aussi : http://192.168.1.20:8123",
+      "errorEmpty": "Saisissez l'adresse de la page.",
+      "errorInvalid": "Ceci ne ressemble pas à une adresse web. Essayez par exemple https://example.com",
+      "errorBlocked": "Ce type d'adresse n'est pas autorisé."
+    },
+    "pin": {
+      "titleChoose": "Choisissez votre PIN",
+      "textChoose": "{{min}} à {{max}} chiffres. Il rouvre les réglages : gardez-le en lieu sûr.",
+      "titleConfirm": "Confirmez votre PIN",
+      "textConfirm": "Saisissez le même PIN une seconde fois.",
+      "label": "PIN",
+      "confirm": "Confirmer",
+      "errorLength": "Le PIN doit avoir de {{min}} à {{max}} chiffres.",
+      "errorMismatch": "Les deux PIN sont différents. Choisissez à nouveau votre PIN.",
+      "errorSave": "Le PIN n'a pas pu être enregistré sur cet appareil. Réessayez."
+    },
+    "alive": {
+      "title": "Le garder en marche",
+      "text": "Deux choses aident le kiosque à rester actif après un redémarrage ou une longue inactivité.",
+      "autoLaunchTitle": "Démarrer FreeKiosk au redémarrage de l'appareil",
+      "autoLaunchText": "Recommandé : après une coupure de courant, la page revient toute seule.",
+      "batteryTitle": "Ne pas laisser Android mettre l'app en pause",
+      "batteryText": "Autorisez FreeKiosk à ignorer l'optimisation de la batterie, pour que la page continue de tourner.",
+      "batteryAllow": "Autoriser"
+    },
+    "lock": {
+      "title": "Verrouiller l'appareil",
+      "text": "Un kiosque n'a d'intérêt que si les visiteurs ne peuvent pas quitter la page.",
+      "lockTitle": "Verrouiller cet appareil (recommandé)",
+      "lockText": "Android vous demande de confirmer une fois. Pour quitter la page, vous utiliserez le geste secret et votre PIN.",
+      "lockTextOwner": "Le verrouillage complet est disponible sur cet appareil : les visiteurs ne peuvent pas quitter la page.",
+      "laterTitle": "Pas maintenant",
+      "laterText": "Vous pourrez le verrouiller plus tard dans les réglages, onglet Sécurité.",
+      "fullTitle": "Un verrouillage complet ?",
+      "fullText": "Le mode Device Owner bloque aussi la barre de navigation et le menu d'alimentation. Il demande un ordinateur, une seule fois.",
+      "fullLink": "Lire le guide"
+    },
+    "ready": {
+      "title": "Votre kiosque est prêt",
+      "text": "Les visiteurs ne voient que la page. Voici comment revenir aux réglages.",
+      "settingsTitle": "Ouvrir les réglages",
+      "tapStep": "Touchez {{count}} fois rapidement au même endroit, en {{seconds}} secondes.",
+      "pinStep": "Puis saisissez votre PIN.",
+      "practiceHint": "Essayez ici : touchez {{count}} fois",
+      "practiceDone": "C'est ce geste",
+      "volume": "Vous pouvez aussi appuyer 5 fois sur Volume haut.",
+      "tvBack": "Appuyez 5 fois de suite sur Retour, puis saisissez votre PIN.",
+      "pinningNote": "Android vous demandera de confirmer le verrouillage.",
+      "start": "Démarrer le kiosque",
+      "openSettings": "Ouvrir d'abord les réglages"
+    }
   }
 }
