@@ -1053,8 +1053,9 @@ The real prompt could not be triggered on the emulator (it does not enforce ADB 
 # Option 1: Factory reset (loses all data)
 adb shell am broadcast -a android.intent.action.MASTER_CLEAR
 
-# Option 2: Remove Device Owner + clear FreeKiosk data
-adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver
+# Option 2: Remove Device Owner from the app (needs the PIN): Settings > Advanced > Remove Device Owner.
+# `adb shell dpm remove-active-admin` is refused on a release build (see the table above).
+# Then clear the FreeKiosk data:
 adb shell pm clear com.freekiosk
 ```
 

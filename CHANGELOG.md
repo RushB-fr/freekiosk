@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- 📖 **Docs: removing Device Owner over ADB does not work on a release build.** The FAQ, the installation guide and the ADB guide gave `adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver` as a way to remove Device Owner, and the FAQ as a way past a forgotten PIN. Android only accepts that command for an app built `android:testOnly`: on the released app it fails with `SecurityException: Attempt to remove non-test admin` (checked on an Android 15 emulator with 2.0.0, with and without Device Owner set from the command line). The three documents now point to Settings > Advanced > Remove Device Owner (PIN needed), and to a factory reset when the PIN is lost. Not checked: a physical device, and other Android versions.
+
 ***
 
 ## [2.1.0-beta.4] - 2026-11-26

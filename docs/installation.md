@@ -281,11 +281,13 @@ sudo udevadm control --reload-rules
 > [!WARNING]
 > "Exit Kiosk Mode" only closes the app but keeps Device Owner active. Use "Remove Device Owner" to completely disable it.
 
-### Option 2: Via ADB
+### Option 2: Via ADB (does not work on a release build)
 
 ```bash
 adb shell dpm remove-active-admin com.freekiosk/.DeviceAdminReceiver
 ```
+
+Android only accepts this command for an app built `android:testOnly="true"`. On the released FreeKiosk it fails with `SecurityException: Attempt to remove non-test admin` (checked on an Android 15 emulator, FreeKiosk 2.0.0). Use Option 1. If you forgot the PIN, the only way left is a factory reset.
 
 
 ## Uninstall
