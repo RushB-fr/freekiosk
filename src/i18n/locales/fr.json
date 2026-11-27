@@ -1618,7 +1618,9 @@
       "laterText": "Vous pourrez le verrouiller plus tard dans les réglages, onglet Sécurité.",
       "fullTitle": "Un verrouillage complet ?",
       "fullText": "Le mode Device Owner bloque aussi la barre de navigation et le menu d'alimentation. Il demande un ordinateur, une seule fois.",
-      "fullLink": "Lire le guide"
+      "fullLink": "Lire le guide",
+      "tvTitle": "Verrouiller une TV",
+      "tvText": "Une TV ne se verrouille pas comme une tablette. Pour garder les visiteurs sur la page, FreeKiosk a besoin du mode Device Owner, à activer une fois depuis un ordinateur. Le kiosque fonctionne sans, et vous pourrez l'ajouter plus tard."
     },
     "ready": {
       "title": "Votre kiosque est prêt",

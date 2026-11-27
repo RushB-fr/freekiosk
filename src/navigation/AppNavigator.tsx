@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import KioskScreen from '../screens/KioskScreen';
@@ -23,6 +23,10 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+const styles = StyleSheet.create({
+  placeholder: { flex: 1, backgroundColor: Colors.background },
+});
+
 const AppNavigator: React.FC = () => {
   // A tablet where nothing is configured starts on the setup wizard, every other one on the kiosk.
   // The answer comes from the storage, a few milliseconds: a plain background until then.
@@ -38,7 +42,7 @@ const AppNavigator: React.FC = () => {
   }, []);
 
   if (!initialRoute) {
-    return <View style={{ flex: 1, backgroundColor: Colors.background }} />;
+    return <View style={styles.placeholder} />;
   }
 
   return (

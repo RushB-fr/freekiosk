@@ -1619,7 +1619,9 @@
       "laterText": "Potrai bloccarlo più tardi nelle impostazioni, scheda Sicurezza.",
       "fullTitle": "Vuoi un blocco completo?",
       "fullText": "La modalità Device Owner blocca anche la barra di navigazione e il menu di spegnimento. Serve un computer, una sola volta.",
-      "fullLink": "Leggi la guida"
+      "fullLink": "Leggi la guida",
+      "tvTitle": "Bloccare una TV",
+      "tvText": "Una TV non si blocca come un tablet. Per tenere i visitatori sulla pagina, FreeKiosk ha bisogno della modalità Device Owner, da impostare una volta da un computer. Il chiosco funziona anche senza e potrai aggiungerla più tardi."
     },
     "ready": {
       "title": "Il tuo chiosco è pronto",

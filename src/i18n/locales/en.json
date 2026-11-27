@@ -1618,7 +1618,9 @@
       "laterText": "You can lock it later in the settings, Security tab.",
       "fullTitle": "Want a complete lockdown?",
       "fullText": "Device Owner mode also blocks the navigation bar and the power menu. It needs a computer, once.",
-      "fullLink": "Read the guide"
+      "fullLink": "Read the guide",
+      "tvTitle": "Locking a TV",
+      "tvText": "A TV cannot be locked the way a tablet is. To keep visitors on the page, FreeKiosk needs Device Owner mode, set once from a computer. The kiosk works without it, and you can add it later."
     },
     "ready": {
       "title": "Your kiosk is ready",

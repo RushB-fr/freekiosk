@@ -1618,7 +1618,9 @@
       "laterText": "Sie können es später in den Einstellungen sperren, Tab Sicherheit.",
       "fullTitle": "Eine vollständige Sperre?",
       "fullText": "Der Device-Owner-Modus blockiert auch die Navigationsleiste und das Ein/Aus-Menü. Er braucht einmalig einen Computer.",
-      "fullLink": "Anleitung lesen"
+      "fullLink": "Anleitung lesen",
+      "tvTitle": "Einen Fernseher sperren",
+      "tvText": "Ein Fernseher lässt sich nicht wie ein Tablet sperren. Damit Besucher auf der Seite bleiben, braucht FreeKiosk den Device-Owner-Modus, einmalig von einem Computer aus eingerichtet. Der Kiosk funktioniert auch ohne ihn, und Sie können ihn später nachholen."
     },
     "ready": {
       "title": "Ihr Kiosk ist bereit",

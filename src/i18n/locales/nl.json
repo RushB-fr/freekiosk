@@ -1618,7 +1618,9 @@
       "laterText": "Je kunt het later vergrendelen in de instellingen, tabblad Beveiliging.",
       "fullTitle": "Een volledige vergrendeling?",
       "fullText": "De Device Owner-modus blokkeert ook de navigatiebalk en het aan/uit-menu. Daarvoor is eenmalig een computer nodig.",
-      "fullLink": "Lees de handleiding"
+      "fullLink": "Lees de handleiding",
+      "tvTitle": "Een tv vergrendelen",
+      "tvText": "Een tv vergrendel je niet zoals een tablet. Om bezoekers op de pagina te houden heeft FreeKiosk de Device Owner-modus nodig, eenmalig in te stellen vanaf een computer. De kiosk werkt ook zonder, en je kunt het later toevoegen."
     },
     "ready": {
       "title": "Je kiosk is klaar",

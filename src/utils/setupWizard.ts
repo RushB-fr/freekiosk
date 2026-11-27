@@ -30,6 +30,8 @@ export interface FreshInstallFacts {
   enrolled: boolean;
   /** A QR provisioning left a cloud enrolment token waiting. */
   pendingEnrollment: boolean;
+  /** A configuration sent over ADB is waiting to be applied (it reaches the storage only once the kiosk screen runs). */
+  pendingAdbConfig: boolean;
 }
 
 /**
@@ -40,7 +42,7 @@ export interface FreshInstallFacts {
  */
 export function decideFreshInstall(facts: FreshInstallFacts): boolean {
   if (facts.setupDone) return false;
-  if (facts.hasPin || facts.enrolled || facts.pendingEnrollment) return false;
+  if (facts.hasPin || facts.enrolled || facts.pendingEnrollment || facts.pendingAdbConfig) return false;
   return !hasConfigurationKey(facts.storedKeys);
 }
 
@@ -64,7 +66,13 @@ export async function isFreshInstall(): Promise<boolean> {
     } catch {
       pendingEnrollment = false;
     }
-    return decideFreshInstall({ storedKeys, setupDone: false, hasPin, enrolled, pendingEnrollment });
+    let pendingAdbConfig = false;
+    try {
+      pendingAdbConfig = !!(await NativeModules.KioskModule?.getPendingAdbConfig?.());
+    } catch {
+      pendingAdbConfig = false;
+    }
+    return decideFreshInstall({ storedKeys, setupDone: false, hasPin, enrolled, pendingEnrollment, pendingAdbConfig });
   } catch (error) {
     console.warn('[SetupWizard] Could not read the install state, skipping the wizard:', error);
     return false;

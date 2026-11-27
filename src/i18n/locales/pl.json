@@ -1620,7 +1620,9 @@
       "laterText": "Możesz zablokować je później w ustawieniach, zakładka Bezpieczeństwo.",
       "fullTitle": "Chcesz pełnej blokady?",
       "fullText": "Tryb Device Owner blokuje też pasek nawigacji i menu zasilania. Wymaga komputera, jednorazowo.",
-      "fullLink": "Przeczytaj poradnik"
+      "fullLink": "Przeczytaj poradnik",
+      "tvTitle": "Blokowanie telewizora",
+      "tvText": "Telewizora nie da się zablokować tak jak tabletu. Aby utrzymać odwiedzających na stronie, FreeKiosk potrzebuje trybu Device Owner, ustawianego raz z komputera. Kiosk działa także bez niego, a możesz go dodać później."
     },
     "ready": {
       "title": "Twój kiosk jest gotowy",

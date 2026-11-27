@@ -32,7 +32,6 @@ import Icon from '../components/Icon';
 import { Colors, Spacing } from '../theme';
 import { StorageService } from '../utils/storage';
 import { saveSecurePin } from '../utils/secureStorage';
-import { grantSettingsAccess } from '../utils/authState';
 import { CLOUD_ENABLED } from '../config/features';
 import {
   TAP_RADIUS_DP,
@@ -86,6 +85,12 @@ const SetupWizardScreen: React.FC<Props> = ({ navigation }) => {
     StorageService.getReturnTapTimeout().then((n) => setTapTimeout(n || 1500)).catch(() => {});
     KioskModule?.isDeviceOwner?.().then((v: boolean) => setIsDeviceOwner(!!v)).catch(() => {});
   }, []);
+
+  // A TV cannot be pinned without Device Owner (Android shows no pinning prompt there): nothing to choose.
+  const tvWithoutOwner = Platform.isTV && !isDeviceOwner;
+  useEffect(() => {
+    if (tvWithoutOwner) setLockChoice('later');
+  }, [tvWithoutOwner]);
 
   const refreshBattery = useCallback(() => {
     KioskModule?.isIgnoringBatteryOptimizations?.()
@@ -196,8 +201,9 @@ const SetupWizardScreen: React.FC<Props> = ({ navigation }) => {
         }
         await StorageService.savePin('');
         await markSetupDone();
-        grantSettingsAccess();
-        navigation.reset({ index: 1, routes: [{ name: 'Kiosk' }, { name: 'Settings', params: { initialTab: 'advanced' } }] });
+        // Through the PIN screen, like any later visit to the settings: the kiosk screen drops the
+        // settings access when it appears, so a direct jump to the settings would be refused.
+        navigation.reset({ index: 1, routes: [{ name: 'Kiosk' }, { name: 'Pin', params: { initialTab: 'advanced' } }] });
       } finally {
         setBusy(false);
       }
@@ -238,12 +244,12 @@ const SetupWizardScreen: React.FC<Props> = ({ navigation }) => {
       if (destination === 'kiosk') {
         navigation.reset({ index: 0, routes: [{ name: 'Kiosk' }] });
       } else {
-        grantSettingsAccess();
+        // Through the PIN screen (see above): the PIN just chosen is the one to enter.
         navigation.reset({
           index: 1,
           routes: [
             { name: 'Kiosk' },
-            { name: 'Settings', params: destination === 'cloud' ? { initialTab: 'advanced' } : undefined },
+            { name: 'Pin', params: destination === 'cloud' ? { initialTab: 'advanced' } : undefined },
           ],
         });
       }
@@ -289,6 +295,7 @@ const SetupWizardScreen: React.FC<Props> = ({ navigation }) => {
         size="large"
         onPress={() => setStep('url')}
         style={styles.gap}
+        hasTVPreferredFocus={Platform.isTV}
       />
       {CLOUD_ENABLED && (
         <View style={styles.card}>
@@ -327,6 +334,7 @@ const SetupWizardScreen: React.FC<Props> = ({ navigation }) => {
         keyboardType="url"
         error={urlError}
         hint={t('setup.url.hint')}
+        autoFocus={Platform.isTV}
       />
       <SettingsButton title={t('setup.next')} icon="arrow-right" onPress={submitUrl} style={styles.gap} />
     </>
@@ -341,6 +349,7 @@ const SetupWizardScreen: React.FC<Props> = ({ navigation }) => {
           {confirming ? t('setup.pin.textConfirm') : t('setup.pin.textChoose', { min: WIZARD_PIN_MIN, max: WIZARD_PIN_MAX })}
         </Text>
         <SettingsInput
+          key={confirming ? 'confirm' : 'choose'}
           label={t('setup.pin.label')}
           icon="key"
           value={pin}
@@ -352,6 +361,7 @@ const SetupWizardScreen: React.FC<Props> = ({ navigation }) => {
           secureTextEntry
           maxLength={WIZARD_PIN_MAX}
           error={pinError}
+          autoFocus={Platform.isTV}
         />
         <SettingsButton
           title={t(confirming ? 'setup.pin.confirm' : 'setup.next')}
@@ -373,6 +383,7 @@ const SetupWizardScreen: React.FC<Props> = ({ navigation }) => {
       <TouchableOpacity
         style={[styles.option, autoLaunch && styles.optionOn]}
         onPress={() => setAutoLaunch((v) => !v)}
+        hasTVPreferredFocus={Platform.isTV}
         accessibilityRole="switch"
         accessibilityState={{ checked: autoLaunch }}
       >
@@ -409,7 +420,19 @@ const SetupWizardScreen: React.FC<Props> = ({ navigation }) => {
     </>
   );
 
-  const renderLock = (): React.ReactNode => (
+  const renderLock = (): React.ReactNode => tvWithoutOwner ? (
+    <>
+      <Text style={styles.title}>{t('setup.lock.title')}</Text>
+      <View style={styles.note}>
+        <Icon name="information" size={20} color={Colors.primary} style={styles.cardIcon} />
+        <View style={styles.optionBody}>
+          <Text style={styles.optionTitle}>{t('setup.lock.tvTitle')}</Text>
+          <Text style={styles.optionText}>{t('setup.lock.tvText')}</Text>
+        </View>
+      </View>
+      <SettingsButton title={t('setup.next')} icon="arrow-right" onPress={() => setStep('ready')} style={styles.gap} hasTVPreferredFocus />
+    </>
+  ) : (
     <>
       <Text style={styles.title}>{t('setup.lock.title')}</Text>
       <Text style={styles.text}>{t('setup.lock.text')}</Text>
@@ -417,6 +440,7 @@ const SetupWizardScreen: React.FC<Props> = ({ navigation }) => {
       <TouchableOpacity
         style={[styles.option, lockChoice === 'lock' && styles.optionOn]}
         onPress={() => setLockChoice('lock')}
+        hasTVPreferredFocus={Platform.isTV}
         accessibilityRole="radio"
         accessibilityState={{ selected: lockChoice === 'lock' }}
       >
@@ -484,7 +508,7 @@ const SetupWizardScreen: React.FC<Props> = ({ navigation }) => {
         {lockChoice === 'lock' && !isDeviceOwner && <Text style={styles.cardHint}>{t('setup.ready.pinningNote')}</Text>}
         {saveError && <Text style={styles.errorText}>{saveError}</Text>}
 
-        <SettingsButton title={t('setup.ready.start')} icon="play" size="large" onPress={() => finish('kiosk')} loading={busy} style={styles.gap} />
+        <SettingsButton title={t('setup.ready.start')} icon="play" size="large" onPress={() => finish('kiosk')} loading={busy} style={styles.gap} hasTVPreferredFocus={Platform.isTV} />
         <SettingsButton title={t('setup.ready.openSettings')} variant="outline" onPress={() => finish('settings')} disabled={busy} style={styles.gapSmall} />
 
         {CLOUD_ENABLED && (
@@ -525,7 +549,8 @@ const SetupWizardScreen: React.FC<Props> = ({ navigation }) => {
           {step !== 'welcome' && !cloudIntent && stepNumber > 0 && (
             <Text style={styles.progress}>{t('setup.progress', { current: stepNumber, total: FLOW.length })}</Text>
           )}
-          {body()}
+          {/* key: a new step is a new tree, so what asks for the TV focus (autoFocus, hasTVPreferredFocus) gets it again */}
+          <React.Fragment key={step}>{body()}</React.Fragment>
           {step !== 'welcome' && (
             <TouchableOpacity onPress={goBack} style={styles.linkButton} disabled={busy}>
               <Text style={styles.link}>{t('setup.back')}</Text>

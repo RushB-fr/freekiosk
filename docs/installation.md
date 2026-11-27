@@ -40,15 +40,22 @@
 - Allow "Install from unknown sources" if prompted
 - Complete installation
 
-**3. Configure**
-- Open FreeKiosk app
-- Tap **5 times** on the secret button (bottom-right corner)
-- Enter your PIN code
-- Set your target URL or app
-- Configure additional settings as needed
+**3. Follow the setup wizard**
+
+Open FreeKiosk. On a device where nothing is configured yet, a short wizard starts (about a minute):
+
+1. **The page to show**: type its address. `https://` is added when missing, and a local server such as `http://192.168.1.20:8123` works too.
+2. **Your own PIN**: 4 to 6 digits, typed twice. It replaces the default code `1234`.
+3. **Keep it running**: start FreeKiosk when the device restarts, and let Android ignore battery optimisation (not offered on Android TV).
+4. **Lock the device**: **Lock this device** (Android asks you to confirm once) or **Not now**. On an Android TV without Device Owner there is nothing to choose: the wizard explains that a TV needs Device Owner mode to be locked.
+5. **Your kiosk is ready**: how to get back to the settings (5 quick taps at the same spot, or Volume Up 5 times; on Android TV, Back 5 times), with a practice zone, then **Start the kiosk**.
+
+Every screen works with an Android TV remote. Leaving half way saves nothing.
+
+The wizard only appears when nothing is configured. A device configured over ADB, provisioned by QR code, enrolled in FreeKiosk Cloud, or updated from an earlier version goes straight to the kiosk. On the first screen, **Connect to FreeKiosk Cloud** asks for a PIN and opens the cloud settings, and **I know FreeKiosk: open all the settings** skips the wizard and keeps the earlier behaviour (default PIN `1234`, then all the settings).
 
 **4. Start Kiosk Mode**
-- Tap "Start Kiosk Mode"
+- Tap "Start the kiosk"
 - Your tablet is now locked in basic kiosk mode!
 
 > [!WARNING]

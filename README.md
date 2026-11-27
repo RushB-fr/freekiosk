@@ -68,8 +68,8 @@ Instead of burying everything in one long page, this README gives you the essent
 
 1. Install FreeKiosk from [Google Play](https://play.google.com/store/apps/details?id=com.freekiosk), or download the latest APK from [Releases](https://github.com/rushb-fr/freekiosk/releases).
 2. Install on Android 8.0+ tablet.
-3. Configure URL/app + PIN.
-4. Start kiosk mode.
+3. Follow the setup wizard that opens on first launch: page address, your own PIN, lock (about a minute, also with an Android TV remote).
+4. Start the kiosk.
 
 For production lockdown, use Device Owner mode:
 

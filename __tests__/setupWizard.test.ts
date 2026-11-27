@@ -30,6 +30,7 @@ const facts = (over: Partial<Parameters<typeof decideFreshInstall>[0]> = {}) => 
   hasPin: false,
   enrolled: false,
   pendingEnrollment: false,
+  pendingAdbConfig: false,
   ...over,
 });
 
@@ -54,6 +55,10 @@ describe('decideFreshInstall', () => {
     expect(decideFreshInstall(facts({ pendingEnrollment: true }))).toBe(false);
   });
 
+  it('is not fresh when an ADB configuration is waiting to be applied', () => {
+    expect(decideFreshInstall(facts({ pendingAdbConfig: true }))).toBe(false);
+  });
+
   it('is not fresh once the wizard has run', () => {
     expect(decideFreshInstall(facts({ setupDone: true }))).toBe(false);
   });
@@ -65,7 +70,10 @@ describe('isFreshInstall', () => {
     (AsyncStorage.getAllKeys as jest.Mock).mockResolvedValue([]);
     (hasSecurePin as jest.Mock).mockResolvedValue(false);
     (CloudSyncService.isEnrolled as jest.Mock).mockResolvedValue(false);
-    (NativeModules as any).KioskModule = { getPendingCloudEnrollment: jest.fn().mockResolvedValue(null) };
+    (NativeModules as any).KioskModule = {
+      getPendingCloudEnrollment: jest.fn().mockResolvedValue(null),
+      getPendingAdbConfig: jest.fn().mockResolvedValue(null),
+    };
   });
 
   it('is true on an empty tablet', async () => {
@@ -83,6 +91,16 @@ describe('isFreshInstall', () => {
       cloud_url: 'https://cloud.example',
     });
     await expect(isFreshInstall()).resolves.toBe(false);
+  });
+
+  it('is false when an ADB configuration is pending, even though the storage is still empty', async () => {
+    (NativeModules as any).KioskModule.getPendingAdbConfig.mockResolvedValue({ '@kiosk_url': 'https://example.com' });
+    await expect(isFreshInstall()).resolves.toBe(false);
+  });
+
+  it('is true when the native side cannot answer about a pending ADB configuration', async () => {
+    (NativeModules as any).KioskModule.getPendingAdbConfig.mockRejectedValue(new Error('boom'));
+    await expect(isFreshInstall()).resolves.toBe(true);
   });
 
   it('is true when the native side cannot answer about a pending enrolment', async () => {
@@ -117,6 +135,7 @@ describe('normalizeWizardUrl', () => {
     expect(normalizeWizardUrl('   ')).toEqual({ ok: false, reason: 'empty' });
   });
 
+  // eslint-disable-next-line no-script-url
   it.each(['javascript:alert(1)', 'data:text/html,hi', 'JavaScript:void(0)', 'blob:https://x/1'])('blocks %s', (input) => {
     expect(normalizeWizardUrl(input)).toEqual({ ok: false, reason: 'blocked' });
   });

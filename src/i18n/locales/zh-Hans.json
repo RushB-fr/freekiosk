@@ -1618,7 +1618,9 @@
       "laterText": "您可以稍后在设置的“安全”选项卡中锁定。",
       "fullTitle": "想要完全锁定吗？",
       "fullText": "Device Owner 模式还会锁定导航栏和电源菜单。只需用电脑设置一次。",
-      "fullLink": "阅读指南"
+      "fullLink": "阅读指南",
+      "tvTitle": "锁定电视",
+      "tvText": "电视无法像平板那样锁定。要让访客停留在页面上，FreeKiosk 需要 Device Owner 模式，只需在电脑上设置一次。没有它自助终端也能运行，您可以稍后再添加。"
     },
     "ready": {
       "title": "您的自助终端已就绪",

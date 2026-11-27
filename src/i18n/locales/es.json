@@ -1619,7 +1619,9 @@
       "laterText": "Puedes bloquearlo más tarde en los ajustes, pestaña Seguridad.",
       "fullTitle": "¿Quieres un bloqueo completo?",
       "fullText": "El modo Device Owner también bloquea la barra de navegación y el menú de apagado. Necesita un ordenador, una sola vez.",
-      "fullLink": "Leer la guía"
+      "fullLink": "Leer la guía",
+      "tvTitle": "Bloquear una TV",
+      "tvText": "Una TV no se bloquea como una tableta. Para mantener a los visitantes en la página, FreeKiosk necesita el modo Device Owner, que se activa una vez desde un ordenador. El quiosco funciona sin él y puedes añadirlo más tarde."
     },
     "ready": {
       "title": "Tu quiosco está listo",
