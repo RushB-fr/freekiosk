@@ -13,11 +13,14 @@
 ## Table of Contents
 
 - [Overview](#overview)
-- [Configuration](#configuration)
-- [Getting Started](#getting-started)
-- [Features](#features)
-- [Troubleshooting](#troubleshooting)
-- [Related Resources](#related-resources)
+- [Enabling the API](#enabling-the-api)
+- [Endpoints Reference](#endpoints-reference)
+- [Authentication](#authentication)
+- [Home Assistant Integration](#home-assistant-integration)
+- [Testing with cURL](#testing-with-curl)
+- [Error Responses](#error-responses)
+- [See Also](#see-also)
+- [Changelog](#changelog)
 
 
 
