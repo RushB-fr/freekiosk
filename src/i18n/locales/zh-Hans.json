@@ -1565,5 +1565,76 @@
       "installFailedTitle": "更新未安装",
       "installFailedMessage": "更新已下载，但 Android 拒绝安装：{{message}}"
     }
+  },
+  "setup": {
+    "progress": "第 {{current}} 步，共 {{total}} 步",
+    "back": "返回",
+    "next": "下一步",
+    "errorGeneric": "保存时出了问题，请重试。",
+    "welcome": {
+      "title": "欢迎使用 FreeKiosk",
+      "text": "在这台设备上只显示一个网页，让访客停留在该页面上。设置大约只需一分钟。",
+      "start": "设置这台平板",
+      "startTv": "设置这台电视",
+      "cloudConnect": "连接到 FreeKiosk Cloud",
+      "advanced": "我了解 FreeKiosk：打开全部设置"
+    },
+    "url": {
+      "title": "要显示哪个页面？",
+      "text": "输入页面的网址，它将以全屏方式打开。",
+      "label": "页面网址",
+      "hint": "例如您的仪表板或网页应用。本地服务器也可以：http://192.168.1.20:8123",
+      "errorEmpty": "请输入页面网址。",
+      "errorInvalid": "这看起来不像网址。请尝试类似 https://example.com 的格式。",
+      "errorBlocked": "不允许使用这种类型的网址。"
+    },
+    "pin": {
+      "titleChoose": "选择您的 PIN",
+      "textChoose": "{{min}} 到 {{max}} 位数字。用它重新打开设置：请妥善保管。",
+      "titleConfirm": "确认您的 PIN",
+      "textConfirm": "请再输入一次相同的 PIN。",
+      "label": "PIN",
+      "confirm": "确认",
+      "errorLength": "PIN 必须为 {{min}} 到 {{max}} 位数字。",
+      "errorMismatch": "两次输入的 PIN 不一致，请重新选择。",
+      "errorSave": "无法在此设备上保存 PIN，请重试。"
+    },
+    "alive": {
+      "title": "保持运行",
+      "text": "有两件事能帮助自助终端在重启或长时间闲置后继续运行。",
+      "autoLaunchTitle": "设备重启时启动 FreeKiosk",
+      "autoLaunchText": "推荐：断电后页面会自动恢复。",
+      "batteryTitle": "不让 Android 暂停应用",
+      "batteryText": "允许 FreeKiosk 忽略电池优化，使页面持续运行。",
+      "batteryAllow": "允许"
+    },
+    "lock": {
+      "title": "锁定设备",
+      "text": "只有访客无法离开页面，自助终端才有意义。",
+      "lockTitle": "锁定此设备（推荐）",
+      "lockText": "Android 会请您确认一次。要离开页面，请使用秘密手势和您的 PIN。",
+      "lockTextOwner": "此设备可使用完全锁定：访客无法离开页面。",
+      "laterTitle": "暂不",
+      "laterText": "您可以稍后在设置的“安全”选项卡中锁定。",
+      "fullTitle": "想要完全锁定吗？",
+      "fullText": "Device Owner 模式还会锁定导航栏和电源菜单。只需用电脑设置一次。",
+      "fullLink": "阅读指南",
+      "tvTitle": "锁定电视",
+      "tvText": "电视无法像平板那样锁定。要让访客停留在页面上，FreeKiosk 需要 Device Owner 模式，只需在电脑上设置一次。没有它自助终端也能运行，您可以稍后再添加。"
+    },
+    "ready": {
+      "title": "您的自助终端已就绪",
+      "text": "访客只能看到该页面。下面是返回设置的方法。",
+      "settingsTitle": "打开设置",
+      "tapStep": "在同一位置，{{seconds}} 秒内快速点按 {{count}} 次。",
+      "pinStep": "然后输入您的 PIN。",
+      "practiceHint": "在这里试试：点按 {{count}} 次",
+      "practiceDone": "就是这个手势",
+      "volume": "您也可以按 5 次音量增大键。",
+      "tvBack": "连续按 5 次“返回”键，然后输入您的 PIN。",
+      "pinningNote": "Android 会请您确认锁定。",
+      "start": "启动自助终端",
+      "openSettings": "先打开设置"
+    }
   }
 }

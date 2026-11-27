@@ -1565,5 +1565,76 @@
       "installFailedTitle": "Update nicht installiert",
       "installFailedMessage": "Das Update wurde heruntergeladen, aber Android hat die Installation abgelehnt: {{message}}"
     }
+  },
+  "setup": {
+    "progress": "Schritt {{current}} von {{total}}",
+    "back": "Zurück",
+    "next": "Weiter",
+    "errorGeneric": "Beim Speichern ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
+    "welcome": {
+      "title": "Willkommen bei FreeKiosk",
+      "text": "Zeigen Sie auf diesem Gerät eine einzelne Webseite und halten Sie Besucher darauf. Die Einrichtung dauert etwa eine Minute.",
+      "start": "Dieses Tablet einrichten",
+      "startTv": "Diesen Fernseher einrichten",
+      "cloudConnect": "Mit FreeKiosk Cloud verbinden",
+      "advanced": "Ich kenne FreeKiosk: alle Einstellungen öffnen"
+    },
+    "url": {
+      "title": "Welche Seite soll angezeigt werden?",
+      "text": "Geben Sie die Adresse der Seite ein. Sie wird im Vollbild geöffnet.",
+      "label": "Adresse der Seite",
+      "hint": "Zum Beispiel Ihr Dashboard oder eine Web-App. Ein lokaler Server geht auch: http://192.168.1.20:8123",
+      "errorEmpty": "Geben Sie die Adresse der Seite ein.",
+      "errorInvalid": "Das sieht nicht wie eine Webadresse aus. Versuchen Sie z. B. https://example.com",
+      "errorBlocked": "Diese Art von Adresse ist nicht erlaubt."
+    },
+    "pin": {
+      "titleChoose": "PIN wählen",
+      "textChoose": "{{min}} bis {{max}} Ziffern. Damit öffnen Sie die Einstellungen wieder: bewahren Sie sie sicher auf.",
+      "titleConfirm": "PIN bestätigen",
+      "textConfirm": "Geben Sie dieselbe PIN noch einmal ein.",
+      "label": "PIN",
+      "confirm": "Bestätigen",
+      "errorLength": "Die PIN muss {{min}} bis {{max}} Ziffern haben.",
+      "errorMismatch": "Die beiden PINs sind verschieden. Wählen Sie Ihre PIN erneut.",
+      "errorSave": "Die PIN konnte auf diesem Gerät nicht gespeichert werden. Versuchen Sie es erneut."
+    },
+    "alive": {
+      "title": "Am Laufen halten",
+      "text": "Zwei Dinge helfen dem Kiosk, nach einem Neustart oder langer Inaktivität aktiv zu bleiben.",
+      "autoLaunchTitle": "FreeKiosk beim Neustart des Geräts starten",
+      "autoLaunchText": "Empfohlen: Nach einem Stromausfall kommt die Seite von selbst zurück.",
+      "batteryTitle": "Android die App nicht pausieren lassen",
+      "batteryText": "Erlauben Sie FreeKiosk, die Akkuoptimierung zu ignorieren, damit die Seite weiterläuft.",
+      "batteryAllow": "Erlauben"
+    },
+    "lock": {
+      "title": "Gerät sperren",
+      "text": "Ein Kiosk ist nur nützlich, wenn Besucher die Seite nicht verlassen können.",
+      "lockTitle": "Dieses Gerät sperren (empfohlen)",
+      "lockText": "Android bittet Sie einmal um Bestätigung. Um die Seite zu verlassen, nutzen Sie die geheime Geste und Ihre PIN.",
+      "lockTextOwner": "Die vollständige Sperre ist auf diesem Gerät verfügbar: Besucher können die Seite nicht verlassen.",
+      "laterTitle": "Jetzt nicht",
+      "laterText": "Sie können es später in den Einstellungen sperren, Tab Sicherheit.",
+      "fullTitle": "Eine vollständige Sperre?",
+      "fullText": "Der Device-Owner-Modus blockiert auch die Navigationsleiste und das Ein/Aus-Menü. Er braucht einmalig einen Computer.",
+      "fullLink": "Anleitung lesen",
+      "tvTitle": "Einen Fernseher sperren",
+      "tvText": "Ein Fernseher lässt sich nicht wie ein Tablet sperren. Damit Besucher auf der Seite bleiben, braucht FreeKiosk den Device-Owner-Modus, einmalig von einem Computer aus eingerichtet. Der Kiosk funktioniert auch ohne ihn, und Sie können ihn später nachholen."
+    },
+    "ready": {
+      "title": "Ihr Kiosk ist bereit",
+      "text": "Besucher sehen nur die Seite. So kommen Sie zurück zu den Einstellungen.",
+      "settingsTitle": "Einstellungen öffnen",
+      "tapStep": "Tippen Sie {{count}}-mal schnell auf dieselbe Stelle, innerhalb von {{seconds}} Sekunden.",
+      "pinStep": "Geben Sie dann Ihre PIN ein.",
+      "practiceHint": "Probieren Sie es hier: {{count}}-mal tippen",
+      "practiceDone": "Das ist die Geste",
+      "volume": "Sie können auch 5-mal die Lauter-Taste drücken.",
+      "tvBack": "Drücken Sie 5-mal hintereinander Zurück und geben Sie dann Ihre PIN ein.",
+      "pinningNote": "Android bittet Sie, die Sperre zu bestätigen.",
+      "start": "Kiosk starten",
+      "openSettings": "Zuerst die Einstellungen öffnen"
+    }
   }
 }

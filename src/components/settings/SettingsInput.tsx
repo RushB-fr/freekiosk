@@ -27,6 +27,8 @@ interface SettingsInputProps {
   multiline?: boolean;
   onBlur?: () => void;
   onFocus?: () => void;
+  /** Take the focus when the field appears (Android TV: nothing is focused until the remote moves). */
+  autoFocus?: boolean;
 }
 
 // Uses native secureTextEntry for password masking - no manual bullet management.
@@ -52,6 +54,7 @@ const SettingsInput: React.FC<SettingsInputProps> = ({
   multiline = false,
   onBlur,
   onFocus,
+  autoFocus = false,
 }) => {
   // On a TV the remote moves the focus between fields; without this outline there is no
   // way to tell which field a key press will type into.
@@ -84,6 +87,7 @@ const SettingsInput: React.FC<SettingsInputProps> = ({
         multiline={multiline}
         onBlur={() => { setFocused(false); onBlur?.(); }}
         onFocus={() => { setFocused(true); onFocus?.(); }}
+        autoFocus={autoFocus}
         cursorColor={Colors.primary}
         selectionColor={Colors.primaryLight}
         caretHidden={false}

@@ -1566,5 +1566,76 @@
       "installFailedTitle": "Aggiornamento non installato",
       "installFailedMessage": "L'aggiornamento è stato scaricato ma Android ha rifiutato di installarlo: {{message}}"
     }
+  },
+  "setup": {
+    "progress": "Passaggio {{current}} di {{total}}",
+    "back": "Indietro",
+    "next": "Avanti",
+    "errorGeneric": "Qualcosa è andato storto durante il salvataggio. Riprova.",
+    "welcome": {
+      "title": "Benvenuto in FreeKiosk",
+      "text": "Mostra una sola pagina web su questo dispositivo e tieni i visitatori su di essa. La configurazione richiede circa un minuto.",
+      "start": "Configura questo tablet",
+      "startTv": "Configura questa TV",
+      "cloudConnect": "Collegati a FreeKiosk Cloud",
+      "advanced": "Conosco FreeKiosk: apri tutte le impostazioni"
+    },
+    "url": {
+      "title": "Quale pagina mostrare?",
+      "text": "Scrivi l'indirizzo della pagina. Si apre a schermo intero.",
+      "label": "Indirizzo della pagina",
+      "hint": "Ad esempio la tua dashboard o una web app. Va bene anche un server locale: http://192.168.1.20:8123",
+      "errorEmpty": "Inserisci l'indirizzo della pagina.",
+      "errorInvalid": "Non sembra un indirizzo web. Prova qualcosa come https://example.com",
+      "errorBlocked": "Questo tipo di indirizzo non è consentito."
+    },
+    "pin": {
+      "titleChoose": "Scegli il tuo PIN",
+      "textChoose": "Da {{min}} a {{max}} cifre. Riapre le impostazioni: conservalo in un posto sicuro.",
+      "titleConfirm": "Conferma il tuo PIN",
+      "textConfirm": "Scrivi di nuovo lo stesso PIN.",
+      "label": "PIN",
+      "confirm": "Conferma",
+      "errorLength": "Il PIN deve avere da {{min}} a {{max}} cifre.",
+      "errorMismatch": "I due PIN sono diversi. Scegli di nuovo il tuo PIN.",
+      "errorSave": "Impossibile salvare il PIN su questo dispositivo. Riprova."
+    },
+    "alive": {
+      "title": "Tenerlo in funzione",
+      "text": "Due cose aiutano il chiosco a restare attivo dopo un riavvio o una lunga inattività.",
+      "autoLaunchTitle": "Avvia FreeKiosk al riavvio del dispositivo",
+      "autoLaunchText": "Consigliato: dopo un blackout la pagina torna da sola.",
+      "batteryTitle": "Non lasciare che Android metta in pausa l'app",
+      "batteryText": "Consenti a FreeKiosk di ignorare l'ottimizzazione della batteria, così la pagina resta attiva.",
+      "batteryAllow": "Consenti"
+    },
+    "lock": {
+      "title": "Blocca il dispositivo",
+      "text": "Un chiosco serve solo se i visitatori non possono lasciare la pagina.",
+      "lockTitle": "Blocca questo dispositivo (consigliato)",
+      "lockText": "Android ti chiede di confermare una volta. Per lasciare la pagina userai il gesto segreto e il tuo PIN.",
+      "lockTextOwner": "Il blocco completo è disponibile su questo dispositivo: i visitatori non possono lasciare la pagina.",
+      "laterTitle": "Non ora",
+      "laterText": "Potrai bloccarlo più tardi nelle impostazioni, scheda Sicurezza.",
+      "fullTitle": "Vuoi un blocco completo?",
+      "fullText": "La modalità Device Owner blocca anche la barra di navigazione e il menu di spegnimento. Serve un computer, una sola volta.",
+      "fullLink": "Leggi la guida",
+      "tvTitle": "Bloccare una TV",
+      "tvText": "Una TV non si blocca come un tablet. Per tenere i visitatori sulla pagina, FreeKiosk ha bisogno della modalità Device Owner, da impostare una volta da un computer. Il chiosco funziona anche senza e potrai aggiungerla più tardi."
+    },
+    "ready": {
+      "title": "Il tuo chiosco è pronto",
+      "text": "I visitatori vedono solo la pagina. Ecco come tornare alle impostazioni.",
+      "settingsTitle": "Apri le impostazioni",
+      "tapStep": "Tocca {{count}} volte velocemente nello stesso punto, entro {{seconds}} secondi.",
+      "pinStep": "Poi inserisci il tuo PIN.",
+      "practiceHint": "Prova qui: tocca {{count}} volte",
+      "practiceDone": "Questo è il gesto",
+      "volume": "Puoi anche premere 5 volte Volume su.",
+      "tvBack": "Premi Indietro 5 volte di seguito, poi inserisci il tuo PIN.",
+      "pinningNote": "Android ti chiederà di confermare il blocco.",
+      "start": "Avvia il chiosco",
+      "openSettings": "Apri prima le impostazioni"
+    }
   }
 }

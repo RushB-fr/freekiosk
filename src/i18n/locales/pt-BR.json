@@ -1565,5 +1565,76 @@
       "installFailedTitle": "Atualização não instalada",
       "installFailedMessage": "A atualização foi baixada, mas o Android se recusou a instalá-la: {{message}}"
     }
+  },
+  "setup": {
+    "progress": "Etapa {{current}} de {{total}}",
+    "back": "Voltar",
+    "next": "Avançar",
+    "errorGeneric": "Algo deu errado ao salvar. Tente novamente.",
+    "welcome": {
+      "title": "Bem-vindo ao FreeKiosk",
+      "text": "Mostre uma única página da web neste dispositivo e mantenha os visitantes nela. A configuração leva cerca de um minuto.",
+      "start": "Configurar este tablet",
+      "startTv": "Configurar esta TV",
+      "cloudConnect": "Conectar ao FreeKiosk Cloud",
+      "advanced": "Conheço o FreeKiosk: abrir todas as configurações"
+    },
+    "url": {
+      "title": "Qual página deve mostrar?",
+      "text": "Digite o endereço da página. Ela abre em tela cheia.",
+      "label": "Endereço da página",
+      "hint": "Por exemplo seu painel ou um aplicativo web. Um servidor local também funciona: http://192.168.1.20:8123",
+      "errorEmpty": "Digite o endereço da página.",
+      "errorInvalid": "Isto não parece um endereço da web. Tente algo como https://example.com",
+      "errorBlocked": "Este tipo de endereço não é permitido."
+    },
+    "pin": {
+      "titleChoose": "Escolha seu PIN",
+      "textChoose": "De {{min}} a {{max}} dígitos. Ele reabre as configurações: guarde-o em um lugar seguro.",
+      "titleConfirm": "Confirme seu PIN",
+      "textConfirm": "Digite o mesmo PIN mais uma vez.",
+      "label": "PIN",
+      "confirm": "Confirmar",
+      "errorLength": "O PIN deve ter de {{min}} a {{max}} dígitos.",
+      "errorMismatch": "Os dois PINs são diferentes. Escolha seu PIN novamente.",
+      "errorSave": "Não foi possível salvar o PIN neste dispositivo. Tente novamente."
+    },
+    "alive": {
+      "title": "Mantê-lo em funcionamento",
+      "text": "Duas coisas ajudam o quiosque a continuar ligado após uma reinicialização ou um longo período parado.",
+      "autoLaunchTitle": "Iniciar o FreeKiosk quando o dispositivo reiniciar",
+      "autoLaunchText": "Recomendado: após uma queda de energia, a página volta sozinha.",
+      "batteryTitle": "Não deixar o Android pausar o app",
+      "batteryText": "Permita que o FreeKiosk ignore a otimização de bateria, para que a página continue rodando.",
+      "batteryAllow": "Permitir"
+    },
+    "lock": {
+      "title": "Bloquear o dispositivo",
+      "text": "Um quiosque só serve se os visitantes não puderem sair da página.",
+      "lockTitle": "Bloquear este dispositivo (recomendado)",
+      "lockText": "O Android pede para você confirmar uma vez. Para sair da página, você usará o gesto secreto e seu PIN.",
+      "lockTextOwner": "O bloqueio completo está disponível neste dispositivo: os visitantes não podem sair da página.",
+      "laterTitle": "Agora não",
+      "laterText": "Você pode bloqueá-lo depois nas configurações, aba Segurança.",
+      "fullTitle": "Quer um bloqueio completo?",
+      "fullText": "O modo Device Owner também bloqueia a barra de navegação e o menu de desligar. Precisa de um computador, uma única vez.",
+      "fullLink": "Ler o guia",
+      "tvTitle": "Bloquear uma TV",
+      "tvText": "Uma TV não é bloqueada como um tablet. Para manter os visitantes na página, o FreeKiosk precisa do modo Device Owner, configurado uma vez a partir de um computador. O quiosque funciona sem ele e você pode adicioná-lo depois."
+    },
+    "ready": {
+      "title": "Seu quiosque está pronto",
+      "text": "Os visitantes veem apenas a página. Veja como voltar às configurações.",
+      "settingsTitle": "Abrir as configurações",
+      "tapStep": "Toque {{count}} vezes rapidamente no mesmo lugar, em {{seconds}} segundos.",
+      "pinStep": "Depois digite seu PIN.",
+      "practiceHint": "Experimente aqui: toque {{count}} vezes",
+      "practiceDone": "Esse é o gesto",
+      "volume": "Você também pode pressionar 5 vezes Aumentar volume.",
+      "tvBack": "Pressione Voltar 5 vezes seguidas e depois digite seu PIN.",
+      "pinningNote": "O Android vai pedir para você confirmar o bloqueio.",
+      "start": "Iniciar o quiosque",
+      "openSettings": "Abrir as configurações primeiro"
+    }
   }
 }

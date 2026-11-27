@@ -18,6 +18,8 @@ interface SettingsButtonProps {
   loading?: boolean;
   style?: ViewStyle;
   fullWidth?: boolean;
+  /** Android TV: take the focus when the button appears, so the remote's OK has something to press. */
+  hasTVPreferredFocus?: boolean;
 }
 
 const SettingsButton: React.FC<SettingsButtonProps> = ({
@@ -30,6 +32,7 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
   loading = false,
   style,
   fullWidth = true,
+  hasTVPreferredFocus = false,
 }) => {
   const getBackgroundColor = () => {
     if (disabled) return Colors.textDisabled;
@@ -95,6 +98,7 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
       onPress={onPress}
       disabled={disabled || loading}
       activeOpacity={0.8}
+      hasTVPreferredFocus={hasTVPreferredFocus}
     >
       {loading ? (
         <ActivityIndicator color={getTextColor()} size="small" />

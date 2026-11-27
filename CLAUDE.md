@@ -80,6 +80,10 @@ Mode is determined by settings read from storage at startup.
 
 `src/screens/settings/SettingsScreenNew.tsx` hosts a tabbed settings interface. Each tab is a separate component under `src/screens/settings/tabs/` and `src/components/settings/`. The settings UI uses React Native Paper (Material Design).
 
+### First launch
+
+`src/screens/SetupWizardScreen.tsx` is the guided first launch (page address, own PIN, keep-alive, lock, "ready" screen with tap practice). `AppNavigator` starts on it only when `isFreshInstall()` (`src/utils/setupWizard.ts`) says nothing is configured: no `@kiosk_*` key but the language and the wizard flag, no PIN, no cloud enrolment, no pending QR enrolment, no pending ADB config. Anything that writes configuration before the first JS run (ADB, cloud, an earlier version) must keep counting as "configured". It saves nothing until "Start the kiosk", and leaves for the settings through the PIN screen (the kiosk screen revokes the settings access when it mounts, so a direct jump to Settings is refused). On Android TV: `hasTVPreferredFocus`/`autoFocus` on each step (remounted by `key`), and no lock choice without Device Owner (pinning does not start there).
+
 ### Navigation
 
 Minimal stack: `src/navigation/AppNavigator.tsx` routes between KioskScreen, PinScreen, SettingsScreenNew, and BlockingOverlaysScreen.
