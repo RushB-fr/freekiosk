@@ -27,6 +27,7 @@ export const KEYS = {
   ALLOW_REMOTE_SCREENSHOT: '@kiosk_allow_remote_screenshot',
   ALLOW_HARDWARE_SCREENSHOT: '@kiosk_allow_hardware_screenshot',
   ALLOW_USB_DEBUG_DIALOG: '@kiosk_allow_usb_debug_dialog',
+  ALLOW_NFC_TAGS: '@kiosk_allow_nfc_tags',
   DEFAULT_LAUNCHER: '@kiosk_default_launcher',
   INTERCOM_MODE: '@kiosk_intercom_mode',
   SCREENSAVER_ENABLED: '@screensaver_enabled',
@@ -504,6 +505,26 @@ export const StorageService = {
     }
   },
 
+  // NFC TAGS IN LOCK MODE (#254) - opt-in; default false. The native side whitelists the system
+  // NFC service for Lock Mode when this is on (see NfcLockTask / KioskModule / MainActivity / BootLockActivity).
+  saveAllowNfcTags: async (value: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(KEYS.ALLOW_NFC_TAGS, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving allow NFC tags:', error);
+    }
+  },
+
+  getAllowNfcTags: async (): Promise<boolean> => {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.ALLOW_NFC_TAGS);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error('Error getting allow NFC tags:', error);
+      return false;
+    }
+  },
+
   getAllowUsbDebugDialog: async (): Promise<boolean> => {
     try {
       const value = await AsyncStorage.getItem(KEYS.ALLOW_USB_DEBUG_DIALOG);
@@ -618,6 +639,7 @@ export const StorageService = {
         KEYS.ALLOW_POWER_BUTTON,
         KEYS.ALLOW_HARDWARE_SCREENSHOT,
         KEYS.ALLOW_USB_DEBUG_DIALOG,
+        KEYS.ALLOW_NFC_TAGS,
         KEYS.SCREEN_LOCK_COMPAT,
         KEYS.BLOCK_FACTORY_RESET,
         KEYS.DEFAULT_LAUNCHER,
@@ -4143,6 +4165,7 @@ export const StorageService = {
         blockFactoryReset: bool(KEYS.BLOCK_FACTORY_RESET),
         allowHardwareScreenshot: bool(KEYS.ALLOW_HARDWARE_SCREENSHOT),
         allowUsbDebugDialog: bool(KEYS.ALLOW_USB_DEBUG_DIALOG),
+        allowNfcTags: bool(KEYS.ALLOW_NFC_TAGS),
         allowRemoteScreenshot: bool(KEYS.ALLOW_REMOTE_SCREENSHOT),
         defaultLauncher: bool(KEYS.DEFAULT_LAUNCHER),
         screenLockCompat: bool(KEYS.SCREEN_LOCK_COMPAT),
@@ -4428,6 +4451,7 @@ export const StorageService = {
       set(KEYS.BLOCK_FACTORY_RESET, sec.blockFactoryReset);
       set(KEYS.ALLOW_HARDWARE_SCREENSHOT, sec.allowHardwareScreenshot);
       set(KEYS.ALLOW_USB_DEBUG_DIALOG, sec.allowUsbDebugDialog);
+      set(KEYS.ALLOW_NFC_TAGS, sec.allowNfcTags);
       set(KEYS.ALLOW_REMOTE_SCREENSHOT, sec.allowRemoteScreenshot);
       set(KEYS.DEFAULT_LAUNCHER, sec.defaultLauncher);
       set(KEYS.SCREEN_LOCK_COMPAT, sec.screenLockCompat);

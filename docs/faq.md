@@ -122,6 +122,9 @@
   2. Reboot tablet
   3. Restart kiosk mode
 
+**Q: An NFC tag (for example a Home Assistant tag) does nothing in Lock Mode**
+- **A:** Android does not open the tag's app directly: it first starts a screen of the system NFC service, which Lock Mode refuses. Turn on **Settings > Security > Allow NFC Tags In Lock Mode** (`--ez allow_nfc_tags true`). It needs Device Owner, it applies the next time Lock Mode starts, and the app the tag opens (Home Assistant Companion, for example) must also be a managed app. It is off by default because the whitelist is per package: with it on, every screen of the NFC service, such as a list of apps or a Wi-Fi connection request, can appear over the kiosk when a tag is scanned, so use it only if you control the tags and who can reach the device.
+
 **Q: Samsung update popup appears**
 - **A:** Device Owner mode should block Samsung popups. If they still appear, try:
   1. Suspend Samsung system apps in FreeKiosk settings (coming in v1.1)

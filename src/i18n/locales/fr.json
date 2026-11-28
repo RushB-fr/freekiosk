@@ -499,7 +499,10 @@
       "remoteScreenshotWarning": "Pendant qu'une capture d'écran à distance est prise, la combinaison matérielle de capture d'écran est brièvement disponible pour quiconque se trouve devant l'appareil.",
       "allowUsbDebugDialog": "Autoriser l'invite de débogage USB en mode verrouillé",
       "allowUsbDebugDialogHint": "Quand un nouvel ordinateur est branché, Android demande sur l'appareil « Autoriser le débogage USB ? ». Le mode verrouillé empêche cette invite d'apparaître : un nouvel ordinateur reste donc non autorisé tant que le mode verrouillé n'est pas désactivé. Activez ceci pour que l'invite puisse apparaître quand le mode verrouillé est actif. Réservé au Device Owner. Prend effet au prochain démarrage du mode verrouillé. Vérifié sur Android standard uniquement.",
-      "allowUsbDebugDialogWarning": "Tant que cette option est activée, toute personne pouvant brancher un ordinateur sur l'appareil peut voir l'invite et appuyer sur Autoriser, ce qui donne à cet ordinateur un accès ADB. Les autres écrans de l'interface système ne sont plus bloqués non plus. Désactivez-la une fois l'opération terminée."
+      "allowUsbDebugDialogWarning": "Tant que cette option est activée, toute personne pouvant brancher un ordinateur sur l'appareil peut voir l'invite et appuyer sur Autoriser, ce qui donne à cet ordinateur un accès ADB. Les autres écrans de l'interface système ne sont plus bloqués non plus. Désactivez-la une fois l'opération terminée.",
+      "allowNfcTags": "Autoriser les tags NFC en mode verrouillé",
+      "allowNfcTagsHint": "Android transmet un tag NFC lu à son appli par un écran du service NFC du système, que le mode verrouillé bloque : un tag qui ouvre une appli (un tag Home Assistant, par exemple) ne fait alors rien. Activez cette option pour laisser passer cet écran. L'appli ouverte par le tag doit aussi être autorisée, comme appli gérée. S'applique au prochain démarrage du mode verrouillé.",
+      "allowNfcTagsWarning": "Tant que cette option est activée, le service NFC du système peut afficher ses propres écrans par-dessus le kiosque quand un tag est lu (par exemple une liste d'applis ou une demande de connexion Wi-Fi). Ne l'activez que si vous maîtrisez les tags et qui peut accéder à l'appareil."
     },
     "autoLaunch": {
       "title": "Lancement automatique",

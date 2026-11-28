@@ -154,6 +154,7 @@ class MainActivity : ReactActivity() {
       "block_factory_reset" to "@kiosk_block_factory_reset",
       "allow_hardware_screenshot" to "@kiosk_allow_hardware_screenshot",
       "allow_usb_debug_dialog" to "@kiosk_allow_usb_debug_dialog",
+      "allow_nfc_tags" to "@kiosk_allow_nfc_tags",
       "url_rotation_enabled" to "@kiosk_url_rotation_enabled",
       "url_rotation_list" to "@kiosk_url_rotation_list",
       "url_rotation_interval" to "@kiosk_url_rotation_interval",
@@ -709,6 +710,12 @@ class MainActivity : ReactActivity() {
         // into the tablet can see the dialog and tap Allow.
         if (getAsyncStorageValue("@kiosk_allow_usb_debug_dialog", "false") == "true") {
           whitelist.add("com.android.systemui")
+        }
+
+        // #254: opt-in, so the system NFC service can relay a scanned tag to its app in lock
+        // mode. Off by default: every screen of that service can then appear over the kiosk.
+        if (getAsyncStorageValue(NfcLockTask.STORAGE_KEY, "false") == "true") {
+          whitelist.add(NfcLockTask.PACKAGE)
         }
         
         val uniqueWhitelist = whitelist.distinct()

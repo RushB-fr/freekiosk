@@ -499,7 +499,10 @@
       "allowHardwareScreenshotsHint": "La Modalità blocco impedisce a chiunque usi il dispositivo la combinazione di screenshot Accensione+Volume giù. Attiva questa opzione per consentirla di nuovo mentre la Modalità blocco è attiva. Chiunque si trovi davanti al dispositivo potrà quindi catturare lo schermo. Ha effetto al prossimo avvio della Modalità blocco.",
       "allowUsbDebugDialog": "Consenti la richiesta di debug USB in Modalità blocco",
       "allowUsbDebugDialogHint": "Quando si collega un nuovo computer, Android chiede sul dispositivo \"Consentire il debug USB?\". La Modalità blocco impedisce la comparsa di questa richiesta, quindi un nuovo computer resta non autorizzato finché la Modalità blocco non viene disattivata. Attiva questa opzione per far comparire la richiesta mentre la Modalità blocco è attiva. Solo con Device Owner. Ha effetto al prossimo avvio della Modalità blocco. Verificato solo su Android stock.",
-      "allowUsbDebugDialogWarning": "Finché è attiva, chiunque possa collegare un computer al dispositivo può vedere la richiesta e toccare Consenti, dando a quel computer l'accesso ADB. Inoltre le altre schermate dell'interfaccia di sistema non sono più bloccate. Disattivala quando hai finito."
+      "allowUsbDebugDialogWarning": "Finché è attiva, chiunque possa collegare un computer al dispositivo può vedere la richiesta e toccare Consenti, dando a quel computer l'accesso ADB. Inoltre le altre schermate dell'interfaccia di sistema non sono più bloccate. Disattivala quando hai finito.",
+      "allowNfcTags": "Consenti i tag NFC in Modalità blocco",
+      "allowNfcTagsHint": "Android passa un tag NFC letto alla sua app attraverso una schermata del servizio NFC di sistema, che la Modalità blocco impedisce: un tag che apre un'app (ad esempio un tag di Home Assistant) non fa nulla. Attivala per lasciar passare quella schermata. Anche l'app aperta dal tag deve essere consentita, come app gestita. Si applica al prossimo avvio della Modalità blocco.",
+      "allowNfcTagsWarning": "Finché è attiva, il servizio NFC di sistema può mostrare proprie schermate sopra il chiosco quando viene letto un tag (ad esempio un elenco di app o una richiesta di connessione Wi-Fi). Attivala solo se controlli i tag e chi può accedere al dispositivo."
     },
     "autoLaunch": {
       "title": "Avvio automatico",
