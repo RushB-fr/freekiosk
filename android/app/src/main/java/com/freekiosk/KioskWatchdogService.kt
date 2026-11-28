@@ -337,6 +337,14 @@ class KioskWatchdogService : Service() {
             return
         }
 
+        // #254: same reasoning for the screen of the system NFC service that relays a scanned
+        // tag to its app: with "Allow NFC Tags In Lock Mode" on, it is let through by lock task
+        // and takes the foreground for a moment. Opt-in only, and only while that service is in front.
+        if (isNfcRelayInFront()) {
+            DebugLog.d(TAG, "NFC tag relay is in front - skipping relaunch check")
+            return
+        }
+
         // In external app mode, the external app is expected to be in the foreground.
         // Don't relaunch MainActivity just because it's not the topActivity. (#106)
         if (getDisplayMode() == "external_app") {
@@ -601,6 +609,28 @@ class KioskWatchdogService : Service() {
     private fun isUsbDebugPromptInFront(): Boolean {
         if (!isUsbDebugDialogAllowed()) return false
         return getForegroundPackageFromEvents() == SYSTEM_UI_PACKAGE
+    }
+
+    private fun isNfcRelayInFront(): Boolean {
+        if (!isNfcTagsAllowed()) return false
+        return getForegroundPackageFromEvents() == NfcLockTask.PACKAGE
+    }
+
+    private fun isNfcTagsAllowed(): Boolean {
+        return try {
+            val dbPath = getDatabasePath("RKStorage").absolutePath
+            val db = SQLiteDatabase.openDatabase(dbPath, null, SQLiteDatabase.OPEN_READONLY)
+            val cursor = db.rawQuery(
+                "SELECT value FROM catalystLocalStorage WHERE key = ?",
+                arrayOf(NfcLockTask.STORAGE_KEY))
+            val allowed = cursor.moveToFirst() && cursor.getString(0) == "true"
+            cursor.close()
+            db.close()
+            allowed
+        } catch (e: Exception) {
+            DebugLog.d(TAG, "Cannot read allow_nfc_tags: ${e.message}")
+            false
+        }
     }
 
     private fun isUsbDebugDialogAllowed(): Boolean {

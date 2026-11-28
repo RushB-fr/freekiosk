@@ -162,6 +162,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
   const [allowRemoteScreenshot, setAllowRemoteScreenshot] = useState<boolean>(false);
   const [allowHardwareScreenshot, setAllowHardwareScreenshot] = useState<boolean>(false);
   const [allowUsbDebugDialog, setAllowUsbDebugDialog] = useState<boolean>(false);
+  const [allowNfcTags, setAllowNfcTags] = useState<boolean>(false);
   const [allowNotifications, setAllowNotifications] = useState<boolean>(false);
   const [allowSystemInfo, setAllowSystemInfo] = useState<boolean>(false);
   const [returnMode, setReturnMode] = useState<string>('tap_anywhere');
@@ -624,6 +625,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
     const savedAllowRemoteScreenshot = await StorageService.getAllowRemoteScreenshot();
     const savedAllowHardwareScreenshot = await StorageService.getAllowHardwareScreenshot();
     const savedAllowUsbDebugDialog = await StorageService.getAllowUsbDebugDialog();
+    const savedAllowNfcTags = await StorageService.getAllowNfcTags();
     const savedAllowNotifications = await StorageService.getAllowNotifications();
     const savedAllowSystemInfo = await StorageService.getAllowSystemInfo();
     const savedReturnMode = await StorageService.getReturnMode();
@@ -704,6 +706,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
     setAllowRemoteScreenshot(savedAllowRemoteScreenshot);
     setAllowHardwareScreenshot(savedAllowHardwareScreenshot);
     setAllowUsbDebugDialog(savedAllowUsbDebugDialog);
+    setAllowNfcTags(savedAllowNfcTags);
     setAllowNotifications(savedAllowNotifications);
     setAllowSystemInfo(savedAllowSystemInfo);
     setReturnMode(savedReturnMode);
@@ -1725,6 +1728,7 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
     await StorageService.saveAllowRemoteScreenshot(allowRemoteScreenshot);
     await StorageService.saveAllowHardwareScreenshot(allowHardwareScreenshot);
     await StorageService.saveAllowUsbDebugDialog(allowUsbDebugDialog);
+    await StorageService.saveAllowNfcTags(allowNfcTags);
     await StorageService.saveAllowNotifications(allowNotifications);
     await StorageService.saveAllowSystemInfo(allowSystemInfo);
     await StorageService.saveReturnMode(returnMode);
@@ -2414,6 +2418,8 @@ const SettingsScreenNew: React.FC<SettingsScreenProps> = ({ navigation, route })
             onAllowHardwareScreenshotChange={setAllowHardwareScreenshot}
             allowUsbDebugDialog={allowUsbDebugDialog}
             onAllowUsbDebugDialogChange={setAllowUsbDebugDialog}
+            allowNfcTags={allowNfcTags}
+            onAllowNfcTagsChange={setAllowNfcTags}
             allowNotifications={allowNotifications}
             onAllowNotificationsChange={setAllowNotifications}
             allowSystemInfo={allowSystemInfo}

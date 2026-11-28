@@ -499,7 +499,10 @@
       "allowHardwareScreenshotsHint": "Tryb blokady blokuje kombinację Zasilanie+Ciszej do zrzutu ekranu dla wszystkich korzystających z urządzenia. Włącz, aby znów na nią zezwolić, gdy tryb blokady jest aktywny. Każdy, kto stoi przed urządzeniem, będzie mógł wtedy przechwycić ekran. Działa przy następnym uruchomieniu trybu blokady.",
       "allowUsbDebugDialog": "Zezwalaj na monit debugowania USB w trybie blokady",
       "allowUsbDebugDialogHint": "Po podłączeniu nowego komputera Android pyta na urządzeniu „Zezwolić na debugowanie USB?”. Tryb blokady nie dopuszcza do wyświetlenia tego monitu, więc nowy komputer pozostaje nieautoryzowany do czasu wyłączenia trybu blokady. Włącz, aby monit mógł się pojawić przy aktywnym trybie blokady. Tylko Device Owner. Działa przy następnym uruchomieniu trybu blokady. Sprawdzone tylko na czystym Androidzie.",
-      "allowUsbDebugDialogWarning": "Gdy ta opcja jest włączona, każdy, kto może podłączyć komputer do urządzenia, zobaczy monit i może dotknąć Zezwól, co daje temu komputerowi dostęp ADB. Inne ekrany interfejsu systemu również nie są już blokowane. Wyłącz ją po zakończeniu."
+      "allowUsbDebugDialogWarning": "Gdy ta opcja jest włączona, każdy, kto może podłączyć komputer do urządzenia, zobaczy monit i może dotknąć Zezwól, co daje temu komputerowi dostęp ADB. Inne ekrany interfejsu systemu również nie są już blokowane. Wyłącz ją po zakończeniu.",
+      "allowNfcTags": "Zezwalaj na tagi NFC w trybie blokady",
+      "allowNfcTagsHint": "Android przekazuje zeskanowany tag NFC do jego aplikacji przez ekran systemowej usługi NFC, który tryb blokady zatrzymuje: tag otwierający aplikację (na przykład tag Home Assistant) nic wtedy nie robi. Włącz tę opcję, aby przepuścić ten ekran. Aplikacja otwierana przez tag również musi być dozwolona, jako aplikacja zarządzana. Działa od następnego uruchomienia trybu blokady.",
+      "allowNfcTagsWarning": "Gdy ta opcja jest włączona, systemowa usługa NFC może po zeskanowaniu tagu wyświetlać własne ekrany nad kioskiem (na przykład listę aplikacji lub prośbę o połączenie z Wi-Fi). Włączaj ją tylko wtedy, gdy kontrolujesz tagi i to, kto ma dostęp do urządzenia."
     },
     "autoLaunch": {
       "title": "Autouruchamianie",

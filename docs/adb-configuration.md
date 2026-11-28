@@ -245,6 +245,7 @@ Every key below is a straight passthrough: the value you pass is stored as-is.
 | `--ez block_factory_reset false` | Apply the `DISALLOW_FACTORY_RESET` restriction |
 | `--ez allow_hardware_screenshot true` | Allow the Power + Volume Down screenshot while Lock Mode is on (Device Owner only, off by default, applies the next time Lock Mode starts) |
 | `--ez allow_usb_debug_dialog true` | Let the "Allow USB debugging?" prompt appear while Lock Mode is on (Device Owner only, off by default, applies the next time Lock Mode starts; see [the troubleshooting entry](#-the-allow-usb-debugging-prompt-does-not-appear-in-lock-mode)) |
+| `--ez allow_nfc_tags true` | Let the system NFC service relay a scanned NFC tag to its app while Lock Mode is on, for example a Home Assistant tag (Device Owner only, off by default, applies the next time Lock Mode starts). The app the tag opens must be allowed too, as a managed app. Every screen of the NFC service can then appear over the kiosk |
 | `--ez keep_screen_on true` | Keep the display awake |
 | `--ez auto_wake_on_screen_off true` | Wake the screen again by itself when something turns it off (Settings > Display > Auto Wake on Screen Off); off by default |
 | `--ez pause_page_screen_off true` | Pause the page's own activity (timers, image fetching) while the screen is really off; off by default. A screen-off command, a lock, the power button or a schedule counts, a dimmed screensaver does not |

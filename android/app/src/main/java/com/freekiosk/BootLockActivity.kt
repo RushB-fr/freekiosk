@@ -173,6 +173,10 @@ class BootLockActivity : Activity() {
             if (readAsyncStorageValue("@kiosk_allow_usb_debug_dialog", "false") == "true") {
                 whitelist.add("com.android.systemui")
             }
+            // #254: same opt-in as MainActivity's whitelist (NFC tags in Lock Mode)
+            if (readAsyncStorageValue(NfcLockTask.STORAGE_KEY, "false") == "true") {
+                whitelist.add(NfcLockTask.PACKAGE)
+            }
             val unique = whitelist.distinct().toTypedArray()
 
             dpm.setLockTaskPackages(admin, unique)

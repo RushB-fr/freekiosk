@@ -499,7 +499,10 @@
       "allowHardwareScreenshotsHint": "O Modo Bloqueio bloqueia a combinação Liga/desliga + Volume - para captura de tela para todos que usam o dispositivo. Ative para permiti-la de novo com o Modo Bloqueio ligado. Qualquer pessoa na frente do dispositivo poderá então capturar a tela. Entra em vigor na próxima vez que o Modo Bloqueio for iniciado.",
       "allowUsbDebugDialog": "Permitir o aviso de depuração USB no Modo Bloqueio",
       "allowUsbDebugDialogHint": "Quando um novo computador é conectado, o Android pergunta no dispositivo \"Permitir depuração USB?\". O Modo Bloqueio impede esse aviso de aparecer, então um novo computador continua sem autorização até o Modo Bloqueio ser desligado. Ative para deixar o aviso aparecer com o Modo Bloqueio ligado. Somente Device Owner. Entra em vigor na próxima vez que o Modo Bloqueio for iniciado. Verificado apenas no Android puro.",
-      "allowUsbDebugDialogWarning": "Enquanto isto estiver ligado, qualquer pessoa que conectar um computador ao dispositivo pode ver o aviso e tocar em Permitir, o que dá a esse computador acesso ADB. As outras telas da interface do sistema também deixam de ser bloqueadas. Desligue quando terminar."
+      "allowUsbDebugDialogWarning": "Enquanto isto estiver ligado, qualquer pessoa que conectar um computador ao dispositivo pode ver o aviso e tocar em Permitir, o que dá a esse computador acesso ADB. As outras telas da interface do sistema também deixam de ser bloqueadas. Desligue quando terminar.",
+      "allowNfcTags": "Permitir tags NFC no Modo Bloqueio",
+      "allowNfcTagsHint": "O Android entrega uma tag NFC lida ao seu app por uma tela do serviço NFC do sistema, que o Modo Bloqueio impede: uma tag que abre um app (por exemplo uma tag do Home Assistant) então não faz nada. Ative para deixar essa tela passar. O app aberto pela tag também precisa estar permitido, como app gerenciado. Vale a partir da próxima vez que o Modo Bloqueio iniciar.",
+      "allowNfcTagsWarning": "Enquanto isto estiver ligado, o serviço NFC do sistema pode mostrar telas próprias sobre o quiosque quando uma tag é lida (por exemplo uma lista de apps ou um pedido de conexão Wi-Fi). Ative só se você controla as tags e quem pode acessar o dispositivo."
     },
     "autoLaunch": {
       "title": "Abertura automática",

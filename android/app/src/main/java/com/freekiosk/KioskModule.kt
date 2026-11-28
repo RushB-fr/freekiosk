@@ -715,6 +715,12 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                             if (isUsbDebugDialogAllowed()) {
                                 whitelist.add("com.android.systemui")
                             }
+
+                            // #254: opt-in, so the system NFC service can relay a scanned tag to its app
+                            // in lock mode (the app it opens must be whitelisted too, e.g. a managed app)
+                            if (isNfcTagsAllowed()) {
+                                whitelist.add(NfcLockTask.PACKAGE)
+                            }
                             
                             val uniqueWhitelist = whitelist.distinct()
                             
@@ -1785,6 +1791,24 @@ class KioskModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     /**
      * Check if window.print() (Allow Printing) is enabled in settings (read from AsyncStorage)
      */
+    /** #254: the opt-in "Allow NFC Tags In Lock Mode" setting. Off by default. */
+    private fun isNfcTagsAllowed(): Boolean {
+        return try {
+            val dbPath = reactApplicationContext.getDatabasePath("RKStorage").absolutePath
+            val db = android.database.sqlite.SQLiteDatabase.openDatabase(dbPath, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY)
+            val cursor = db.rawQuery(
+                "SELECT value FROM catalystLocalStorage WHERE key = ?",
+                arrayOf(NfcLockTask.STORAGE_KEY)
+            )
+            val result = cursor.moveToFirst() && cursor.getString(0) == "true"
+            cursor.close()
+            db.close()
+            result
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     /**
      * #268: whether the admin allowed the system "Allow USB debugging?" dialog in lock mode.
      * That dialog is an activity of SystemUI, which lock task keeps from coming to the front

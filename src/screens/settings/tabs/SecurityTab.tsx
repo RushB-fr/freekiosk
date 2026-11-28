@@ -43,6 +43,8 @@ interface SecurityTabProps {
   onAllowHardwareScreenshotChange: (value: boolean) => void;
   allowUsbDebugDialog: boolean;
   onAllowUsbDebugDialogChange: (value: boolean) => void;
+  allowNfcTags: boolean;
+  onAllowNfcTagsChange: (value: boolean) => void;
   
   // Notifications (NFC support)
   allowNotifications: boolean;
@@ -133,6 +135,8 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
   onAllowHardwareScreenshotChange,
   allowUsbDebugDialog,
   onAllowUsbDebugDialogChange,
+  allowNfcTags,
+  onAllowNfcTagsChange,
   allowNotifications,
   onAllowNotificationsChange,
   allowSystemInfo,
@@ -283,6 +287,21 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
               <SettingsInfoBox variant="warning">
                 <Text style={styles.infoText}>
                   {t('security.lockMode.allowUsbDebugDialogWarning')}
+                </Text>
+              </SettingsInfoBox>
+            )}
+            <View style={styles.divider} />
+            <SettingsSwitch
+              label={t('security.lockMode.allowNfcTags')}
+              icon="nfc"
+              hint={t('security.lockMode.allowNfcTagsHint')}
+              value={allowNfcTags}
+              onValueChange={onAllowNfcTagsChange}
+            />
+            {allowNfcTags && (
+              <SettingsInfoBox variant="warning">
+                <Text style={styles.infoText}>
+                  {t('security.lockMode.allowNfcTagsWarning')}
                 </Text>
               </SettingsInfoBox>
             )}
