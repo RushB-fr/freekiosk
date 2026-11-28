@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_service_description">FreeKiosk gebruikt deze service om toetsenbordinvoer en afstandsbedieningscommando\'s naar apps op dit apparaat te sturen. Dit is nodig voor de besturing op afstand via de REST-API in de modus voor externe apps.</string>
+    <string name="boot_loading">Kiosk wordt gestart…</string>
+
+    <string name="channel_monitor_name">Bewaking van achtergrond-apps</string>
+    <string name="channel_monitor_description">Bewaakt beheerde apps zodat ze blijven draaien</string>
+    <plurals name="notification_monitoring">
+        <item quantity="one">%d achtergrond-app wordt bewaakt</item>
+        <item quantity="other">%d achtergrond-apps worden bewaakt</item>
+    </plurals>
+
+    <string name="channel_camera_name">Camera op afstand</string>
+    <string name="channel_camera_description">Laat de REST-API en MQTT de camera gebruiken terwijl een andere app wordt getoond</string>
+    <string name="notification_camera">Camera op afstand beschikbaar</string>
+
+    <string name="channel_watchdog_name">Kioskbewaking</string>
+    <string name="channel_watchdog_description">Houdt FreeKiosk draaiend in kioskmodus</string>
+    <string name="notification_watchdog_connected">Verbinding blijft behouden</string>
+    <string name="notification_watchdog_active">Kioskmodus actief</string>
+
+    <string name="channel_overlay_name">FreeKiosk-overlay</string>
+    <string name="channel_overlay_description">Overlayservice voor de modus voor externe apps</string>
+    <string name="notification_overlay">Modus voor externe apps actief</string>
+
+    <string name="channel_wake_name">Scherm activeren</string>
+    <string name="notification_wake">Scherm wordt geactiveerd</string>
+</resources>

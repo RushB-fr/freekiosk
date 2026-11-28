@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_service_description">FreeKiosk używa tej usługi do wysyłania danych z klawiatury i poleceń zdalnego sterowania do aplikacji działających na tym urządzeniu. Jest ona potrzebna, aby zdalne sterowanie przez REST API działało w trybie aplikacji zewnętrznej.</string>
+    <string name="boot_loading">Uruchamianie kiosku…</string>
+
+    <string name="channel_monitor_name">Monitor aplikacji w tle</string>
+    <string name="channel_monitor_description">Monitoruje zarządzane aplikacje, aby dalej działały</string>
+    <plurals name="notification_monitoring">
+        <item quantity="one">Monitorowanie %d aplikacji w tle</item>
+        <item quantity="few">Monitorowanie %d aplikacji w tle</item>
+        <item quantity="many">Monitorowanie %d aplikacji w tle</item>
+        <item quantity="other">Monitorowanie %d aplikacji w tle</item>
+    </plurals>
+
+    <string name="channel_camera_name">Kamera zdalna</string>
+    <string name="channel_camera_description">Pozwala REST API i MQTT używać kamery, gdy wyświetlana jest inna aplikacja</string>
+    <string name="notification_camera">Kamera zdalna dostępna</string>
+
+    <string name="channel_watchdog_name">Strażnik kiosku</string>
+    <string name="channel_watchdog_description">Utrzymuje działanie FreeKiosk w trybie kiosku</string>
+    <string name="notification_watchdog_connected">Połączenie utrzymane</string>
+    <string name="notification_watchdog_active">Tryb kiosku aktywny</string>
+
+    <string name="channel_overlay_name">Nakładka FreeKiosk</string>
+    <string name="channel_overlay_description">Usługa nakładki dla trybu aplikacji zewnętrznej</string>
+    <string name="notification_overlay">Tryb aplikacji zewnętrznej aktywny</string>
+
+    <string name="channel_wake_name">Wybudzanie ekranu</string>
+    <string name="notification_wake">Wybudzanie ekranu</string>
+</resources>

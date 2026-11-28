@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_service_description">FreeKiosk verwendet diesen Dienst, um Tastatureingaben und Fernsteuerungsbefehle an Apps zu senden, die auf diesem Gerät laufen. Er ist erforderlich, damit die Fernsteuerung über die REST-API im Modus „Externe App“ funktioniert.</string>
+    <string name="boot_loading">Kiosk wird gestartet…</string>
+
+    <string name="channel_monitor_name">Überwachung von Hintergrund-Apps</string>
+    <string name="channel_monitor_description">Überwacht verwaltete Apps, damit sie weiterlaufen</string>
+    <plurals name="notification_monitoring">
+        <item quantity="one">%d Hintergrund-App wird überwacht</item>
+        <item quantity="other">%d Hintergrund-Apps werden überwacht</item>
+    </plurals>
+
+    <string name="channel_camera_name">Remote-Kamera</string>
+    <string name="channel_camera_description">Lässt die REST-API und MQTT die Kamera nutzen, während eine andere App angezeigt wird</string>
+    <string name="notification_camera">Remote-Kamera verfügbar</string>
+
+    <string name="channel_watchdog_name">Kiosk-Wächter</string>
+    <string name="channel_watchdog_description">Hält FreeKiosk im Kioskmodus am Laufen</string>
+    <string name="notification_watchdog_connected">Verbindung wird gehalten</string>
+    <string name="notification_watchdog_active">Kioskmodus aktiv</string>
+
+    <string name="channel_overlay_name">FreeKiosk-Overlay</string>
+    <string name="channel_overlay_description">Overlay-Dienst für den Modus „Externe App“</string>
+    <string name="notification_overlay">Modus „Externe App“ aktiv</string>
+
+    <string name="channel_wake_name">Bildschirm aufwecken</string>
+    <string name="notification_wake">Bildschirm wird aufgeweckt</string>
+</resources>
