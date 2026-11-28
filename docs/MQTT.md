@@ -495,7 +495,7 @@ MQTT and the REST API can run simultaneously. Both use the same internal command
 
 FreeKiosk talks to an **MQTT broker**, never to the Home Assistant API. `mqtt.publish` is a Home Assistant service that publishes to the same broker, so there is no Home Assistant token or session to configure in FreeKiosk.
 
-Nabu Casa remote access forwards the Home Assistant web interface only. It does not carry MQTT traffic, so the tablet cannot use it as a broker address. If the tablet is not on the same network as Home Assistant, give it a path to the broker:
+Nabu Casa remote access is documented as access to the Home Assistant web interface (and to the add-ons served through it); its documentation does not describe carrying MQTT, so do not plan on using it as a broker address. If the tablet is not on the same network as Home Assistant, give it a path to the broker:
 
 
 
