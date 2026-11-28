@@ -1,0 +1,4227 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "FreeKiosk REST API",
+    "version": "2.1.0",
+    "description": "The REST API of the FreeKiosk Android app: read the state of a tablet and control it over the local network.\n\nTurn it on in **Settings > Advanced > REST API** (or over ADB). The default port is 8080. The server stays reachable while the screen is off.\n\n**Authentication.** Optional. When an API key is set on the tablet, send it as the `X-Api-Key` header, or as the password of an HTTP Basic credential (any user name), for clients such as the Home Assistant MJPEG camera integration that can only send Basic. Without a key, no credential is asked.\n\n**Answers.** JSON: `{ \"success\": true, \"data\": {...}, \"timestamp\": 1704672000 }`, or `{ \"success\": false, \"error\": \"...\", \"timestamp\": ... }` with a 4xx or 5xx status. Screenshots and camera pictures are binary images.\n\n**Remote control.** The commands answer 403 when **Allow remote control** is off in the settings; the read endpoints do not. Some commands need Device Owner (reboot, lock, true screen off).\n\nRead endpoints and most commands accept GET and POST, for convenience. Commands that need values take a JSON body on POST only.\n\nThis file is checked against the routes of the server by the test suite (`__tests__/OpenApiSpec.test.ts`), so a route added or removed without updating it fails the build. The guide with examples is [docs/rest-api.md](rest-api.md).",
+    "license": {
+      "name": "MIT",
+      "url": "https://github.com/RushB-fr/freekiosk/blob/main/LICENSE"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://{host}:{port}",
+      "description": "The tablet, on the local network",
+      "variables": {
+        "host": {
+          "default": "192.168.1.50",
+          "description": "IP address of the tablet"
+        },
+        "port": {
+          "default": "8080"
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "ApiKeyHeader": []
+    },
+    {
+      "ApiKeyBasic": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Status and information"
+    },
+    {
+      "name": "Display and sound"
+    },
+    {
+      "name": "Pages and apps"
+    },
+    {
+      "name": "Remote control"
+    },
+    {
+      "name": "Images"
+    },
+    {
+      "name": "Device"
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "getRoot",
+        "summary": "List the endpoints",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndpointIndexResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "description": "The server describes itself: the endpoints by method."
+      },
+      "post": {
+        "operationId": "postRoot",
+        "summary": "List the endpoints",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndpointIndexResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "description": "The server describes itself: the endpoints by method."
+      }
+    },
+    "/api/status": {
+      "get": {
+        "operationId": "getStatus",
+        "summary": "Full device status",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postStatus",
+        "summary": "Full device status",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/battery": {
+      "get": {
+        "operationId": "getBattery",
+        "summary": "Battery state",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatteryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postBattery",
+        "summary": "Battery state",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatteryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/screen": {
+      "get": {
+        "operationId": "getScreen",
+        "summary": "Screen state (physical state and screensaver overlay)",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postScreen",
+        "summary": "Screen state (physical state and screensaver overlay)",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/wifi": {
+      "get": {
+        "operationId": "getWifi",
+        "summary": "Wi-Fi state",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WifiResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postWifi",
+        "summary": "Wi-Fi state",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WifiResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/info": {
+      "get": {
+        "operationId": "getInfo",
+        "summary": "Device information",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceInfoResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postInfo",
+        "summary": "Device information",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceInfoResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "Health check",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postHealth",
+        "summary": "Health check",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/rotation": {
+      "get": {
+        "operationId": "getRotation",
+        "summary": "State of the URL rotation",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RotationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postRotation",
+        "summary": "State of the URL rotation",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RotationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/sensors": {
+      "get": {
+        "operationId": "getSensors",
+        "summary": "Light, proximity and accelerometer",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SensorsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postSensors",
+        "summary": "Light, proximity and accelerometer",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SensorsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/storage": {
+      "get": {
+        "operationId": "getStorage",
+        "summary": "Storage use",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postStorage",
+        "summary": "Storage use",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/memory": {
+      "get": {
+        "operationId": "getMemory",
+        "summary": "Memory use",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postMemory",
+        "summary": "Memory use",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/location": {
+      "get": {
+        "operationId": "getLocation",
+        "summary": "Last known position",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postLocation",
+        "summary": "Last known position",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/autoBrightness": {
+      "get": {
+        "operationId": "getAutoBrightness",
+        "summary": "State of the automatic brightness",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoBrightnessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postAutoBrightness",
+        "summary": "State of the automatic brightness",
+        "tags": [
+          "Status and information"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoBrightnessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/brightness": {
+      "get": {
+        "operationId": "getBrightness",
+        "summary": "Current brightness",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrightnessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "setBrightness",
+        "summary": "Set the brightness",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "description": "Always a command: a POST without a valid value answers 400 (use GET to read the brightness).",
+        "requestBody": {
+          "required": true,
+          "description": "The brightness, 0 to 100",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                },
+                "required": [
+                  "value"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/volume": {
+      "get": {
+        "operationId": "getVolume",
+        "summary": "Current media volume",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VolumeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "setVolume",
+        "summary": "Set the media volume",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "description": "Always a command: a POST without a valid value answers 400 (use GET to read the volume).",
+        "requestBody": {
+          "required": true,
+          "description": "The volume, 0 to 100",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                },
+                "required": [
+                  "value"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/screen/on": {
+      "get": {
+        "operationId": "getScreenOn",
+        "summary": "Turn the screen on",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postScreenOn",
+        "summary": "Turn the screen on",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/screen/off": {
+      "get": {
+        "operationId": "getScreenOff",
+        "summary": "Turn the screen off",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "description": "A true screen off needs Device Owner; without it the brightness goes to 0."
+      },
+      "post": {
+        "operationId": "postScreenOff",
+        "summary": "Turn the screen off",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "description": "A true screen off needs Device Owner; without it the brightness goes to 0."
+      }
+    },
+    "/api/screensaver/on": {
+      "get": {
+        "operationId": "getScreensaverOn",
+        "summary": "Activate the screensaver",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postScreensaverOn",
+        "summary": "Activate the screensaver",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/screensaver/off": {
+      "get": {
+        "operationId": "getScreensaverOff",
+        "summary": "Deactivate the screensaver",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postScreensaverOff",
+        "summary": "Deactivate the screensaver",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/wake": {
+      "get": {
+        "operationId": "getWake",
+        "summary": "Wake the screen from the screensaver",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postWake",
+        "summary": "Wake the screen from the screensaver",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/audio/stop": {
+      "get": {
+        "operationId": "getAudioStop",
+        "summary": "Stop the audio that is playing",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postAudioStop",
+        "summary": "Stop the audio that is playing",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/audio/beep": {
+      "get": {
+        "operationId": "getAudioBeep",
+        "summary": "Play a short beep",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postAudioBeep",
+        "summary": "Play a short beep",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/reload": {
+      "get": {
+        "operationId": "getReload",
+        "summary": "Reload the page",
+        "tags": [
+          "Pages and apps"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postReload",
+        "summary": "Reload the page",
+        "tags": [
+          "Pages and apps"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/clearCache": {
+      "get": {
+        "operationId": "getClearCache",
+        "summary": "Clear the WebView cache, cookies and storage",
+        "tags": [
+          "Pages and apps"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "description": "Also remounts the WebView."
+      },
+      "post": {
+        "operationId": "postClearCache",
+        "summary": "Clear the WebView cache, cookies and storage",
+        "tags": [
+          "Pages and apps"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "description": "Also remounts the WebView."
+      }
+    },
+    "/api/rotation/start": {
+      "get": {
+        "operationId": "getRotationStart",
+        "summary": "Start the URL rotation",
+        "tags": [
+          "Pages and apps"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postRotationStart",
+        "summary": "Start the URL rotation",
+        "tags": [
+          "Pages and apps"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/rotation/stop": {
+      "get": {
+        "operationId": "getRotationStop",
+        "summary": "Stop the URL rotation",
+        "tags": [
+          "Pages and apps"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postRotationStop",
+        "summary": "Stop the URL rotation",
+        "tags": [
+          "Pages and apps"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/restart-ui": {
+      "get": {
+        "operationId": "getRestartUi",
+        "summary": "Restart the app screen",
+        "tags": [
+          "Device"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "description": "Recreates the activity, without rebooting the device."
+      },
+      "post": {
+        "operationId": "postRestartUi",
+        "summary": "Restart the app screen",
+        "tags": [
+          "Device"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "description": "Recreates the activity, without rebooting the device."
+      }
+    },
+    "/api/open-settings": {
+      "get": {
+        "operationId": "getOpenSettings",
+        "summary": "Open the PIN screen",
+        "tags": [
+          "Device"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "description": "A person at the screen still has to enter the PIN."
+      },
+      "post": {
+        "operationId": "postOpenSettings",
+        "summary": "Open the PIN screen",
+        "tags": [
+          "Device"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "description": "A person at the screen still has to enter the PIN."
+      }
+    },
+    "/api/reboot": {
+      "get": {
+        "operationId": "getReboot",
+        "summary": "Reboot the device",
+        "tags": [
+          "Device"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "description": "Needs Device Owner."
+      },
+      "post": {
+        "operationId": "postReboot",
+        "summary": "Reboot the device",
+        "tags": [
+          "Device"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "description": "Needs Device Owner."
+      }
+    },
+    "/api/lock": {
+      "get": {
+        "operationId": "getLock",
+        "summary": "Lock the device screen",
+        "tags": [
+          "Device"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "description": "Needs Device Owner, or the accessibility service on Android 9 and later; otherwise it answers with an error."
+      },
+      "post": {
+        "operationId": "postLock",
+        "summary": "Lock the device screen",
+        "tags": [
+          "Device"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "description": "Needs Device Owner, or the accessibility service on Android 9 and later; otherwise it answers with an error."
+      }
+    },
+    "/api/autoBrightness/disable": {
+      "get": {
+        "operationId": "getAutoBrightnessDisable",
+        "summary": "Turn the automatic brightness off",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postAutoBrightnessDisable",
+        "summary": "Turn the automatic brightness off",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/autoBrightness/enable": {
+      "get": {
+        "operationId": "getAutoBrightnessEnable",
+        "summary": "Turn the automatic brightness on",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "description": "Optional limits, each 0 to 100",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "min": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "max": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "postAutoBrightnessEnable",
+        "summary": "Turn the automatic brightness on",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "description": "Optional limits, each 0 to 100",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "min": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "max": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/url": {
+      "post": {
+        "operationId": "setUrl",
+        "summary": "Open a URL",
+        "tags": [
+          "Pages and apps"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                },
+                "required": [
+                  "url"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/navigate": {
+      "post": {
+        "operationId": "navigate",
+        "summary": "Open a URL (alias of /api/url)",
+        "tags": [
+          "Pages and apps"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                },
+                "required": [
+                  "url"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mode": {
+      "post": {
+        "operationId": "setMode",
+        "summary": "Switch the display mode",
+        "tags": [
+          "Pages and apps"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          }
+        },
+        "description": "Applied at runtime, without a reboot.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "webview",
+                      "external_app",
+                      "media_player"
+                    ]
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "Only with `webview`; optional, keeps the current page when omitted"
+                  },
+                  "package": {
+                    "type": "string",
+                    "description": "Only with `external_app`; optional, restores the stored configuration (the multi-app grid) when omitted"
+                  }
+                },
+                "required": [
+                  "mode"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/app/launch": {
+      "post": {
+        "operationId": "launchApp",
+        "summary": "Launch an installed app",
+        "tags": [
+          "Pages and apps"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "package": {
+                    "type": "string",
+                    "example": "com.spotify.music"
+                  }
+                },
+                "required": [
+                  "package"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/js": {
+      "post": {
+        "operationId": "executeJs",
+        "summary": "Run JavaScript in the page",
+        "tags": [
+          "Pages and apps"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "code"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/toast": {
+      "post": {
+        "operationId": "showToast",
+        "summary": "Show a toast",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "text"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tts": {
+      "post": {
+        "operationId": "speak",
+        "summary": "Speak a text",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "language": {
+                    "type": "string",
+                    "description": "BCP 47 tag such as `fr` or `en-US`; detected from the text when omitted"
+                  }
+                },
+                "required": [
+                  "text"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/audio/play": {
+      "post": {
+        "operationId": "playAudio",
+        "summary": "Play a sound from a URL",
+        "tags": [
+          "Display and sound"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "loop": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "volume": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "default": 50
+                  }
+                },
+                "required": [
+                  "url"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/remote/text": {
+      "post": {
+        "operationId": "typeText",
+        "summary": "Type a text",
+        "tags": [
+          "Remote control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "text"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/remote/up": {
+      "get": {
+        "operationId": "getRemoteUp",
+        "summary": "Send the \"up\" key (Android TV remote)",
+        "tags": [
+          "Remote control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postRemoteUp",
+        "summary": "Send the \"up\" key (Android TV remote)",
+        "tags": [
+          "Remote control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/remote/down": {
+      "get": {
+        "operationId": "getRemoteDown",
+        "summary": "Send the \"down\" key (Android TV remote)",
+        "tags": [
+          "Remote control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postRemoteDown",
+        "summary": "Send the \"down\" key (Android TV remote)",
+        "tags": [
+          "Remote control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/remote/left": {
+      "get": {
+        "operationId": "getRemoteLeft",
+        "summary": "Send the \"left\" key (Android TV remote)",
+        "tags": [
+          "Remote control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postRemoteLeft",
+        "summary": "Send the \"left\" key (Android TV remote)",
+        "tags": [
+          "Remote control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/remote/right": {
+      "get": {
+        "operationId": "getRemoteRight",
+        "summary": "Send the \"right\" key (Android TV remote)",
+        "tags": [
+          "Remote control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postRemoteRight",
+        "summary": "Send the \"right\" key (Android TV remote)",
+        "tags": [
+          "Remote control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/remote/select": {
+      "get": {
+        "operationId": "getRemoteSelect",
+        "summary": "Send the \"select\" key (Android TV remote)",
+        "tags": [
+          "Remote control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postRemoteSelect",
+        "summary": "Send the \"select\" key (Android TV remote)",
+        "tags": [
+          "Remote control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/remote/back": {
+      "get": {
+        "operationId": "getRemoteBack",
+        "summary": "Send the \"back\" key (Android TV remote)",
+        "tags": [
+          "Remote control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postRemoteBack",
+        "summary": "Send the \"back\" key (Android TV remote)",
+        "tags": [
+          "Remote control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/remote/home": {
+      "get": {
+        "operationId": "getRemoteHome",
+        "summary": "Send the \"home\" key (Android TV remote)",
+        "tags": [
+          "Remote control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postRemoteHome",
+        "summary": "Send the \"home\" key (Android TV remote)",
+        "tags": [
+          "Remote control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/remote/menu": {
+      "get": {
+        "operationId": "getRemoteMenu",
+        "summary": "Send the \"menu\" key (Android TV remote)",
+        "tags": [
+          "Remote control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postRemoteMenu",
+        "summary": "Send the \"menu\" key (Android TV remote)",
+        "tags": [
+          "Remote control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/remote/playpause": {
+      "get": {
+        "operationId": "getRemotePlaypause",
+        "summary": "Send the \"playpause\" key (Android TV remote)",
+        "tags": [
+          "Remote control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postRemotePlaypause",
+        "summary": "Send the \"playpause\" key (Android TV remote)",
+        "tags": [
+          "Remote control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/remote/keyboard": {
+      "get": {
+        "operationId": "getKeyboardCombo",
+        "summary": "Press a key combination",
+        "tags": [
+          "Remote control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "map",
+            "in": "query",
+            "required": true,
+            "description": "Keys joined by `+`; modifiers are ctrl, alt, shift and meta",
+            "schema": {
+              "type": "string",
+              "example": "ctrl+c"
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "postKeyboardCombo",
+        "summary": "Press a key combination",
+        "tags": [
+          "Remote control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "map",
+            "in": "query",
+            "required": true,
+            "description": "Keys joined by `+`; modifiers are ctrl, alt, shift and meta",
+            "schema": {
+              "type": "string",
+              "example": "ctrl+c"
+            }
+          }
+        ]
+      }
+    },
+    "/api/remote/keyboard/{key}": {
+      "parameters": [
+        {
+          "name": "key",
+          "in": "path",
+          "required": true,
+          "description": "a to z, 0 to 9, f1 to f12, space, enter and the other names listed in the REST API guide",
+          "schema": {
+            "type": "string",
+            "example": "a"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getKeyboardKey",
+        "summary": "Press one key",
+        "tags": [
+          "Remote control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postKeyboardKey",
+        "summary": "Press one key",
+        "tags": [
+          "Remote control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/screenshot": {
+      "get": {
+        "operationId": "getScreenshot",
+        "summary": "Screenshot (PNG)",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "The screen as a PNG image",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "description": "Answers 503 with a JSON error when no screenshot can be taken."
+      },
+      "post": {
+        "operationId": "postScreenshot",
+        "summary": "Screenshot (PNG)",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "The screen as a PNG image",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "description": "Answers 503 with a JSON error when no screenshot can be taken."
+      }
+    },
+    "/api/camera/photo": {
+      "get": {
+        "operationId": "getCameraPhoto",
+        "summary": "Take a photo (JPEG)",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "The photo as a JPEG image",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "camera",
+            "in": "query",
+            "required": false,
+            "description": "Which camera",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "front",
+                "back"
+              ],
+              "default": "back"
+            }
+          },
+          {
+            "name": "quality",
+            "in": "query",
+            "required": false,
+            "description": "JPEG quality",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 80
+            }
+          },
+          {
+            "name": "rotate",
+            "in": "query",
+            "required": false,
+            "description": "Rotation of the picture in degrees, or `auto`",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "0",
+                "90",
+                "180",
+                "270"
+              ]
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "postCameraPhoto",
+        "summary": "Take a photo (JPEG)",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "The photo as a JPEG image",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "camera",
+            "in": "query",
+            "required": false,
+            "description": "Which camera",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "front",
+                "back"
+              ],
+              "default": "back"
+            }
+          },
+          {
+            "name": "quality",
+            "in": "query",
+            "required": false,
+            "description": "JPEG quality",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 80
+            }
+          },
+          {
+            "name": "rotate",
+            "in": "query",
+            "required": false,
+            "description": "Rotation of the picture in degrees, or `auto`",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "0",
+                "90",
+                "180",
+                "270"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/api/camera/list": {
+      "get": {
+        "operationId": "getCameraList",
+        "summary": "List the cameras",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CameraListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postCameraList",
+        "summary": "List the cameras",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CameraListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/camera/stream": {
+      "get": {
+        "operationId": "getCameraStream",
+        "summary": "Live MJPEG stream",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "A multipart stream of JPEG frames (boundary `frame`)",
+            "content": {
+              "multipart/x-mixed-replace": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "description": "GET only: the response never ends.",
+        "parameters": [
+          {
+            "name": "camera",
+            "in": "query",
+            "required": false,
+            "description": "Which camera",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "front",
+                "back"
+              ],
+              "default": "front"
+            }
+          },
+          {
+            "name": "fps",
+            "in": "query",
+            "required": false,
+            "description": "Frames per second",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30,
+              "default": 10
+            }
+          },
+          {
+            "name": "quality",
+            "in": "query",
+            "required": false,
+            "description": "JPEG quality",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 60
+            }
+          },
+          {
+            "name": "width",
+            "in": "query",
+            "required": false,
+            "description": "Maximum width in pixels",
+            "schema": {
+              "type": "integer",
+              "minimum": 160,
+              "maximum": 3840,
+              "default": 1280
+            }
+          },
+          {
+            "name": "rotate",
+            "in": "query",
+            "required": false,
+            "description": "Rotation of the picture in degrees, or `auto`",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "0",
+                "90",
+                "180",
+                "270"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Api-Key"
+      },
+      "ApiKeyBasic": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "The API key is the password; the user name is ignored"
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "The API key is set on the tablet and the request does not carry it",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Remote control is switched off in the settings (REST API > Allow remote control)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "A required value is missing or invalid; `error` says which",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unavailable": {
+        "description": "The feature is not available right now (for example the camera permission is not granted); `error` says why",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "MethodNotAllowed": {
+        "description": "Only POST with a JSON body is accepted on this endpoint (a GET gets this answer)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": [
+          "success",
+          "error",
+          "timestamp"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "error": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix time in seconds"
+          }
+        }
+      },
+      "CommandResult": {
+        "type": "object",
+        "description": "What the app answers once it has run a command. Extra fields depend on the command.",
+        "properties": {
+          "executed": {
+            "type": "boolean",
+            "description": "Whether the command was carried out"
+          },
+          "command": {
+            "type": "string",
+            "description": "Internal name of the command"
+          }
+        },
+        "additionalProperties": true
+      },
+      "Battery": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Battery percentage"
+          },
+          "charging": {
+            "type": "boolean"
+          },
+          "plugged": {
+            "type": "string",
+            "enum": [
+              "usb",
+              "ac",
+              "wireless",
+              "none"
+            ],
+            "description": "Power source"
+          },
+          "temperature": {
+            "type": "number",
+            "description": "Degrees Celsius"
+          },
+          "voltage": {
+            "type": "number",
+            "description": "Volts"
+          },
+          "health": {
+            "type": "string",
+            "enum": [
+              "good",
+              "overheat",
+              "dead",
+              "over_voltage",
+              "failure",
+              "cold",
+              "unknown"
+            ]
+          },
+          "technology": {
+            "type": "string",
+            "example": "Li-ion"
+          }
+        },
+        "additionalProperties": true
+      },
+      "Brightness": {
+        "type": "object",
+        "properties": {
+          "brightness": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "brightness"
+        ]
+      },
+      "Screen": {
+        "type": "object",
+        "properties": {
+          "on": {
+            "type": "boolean",
+            "description": "Physical screen state (PowerManager.isInteractive); true while the screensaver overlay shows"
+          },
+          "brightness": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "screensaverActive": {
+            "type": "boolean",
+            "description": "Whether the screensaver overlay is covering the content"
+          }
+        },
+        "additionalProperties": true
+      },
+      "Sensors": {
+        "type": "object",
+        "properties": {
+          "light": {
+            "type": "number",
+            "description": "Lux; -1 when there is no sensor"
+          },
+          "proximity": {
+            "type": "number",
+            "description": "-1 when there is no sensor"
+          },
+          "accelerometer": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              },
+              "z": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "Storage": {
+        "type": "object",
+        "properties": {
+          "totalMB": {
+            "type": "integer"
+          },
+          "availableMB": {
+            "type": "integer"
+          },
+          "usedMB": {
+            "type": "integer"
+          },
+          "usedPercent": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": true
+      },
+      "Memory": {
+        "type": "object",
+        "properties": {
+          "totalMB": {
+            "type": "integer"
+          },
+          "availableMB": {
+            "type": "integer"
+          },
+          "usedMB": {
+            "type": "integer"
+          },
+          "usedPercent": {
+            "type": "integer"
+          },
+          "lowMemory": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": true
+      },
+      "Wifi": {
+        "type": "object",
+        "properties": {
+          "connected": {
+            "type": "boolean"
+          },
+          "ssid": {
+            "type": "string"
+          },
+          "rssi": {
+            "type": "integer",
+            "description": "Signal strength in dBm"
+          },
+          "ip": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "DeviceInfo": {
+        "type": "object",
+        "properties": {
+          "ip": {
+            "type": "string",
+            "description": "Local IP address"
+          },
+          "hostname": {
+            "type": "string",
+            "description": "Always `freekiosk`"
+          },
+          "version": {
+            "type": "string",
+            "description": "FreeKiosk version"
+          },
+          "isDeviceOwner": {
+            "type": "boolean",
+            "description": "Required for reboot, lock and a true screen off"
+          },
+          "kioskMode": {
+            "type": "boolean",
+            "description": "Whether lock task mode is active"
+          },
+          "manufacturer": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "androidVersion": {
+            "type": "string",
+            "example": "11"
+          },
+          "apiLevel": {
+            "type": "integer",
+            "example": 30
+          },
+          "processor": {
+            "type": "string"
+          },
+          "deviceName": {
+            "type": "string"
+          },
+          "product": {
+            "type": "string"
+          },
+          "uptime": {
+            "type": "integer",
+            "description": "Seconds since the device booted"
+          },
+          "androidId": {
+            "type": "string",
+            "description": "Settings.Secure.ANDROID_ID, stable per tablet"
+          }
+        },
+        "additionalProperties": true
+      },
+      "Health": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          },
+          "timestamp": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "Volume": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "maxLevel": {
+            "type": "integer",
+            "example": 100
+          }
+        },
+        "required": [
+          "level",
+          "maxLevel"
+        ]
+      },
+      "Rotation": {
+        "type": "object",
+        "description": "State of the URL rotation",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "urls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "interval": {
+            "type": "integer",
+            "description": "Seconds between two pages"
+          },
+          "currentIndex": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": true
+      },
+      "AutoBrightness": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "min": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "max": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "currentLightLevel": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": true
+      },
+      "Location": {
+        "type": "object",
+        "description": "Last known position (GPS, network and passive providers). Needs the location permission and location switched on.",
+        "properties": {
+          "executed": {
+            "type": "boolean"
+          },
+          "command": {
+            "type": "string"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "accuracy": {
+            "type": "number",
+            "description": "Meters"
+          },
+          "altitude": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": true
+      },
+      "CameraList": {
+        "type": "object",
+        "properties": {
+          "cameras": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "facing": {
+                  "type": "string",
+                  "enum": [
+                    "front",
+                    "back"
+                  ]
+                },
+                "maxWidth": {
+                  "type": "integer"
+                },
+                "maxHeight": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Status": {
+        "type": "object",
+        "description": "Everything in one call. Each block is also served by its own endpoint.",
+        "properties": {
+          "battery": {
+            "$ref": "#/components/schemas/Battery"
+          },
+          "screen": {
+            "$ref": "#/components/schemas/Screen"
+          },
+          "webview": {
+            "type": "object",
+            "properties": {
+              "currentUrl": {
+                "type": "string"
+              },
+              "canGoBack": {
+                "type": "boolean"
+              },
+              "loading": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": true
+          },
+          "device": {
+            "$ref": "#/components/schemas/DeviceInfo"
+          },
+          "wifi": {
+            "$ref": "#/components/schemas/Wifi"
+          },
+          "sensors": {
+            "$ref": "#/components/schemas/Sensors"
+          },
+          "autoBrightness": {
+            "$ref": "#/components/schemas/AutoBrightness"
+          },
+          "kiosk": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "pinEnabled": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": true
+          },
+          "audio": {
+            "type": "object",
+            "properties": {
+              "volume": {
+                "type": "integer"
+              }
+            },
+            "additionalProperties": true
+          },
+          "storage": {
+            "$ref": "#/components/schemas/Storage"
+          },
+          "memory": {
+            "$ref": "#/components/schemas/Memory"
+          }
+        },
+        "additionalProperties": true
+      },
+      "EndpointIndex": {
+        "type": "object",
+        "description": "Self-description of the server: the endpoints by method",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "FreeKiosk REST API"
+          },
+          "version": {
+            "type": "string",
+            "example": "1.0"
+          },
+          "endpoints": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "EndpointIndexResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "timestamp"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/EndpointIndex"
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix time in seconds"
+          }
+        }
+      },
+      "StatusResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "timestamp"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/Status"
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix time in seconds"
+          }
+        }
+      },
+      "BatteryResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "timestamp"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/Battery"
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix time in seconds"
+          }
+        }
+      },
+      "ScreenResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "timestamp"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/Screen"
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix time in seconds"
+          }
+        }
+      },
+      "WifiResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "timestamp"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/Wifi"
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix time in seconds"
+          }
+        }
+      },
+      "DeviceInfoResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "timestamp"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/DeviceInfo"
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix time in seconds"
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "timestamp"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/Health"
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix time in seconds"
+          }
+        }
+      },
+      "RotationResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "timestamp"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/Rotation"
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix time in seconds"
+          }
+        }
+      },
+      "SensorsResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "timestamp"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/Sensors"
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix time in seconds"
+          }
+        }
+      },
+      "StorageResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "timestamp"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/Storage"
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix time in seconds"
+          }
+        }
+      },
+      "MemoryResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "timestamp"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/Memory"
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix time in seconds"
+          }
+        }
+      },
+      "LocationResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "timestamp"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/Location"
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix time in seconds"
+          }
+        }
+      },
+      "AutoBrightnessResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "timestamp"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/AutoBrightness"
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix time in seconds"
+          }
+        }
+      },
+      "BrightnessResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "timestamp"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/Brightness"
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix time in seconds"
+          }
+        }
+      },
+      "CommandResultResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "timestamp"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/CommandResult"
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix time in seconds"
+          }
+        }
+      },
+      "VolumeResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "timestamp"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/Volume"
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix time in seconds"
+          }
+        }
+      },
+      "CameraListResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "timestamp"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/CameraList"
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix time in seconds"
+          }
+        }
+      }
+    }
+  }
+}
