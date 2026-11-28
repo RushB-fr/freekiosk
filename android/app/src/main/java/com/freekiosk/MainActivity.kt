@@ -207,7 +207,9 @@ class MainActivity : ReactActivity() {
       "pin_mode", "external_app_mode", "status_bar",
       // Cloud enrollment over ADB. The dashboard's "Headless install (ADB)" snippet
       // has advertised --es cloud_token since the cloud shipped, but nothing read it.
-      "cloud_token", "cloud_url"
+      "cloud_token", "cloud_url",
+      // Certificates to trust in advance by SHA-256 fingerprint (see CertificateModule).
+      "trusted_cert_fingerprints"
     )
 
     /** Where a cloud_token enrolls when the command does not say. */
@@ -2171,6 +2173,14 @@ class MainActivity : ReactActivity() {
         .putString(DeviceAdminReceiver.KEY_ORG_ID, "")
         .commit()
       android.util.Log.i("FreeKiosk-ADB", "Cloud enrollment queued for $cloudUrl")
+    }
+
+    // Certificates to trust in advance, by SHA-256 fingerprint (commas, semicolons or line breaks).
+    // They live in the native store the WebView client reads, so they do not go through the
+    // pending config. The list replaces the previous one; an empty value empties it.
+    intent.getStringExtra("trusted_cert_fingerprints")?.let { raw ->
+      val count = CertificateModule.replaceTrusted(this, raw)
+      android.util.Log.i("FreeKiosk-ADB", "Trusted certificate fingerprints: $count")
     }
 
     // Mark that there is pending config

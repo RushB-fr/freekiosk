@@ -679,6 +679,20 @@
       "expired": "Expirou: ",
       "expires": "Expira: "
     },
+    "trustedCertificates": {
+      "title": "Certificados confiáveis",
+      "hint": "Confie antecipadamente no certificado de um servidor pela impressão digital SHA-256, por exemplo para um tablet diante do qual ninguém pode aceitar o aviso. Só uma correspondência exata é aceita: qualquer outro certificado autoassinado continua perguntando.",
+      "empty": "Nenhum certificado confiável adicionado",
+      "fingerprintLabel": "Impressão digital SHA-256",
+      "fingerprintHint": "Cole o resultado de: openssl x509 -noout -fingerprint -sha256 -in cert.pem. Você também pode copiá-la do aviso do certificado.",
+      "fingerprintPlaceholder": "AB:CD:EF:...",
+      "labelLabel": "Nome (opcional)",
+      "labelPlaceholder": "Home Assistant",
+      "add": "Confiar neste certificado",
+      "invalid": "Isto não é uma impressão digital SHA-256: ela tem 32 bytes, ou seja, 64 caracteres hexadecimais.",
+      "removeTitle": "Remover certificado confiável",
+      "removeMessage": "Deixar de confiar neste certificado? O aviso voltará a aparecer na próxima vez que uma página o usar."
+    },
     "accessibility": {
       "title": "Serviço de acessibilidade",
       "status": "Status",

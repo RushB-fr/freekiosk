@@ -679,6 +679,20 @@
       "expired": "Wygasł: ",
       "expires": "Wygasa: "
     },
+    "trustedCertificates": {
+      "title": "Zaufane certyfikaty",
+      "hint": "Zaufaj certyfikatowi serwera z góry, podając jego odcisk SHA-256, na przykład dla tabletu, przy którym nikt nie może zaakceptować ostrzeżenia. Akceptowane jest tylko dokładne dopasowanie: każdy inny certyfikat z podpisem własnym nadal pyta.",
+      "empty": "Brak z góry zaufanych certyfikatów",
+      "fingerprintLabel": "Odcisk SHA-256",
+      "fingerprintHint": "Wklej wynik polecenia: openssl x509 -noout -fingerprint -sha256 -in cert.pem. Możesz też skopiować go z ostrzeżenia o certyfikacie.",
+      "fingerprintPlaceholder": "AB:CD:EF:...",
+      "labelLabel": "Nazwa (opcjonalnie)",
+      "labelPlaceholder": "Home Assistant",
+      "add": "Zaufaj temu certyfikatowi",
+      "invalid": "To nie jest odcisk SHA-256: ma 32 bajty, czyli 64 znaki szesnastkowe.",
+      "removeTitle": "Usuń zaufany certyfikat",
+      "removeMessage": "Przestać ufać temu certyfikatowi? Ostrzeżenie pojawi się ponownie, gdy strona następnym razem go użyje."
+    },
     "accessibility": {
       "title": "Usługa ułatwień dostępu",
       "status": "Stan",

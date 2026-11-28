@@ -14,6 +14,7 @@ import {
 } from '../../../components/settings';
 import { ApiSettingsSection } from '../../../components/ApiSettingsSection';
 import { MqttSettingsSection } from '../../../components/MqttSettingsSection';
+import { TrustedCertificatesSection } from '../../../components/TrustedCertificatesSection';
 import { CertificateInfo } from '../../../utils/CertificateModule';
 import AccessibilityModule from '../../../utils/AccessibilityModule';
 import { CloudSyncService } from '../../../utils/CloudSyncService';
@@ -434,6 +435,9 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({
           )}
         </SettingsSection>
       )}
+
+      {/* Certificates trusted in advance by fingerprint - WebView only */}
+      {displayMode === 'webview' && <TrustedCertificatesSection />}
       
       {/* REST API - Home Assistant Integration */}
       <ApiSettingsSection />

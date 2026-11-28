@@ -168,7 +168,7 @@ index 80c6803..dc8f001 100644
  
      public void setInjectedJavaScriptObject(String obj) {
 diff --git a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
-index 0287e1c..0da28f8 100644
+index 0287e1c..ea42ec2 100644
 --- a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
 +++ b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
 @@ -1,9 +1,11 @@
@@ -434,7 +434,7 @@ index 0287e1c..0da28f8 100644
          switch (code) {
              case SslError.SSL_DATE_INVALID:
                  description = "The date of the certificate is invalid";
-@@ -200,26 +370,230 @@ public class RNCWebViewClient extends WebViewClient {
+@@ -200,24 +370,236 @@ public class RNCWebViewClient extends WebViewClient {
  
          description = descriptionPrefix + description;
  
@@ -534,9 +534,9 @@ index 0287e1c..0da28f8 100644
 +            code,
 +            description,
 +            failingUrl
-         );
-     }
- 
++        );
++    }
++
 +    // ✅ IMPROVED: Helper methods to manage certificate acceptance with SHA-256 and expiration
 +
 +    /**
@@ -608,7 +608,15 @@ index 0287e1c..0da28f8 100644
 +        SharedPreferences prefs = context.getSharedPreferences(
 +            "freekiosk_ssl_certs",
 +            Context.MODE_PRIVATE
-+        );
+         );
++
++        // Certificates the user trusts in advance by SHA-256 fingerprint (Settings > Advanced, or the
++        // ADB key trusted_cert_fingerprints): an exact match is trusted, with no expiry. The
++        // fingerprint is 64 hex characters, so the "issuer|subject" fallback of
++        // getCertificateFingerprint() can never match an entry.
++        if (prefs.contains("pin_" + fingerprint)) {
++            return true;
++        }
 +
 +        // Check if certificate is accepted
 +        boolean isAccepted = prefs.getBoolean("cert_" + fingerprint, false);
@@ -672,12 +680,10 @@ index 0287e1c..0da28f8 100644
 +        if (BuildConfig.DEBUG) {
 +            Log.i(TAG, "All accepted certificates cleared");
 +        }
-+    }
-+
+     }
+ 
      public void onReceivedSubResourceSslError(
-       WebView webView,
-       int errorCode,
-@@ -314,8 +688,6 @@ public class RNCWebViewClient extends WebViewClient {
+@@ -314,8 +696,6 @@ public class RNCWebViewClient extends WebViewClient {
      protected WritableMap createWebViewEvent(WebView webView, String url) {
          WritableMap event = Arguments.createMap();
          event.putDouble("target", RNCWebViewWrapper.getReactTagFromWebView(webView));

@@ -442,6 +442,22 @@ token is queued and then ignored (unenroll it first from Settings, Advanced, Clo
 tablet cannot reach the cloud yet, it retries every 30 seconds; a token that was refused
 (expired, already used, device limit reached) is reported on the welcome screen.
 
+### Trusted Certificates
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `--es trusted_cert_fingerprints "FP1,FP2"` | String | SHA-256 fingerprints of the self-signed certificates to trust in advance, separated by commas, semicolons or line breaks. The list **replaces** the previous one; a blank value (`' '`: `adb shell` drops an empty string) empties it |
+
+Get a fingerprint from the certificate file with `openssl x509 -noout -fingerprint -sha256 -in cert.pem`; the colons, the case and the
+`SHA256 Fingerprint=` label are accepted. Only a certificate whose fingerprint is in the list is trusted, for the page itself and for
+the resources it loads: every other self-signed certificate still shows the warning. The same list is edited on the tablet in
+**Settings > Advanced > Trusted certificates**. Like every key, the command needs the PIN. This key is read from the direct
+`--es` extra, not from the `--es config` JSON.
+
+```bash
+adb shell am start -n com.freekiosk/.MainActivity --es pin "1234" --es trusted_cert_fingerprints "65:47:40:4C:..."
+```
+
 ### Scripting the settings gesture
 
 Opening the settings takes `return_tap_count` taps (5 by default) on the same spot, all
