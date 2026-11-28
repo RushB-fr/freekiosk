@@ -2,4 +2,29 @@
     <string name="app_name">FreeKiosk</string>
     <string name="accessibility_service_description">FreeKiosk uses this service to send keyboard input and remote control commands to apps running on this device. This is required for the REST API remote control feature to work in external app mode.</string>
     <string name="boot_loading">Starting kiosk…</string>
+
+    <!-- Notification channels and ongoing notifications of the services (#420). The title of every
+         notification is the brand name and stays in the code. These follow the language of the device. -->
+    <string name="channel_monitor_name">Background App Monitor</string>
+    <string name="channel_monitor_description">Monitors managed apps to keep them running</string>
+    <plurals name="notification_monitoring">
+        <item quantity="one">Monitoring %d background app</item>
+        <item quantity="other">Monitoring %d background apps</item>
+    </plurals>
+
+    <string name="channel_camera_name">Remote camera</string>
+    <string name="channel_camera_description">Lets the REST API and MQTT use the camera while another app is shown</string>
+    <string name="notification_camera">Remote camera available</string>
+
+    <string name="channel_watchdog_name">Kiosk Watchdog</string>
+    <string name="channel_watchdog_description">Keeps FreeKiosk running in kiosk mode</string>
+    <string name="notification_watchdog_connected">Staying connected</string>
+    <string name="notification_watchdog_active">Kiosk mode active</string>
+
+    <string name="channel_overlay_name">FreeKiosk Overlay</string>
+    <string name="channel_overlay_description">Overlay service for external app mode</string>
+    <string name="notification_overlay">External app mode active</string>
+
+    <string name="channel_wake_name">Screen wake</string>
+    <string name="notification_wake">Waking screen</string>
 </resources>

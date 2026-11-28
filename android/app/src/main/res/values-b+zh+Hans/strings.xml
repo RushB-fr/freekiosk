@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_service_description">FreeKiosk 使用此服务向此设备上运行的应用发送键盘输入和遥控命令。要在外部应用模式下使用 REST API 远程控制功能，需要启用该服务。</string>
+    <string name="boot_loading">正在启动自助终端…</string>
+
+    <string name="channel_monitor_name">后台应用监控</string>
+    <string name="channel_monitor_description">监控受管理的应用，使其保持运行</string>
+    <plurals name="notification_monitoring">
+        <item quantity="other">正在监控 %d 个后台应用</item>
+    </plurals>
+
+    <string name="channel_camera_name">远程摄像头</string>
+    <string name="channel_camera_description">在显示其他应用时，允许 REST API 和 MQTT 使用摄像头</string>
+    <string name="notification_camera">远程摄像头可用</string>
+
+    <string name="channel_watchdog_name">自助终端守护</string>
+    <string name="channel_watchdog_description">让 FreeKiosk 在自助终端模式下保持运行</string>
+    <string name="notification_watchdog_connected">保持连接</string>
+    <string name="notification_watchdog_active">自助终端模式已启用</string>
+
+    <string name="channel_overlay_name">FreeKiosk 悬浮层</string>
+    <string name="channel_overlay_description">外部应用模式的悬浮层服务</string>
+    <string name="notification_overlay">外部应用模式已启用</string>
+
+    <string name="channel_wake_name">唤醒屏幕</string>
+    <string name="notification_wake">正在唤醒屏幕</string>
+</resources>

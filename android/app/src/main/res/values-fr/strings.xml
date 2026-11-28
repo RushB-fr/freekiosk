@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_service_description">FreeKiosk utilise ce service pour envoyer des saisies clavier et des commandes de télécommande aux applications qui s\'exécutent sur cet appareil. Il est nécessaire au contrôle à distance par l\'API REST en mode application externe.</string>
+    <string name="boot_loading">Démarrage du kiosque…</string>
+
+    <string name="channel_monitor_name">Surveillance des applis en arrière-plan</string>
+    <string name="channel_monitor_description">Surveille les applications gérées pour qu\'elles restent actives</string>
+    <plurals name="notification_monitoring">
+        <item quantity="one">Surveillance de %d appli en arrière-plan</item>
+        <item quantity="other">Surveillance de %d applis en arrière-plan</item>
+    </plurals>
+
+    <string name="channel_camera_name">Caméra à distance</string>
+    <string name="channel_camera_description">Permet à l\'API REST et à MQTT d\'utiliser la caméra pendant qu\'une autre appli est affichée</string>
+    <string name="notification_camera">Caméra à distance disponible</string>
+
+    <string name="channel_watchdog_name">Surveillance du kiosque</string>
+    <string name="channel_watchdog_description">Maintient FreeKiosk actif en mode kiosque</string>
+    <string name="notification_watchdog_connected">Connexion maintenue</string>
+    <string name="notification_watchdog_active">Mode kiosque actif</string>
+
+    <string name="channel_overlay_name">Surcouche FreeKiosk</string>
+    <string name="channel_overlay_description">Service de surcouche pour le mode application externe</string>
+    <string name="notification_overlay">Mode application externe actif</string>
+
+    <string name="channel_wake_name">Réveil de l\'écran</string>
+    <string name="notification_wake">Réveil de l\'écran en cours</string>
+</resources>

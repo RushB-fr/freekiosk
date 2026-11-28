@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_service_description">O FreeKiosk usa este serviço para enviar entradas de teclado e comandos de controle remoto aos apps em execução neste dispositivo. Ele é necessário para que o controle remoto pela API REST funcione no modo de app externo.</string>
+    <string name="boot_loading">Iniciando o quiosque…</string>
+
+    <string name="channel_monitor_name">Monitor de apps em segundo plano</string>
+    <string name="channel_monitor_description">Monitora os apps gerenciados para mantê-los em execução</string>
+    <plurals name="notification_monitoring">
+        <item quantity="one">Monitorando %d app em segundo plano</item>
+        <item quantity="other">Monitorando %d apps em segundo plano</item>
+    </plurals>
+
+    <string name="channel_camera_name">Câmera remota</string>
+    <string name="channel_camera_description">Permite que a API REST e o MQTT usem a câmera enquanto outro app é exibido</string>
+    <string name="notification_camera">Câmera remota disponível</string>
+
+    <string name="channel_watchdog_name">Vigia do quiosque</string>
+    <string name="channel_watchdog_description">Mantém o FreeKiosk em execução no modo quiosque</string>
+    <string name="notification_watchdog_connected">Conexão mantida</string>
+    <string name="notification_watchdog_active">Modo quiosque ativo</string>
+
+    <string name="channel_overlay_name">Sobreposição do FreeKiosk</string>
+    <string name="channel_overlay_description">Serviço de sobreposição para o modo de app externo</string>
+    <string name="notification_overlay">Modo de app externo ativo</string>
+
+    <string name="channel_wake_name">Ativação da tela</string>
+    <string name="notification_wake">Ativando a tela</string>
+</resources>

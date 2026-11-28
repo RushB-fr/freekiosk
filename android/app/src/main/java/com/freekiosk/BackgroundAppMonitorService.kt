@@ -308,10 +308,10 @@ class BackgroundAppMonitorService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Background App Monitor",
+                getString(R.string.channel_monitor_name),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Monitors managed apps to keep them running"
+                description = getString(R.string.channel_monitor_description)
                 setShowBadge(false)
             }
             val nm = getSystemService(NotificationManager::class.java)
@@ -322,7 +322,8 @@ class BackgroundAppMonitorService : Service() {
     private fun buildNotification(): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("FreeKiosk")
-            .setContentText("Monitoring ${keepAlivePackages.size} background app(s)")
+            .setContentText(resources.getQuantityString(
+                R.plurals.notification_monitoring, keepAlivePackages.size, keepAlivePackages.size))
             .setSmallIcon(android.R.drawable.ic_menu_manage)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)

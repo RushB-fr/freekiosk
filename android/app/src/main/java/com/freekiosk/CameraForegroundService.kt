@@ -105,10 +105,10 @@ class CameraForegroundService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Remote camera",
+                getString(R.string.channel_camera_name),
                 NotificationManager.IMPORTANCE_MIN   // silent, no badge
             ).apply {
-                description = "Lets the REST API and MQTT use the camera while another app is shown"
+                description = getString(R.string.channel_camera_description)
                 setShowBadge(false)
             }
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -119,7 +119,7 @@ class CameraForegroundService : Service() {
     private fun buildNotification(): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("FreeKiosk")
-            .setContentText("Remote camera available")
+            .setContentText(getString(R.string.notification_camera))
             .setSmallIcon(R.mipmap.ic_launcher)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setOngoing(true)
