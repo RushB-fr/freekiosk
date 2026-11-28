@@ -679,6 +679,20 @@
       "expired": "Verlopen: ",
       "expires": "Verloopt: "
     },
+    "trustedCertificates": {
+      "title": "Vertrouwde certificaten",
+      "hint": "Vertrouw het certificaat van een server vooraf via de SHA-256-vingerafdruk, bijvoorbeeld voor een tablet waar niemand de waarschuwing kan accepteren. Alleen een exacte overeenkomst wordt vertrouwd: elk ander zelfondertekend certificaat blijft om bevestiging vragen.",
+      "empty": "Geen vooraf vertrouwd certificaat",
+      "fingerprintLabel": "SHA-256-vingerafdruk",
+      "fingerprintHint": "Plak de uitvoer van: openssl x509 -noout -fingerprint -sha256 -in cert.pem. Je kunt hem ook kopiëren uit de certificaatwaarschuwing.",
+      "fingerprintPlaceholder": "AB:CD:EF:...",
+      "labelLabel": "Naam (optioneel)",
+      "labelPlaceholder": "Home Assistant",
+      "add": "Dit certificaat vertrouwen",
+      "invalid": "Dit is geen SHA-256-vingerafdruk: die heeft 32 bytes, dus 64 hexadecimale tekens.",
+      "removeTitle": "Vertrouwd certificaat verwijderen",
+      "removeMessage": "Dit certificaat niet meer vertrouwen? De waarschuwing verschijnt opnieuw de volgende keer dat een pagina het gebruikt."
+    },
     "accessibility": {
       "title": "Toegankelijkheidsservice",
       "status": "Status",

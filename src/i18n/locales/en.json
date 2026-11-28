@@ -679,6 +679,20 @@
       "expired": "Expired: ",
       "expires": "Expires: "
     },
+    "trustedCertificates": {
+      "title": "Trusted certificates",
+      "hint": "Trust a server's certificate in advance by its SHA-256 fingerprint, for example for a tablet nobody is in front of to accept the warning. Only an exact match is trusted: any other self-signed certificate still asks.",
+      "empty": "No certificate trusted in advance",
+      "fingerprintLabel": "SHA-256 fingerprint",
+      "fingerprintHint": "Paste the output of: openssl x509 -noout -fingerprint -sha256 -in cert.pem. You can also copy it from the certificate warning.",
+      "fingerprintPlaceholder": "AB:CD:EF:...",
+      "labelLabel": "Name (optional)",
+      "labelPlaceholder": "Home Assistant",
+      "add": "Trust this certificate",
+      "invalid": "This is not a SHA-256 fingerprint: it has 32 bytes, 64 hexadecimal characters.",
+      "removeTitle": "Remove trusted certificate",
+      "removeMessage": "Stop trusting this certificate? The warning will appear again the next time a page uses it."
+    },
     "accessibility": {
       "title": "Accessibility Service",
       "status": "Status",

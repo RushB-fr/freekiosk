@@ -679,6 +679,20 @@
       "expired": "Expiré : ",
       "expires": "Expire : "
     },
+    "trustedCertificates": {
+      "title": "Certificats de confiance",
+      "hint": "Faites confiance à l'avance au certificat d'un serveur grâce à son empreinte SHA-256, par exemple pour une tablette devant laquelle personne ne peut accepter l'avertissement. Seule une correspondance exacte est acceptée : tout autre certificat auto-signé demande toujours.",
+      "empty": "Aucun certificat de confiance ajouté",
+      "fingerprintLabel": "Empreinte SHA-256",
+      "fingerprintHint": "Collez le résultat de : openssl x509 -noout -fingerprint -sha256 -in cert.pem. Vous pouvez aussi la copier depuis l'avertissement du certificat.",
+      "fingerprintPlaceholder": "AB:CD:EF:...",
+      "labelLabel": "Nom (facultatif)",
+      "labelPlaceholder": "Home Assistant",
+      "add": "Faire confiance à ce certificat",
+      "invalid": "Ce n'est pas une empreinte SHA-256 : elle fait 32 octets, soit 64 caractères hexadécimaux.",
+      "removeTitle": "Retirer le certificat de confiance",
+      "removeMessage": "Ne plus faire confiance à ce certificat ? L'avertissement réapparaîtra la prochaine fois qu'une page l'utilise."
+    },
     "accessibility": {
       "title": "Service d'accessibilité",
       "status": "État",

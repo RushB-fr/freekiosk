@@ -679,6 +679,20 @@
       "expired": "Scaduto: ",
       "expires": "Scade: "
     },
+    "trustedCertificates": {
+      "title": "Certificati attendibili",
+      "hint": "Considera attendibile in anticipo il certificato di un server tramite la sua impronta SHA-256, ad esempio per un tablet davanti al quale nessuno può accettare l'avviso. Solo una corrispondenza esatta è accettata: ogni altro certificato autofirmato continua a chiedere.",
+      "empty": "Nessun certificato attendibile aggiunto",
+      "fingerprintLabel": "Impronta SHA-256",
+      "fingerprintHint": "Incolla il risultato di: openssl x509 -noout -fingerprint -sha256 -in cert.pem. Puoi anche copiarla dall'avviso del certificato.",
+      "fingerprintPlaceholder": "AB:CD:EF:...",
+      "labelLabel": "Nome (facoltativo)",
+      "labelPlaceholder": "Home Assistant",
+      "add": "Considera attendibile questo certificato",
+      "invalid": "Non è un'impronta SHA-256: ha 32 byte, cioè 64 caratteri esadecimali.",
+      "removeTitle": "Rimuovi il certificato attendibile",
+      "removeMessage": "Non considerare più attendibile questo certificato? L'avviso riapparirà la prossima volta che una pagina lo usa."
+    },
     "accessibility": {
       "title": "Servizio di accessibilità",
       "status": "Stato",

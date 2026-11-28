@@ -679,6 +679,20 @@
       "expired": "Abgelaufen: ",
       "expires": "Läuft ab: "
     },
+    "trustedCertificates": {
+      "title": "Vertrauenswürdige Zertifikate",
+      "hint": "Vertrauen Sie dem Zertifikat eines Servers im Voraus anhand seines SHA-256-Fingerabdrucks, zum Beispiel für ein Tablet, vor dem niemand die Warnung bestätigen kann. Nur eine exakte Übereinstimmung wird akzeptiert: jedes andere selbstsignierte Zertifikat fragt weiterhin nach.",
+      "empty": "Kein Zertifikat im Voraus als vertrauenswürdig eingetragen",
+      "fingerprintLabel": "SHA-256-Fingerabdruck",
+      "fingerprintHint": "Fügen Sie die Ausgabe von diesem Befehl ein: openssl x509 -noout -fingerprint -sha256 -in cert.pem. Sie können ihn auch aus der Zertifikatswarnung kopieren.",
+      "fingerprintPlaceholder": "AB:CD:EF:...",
+      "labelLabel": "Name (optional)",
+      "labelPlaceholder": "Home Assistant",
+      "add": "Diesem Zertifikat vertrauen",
+      "invalid": "Das ist kein SHA-256-Fingerabdruck: er hat 32 Bytes, also 64 Hexadezimalzeichen.",
+      "removeTitle": "Vertrauenswürdiges Zertifikat entfernen",
+      "removeMessage": "Diesem Zertifikat nicht mehr vertrauen? Die Warnung erscheint wieder, sobald eine Seite es verwendet."
+    },
     "accessibility": {
       "title": "Bedienungshilfen-Dienst",
       "status": "Status",

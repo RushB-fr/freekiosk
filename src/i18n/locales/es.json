@@ -679,6 +679,20 @@
       "expired": "Caducado: ",
       "expires": "Caduca: "
     },
+    "trustedCertificates": {
+      "title": "Certificados de confianza",
+      "hint": "Confía de antemano en el certificado de un servidor mediante su huella SHA-256, por ejemplo para una tablet ante la que nadie puede aceptar la advertencia. Solo se acepta una coincidencia exacta: cualquier otro certificado autofirmado sigue preguntando.",
+      "empty": "Ningún certificado de confianza añadido",
+      "fingerprintLabel": "Huella SHA-256",
+      "fingerprintHint": "Pega el resultado de: openssl x509 -noout -fingerprint -sha256 -in cert.pem. También puedes copiarla de la advertencia del certificado.",
+      "fingerprintPlaceholder": "AB:CD:EF:...",
+      "labelLabel": "Nombre (opcional)",
+      "labelPlaceholder": "Home Assistant",
+      "add": "Confiar en este certificado",
+      "invalid": "No es una huella SHA-256: tiene 32 bytes, es decir 64 caracteres hexadecimales.",
+      "removeTitle": "Quitar certificado de confianza",
+      "removeMessage": "¿Dejar de confiar en este certificado? La advertencia volverá a aparecer la próxima vez que una página lo use."
+    },
     "accessibility": {
       "title": "Servicio de accesibilidad",
       "status": "Estado",

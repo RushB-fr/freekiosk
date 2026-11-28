@@ -679,6 +679,20 @@
       "expired": "已过期：",
       "expires": "到期时间："
     },
+    "trustedCertificates": {
+      "title": "受信任的证书",
+      "hint": "通过 SHA-256 指纹提前信任某台服务器的证书，例如用于无人在旁确认警告的平板。只信任完全匹配的指纹：其他任何自签名证书仍会询问。",
+      "empty": "尚未提前信任任何证书",
+      "fingerprintLabel": "SHA-256 指纹",
+      "fingerprintHint": "粘贴以下命令的输出：openssl x509 -noout -fingerprint -sha256 -in cert.pem。也可以从证书警告中复制。",
+      "fingerprintPlaceholder": "AB:CD:EF:...",
+      "labelLabel": "名称（可选）",
+      "labelPlaceholder": "Home Assistant",
+      "add": "信任此证书",
+      "invalid": "这不是 SHA-256 指纹：它是 32 字节，即 64 个十六进制字符。",
+      "removeTitle": "移除受信任的证书",
+      "removeMessage": "不再信任此证书？下次有页面使用它时会再次出现警告。"
+    },
     "accessibility": {
       "title": "无障碍服务",
       "status": "状态",

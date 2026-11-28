@@ -136,6 +136,7 @@
   - Use valid HTTPS URL
   - Check WiFi connection
   - Use trusted SSL certificate
+  - For a self-signed certificate, accept the warning once, or trust its SHA-256 fingerprint in advance in **Settings > Advanced > Trusted certificates** (or with the `trusted_cert_fingerprints` ADB key), for a tablet nobody is in front of
 
 **Q: App crashes on start**
 - **A:** Please report a bug with:
