@@ -37,6 +37,7 @@ FreeKiosk includes a built-in REST API server for integration with **Home Assist
 | **Protocol** | HTTP (HTTPS planned) |
 | **Authentication** | Optional API Key (`X-Api-Key` header, or HTTP Basic password) |
 | **Format** | JSON responses |
+| **OpenAPI** | [openapi.json](openapi.json): every endpoint, its parameters and its answers, for Swagger UI, Postman or a client generator. A test checks it against the server's routes |
 
 
 
